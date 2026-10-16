@@ -104,7 +104,7 @@ export function Sheet({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(
-          "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-[24px] bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-xl",
+          "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
           className,
         )}
       >

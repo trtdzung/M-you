@@ -7,17 +7,17 @@ import { cn } from "@/lib/cn";
  * loading once instead of reading each block.
  */
 export function Skeleton({ className }: { className?: string }) {
-  return <span aria-hidden className={cn("shimmer block rounded-[12px]", className)} />;
+  return <span aria-hidden className={cn("shimmer block rounded-sm", className)} />;
 }
 
 /** Card-sized block matching MSB card radius. */
 export function SkeletonCard({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-24 rounded-[24px]", className)} />;
+  return <Skeleton className={cn("h-24 rounded-card", className)} />;
 }
 
 /** List-row sized block. */
 export function SkeletonRow({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-12 rounded-[16px]", className)} />;
+  return <Skeleton className={cn("h-12 rounded-row", className)} />;
 }
 
 /** Text-line block; set width via `className` (e.g. `w-2/3`). */

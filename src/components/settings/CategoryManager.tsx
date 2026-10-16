@@ -5,9 +5,8 @@ import { Lock } from "lucide-react";
 import { CATEGORIES } from "@/domain/models";
 import { categoryToJarMap, KHAC_JAR_ID, KHAC_JAR_LABEL } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
-import { Sheet } from "@/components/primitives";
+import { Sheet, SegmentedControl } from "@/components/primitives";
 import { categoryColor } from "@/lib/category-colors";
-import { cn } from "@/lib/cn";
 
 type Tab = "expense" | "income";
 
@@ -27,28 +26,22 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet title="Quản lý danh mục" description="Danh mục mặc định được khoá" onClose={onClose}>
-      <div role="tablist" aria-label="Loại danh mục" className="mb-4 flex gap-1 rounded-full bg-surface-muted p-1">
-        {(["expense", "income"] as const).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => setTab(t)}
-            className={cn(
-              "min-h-11 flex-1 rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-              tab === t ? "bg-surface text-primary shadow-card" : "text-muted hover:text-text",
-            )}
-          >
-            {t === "expense" ? "Chi tiêu" : "Thu nhập"}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        ariaLabel="Loại danh mục"
+        className="mb-4"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "expense", label: "Chi tiêu" },
+          { value: "income", label: "Thu nhập" },
+        ]}
+      />
 
       <ul className="flex flex-col gap-2">
         {rows.map((c) => {
           const jarId = catToJar.get(c.id) ?? KHAC_JAR_ID;
           return (
-            <li key={c.id} className="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5">
+            <li key={c.id} className="flex items-center gap-2 rounded-row bg-surface-muted px-3 py-2.5">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryColor(c.id) }} />
               <span className="flex min-w-0 flex-1 items-center gap-1.5">
                 <span className="truncate text-sm font-medium text-text">{c.label}</span>
@@ -59,7 +52,7 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
                   aria-label={`Hũ của ${c.label}`}
                   value={jarId}
                   onChange={(e) => assignCategory(c.id, e.target.value)}
-                  className="min-h-9 max-w-[46%] rounded-lg border border-border bg-surface px-2 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  className="min-h-9 max-w-[46%] rounded-sm border border-border bg-surface px-2 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 >
                   {config.jars.map((j) => (
                     <option key={j.id} value={j.id}>{j.label}</option>
@@ -84,7 +77,7 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
         })}
       </ul>
 
-      <p className="mt-4 rounded-xl bg-surface-muted px-3 py-2 text-xs text-muted">
+      <p className="mt-4 rounded-row bg-surface-muted px-3 py-2 text-xs text-muted">
         Thêm danh mục tuỳ chỉnh sẽ có trong bản cập nhật tới. Danh mục Chi luôn thuộc đúng một hũ.
       </p>
     </Sheet>

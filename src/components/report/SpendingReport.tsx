@@ -51,7 +51,7 @@ export function SpendingReport({ monthKey, onClose }: { monthKey: string; onClos
   return (
     <Sheet title="Báo cáo chi tiêu" description={`${monthKeyLabel(monthKey)} · theo hũ`} onClose={onClose}>
       {error ? (
-        <p role="alert" className="rounded-2xl bg-surface-muted px-4 py-3 text-sm text-muted">
+        <p role="alert" className="rounded-row bg-surface-muted px-4 py-3 text-sm text-muted">
           Không tải được báo cáo. Thử lại sau.
         </p>
       ) : loading || !financials ? (
@@ -79,7 +79,7 @@ function JarBreakdownRow({ group, total, color }: { group: JarSpendGroup; total:
   const hasChildren = group.categories.length > 0;
 
   return (
-    <li className="overflow-hidden rounded-2xl bg-surface-muted">
+    <li className="overflow-hidden rounded-row bg-surface-muted">
       <button
         type="button"
         aria-expanded={open}

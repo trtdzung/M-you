@@ -26,7 +26,7 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
             clearCategory(txn.id);
             onClose();
           }}
-          className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border py-2 text-sm text-muted hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-row border border-border py-2 text-sm text-muted hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <RotateCcw size={14} />
           Khôi phục danh mục gốc

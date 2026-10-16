@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Money } from "@/components/primitives";
 import { ChartFrame } from "@/components/charts/ChartFrame";
 import { categoryColor, CATEGORY_COLOR_FALLBACK } from "@/lib/category-colors";
-import { formatVndCompact } from "@/lib/format";
+import { formatVndCompact, formatVndUnit } from "@/lib/format";
 import { KHAC_JAR_ID, KHAC_JAR_LABEL } from "@/domain/engine";
 
 /** One jar's slice. `colorKey` is a category id used for a stable hue. */
@@ -50,23 +50,43 @@ function toSlices(data: JarDonutDatum[]): { slices: Slice[]; total: number } {
  * Presentation-only: nhận danh sách hũ + số đã tiêu, tự gộp ≤6 slice và tô màu ổn
  * định theo danh mục đại diện. Tâm donut hiện tổng chi; `legend` bật danh sách %.
  */
+/** On-slice percentage label; drawn only for slices large enough to fit text. */
+function sliceLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }: {
+  cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number;
+}) {
+  if (percent < 0.08) return null;
+  const RADIAN = Math.PI / 180;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="var(--color-primary-fg)" fontSize={12} fontWeight={600} textAnchor="middle" dominantBaseline="central">
+      {Math.round(percent * 100)}%
+    </text>
+  );
+}
+
 export function SpendingDonut({
   data,
   height = 200,
   legend = false,
   centerLabel = "Tổng chi",
+  centerBadge,
+  emptyLabel = "Chưa có chi tiêu kỳ này.",
+  showPercentLabels = false,
 }: {
   data: JarDonutDatum[];
   height?: number;
   legend?: boolean;
   centerLabel?: string;
+  centerBadge?: ReactNode;
+  emptyLabel?: string;
+  showPercentLabels?: boolean;
 }) {
   const { slices, total } = useMemo(() => toSlices(data), [data]);
 
   if (slices.length === 0) {
-    return (
-      <p className="py-8 text-center text-sm text-muted">Chưa có chi tiêu kỳ này.</p>
-    );
+    return <p className="py-8 text-center text-sm text-muted">{emptyLabel}</p>;
   }
 
   return (
@@ -85,6 +105,8 @@ export function SpendingDonut({
                 endAngle={-270}
                 paddingAngle={1}
                 stroke="var(--color-surface)"
+                label={showPercentLabels ? sliceLabel : undefined}
+                labelLine={false}
               >
                 {slices.map((s) => (
                   <Cell key={s.id} fill={s.color} />
@@ -92,14 +114,15 @@ export function SpendingDonut({
               </Pie>
               <Tooltip
                 formatter={(v: number, name) => [formatVndCompact(v), name as string]}
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--color-border)" }}
+                contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid var(--color-border)" }}
               />
             </PieChart>
           </ResponsiveContainer>
         </ChartFrame>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1">
           <span className="text-[11px] text-muted">{centerLabel}</span>
-          <Money amount={total} className="text-sm font-semibold text-text" />
+          <span className="text-lg font-bold text-text">{formatVndUnit(total)}</span>
+          {centerBadge}
         </div>
       </div>
 

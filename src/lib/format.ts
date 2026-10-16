@@ -56,6 +56,22 @@ function trim(n: number): string {
 }
 
 /**
+ * Short unit-suffixed VND for chart labels, matching the reference PFM style:
+ * 5_500_000 -> "5,5 Tr", 500_000 -> "500 N", 28_200_000 -> "28,2 Tr",
+ * -5_000_000 -> "-5 Tr". Unknown values return "—".
+ */
+export function formatVndUnit(amount: MaybeAmount): string {
+  if (isUnknownAmount(amount)) return "—";
+  const value = amount as number;
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000_000) return `${sign}${trim(abs / 1_000_000_000)} Tỷ`;
+  if (abs >= 1_000_000) return `${sign}${trim(abs / 1_000_000)} Tr`;
+  if (abs >= 1_000) return `${sign}${trim(abs / 1_000)} N`;
+  return `${sign}${vndFormatter.format(abs)} ₫`;
+}
+
+/**
  * Mask an account number for display, keeping only the last 4 digits behind
  * bullet dots, e.g. "668812081991" -> "•••• 1991". Non-digits are stripped;
  * a number shorter than 4 digits is shown in full behind the dots.

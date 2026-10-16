@@ -27,7 +27,7 @@ export function AddTxnFab() {
       type="button"
       onClick={openAdd}
       aria-label="Thêm giao dịch"
-      className="brand-gradient pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full text-primary-fg shadow-nav ring-4 ring-white/80 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2"
+      className="brand-gradient pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full text-primary-fg shadow-nav ring-4 ring-surface/80 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2"
     >
       <Plus size={26} strokeWidth={2.4} />
     </button>

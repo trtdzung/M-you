@@ -45,7 +45,7 @@ export function PfmBottomNav() {
       aria-label="Điều hướng PFM"
       className="shell-bottom-nav pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-shell-main-inset"
     >
-      <div className="shadow-nav pointer-events-auto relative flex w-full items-stretch justify-between gap-1 rounded-full border border-white/40 bg-white/80 px-2 py-2 backdrop-blur-xl">
+      <div className="shadow-nav pointer-events-auto relative flex w-full items-stretch justify-between gap-1 rounded-full border border-surface/60 bg-surface/80 px-2 py-2 backdrop-blur-xl">
         {left.map((tab) => (
           <NavItem key={tab.id} tab={tab} active={tab.id === active} onSelect={() => go(tab.id)} />
         ))}

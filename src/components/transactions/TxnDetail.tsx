@@ -39,7 +39,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
   return (
     <Sheet title="Chi tiết giao dịch" description={txn.merchantName} onClose={onClose}>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface-muted p-4">
+        <div className="flex items-center justify-between gap-3 rounded-row bg-surface-muted p-4">
           <div className="flex flex-wrap items-center gap-2">
             <SourceBadge source={txn.source} />
             <span className="text-xs text-muted">{TYPE_LABEL[txn.type]}</span>
@@ -51,7 +51,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
           />
         </div>
 
-        <dl className="flex flex-col divide-y divide-border rounded-2xl bg-surface-muted px-4">
+        <dl className="flex flex-col divide-y divide-border rounded-row bg-surface-muted px-4">
           <Row label="Ngày" value={formatDate(txn.postedAt)} />
           <Row label="Trạng thái" value={txn.status === "posted" ? "Đã ghi nhận" : txn.status} />
           {txn.relatedTransactionId && <Row label="Tham chiếu" value={txn.relatedTransactionId} />}
@@ -83,7 +83,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
             <button
               type="button"
               onClick={() => setPicking(true)}
-              className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              className="flex min-h-11 w-full items-center gap-2 rounded-row border border-border bg-surface px-3 py-2 text-sm text-text hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryColor(txn.categoryId) }} />
               <span className="flex-1 truncate text-left">{category?.label ?? txn.categoryId}</span>
@@ -93,7 +93,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
           )}
         </div>
 
-        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-3">
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-row border border-border bg-surface p-3">
           <span className="flex items-center gap-2">
             <EyeOff size={16} className="shrink-0 text-muted" aria-hidden />
             <span className="min-w-0">

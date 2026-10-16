@@ -80,7 +80,7 @@ export function PfmTxnList() {
   if (error) return <ErrorState />;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <PeriodPicker />
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc theo hũ">
@@ -125,7 +125,7 @@ export function PfmTxnList() {
                       key={t.id}
                       className={cn(
                         hidden && "opacity-55",
-                        uncategorized && "rounded-lg bg-warning-soft/40",
+                        uncategorized && "rounded-row bg-warning-soft/40",
                       )}
                     >
                       <TxnRow txn={t} onEdit={setSelected} />

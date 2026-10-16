@@ -58,7 +58,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
               if (v && v !== jar.label) updateJar(jarId, { label: v });
             }}
             aria-label="Tên hũ"
-            className="min-h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="min-h-11 rounded-row border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           />
           {dup && <span className="text-xs text-warning">⚠ Trùng tên với hũ khác</span>}
         </label>
@@ -72,7 +72,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
             onBlur={commitLimit}
             placeholder="Chưa đặt"
             aria-label="Hạn mức mỗi tháng"
-            className="min-h-11 rounded-xl border border-border bg-surface px-3 text-right text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="min-h-11 rounded-row border border-border bg-surface px-3 text-right text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           />
           <span className={cn("text-right text-xs", limitError ? "text-negative" : "text-muted")}>
             {limitError ?? (limitDraft.trim() === "" ? "Để trống = chưa đặt hạn mức" : formatVnd(Number(limitDraft.replace(/[^\d]/g, ""))))}
@@ -91,7 +91,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
                 className="flex h-9 w-9 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                 style={{ background: c }}
               >
-                {jarAccent(jar) === c && <Check size={16} className="text-white" aria-hidden />}
+                {jarAccent(jar) === c && <Check size={16} className="text-primary-fg" aria-hidden />}
               </button>
             ))}
           </div>
@@ -110,7 +110,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
                   aria-pressed={active}
                   onClick={() => updateJar(jarId, { icon: key })}
                   className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    "flex h-10 w-10 items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     active ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface text-muted",
                   )}
                 >
@@ -135,7 +135,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
                       aria-label={`Chuyển ${CATEGORY_BY_ID[catId]?.label ?? catId} sang hũ khác`}
                       value=""
                       onChange={(e) => e.target.value && assignCategory(catId, e.target.value)}
-                      className="min-h-9 rounded-lg border border-border bg-surface px-2 text-xs text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                      className="min-h-9 rounded-sm border border-border bg-surface px-2 text-xs text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                     >
                       <option value="">Chuyển sang…</option>
                       {otherJars.map((j) => (
@@ -150,13 +150,13 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
         </Field>
 
         {confirmDelete ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-negative/40 bg-negative-soft/40 p-3">
+          <div className="flex flex-col gap-2 rounded-row border border-negative/40 bg-negative-soft/40 p-3">
             <p className="text-sm text-text">Xoá hũ này? Danh mục trong hũ sẽ chuyển sang “Khác”.</p>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => { removeJar(jarId); onClose(); }}
-                className="min-h-10 flex-1 rounded-full bg-negative px-3 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="min-h-10 flex-1 rounded-full bg-negative px-3 text-sm font-semibold text-primary-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 Xoá hũ
               </button>

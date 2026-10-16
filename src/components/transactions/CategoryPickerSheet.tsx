@@ -41,7 +41,7 @@ export function CategoryOptionGrid({
             onClick={() => onSelect(c.id)}
             aria-pressed={active}
             className={cn(
-              "flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+              "flex min-h-11 items-center gap-2 rounded-row border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
               active ? "border-primary bg-primary/10 font-medium text-text" : "border-border bg-surface text-text hover:bg-surface-muted",
             )}
           >
@@ -55,7 +55,7 @@ export function CategoryOptionGrid({
         <button
           type="button"
           onClick={onAddCategory}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="flex min-h-11 items-center justify-center gap-1.5 rounded-row border border-dashed border-border px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <Plus size={15} aria-hidden /> Thêm danh mục
         </button>

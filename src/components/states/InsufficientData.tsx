@@ -15,7 +15,7 @@ export function InsufficientData({
   action?: ReactNode;
 }) {
   return (
-    <div className="shadow-card flex flex-col items-center justify-center gap-3 rounded-[24px] bg-warning-soft/60 px-6 py-10 text-center">
+    <div className="shadow-card flex flex-col items-center justify-center gap-3 rounded-card bg-warning-soft/60 px-6 py-10 text-center">
       <HelpCircle size={38} strokeWidth={1.5} className="text-warning" />
       <div>
         <p className="text-base font-semibold text-text">{title}</p>

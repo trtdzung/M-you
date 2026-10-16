@@ -24,7 +24,7 @@ export function ChartFrame({
       {mounted ? (
         children
       ) : (
-        <div className="shimmer h-full w-full rounded-[16px]" aria-hidden />
+        <div className="shimmer h-full w-full rounded-row" aria-hidden />
       )}
     </div>
   );

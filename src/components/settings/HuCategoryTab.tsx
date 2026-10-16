@@ -45,7 +45,7 @@ export function HuCategoryTab() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <SectionHeader
         title="Hũ & danh mục"
         action={
@@ -68,9 +68,9 @@ export function HuCategoryTab() {
               <button
                 type="button"
                 onClick={() => setEditing(jar.id)}
-                className="shadow-card flex min-h-16 w-full items-center gap-3 rounded-2xl bg-surface p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="shadow-card flex min-h-16 w-full items-center gap-3 rounded-row bg-surface p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: `${accent}1a`, color: accent }}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm" style={{ background: `${accent}1a`, color: accent }}>
                   <Icon size={20} strokeWidth={1.8} />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -98,11 +98,11 @@ export function HuCategoryTab() {
         type="button"
         onClick={() => setManaging(true)}
         className={cn(
-          "shadow-card flex min-h-14 w-full items-center gap-3 rounded-2xl bg-surface p-3 text-left",
+          "shadow-card flex min-h-14 w-full items-center gap-3 rounded-row bg-surface p-3 text-left",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         )}
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-muted">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-surface-muted text-muted">
           <Tag size={20} strokeWidth={1.8} />
         </span>
         <span className="min-w-0 flex-1">

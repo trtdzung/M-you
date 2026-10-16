@@ -1,4 +1,5 @@
 export { Card } from "./Card";
+export { SegmentedControl, type SegmentOption } from "./SegmentedControl";
 export { Money } from "./Money";
 export { SourceBadge, type Source } from "./SourceBadge";
 export { ProvenanceChip } from "./ProvenanceChip";

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Wallet } from "lucide-react";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
-import { Card, Money, SectionHeader, SourceBadge } from "@/components/primitives";
+import { Card, Money, SectionHeader, SegmentedControl, SourceBadge } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/states";
 import { cn } from "@/lib/cn";
 import { useFinancials } from "@/state/useFinancials";
@@ -57,22 +57,15 @@ export function BudgetTab() {
         </span>
       </div>
 
-      <div role="tablist" aria-label="Loại ngân sách" className="flex gap-1 rounded-full bg-surface-muted p-1">
-        {(["chi", "thu"] as const).map((s) => (
-          <button
-            key={s}
-            role="tab"
-            aria-selected={seg === s}
-            onClick={() => setSeg(s)}
-            className={cn(
-              "min-h-[44px] flex-1 rounded-full px-3 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-              seg === s ? "bg-surface text-primary shadow-card" : "text-muted hover:text-text",
-            )}
-          >
-            {s === "chi" ? "Chi tiêu" : "Thu nhập"}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        ariaLabel="Loại ngân sách"
+        value={seg}
+        onChange={setSeg}
+        options={[
+          { value: "chi", label: "Chi tiêu" },
+          { value: "thu", label: "Thu nhập" },
+        ]}
+      />
 
       {seg === "thu" ? (
         <Empty

@@ -125,7 +125,7 @@ function FindingRow({
   freshness: string | null;
 }) {
   return (
-    <Card className="p-3">
+    <Card padding="none" className="p-3">
       <p className="text-sm font-semibold text-text">{title}</p>
       <p className="mt-0.5 text-sm text-muted">{detail}</p>
       <ProvenanceChip className="mt-2" source={source} freshness={freshness} />
@@ -136,14 +136,14 @@ function FindingRow({
 function HighlightCard({ highlight }: { highlight: BriefHighlight }) {
   const { insight, meaning, action, source, freshness } = highlight;
   return (
-    <Card className="p-3">
+    <Card padding="none" className="p-3">
       <p className="text-sm font-semibold text-text">{insight.title}</p>
       <p className="mt-0.5 text-sm text-muted">{insight.explanation}</p>
 
       <InsightEvidence insight={insight} />
       <ProvenanceChip className="mt-2" source={source} freshness={freshness} />
 
-      <div className="mt-3 rounded-lg border border-border bg-surface-muted p-3">
+      <div className="mt-3 rounded-row border border-border bg-surface-muted p-3">
         <p className="text-xs font-medium text-muted">Nghĩa là gì</p>
         <p className="mt-0.5 text-sm text-text">{meaning}</p>
       </div>

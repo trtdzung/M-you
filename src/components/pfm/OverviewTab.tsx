@@ -2,37 +2,49 @@
 
 import { useMemo, useState } from "react";
 import { ErrorState, SkeletonCard } from "@/components/states";
-import { SpendingSection } from "@/components/report/SpendingSection";
+import { SpendingSection, type DonutSide } from "@/components/report/SpendingSection";
 import { SpendingReport } from "@/components/report/SpendingReport";
 import { CashflowOverviewCard } from "@/components/cashflow/CashflowOverviewCard";
 import { CashflowTrendCard } from "@/components/cashflow/CashflowTrendCard";
-import { cashflowTrend } from "@/domain/engine";
+import type { JarDonutDatum } from "@/components/report/SpendingDonut";
+import { cashflowTrend, incomeByCategory, monthPeriodFromKey } from "@/domain/engine";
 import type { PfmTabId } from "./PfmTabs";
 import { useInsights } from "@/state/useInsights";
-import { currentMonthKey, DEMO_NOW } from "@/lib/demo-clock";
+import { currentMonthKey } from "@/lib/demo-clock";
 
 /**
- * Tổng quan — the current-month income/expense picture, in three sections:
- * "Tổng quan thu chi" (income/expense/net at a glance), "Báo cáo thu chi"
- * (spend-by-jar breakdown + detailed report), and "Biến động thu chi" (the
- * 6-month trend). Every number traces to the deterministic engine (invariant #1);
- * missing values render "—", never 0 (#6). Wealth/net-worth lives on its own tab.
+ * Tổng quan — the current-month income/expense picture in three sections:
+ * "Tổng quan thu chi" (two-bar income vs expense), "Báo cáo thu chi" (donut with
+ * Chi tiêu/Thu nhập toggle + detailed report), and "Biến động thu chi" (two-line
+ * trend). Every number traces to the deterministic engine (invariant #1); missing
+ * values render "—", never 0 (#6). Wealth/net-worth lives on its own tab.
  */
 export function OverviewTab({ onNavigate: _onNavigate }: { onNavigate: (tab: PfmTabId) => void }) {
-  // The overview is ALWAYS the current month, independent of any month selected
-  // on the other tabs' shared PeriodPicker, so the picture stays consistent.
+  // Always the current month, independent of any month picked on other tabs.
   const { loading, error, financials, transactions } = useInsights(currentMonthKey());
   const [reportOpen, setReportOpen] = useState(false);
 
   const monthKey = financials?.monthKey ?? currentMonthKey();
-  const trend = useMemo(() => cashflowTrend(transactions, monthKey), [transactions, monthKey]);
+  // 12 months so the trend card can toggle two 6-month windows.
+  const trend = useMemo(() => cashflowTrend(transactions, monthKey, 12), [transactions, monthKey]);
+
+  const incomeData: JarDonutDatum[] = useMemo(
+    () =>
+      incomeByCategory(transactions, monthPeriodFromKey(monthKey)).map((c) => ({
+        id: c.categoryId,
+        label: c.label,
+        amount: c.amount,
+        colorKey: c.categoryId,
+      })),
+    [transactions, monthKey],
+  );
 
   if (loading) {
     return (
-      <div className="flex min-h-full flex-col gap-4 pb-6">
-        <SkeletonCard className="h-28" />
+      <div className="flex min-h-full flex-col gap-5 pb-6">
+        <SkeletonCard className="h-56" />
+        <SkeletonCard className="h-72" />
         <SkeletonCard className="h-64" />
-        <SkeletonCard className="h-40" />
       </div>
     );
   }
@@ -40,28 +52,33 @@ export function OverviewTab({ onNavigate: _onNavigate }: { onNavigate: (tab: Pfm
 
   const { cashflow, prevCashflow } = financials;
 
-  return (
-    <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-4 pb-6">
-      <p className="px-1 text-xs font-medium uppercase tracking-[0.08em] text-muted">
-        Thu chi · {currentMonthLabel()}
-      </p>
+  const expenseData: JarDonutDatum[] = financials.jarBudget.lines.map((l) => ({
+    id: l.huId,
+    label: l.label,
+    amount: l.spent,
+    colorKey: l.categoryIds[0] ?? l.huId,
+  }));
 
+  const expenseSide: DonutSide = {
+    data: expenseData,
+    total: cashflow.expense,
+    prevTotal: prevCashflow.expense,
+  };
+  const incomeSide: DonutSide = {
+    data: incomeData,
+    total: cashflow.income,
+    prevTotal: prevCashflow.income,
+  };
+
+  return (
+    <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
       <CashflowOverviewCard cashflow={cashflow} prevCashflow={prevCashflow} />
 
-      <SpendingSection
-        lines={financials.jarBudget.lines}
-        expense={cashflow.expense}
-        prevExpense={prevCashflow.expense}
-        onOpenReport={() => setReportOpen(true)}
-      />
+      <SpendingSection expense={expenseSide} income={incomeSide} onOpenReport={() => setReportOpen(true)} />
 
-      <CashflowTrendCard trend={trend} cashflow={cashflow} prevCashflow={prevCashflow} />
+      <CashflowTrendCard trend={trend} />
 
       {reportOpen && <SpendingReport monthKey={monthKey} onClose={() => setReportOpen(false)} />}
     </div>
   );
-}
-
-function currentMonthLabel(): string {
-  return `Tháng ${DEMO_NOW.getUTCMonth() + 1}/${DEMO_NOW.getUTCFullYear()}`;
 }
