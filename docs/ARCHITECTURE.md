@@ -55,7 +55,7 @@ AI Facade (implemented, Tier A + Tier B)
 
 ## UI information architecture (implemented)
 
-The mobile-first UI is a **3-tab MSB banking layout** (`src/components/shell/BottomNav.tsx`), replacing an earlier 5-tab PFM layout, so navigation matches the real MSB app. This is a presentation-layer reshuffle only — it does not change the module responsibilities, canonical models, or provider contracts below.
+The mobile-first UI is a **3-tab MSB banking layout** (`src/components/shell/BottomNav.tsx`): Trang chủ / Tài khoản / PFM. Inside `/pfm`, the IA was first redesigned around MSB's four product-thesis questions as a 4-tab spine (`plans/260909-1519-pfm-benchmark-ia-redesign/`), then reformatted to a **3-tab spine** — Tổng quan / Hũ / Dòng tiền (`plans/260909-2254-pfm-3tab-reformat/`): Hũ was promoted from a Dòng tiền dock to a top-level tab, Dòng tiền became a pure category-chart view (the 3-dock sub-hub retired), and the Kế hoạch/Trợ lý tabs were unmounted (UI only — engine and tests kept). This is a presentation-layer reshuffle only — it does not change the calculation engine, canonical models, or provider contracts below.
 
 ```text
 src/app/
@@ -64,32 +64,70 @@ src/app/
   accounts/page.tsx         Tài khoản tab: account list
   accounts/[id]/page.tsx    Account detail: header + scoped transaction list
   transactions/page.tsx     All-transactions view (shared list component)
-  pfm/page.tsx              Single PFM route: 4 client-side tabs (Overview /
-                            Cashflow / Wealth / Insights) via PfmTabHost
+  pfm/page.tsx              Single PFM route: 3 client-side tabs (Tổng quan /
+                            Hũ / Dòng tiền) via PfmTabHost (3-tab reformat,
+                            plans/260909-2254-pfm-3tab-reformat/)
+  pfm/wealth/page.tsx       Tài sản & Nợ manual manager (WealthManager) — a
+                            real page, not a redirect (drill target from
+                            Tổng quan and the `open-wealth` copilot intent)
   pfm/cashflow/page.tsx     Redirect -> /pfm?tab=cashflow (legacy deep link)
-  pfm/wealth/page.tsx       Redirect -> /pfm?tab=wealth (legacy deep link)
-  pfm/insights/page.tsx     Redirect -> /pfm?tab=insights (legacy deep link)
+  pfm/jars/page.tsx         Redirect -> /pfm?tab=hu (legacy deep link; Hũ is
+                            now a top-level tab, not a Dòng tiền dock)
+  pfm/insights/page.tsx     Redirect -> /assistant (legacy deep link; the old
+                            Insights tab is retired, and the Trợ lý tab that
+                            once hosted its feed was itself later removed —
+                            the feed now surfaces inside the /assistant
+                            chat's empty state)
   cashflow/page.tsx         Redirect -> /pfm?tab=cashflow (legacy route kept alive)
-  wealth/page.tsx           Redirect -> /pfm?tab=wealth (legacy route kept alive)
+  wealth/page.tsx           Redirect -> /pfm?tab=overview (legacy route kept alive;
+                            the old Wealth tab no longer exists — see /pfm/wealth
+                            above for the manual asset/liability manager)
   settings/page.tsx         Consent scope + revoke, persona switcher, About
   assistant/                AI Assistant chat screen
   transfer-confirm/         Native MSB transfer confirmation (draft handoff)
 ```
 
-Key shared components introduced by the refactor:
+`PfmTabHost` validates `?tab` against the 3-tab enum (`overview` | `hu` | `cashflow`, `src/components/pfm/PfmTabs.tsx`) on every `searchParams` change and falls back to `overview` for a stale/unknown value (e.g. old `?tab=wealth` / `?tab=insights` / `?tab=plan` / `?tab=assistant` bookmarks) — no dead-ends, and the fallback never fights a user's in-session tap (equality-guarded re-sync). It also special-cases the legacy `?tab=cashflow&dock=hu` deep link (from the retired sub-hub), normalizing it to `?tab=hu` via `router.replace` so an old Hũ deep link lands on the Hũ tab, not a dead dock.
+
+Key shared components:
 
 - `src/components/shell/BottomNav.tsx` — 3 tabs (Trang chủ `/`, Tài khoản `/accounts` + `/transactions`, PFM `/pfm`); active-tab matching is prefix-based per tab.
 - `src/components/shell/AssistantFab.tsx` — floating action button (Sparkles icon) rendered above the tab bar on every screen except `/assistant`, linking to `/assistant`.
 - `src/components/home/*` (`AccountSummaryCard`, `HomeQuickGrid`, `PromoCarousel`, `PromoCard`, `Dots`) — Home-specific presentation, not reused elsewhere.
-- `src/components/transactions/TransactionListSection.tsx` — shared transaction list, used by both `/transactions` (all accounts) and `/accounts/[id]` (scoped via an `accountId` filter prop).
-- `src/components/pfm/PfmTabHost.tsx` + `src/components/pfm/PfmTabs.tsx` — the single-route `/pfm` tab host: client-side switching (no navigation, no refetch — `useFinancials` loads once), initial tab read from `?tab=` for deep links. The Overview panel is locked to one non-scrolling viewport (`overflow-hidden`); the other three panels scroll within their own region.
-- `src/components/pfm/OverviewTab.tsx` + `src/components/pfm/cockpit/*` (`HeroNetWorth`, `StatTile`, `InsightStrip`, `Sparkline`) — the no-scroll "4-Question Cockpit": hero net worth, 2×2 KPI grid (cashflow net, end-of-month estimate, next obligation, runway), top-1 insight strip, and a worst-case provenance footer. Always the current month (`currentMonthKey()`) — no `PeriodPicker` here, independent of the month selected on the other tabs.
-- `src/components/cashflow/CashflowView.tsx` and `src/components/wealth/WealthView.tsx` — cash flow and wealth tab panels rendered directly by `PfmTabHost`; obligations, previously on Home, now live only inside the Overview cockpit.
-- `src/components/charts/CashflowTrendChart.tsx` — multi-month income/expense/net chart backing the Cashflow tab, fed by `cashflowTrend()`.
-- `src/components/wealth/HealthPanel.tsx` — 2×2 financial-health panel (runway, surplus, essential-expense coverage, asset concentration) on the Wealth tab, fed by `financialHealth()`.
-- `src/components/insights/InsightFilters.tsx` — severity filter (info / attention / urgent) on the Insights tab.
+- `src/components/transactions/TransactionListSection.tsx` — shared transaction list, used by `/transactions` (all accounts, including drill-through from a Dòng tiền category tap) and `/accounts/[id]` (scoped via an `accountId` filter prop). No longer mounted inside `/pfm` — the retired Dòng tiền · Giao dịch dock used to host it there.
+- `src/components/pfm/PfmTabHost.tsx` + `src/components/pfm/PfmTabs.tsx` — the single-route `/pfm` tab host: client-side switching (no navigation, no refetch — `useFinancials` loads once), `?tab` re-synced on every change (see above). Tabs (3-tab reformat, `plans/260909-2254-pfm-3tab-reformat/`): **Tổng quan** (`OverviewTab`, no-scroll cockpit), **Hũ** (`HuTab`), **Dòng tiền** (`CashflowChartView`). Only Tổng quan is locked to `overflow-hidden`; the other two scroll within their own region.
+- `src/components/pfm/OverviewTab.tsx` + `src/components/pfm/cockpit/*` (`HeroNetWorth`, `StatTile`, `InsightStrip`, `Sparkline`) — the no-scroll "4-Question Cockpit": hero net worth, 2×2 KPI grid (cashflow net, end-of-month estimate, next obligation, runway), top-1 insight strip, a `NetWorthSummary` drill tile (assets/liabilities decomposed from `networth.breakdown`, one tap to `/pfm/wealth`), and a worst-case provenance footer.
+- **Hũ tab** (`src/components/pfm/HuTab.tsx`) — the jar partition promoted from a Dòng tiền dock to a top-level tab: its own `PeriodPicker`, `JarList` (reconciliation meter + over-allocated warning + per-jar spend overlay), and an "Điều chỉnh hũ" modal wrapping `JarSetup` (template picker, editor, category assignment); `/pfm/jars` now redirects here.
+- **Dòng tiền tab** (`src/components/cashflow/CashflowChartView.tsx`) — replaces the retired 3-dock sub-hub with a pure category-chart view: `PeriodPicker`, jar-filter chips (`groupSpendingByJar`/`jarChipList`), a donut + category bar list (`spendingByCategory`, MoM delta per row, tap-through to `/transactions?category=<id>`), the relocated `CashflowTrendChart` (6-month trend), and a "Xem báo cáo tháng" CTA opening `ReportBriefSheet` (see "Advisory brief" below). The transaction feed itself is not on this tab — it lives at `/transactions` (`TransactionListSection`).
+- **Tài sản & Nợ manager** (`src/components/wealth/WealthManager.tsx`, route `/pfm/wealth`) — net-worth strip, editable user-record lists (`AssetEditor` / `LiabilityEditor` bottom sheets), read-only seed section, drop-notice banner. See "Asset and liability module" below for the CRUD/threading contract.
+- **Kế hoạch and Trợ lý (unmounted, 3-tab reformat)** — `src/components/plan/PlanTab.tsx` (`GoalList` + `GoalEditor` + `GoalProjectionCard` for goal CRUD/what-if, `SurplusPanel`, `HealthPanel`) and `src/components/assistant/AssistantTab.tsx` (copilot entry Link + `SuggestedPrompts` + `InsightsView`) still exist as components, each carrying a `// DEFERRED:` header comment, but neither is referenced by `PfmTabHost` anymore — this is a UI-unmount only, the goal/health/surplus engine and the AI facade are unaffected. The rule-based insights feed they used to host now renders inline inside the `/assistant` chat's empty state (`ChatPanel.tsx`). See "Goals module" below for the untouched CRUD/threading contract.
+- `src/components/charts/CashflowTrendChart.tsx` — multi-month income/expense/net chart, now rendered on the Dòng tiền tab, fed by `cashflowTrend()`.
+- `src/components/wealth/HealthPanel.tsx` — 2×2 financial-health panel (runway, surplus, essential-expense coverage, asset concentration), fed by the composed `Financials.health`; currently unmounted along with `PlanTab` (see above).
+- `src/components/insights/InsightFilters.tsx` — severity filter (info / attention / urgent), now rendered inside the `/assistant` chat's empty-state insights feed (`InsightsView` in `ChatPanel.tsx`).
+- `src/components/primitives/ProvenanceChip.tsx` — thin wrapper over `SourceBadge` (+ optional freshness); one shared place for provenance styling (invariant #5), used across the Tổng quan and Wealth surfaces (also referenced by the currently-unmounted Kế hoạch components).
+- `src/components/states/UnknownValue.tsx` — renders `—` / "Chưa xác định", never `0₫` (invariant #6).
 - `src/lib/format.ts` (`maskAccountNumber`) — masks an account number to its last 4 digits for display (e.g. `•••• 1991`); used by the Home account card and account list/detail headers. Presentation-only; does not touch the calculation engine or provider data.
 - `src/lib/transfer-draft-store.ts` — session-scoped (`sessionStorage`) hand-off of a `TransferDraft`'s display fields (name, masked account, amount, memo, source label) from the chat `DraftCard` to `/transfer-confirm`, keyed by draft id. The draft's PII/financial fields never travel in the URL query string — only the `draftId` does. No account number (only the masked form) is ever stored, and nothing in this module executes a transfer; it purely carries display state across the client-side navigation boundary, consistent with the `TransferDraft` model and pipeline in "Tier B — draft-only tools" below.
+- `src/lib/copilot-nav.ts` (`resolveIntentRoute`) — see "Copilot universal jump" below.
+- `src/lib/persona-storage.ts` (`personaLocalStorageResource<T>()`) — see "Shared user-record CRUD infrastructure" below.
+
+### Copilot universal jump (implemented)
+
+`src/lib/copilot-nav.ts` — `resolveIntentRoute(intent)` is a **static code whitelist**, not an LLM navigation authority (invariant #2): the intent id is a strict enum and every route is a fixed literal with no free-text interpolation (no per-intent params anymore — the 3-tab reformat retired the Dòng tiền sub-hub docks, so there is no `dock` param left to smuggle a path through); any unknown intent falls back to `/pfm` (never a dead-end, never an injected route). Intents: `open-overview`, `open-cashflow`, `open-hu`, `open-transactions`, `open-report`, `open-wealth`, `open-assistant`. The former `open-plan` intent was removed along with the Kế hoạch tab; any CTA that used to open it now points at `open-hu` instead. It is the single source of truth consumed by the Assistant FAB, `SuggestedPrompts`, and the advisory brief's "nên làm gì" CTAs — all three render it as a **tappable `Link`**, never an auto-navigation, so an LLM-originated suggestion can only ever produce a link the user chooses to follow.
+
+### Advisory brief — Báo cáo tư vấn (implemented, deterministic)
+
+`src/insights/brief.ts` (`composeMonthlyBrief`) + `src/insights/advisory-copy.ts` compose a **deterministic, templated** monthly brief from the same rule-based detectors (`runDetectors`) and cashflow facts the rest of the app uses — no LLM, no network call, grounding by construction. Output: `positives[]`, `risks[]`, `highlights[]` (each with evidence, a magnitude band, templated "nghĩa là gì" / "nên làm gì" copy, and a whitelisted `resolveIntentRoute` CTA), and a deduped `actions[]` list. Insufficient-data months return an honest empty message and zero actions; data-rich but detector-quiet months get one grounded fallback CTA derived from `cashflow.net` (never a fabricated action). Rendered by `src/components/insights/AdvisoryReport.tsx` (loading/error/insufficient/empty states) inside `src/components/cashflow/ReportBriefSheet.tsx`, a bottom sheet opened from the "Xem báo cáo tháng" CTA on the Dòng tiền tab (the former dedicated Báo cáo dock is retired along with the rest of the sub-hub). **LLM narration of this brief was scoped for this redesign but deferred** (red-team: injection/timeout/pipeline-shape risk not worth taking before the new IA is validated) — see EPIC-07/PFM-062 in `plans/project-backlog.md`.
+
+### Shared user-record CRUD infrastructure (implemented)
+
+Jars pioneered a "load / save / schema-guard / reseed" pattern for user-editable state; `src/lib/persona-storage.ts` (`personaLocalStorageResource<T>()`) generalizes it into one shared helper so assets/liabilities and goals don't re-derive persona keys, SSR guards, and try/catch:
+
+- Persona-scoped key (`msb-pfm.{namespace}.{personaId}`) — one persona's records never leak into another.
+- Schema-guarded read (`guard: (value: unknown) => value is T`); missing/corrupt/foreign-shape data falls back to a deep-cloned `seed()`, never a throw.
+- `load` / `read` / `save` / `clear` / `reseed`, all storage I/O wrapped in try/catch (private mode, quota, SSR all degrade gracefully).
+
+The mock provider builds a generic `userRecordStore<T>()` on top of this helper (`src/providers/mock/mock-provider.ts`), reused verbatim by assets, liabilities, and goals. Each record type adds its own **per-record guard** (`isValidAssetRecord` / `isValidLiabilityRecord` / `isValidGoalRecord`) inside a versioned store envelope (`UserRecordStore<T>`, e.g. `ASSET_STORE_VERSION`), so one corrupt record is dropped (counted, surfaced as a dismissible drop-notice) without wiping the whole store. Each CRUD context (`AssetLiabilityProvider` in `src/state/assets.tsx`, `GoalProvider` in `src/state/goals.tsx`) does a **synchronous reset-to-seed before the async load** on persona switch, so a persona change never flashes the previous persona's records.
 
 ## Module responsibilities
 
@@ -115,7 +153,7 @@ Key shared components introduced by the refactor:
 
 - Aggregate assets and liabilities.
 - Calculate net worth and net-worth trend (`networth.ts` — `calculateNetWorth`, `networthTrend`), exposing the raw current/previous values plus a sparkline series and lowest-trust provenance.
-- Compute explainable financial-health indicators (`health.ts` — runway, surplus, essential-expense coverage, asset concentration), each `null` rather than defaulted when its inputs are missing.
+- Compute explainable financial-health indicators (`health.ts` — runway, surplus, essential-expense coverage, asset concentration), each `null` rather than defaulted when its inputs are missing. Composed exactly once per `computeFinancials` call (`Financials.health`) and reused by every consumer (Tổng quan's Sức khỏe tile; `HealthPanel`, currently unmounted with the rest of the Kế hoạch tab) instead of each screen recomputing it.
 - Keep source and freshness metadata.
 - Distinguish verified, self-reported, and estimated values.
 
@@ -135,9 +173,9 @@ Key shared components introduced by the refactor:
 - **Templates:** `src/domain/models/jar-defaults.ts` defines three pickable templates (`JAR_TEMPLATE_LIST`) — Cá nhân (6 hũ, `DEFAULT_JAR_CONFIG`), Gia đình (4 hũ), Kinh doanh (3 hũ) — each a static literal whose percents sum to ≤100 so applying one can never start over-allocated, and with one-category-one-jar already enforced. `configFromTemplate` builds a fresh `version: 2` config; applying a template replaces the whole jar set.
 - **Persistence:** `Providers.getJarConfig()` / `saveJarConfig()` (`src/providers/interfaces.ts`) remain the only *write* methods on `Providers`. The mock adapter (`src/providers/mock/mock-provider.ts`) backs them with persona-scoped `localStorage` (key `msb-pfm.jars.<personaId>`) plus a structural schema guard (`isValidJarConfig`: `version === 2` + shape checks); a missing, corrupt, wrong-shape, or **stored-v1** record reads back as `null`/is discarded, so the caller reseeds from `DEFAULT_JAR_CONFIG` — the v1→v2 model change is a hard cutover, not a field migration, since v1's income-basis/anchor concepts have no v2 equivalent (accepted data loss in the prototype's localStorage-backed persistence). A real adapter maps these two methods to the MSB preferences API (invariant #4) without changing the interface.
 - **`JarConfigProvider` context (`src/state/jars.tsx`):** loads the config through the provider seam on mount and on persona switch (`migrateJarConfig` discards any `version !== 2` record and reseeds), normalizes overlapping categories on load, enforces one-category-one-jar on every mutation (`stripCategories`), and persists each mutation back through `saveJarConfig`. Exposes `applyTemplate` for the template picker. `useFinancials` threads the live `config` into `computeFinancials` via `ComposeOptions.jarConfig`.
-- **UI (`src/components/jars/`):** `JarCard` renders one explicit jar as **chia** (earmark) vs **đã tiêu kỳ này** (spend overlay) with a MoM delta and a "Vượt ngân sách" warning when over; `JarList` renders these inside a "Hũ chi tiêu" section on `CashflowView.tsx` (Cashflow tab) — the residual "Chưa phân bổ" line is never rendered as a jar card, only inside the reconciliation meter. `JarSetup` (template picker + `AllocationMeter` reconciliation meter + `JarEditor` + `CategoryAssigner` + `SurplusPanel`) is the setup screen at the dedicated route `src/app/pfm/jars/page.tsx` — kept off the main `/pfm` tab bar (still 4 tabs), reachable from Cashflow. `src/components/budget/PressureRow.tsx` is still the shared row primitive reused by `JarCard`.
+- **UI (`src/components/jars/`, `src/components/pfm/HuTab.tsx`):** `JarCard` renders one explicit jar as **chia** (earmark) vs **đã tiêu kỳ này** (spend overlay) with a MoM delta and a "Vượt ngân sách" warning when over; `JarList` renders these inside `HuTab` (the top-level Hũ tab — promoted out of the retired Dòng tiền sub-hub in the 3-tab reformat, see the IA section above) — the residual "Chưa phân bổ" line is never rendered as a jar card, only inside the reconciliation meter. `JarSetup` (template picker + `AllocationMeter` reconciliation meter + `JarEditor` + `CategoryAssigner`) opens as a tab-scoped "Điều chỉnh hũ" modal from `HuTab`; `SurplusPanel` was relocated out of `JarSetup` to the Kế hoạch tab (`PlanTab`) in the earlier IA redesign, and `PlanTab` itself is now unmounted (3-tab reformat — see "Key shared components" above). `src/app/pfm/jars/page.tsx` is now a thin `redirect("/pfm?tab=hu")` for legacy links. `src/components/budget/PressureRow.tsx` is still the shared row primitive reused by `JarCard`.
 - **Insight:** `src/insights/detectors/jar-pressure.ts` returns one of two non-blocking warnings, in priority order — (1) over-allocated residual (`Σ chia > số dư`), or (2) the most-breached jar (`đã tiêu > chia`) — and only fires for the current month, off `jarPartition.status !== "ok"`.
-- **Level 3 surplus allocation (`src/domain/engine/surplus.ts`):** `surplusFromResidual(residual)` = `residual === "unknown" ? "unknown" : max(0, residual)` — the surplus **is** the "Chưa phân bổ" residual (a stock already net of every earmark), not `income − expense`; it must not subtract expense again, since the residual was never income-derived. `simulateSurplusAllocation({ surplus, goals, split })` is unchanged: a pure, read-only what-if that distributes the surplus across goals per a UI-supplied split, capping each target at the goal's remaining headroom and the surplus left — it never mutates a goal, moves money, or produces a transfer draft. An unknown primary balance yields `surplus: "unknown"`, never `0`. Rendered by `SurplusPanel` (`src/components/jars/SurplusPanel.tsx`) inside `JarSetup`.
+- **Level 3 surplus allocation (`src/domain/engine/surplus.ts`):** `surplusFromResidual(residual)` = `residual === "unknown" ? "unknown" : max(0, residual)` — the surplus **is** the "Chưa phân bổ" residual (a stock already net of every earmark), not `income − expense`; it must not subtract expense again, since the residual was never income-derived. `simulateSurplusAllocation({ surplus, goals, split })` is unchanged: a pure, read-only what-if that distributes the surplus across goals per a UI-supplied split, capping each target at the goal's remaining headroom and the surplus left — it never mutates a goal, moves money, or produces a transfer draft. An unknown primary balance yields `surplus: "unknown"`, never `0`. Rendered by `SurplusPanel` (`src/components/jars/SurplusPanel.tsx`), which lives on `PlanTab` — currently unmounted along with the rest of the Kế hoạch tab (3-tab reformat; engine untouched), reading the merged `financials.goals`.
 - **Legacy Budget (dormant):** the flat per-category `Budget`/`evaluateBudget` (`src/domain/engine/budget.ts`) remains wired into `Financials.budgetLines` but is not surfaced in any screen alongside Hũ — Hũ is the only budgeting concept presented to the user. `pressure.ts` (`NEAR_THRESHOLD`, `statusOf`, `daysLeftIn`) still backs the legacy Budget's ok/near/over classification but is not used by the jar partition, which has its own boolean `isOverBudget`.
 
 ### Asset and liability module
@@ -145,12 +183,14 @@ Key shared components introduced by the refactor:
 - Manage manually declared assets and debts.
 - Store valuation timestamp and confidence.
 - Track debt terms and upcoming obligations.
+- **CRUD (implemented, `/pfm/wealth`):** `Providers.getUserAssets` / `getUserLiabilities` (return `{records, dropped}`) plus `create/update/deleteAsset` and `create/update/deleteLiability` (`src/providers/interfaces.ts`), backed by the shared `userRecordStore<T>()`. These are **persistence-only** — `listAssets()` / `listLiabilities()` stay **seed-only** and are never also merged in the provider layer. The single merge point is `ComposeOptions.userAssets` / `userLiabilities` in `finance-compose.ts`: user records are context state (`AssetLiabilityProvider`) threaded into `computeFinancials`'s `useMemo` deps, merged with seed data for `calculateNetWorth` and `upcomingObligations` exactly once — so a mutation recomputes net worth/debt health live, with no double-count. New self-reported records carry `source: "self_reported"`; a blank valuation stays `null` (`UnknownValue`), never `0`. Validation (`src/domain/models/asset-liability-input.ts`) is the sole gate between the form and a committed record: blank/NaN/negative/over-cap and enum-checked types are blocked client-side before they can reach storage.
 
 ### Goals module
 
 - Store target, deadline, current funding, priority, and contribution.
 - Calculate required periodic contribution.
 - Run deterministic completion scenarios.
+- **CRUD (engine + provider implemented; Kế hoạch tab UI currently unmounted, 3-tab reformat):** mirrors the asset/liability pattern exactly. `GoalDataProvider` (`listGoals` seed-only + `getUserGoals` + `create/update/deleteGoal`) is backed by the same `userRecordStore<GoalRecord>()`; `GoalProvider` (`src/state/goals.tsx`) is the context, `ComposeOptions.userGoals` is the single merge point (`Financials.goals = [...raw.goals, ...userGoals]`), and `useFinancials` threads it into the `useMemo` deps for live recompute. `GoalProjectionCard` exposes a direct-tap `simulateGoal` what-if (live monthly-contribution slider); a parity test (`goal-parity.test.ts`) asserts the chat tool's `simulateGoal` call returns the identical projection as the direct-tap UI (invariant #1).
 
 ### Insight module
 
@@ -305,7 +345,7 @@ BeneficiaryDataProvider  # saved payees for Tier B recipient resolution (findRec
 
 The mock provider supplies deterministic fixtures for the prototype. Production providers can later connect to MSB core banking, card, savings, or investment systems without changing calculation and presentation contracts.
 
-The composed `Providers` bundle (`src/providers/interfaces.ts`) also exposes `getJarConfig()` / `saveJarConfig()` — the first *write* pair on this interface, all other methods being reads. See "Spending jars" above for the mock persistence strategy and the intended real-adapter mapping.
+The composed `Providers` bundle (`src/providers/interfaces.ts`) also exposes the write methods `getJarConfig()`/`saveJarConfig()` (Hũ) and the CRUD pairs for user assets, liabilities, and goals (`getUserAssets`/`create·update·deleteAsset`, `getUserLiabilities`/`create·update·deleteLiability`, `getUserGoals`/`create·update·deleteGoal`) — all persistence-only, all backed by the mock adapter's shared `userRecordStore<T>()` (persona-scoped `localStorage`, versioned envelope, per-record guard). See "Spending jars" above and "Shared user-record CRUD infrastructure" in the IA section for the persistence strategy and the intended real-adapter mapping.
 
 ## Financial calculation rules
 
