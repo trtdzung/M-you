@@ -30,10 +30,17 @@ export interface TransferPurposeSuggestion {
   origin: ClassifyOrigin;
 }
 
-/** First valid purpose row for this txn, or undefined. */
+/**
+ * First valid purpose row for this txn, or undefined. `other` ("Khác") is
+ * rejected here: a suggestion of "Other" tells the user nothing and is noise they
+ * must undo — the local heuristic already refuses to emit it, and the AI path
+ * (which CAN return `other` when it can't tell) must follow the same policy.
+ */
 async function firstPurpose(classify: ClassifyFn, input: ClassifyInput): Promise<string | undefined> {
   const rows = await classify([input]);
-  const hit = rows.find((r) => r.txnId === input.txnId && isTransferPurpose(r.categoryId));
+  const hit = rows.find(
+    (r) => r.txnId === input.txnId && isTransferPurpose(r.categoryId) && r.categoryId !== "other",
+  );
   return hit?.categoryId;
 }
 
