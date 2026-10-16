@@ -7,16 +7,31 @@ export type QuickAction = {
   icon: LucideIcon;
   onClick?: () => void;
   href?: string;
+  /** Tiny "AI" tag at the button's top-right corner — flags an AI-assisted entry point. */
+  aiBadge?: boolean;
 };
 
 function ActionCell({ action, layout }: { action: QuickAction; layout: "grid" | "row" }) {
   const Icon = action.icon;
-  const cell =
+  const cell = cn(
+    "relative",
     layout === "grid"
       ? "flex min-h-[44px] flex-col items-center justify-center gap-2 rounded-[16px] px-2 py-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-      : "flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
+      : "flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+  );
   const inner = (
     <>
+      {action.aiBadge && (
+        <span
+          aria-hidden
+          className={cn(
+            "absolute right-1 top-0.5 font-bold leading-none tracking-wide text-negative",
+            layout === "grid" ? "text-[10px]" : "text-[8px]",
+          )}
+        >
+          AI
+        </span>
+      )}
       <Icon size={layout === "grid" ? 26 : 22} strokeWidth={1.8} className="text-text" />
       <span className="text-[12px] font-medium leading-tight text-text">{action.label}</span>
     </>

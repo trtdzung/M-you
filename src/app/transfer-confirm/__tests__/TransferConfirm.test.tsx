@@ -122,7 +122,6 @@ function txnByCategory(categoryId: string): MockTxn | undefined {
 }
 
 async function completeTransfer() {
-  fireEvent.change(screen.getByPlaceholderText("Bạn tự nhập OTP"), { target: { value: "1234" } });
   fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
   await screen.findByText("Chuyển tiền thành công");
 }
@@ -206,7 +205,6 @@ describe("TransferConfirm — always create + categorize", () => {
   it("double-submit creates only one txn (F#3)", async () => {
     h.draft = jarDraft();
     render(<TransferConfirm />);
-    fireEvent.change(screen.getByPlaceholderText("Bạn tự nhập OTP"), { target: { value: "1234" } });
     const btn = screen.getByRole("button", { name: "Xác nhận chuyển tiền" });
     fireEvent.click(btn);
     fireEvent.click(btn);
@@ -232,7 +230,6 @@ describe("TransferConfirm — always create + categorize", () => {
     h.draft = jarDraft();
     h.listAccounts.mockRejectedValueOnce(new Error("provider down"));
     render(<TransferConfirm />);
-    fireEvent.change(screen.getByPlaceholderText("Bạn tự nhập OTP"), { target: { value: "1234" } });
     const btn = screen.getByRole("button", { name: "Xác nhận chuyển tiền" });
 
     fireEvent.click(btn);
@@ -344,7 +341,6 @@ describe("TransferConfirm — funding top-up (Approach A: spread-as-spend)", () 
       sourceLabel: "Hũ Ăn uống", sourceJarId: "food", sourceAccountId: "acc1", plannedReallocation: true,
     };
     render(<TransferConfirm />);
-    fireEvent.change(screen.getByPlaceholderText("Bạn tự nhập OTP"), { target: { value: "1234" } });
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
 
     await screen.findByText(/Số dư không đủ để hoàn tất giao dịch/);

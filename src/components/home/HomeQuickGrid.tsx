@@ -21,7 +21,7 @@ const noop = () => {};
  * demo chưa có màn.
  */
 const ACTIONS: QuickAction[] = [
-  { label: "Chuyển tiền", icon: ArrowUpRight, href: "/transfer" },
+  { label: "Chuyển tiền", icon: ArrowUpRight, href: "/transfer", aiBadge: true },
   { label: "Quét QR", icon: ScanLine, onClick: noop },
   { label: "Tiền gửi", icon: PiggyBank, onClick: noop },
   { label: "Thẻ", icon: CreditCard, onClick: noop },
@@ -31,7 +31,7 @@ const ACTIONS: QuickAction[] = [
 
 const FOOTER: QuickAction[] = [
   { label: "Rewards", icon: Award, onClick: noop },
-  { label: "PFM", icon: PieChart, href: "/pfm" },
+  { label: "PFM", icon: PieChart, href: "/pfm", aiBadge: true },
   { label: "Xem thêm", icon: LayoutGrid, onClick: noop },
 ];
 
