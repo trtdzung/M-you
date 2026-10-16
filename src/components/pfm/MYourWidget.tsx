@@ -30,6 +30,7 @@ interface ChatBubble {
 const GREETING = "Xin chào 👋 Mình là M-Your. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
 const DELETE_LOCK_MS = 30_000;
+const VOICE_WORD_REVEAL_MS = 70;
 
 function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
   return messages.map((m, i) => ({
@@ -38,6 +39,16 @@ function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
     text: m.content,
     ui: m.ui,
   }));
+}
+
+function composeVoiceDraft(prefix: string, transcript: string) {
+  return [prefix, transcript].filter(Boolean).join(" ");
+}
+
+function sharedWordPrefix(left: string[], right: string[]) {
+  let length = 0;
+  while (length < left.length && length < right.length && left[length] === right[length]) length += 1;
+  return length;
 }
 
 /**
@@ -66,11 +77,48 @@ export function MYourWidget() {
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voicePrefix = useRef("");
-  const voice = useStreamingSpeech((text) => {
-    setInput([voicePrefix.current, text].filter(Boolean).join(" "));
-  });
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealedTranscriptRef = useRef("");
+
+  const clearVoiceReveal = useCallback(() => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = null;
+  }, []);
+
+  const revealVoiceTranscript = useCallback((text: string, final: boolean) => {
+    clearVoiceReveal();
+    const target = text.trim();
+    if (final) {
+      revealedTranscriptRef.current = target;
+      setInput(composeVoiceDraft(voicePrefix.current, target));
+      return;
+    }
+
+    const visibleWords = revealedTranscriptRef.current.match(/\S+/g) ?? [];
+    const targetWords = target.match(/\S+/g) ?? [];
+    let position = sharedWordPrefix(visibleWords, targetWords);
+
+    // A revised hypothesis can change earlier words. Keep only its stable prefix
+    // before revealing the newer words, so the composer never appends stale text.
+    revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
+    setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
+
+    const revealNext = () => {
+      if (position >= targetWords.length) return;
+      position += 1;
+      revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
+      setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
+      if (position < targetWords.length) revealTimerRef.current = setTimeout(revealNext, VOICE_WORD_REVEAL_MS);
+    };
+    revealNext();
+  }, [clearVoiceReveal]);
+
+  const voice = useStreamingSpeech(revealVoiceTranscript);
   const voiceBusy = voice.state !== "idle";
-  const cancelVoice = voice.cancel;
+  const cancelVoice = useCallback(() => {
+    clearVoiceReveal();
+    voice.cancel();
+  }, [clearVoiceReveal, voice.cancel]);
 
   useEffect(() => {
     cancelVoice();
@@ -101,8 +149,9 @@ export function MYourWidget() {
   useEffect(() => {
     return () => {
       if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+      clearVoiceReveal();
     };
-  }, []);
+  }, [clearVoiceReveal]);
 
   const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
 
@@ -268,7 +317,12 @@ export function MYourWidget() {
                 type="button"
                 onClick={() => {
                   if (voiceBusy) voice.stop();
-                  else { voicePrefix.current = input.trim(); voice.start(); }
+                  else {
+                    clearVoiceReveal();
+                    voicePrefix.current = input.trim();
+                    revealedTranscriptRef.current = "";
+                    voice.start();
+                  }
                 }}
                 disabled={composerDisabled || voice.state === "finishing"}
                 aria-label={voice.state === "connecting" ? "Hủy kết nối micro" : voiceBusy ? "Dừng ghi âm" : "Nhập bằng giọng nói"}
