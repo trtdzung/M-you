@@ -57,6 +57,8 @@ export interface Transaction {
    * (invariant #3). Absent for internal/merchant transactions.
    */
   counterpartyAccountNumber?: string;
+  /** The counterparty's bank, as recorded on the original transfer. Absent when unknown. */
+  counterpartyBankName?: string;
 }
 
 export interface TransactionQuery {
@@ -95,10 +97,16 @@ export interface Account {
   tier?: string;
   /**
    * Display-safe account number, already masked to the last 4 digits
-   * (e.g. "•••• 1991"). The full number is never carried on this UI-facing model.
+   * (e.g. "•••• 1991"). Most screens (Trang chủ, Tài khoản tab) show this form.
    * Provenance follows `source`; presentation-only.
    */
   maskedNumber: string;
+  /**
+   * Full account number. Shown where the flow calls for it unmasked (e.g. the
+   * "Tài khoản nguồn" picker in Chuyển tiền, matching how a recipient's own
+   * account number is shown in full). Provenance follows `source`.
+   */
+  accountNumber: string;
 }
 
 // ---------------------------------------------------------------------------

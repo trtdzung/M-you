@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { isChartUi, type ChartUi } from "./agent-api";
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body } as Response;
@@ -82,5 +83,57 @@ describe("deleteChatHistory", () => {
 
     const { deleteChatHistory } = await import("./agent-api");
     await expect(deleteChatHistory("CIF_0001")).rejects.toThrow("Agent API error 502");
+  });
+});
+
+describe("isChartUi", () => {
+  const validPie: ChartUi = {
+    type: "chart",
+    chart_type: "pie",
+    title: "Chi tiêu theo danh mục",
+    labels: ["Mua sắm", "Ăn uống"],
+    series: [{ name: "VND", data: [16280000, 10500000] }],
+  };
+
+  it("is true for a well-formed chart payload", () => {
+    expect(isChartUi(validPie)).toBe(true);
+  });
+
+  it("is true for bar/line with multiple series, each matching labels length", () => {
+    expect(
+      isChartUi({
+        type: "chart",
+        chart_type: "bar",
+        title: "Thu chi 3 tháng",
+        labels: ["06", "07", "08"],
+        series: [
+          { name: "Thu", data: [1, 2, 3] },
+          { name: "Chi", data: [4, 5, 6] },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("is false for null/undefined", () => {
+    expect(isChartUi(null)).toBe(false);
+    expect(isChartUi(undefined)).toBe(false);
+  });
+
+  it("is false for other/unsupported ui types (never throws)", () => {
+    expect(isChartUi({ type: "transfer_form" })).toBe(false);
+    expect(isChartUi({ type: "create_jar" })).toBe(false);
+  });
+
+  it("is false for an invalid chart_type", () => {
+    expect(isChartUi({ ...validPie, chart_type: "scatter" } as unknown as ChartUi)).toBe(false);
+  });
+
+  it("is false when a series' data length doesn't match labels length", () => {
+    expect(isChartUi({ ...validPie, series: [{ name: "VND", data: [1] }] })).toBe(false);
+  });
+
+  it("is false when series is empty or missing", () => {
+    expect(isChartUi({ ...validPie, series: [] })).toBe(false);
+    expect(isChartUi({ type: "chart", chart_type: "pie", title: "t", labels: [] })).toBe(false);
   });
 });

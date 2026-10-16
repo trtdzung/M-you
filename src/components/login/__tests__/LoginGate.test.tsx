@@ -1,8 +1,11 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { PersonaProvider, usePersona } from "@/providers/context";
 import { LOGIN_PASSWORD } from "@/lib/auth";
 import { LoginGate } from "../LoginGate";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 /**
  * The login gate is the app's front door: renders `LoginScreen` until a sample
@@ -27,6 +30,7 @@ function renderGate() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  push.mockClear();
 });
 
 describe("LoginGate", () => {
@@ -57,6 +61,20 @@ describe("LoginGate", () => {
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
 
     expect(screen.getByText("Persona hiện tại: irregular")).toBeInTheDocument();
+  });
+
+  it("sends the user to Trang chủ after logging in, regardless of which screen they started on", () => {
+    renderGate();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), {
+      target: { value: "CIF_0001" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
+      target: { value: LOGIN_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+
+    expect(push).toHaveBeenCalledWith("/");
   });
 
   it("stays clickable and shows an error when the password is typed before a customer is chosen", () => {

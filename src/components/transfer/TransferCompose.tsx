@@ -2,27 +2,46 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldAlert, TriangleAlert } from "lucide-react";
-import { Card, SourceBadge } from "@/components/primitives";
+import { Home, QrCode } from "lucide-react";
 import { useProviders } from "@/providers/context";
+import { useJarConfig } from "@/state/jars";
+import { useFinancials } from "@/state/useFinancials";
 import { putTransferDraft } from "@/lib/transfer-draft-store";
 import { assessTransferRisk } from "@/lib/transfer-risk";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
-import { AmountMemoFields } from "./AmountMemoFields";
-import { RecipientPicker, type SelectedRecipient } from "./RecipientPicker";
+import { TransferHeader } from "./TransferHeader";
+import { type SelectedRecipient } from "./RecipientPicker";
+import { TransferAccountPicker } from "./TransferAccountPicker";
+import { TransferBankEntry } from "./TransferBankEntry";
+import { TransferAmountStep } from "./TransferAmountStep";
+
+type Step = "pick" | "bank-entry" | "amount";
 
 export function TransferCompose() {
   const providers = useProviders();
   const router = useRouter();
+  const { config: jarConfig } = useJarConfig();
+  const { financials } = useFinancials();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [step, setStep] = useState<Step>("pick");
   const [recipient, setRecipient] = useState<SelectedRecipient | null>(null);
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [sourceAccountId, setSourceAccountId] = useState("");
+
+  function selectRecipient(next: SelectedRecipient) {
+    setRecipient(next);
+    setStep("amount");
+  }
+
+  function backToPick() {
+    setRecipient(null);
+    setStep("pick");
+  }
 
   useEffect(() => {
     let active = true;
@@ -31,7 +50,7 @@ export function TransferCompose() {
     Promise.all([providers.listBeneficiaries(), providers.listTransactions(), providers.listAccounts()])
       .then(([nextBeneficiaries, nextTransactions, nextAccounts]) => {
         if (!active) return;
-        const eligibleAccounts = nextAccounts.filter((account) => account.type !== "credit_card");
+        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current");
         setBeneficiaries(nextBeneficiaries);
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
@@ -41,6 +60,15 @@ export function TransferCompose() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [providers]);
+
+  const jars = useMemo(
+    () =>
+      jarConfig.jars.map((jar) => ({
+        ...jar,
+        remaining: financials?.jarBudget.lines.find((line) => line.huId === jar.id)?.remaining ?? null,
+      })),
+    [jarConfig, financials],
+  );
 
   const numericAmount = Number(amount);
   const selectedAccount = accounts.find((account) => account.id === sourceAccountId);
@@ -64,26 +92,52 @@ export function TransferCompose() {
     router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`);
   }
 
-  if (loading) return <p role="status" className="py-6 text-sm text-muted">Đang tải thông tin chuyển tiền…</p>;
-  if (error) return <p role="alert" className="rounded-xl bg-negative-soft p-3 text-sm text-negative">Không thể tải thông tin lúc này. Vui lòng thử lại.</p>;
+  let content: React.ReactNode;
+  if (loading) {
+    content = <p role="status" className="py-6 text-sm text-muted">Đang tải thông tin chuyển tiền…</p>;
+  } else if (error) {
+    content = <p role="alert" className="rounded-xl bg-negative-soft p-3 text-sm text-negative">Không thể tải thông tin lúc này. Vui lòng thử lại.</p>;
+  } else if (step === "pick") {
+    content = (
+      <TransferAccountPicker
+        beneficiaries={beneficiaries}
+        transactions={transactions}
+        onSelectRecipient={selectRecipient}
+        onEnterBankDetails={() => setStep("bank-entry")}
+      />
+    );
+  } else if (step === "bank-entry") {
+    content = <TransferBankEntry onContinue={selectRecipient} onBack={() => setStep("pick")} />;
+  } else if (recipient) {
+    content = (
+      <>
+        {accounts.length === 0 && <p role="alert" className="mx-4 mb-2 text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
+        <TransferAmountStep
+          recipient={recipient}
+          accounts={accounts}
+          jars={jars}
+          sourceAccountId={sourceAccountId}
+          amount={amount}
+          memo={memo}
+          canContinue={canContinue}
+          onChangeRecipient={backToPick}
+          onSourceChange={setSourceAccountId}
+          onAmountChange={setAmount}
+          onMemoChange={setMemo}
+          onContinue={continueToConfirm}
+        />
+      </>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex items-start gap-2 bg-primary-soft/40">
-        <ShieldAlert size={16} className="mt-0.5 shrink-0 text-primary" />
-        <p className="text-[11px] leading-snug text-muted">Bước này chỉ tạo bản nháp để bạn tự kiểm tra và xác nhận.</p>
-      </Card>
-      <Card><RecipientPicker beneficiaries={beneficiaries} transactions={transactions} onChange={setRecipient} /></Card>
-      <Card><AmountMemoFields amount={amount} memo={memo} accounts={accounts} sourceAccountId={sourceAccountId} onAmountChange={setAmount} onMemoChange={setMemo} onSourceChange={setSourceAccountId} /></Card>
-      {riskFlags.length > 0 && <Card className="flex items-start gap-2 bg-warning-soft" role="alert">
-        <TriangleAlert size={17} className="mt-0.5 shrink-0 text-warning" />
-        <div className="text-sm text-warning"><p className="font-semibold">Cần kiểm tra kỹ</p><p className="mt-0.5">{riskFlags.includes("over_threshold") ? "Số tiền từ ngưỡng cảnh báo trở lên. " : ""}{riskFlags.includes("new_payee") ? "Đây là người nhận mới." : ""}</p></div>
-      </Card>}
-      {accounts.length === 0 && <p role="alert" className="text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
-      <button type="button" disabled={!canContinue} onClick={continueToConfirm} className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45">
-        Tiếp tục <ArrowRight size={16} />
-      </button>
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted"><SourceBadge source="mock" /></div>
+    <div className="flex h-full flex-col">
+      {step === "pick" ? (
+        <TransferHeader onBack={() => router.back()} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
+      ) : (
+        <TransferHeader onBack={() => router.back()} rightIcon={<Home size={20} strokeWidth={2} />} rightLabel="Về trang chủ" onRightClick={() => router.push("/")} />
+      )}
+      <div className="flex min-h-0 flex-1 flex-col">{content}</div>
     </div>
   );
 }

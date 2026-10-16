@@ -5,13 +5,15 @@ import { Send, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Loading, ErrorState } from "@/components/states";
 import { usePersona } from "@/providers/context";
-import { getChatHistory, sendChatMessage, deleteChatHistory, type HistoryMessage } from "@/lib/agent-api";
+import { getChatHistory, sendChatMessage, deleteChatHistory, isChartUi, type HistoryMessage, type UiPayload } from "@/lib/agent-api";
 import { AgentMarkdown } from "./AgentMarkdown";
+import { AgentChartCard } from "./AgentChartCard";
 
 interface ChatBubble {
   id: string;
   role: "user" | "agent";
   text: string;
+  ui?: UiPayload;
   error?: boolean;
 }
 
@@ -24,6 +26,7 @@ function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
     id: `h${i}`,
     role: m.role === "user" ? "user" : "agent",
     text: m.content,
+    ui: m.ui,
   }));
 }
 
@@ -84,7 +87,7 @@ export function MYourWidget() {
     setSending(true);
     try {
       const res = await sendChatMessage(text, cif);
-      setMessages((prev) => [...prev, { id: replyId, role: "agent", text: res.answer }]);
+      setMessages((prev) => [...prev, { id: replyId, role: "agent", text: res.answer, ui: res.ui }]);
     } catch {
       setMessages((prev) => [...prev, { id: replyId, role: "agent", text: SEND_ERROR, error: true }]);
     } finally {
@@ -195,7 +198,7 @@ export function MYourWidget() {
                   </div>
                 )}
                 {messages.map((m) => (
-                  <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+                  <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
                     <div
                       className={cn(
                         "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
@@ -208,6 +211,7 @@ export function MYourWidget() {
                     >
                       {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
                     </div>
+                    {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
                   </div>
                 ))}
                 {sending && (
