@@ -21,7 +21,11 @@ export function ChartFrame({
 
   return (
     <div role="img" aria-label={label} style={{ height }} className="w-full">
-      {mounted ? children : <div className="h-full w-full animate-pulse rounded-md bg-surface-muted" />}
+      {mounted ? (
+        children
+      ) : (
+        <div className="shimmer h-full w-full rounded-[16px]" aria-hidden />
+      )}
     </div>
   );
 }

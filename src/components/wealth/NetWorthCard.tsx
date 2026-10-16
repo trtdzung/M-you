@@ -19,7 +19,7 @@ export function NetWorthCard({ networth }: { networth: NetWorthResult }) {
         <Freshness at={networth.meta.freshness} />
       </div>
       {networth.hasUnknown && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg bg-warning-soft/50 p-2 text-xs text-warning">
+        <div className="mt-3 flex items-start gap-2 rounded-[16px] bg-warning-soft/60 p-3 text-xs text-warning">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>{networth.unknownFields.join(", ")} chưa có giá trị nên không được cộng vào tổng.</span>
         </div>

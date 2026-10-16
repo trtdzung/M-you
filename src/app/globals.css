@@ -1,23 +1,29 @@
 @import "tailwindcss";
 
-/* MSB PFM design tokens — mobile-first bank-app aesthetic */
+/* MSB PFM design tokens — reskin bám app MSB thật (ref-ui-msb/) */
 @theme {
-  /* Fonts */
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* Fonts — Be Vietnam Pro (nạp qua next/font, var --font-be-vietnam) */
+  --font-sans: var(--font-be-vietnam), "Be Vietnam Pro", system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /* Surfaces & text */
-  --color-background: #f4f5f7;
+  --color-background: #fbe9e3; /* blush nền màn con */
+  --color-background-soft: #fdf3ef;
   --color-surface: #ffffff;
-  --color-surface-muted: #f8fafc;
-  --color-text: #0f172a;
-  --color-muted: #64748b;
-  --color-border: #e2e8f0;
+  --color-surface-tint: #fceee7; /* card peach (quick-actions) */
+  --color-surface-muted: #fdf3ef;
+  --color-text: #1f2a44; /* mực navy */
+  --color-ink-soft: #2a3654;
+  --color-muted: #5f6775; /* đủ tương phản AA trên cả blush và trắng */
+  --color-border: #f0e2db; /* divider rất nhạt, không viền cứng */
 
-  /* Brand */
-  --color-primary: #d81f36;
+  /* Brand — cam-đỏ MSB */
+  --color-primary: #f26522;
+  --color-primary-strong: #c2410c; /* cam đậm — chữ trên nền peach (AA) */
   --color-primary-fg: #ffffff;
-  --color-primary-soft: #fde8ea;
+  --color-primary-soft: #fce3d7;
+  --color-brand-red: #e8321e;
+  --color-brand-orange: #f5822c;
 
   /* Semantic money colors */
   --color-positive: #16a34a;
@@ -27,7 +33,7 @@
   --color-warning: #d97706;
   --color-warning-soft: #fef3c7;
 
-  /* Source-label palette */
+  /* Source-label palette (giữ nguyên) */
   --color-source-msb: #1d4ed8;
   --color-source-msb-soft: #dbeafe;
   --color-source-self: #7c3aed;
@@ -37,14 +43,16 @@
   --color-source-mock: #64748b;
   --color-source-mock-soft: #e2e8f0;
 
-  /* Radii */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* Radii — MSB card rất tròn */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-card: 24px;
+  --radius-row: 16px;
 
-  /* Phone frame width */
-  --spacing-phone: 420px;
+  /* Phone frame width — chuẩn iPhone 17 Pro Max (440pt) */
+  --spacing-phone: 440px;
 }
 
 html,
@@ -62,4 +70,68 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Gradient thương hiệu — hero Overview, banner.
+   Đủ tối để icon/logo trắng (large/UI) đạt ≥3:1 dọc toàn dải. Không đặt chữ
+   thường (normal-size) lên gradient — số/nhãn nằm trên card trắng đè lên. */
+.brand-gradient {
+  background-image: linear-gradient(135deg, #e2301c 0%, #f2621f 100%);
+}
+
+/* Soft shadow chuẩn MSB (dùng qua utility shadow-card / shadow-nav nếu cần) */
+@utility shadow-card {
+  box-shadow: 0 8px 24px -10px rgba(31, 42, 68, 0.14);
+}
+@utility shadow-nav {
+  box-shadow: 0 10px 30px -8px rgba(31, 42, 68, 0.22);
+}
+
+/* Motion — nhẹ, tôn trọng prefers-reduced-motion */
+@keyframes shimmer {
+  from {
+    background-position: -150% 0;
+  }
+  to {
+    background-position: 250% 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Shimmer peach cho skeleton loading */
+@utility shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-surface-tint) 0%,
+    #fff7f3 50%,
+    var(--color-surface-tint) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* Fade nội dung khi đổi route / xuất hiện */
+@utility fade-in {
+  animation: fade-in 0.24s ease-out;
+}
+
+/* Bắt buộc: vô hiệu hoá chuyển động khi người dùng yêu cầu giảm chuyển động */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { monthPeriodFromKey } from "@/domain/engine";
 import { ScreenHeader } from "@/components/shell/ScreenHeader";
-import { Card, SectionHeader } from "@/components/primitives";
-import { Empty, ErrorState, Loading } from "@/components/states";
+import { Card, SectionHeader, SourceBadge } from "@/components/primitives";
+import { Empty, ErrorState, SkeletonCard, SkeletonRow, SkeletonScreen } from "@/components/states";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
 import { BudgetList } from "@/components/budget/BudgetList";
 import { TxnRow } from "@/components/transactions/TxnRow";
@@ -41,13 +41,27 @@ export default function TransactionsPage() {
         <span className="text-xs text-muted">{rows.length} giao dịch</span>
       </div>
 
-      {loading && <Loading />}
+      {loading && (
+        <SkeletonScreen>
+          <SkeletonCard className="h-40" />
+          <div className="flex flex-col gap-2">
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </div>
+        </SkeletonScreen>
+      )}
       {error && <ErrorState />}
 
       {!loading && !error && financials && (
         <>
           <section className="mb-6">
-            <SectionHeader title="Ngân sách tháng" subtitle="Mức chi so với hạn mức" />
+            <SectionHeader
+              title="Ngân sách tháng"
+              subtitle="Mức chi so với hạn mức"
+              action={<SourceBadge source="self_reported" />}
+            />
             <Card>
               {financials.budgetLines.length > 0 ? (
                 <BudgetList lines={financials.budgetLines} />
@@ -63,7 +77,7 @@ export default function TransactionsPage() {
               <TxnFilters value={filters} onChange={setFilters} />
             </div>
             {rows.length > 0 ? (
-              <Card className="divide-y divide-border p-2">
+              <Card className="divide-y divide-border">
                 {rows.map((t) => (
                   <TxnRow key={t.id} txn={t} onEdit={setEditing} />
                 ))}

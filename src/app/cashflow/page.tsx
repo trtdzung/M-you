@@ -1,8 +1,8 @@
 "use client";
 
 import { ScreenHeader } from "@/components/shell/ScreenHeader";
-import { Card, Money, SectionHeader, Stat } from "@/components/primitives";
-import { Empty, ErrorState, InsufficientData, Loading } from "@/components/states";
+import { Card, Freshness, Money, SectionHeader, Stat } from "@/components/primitives";
+import { Empty, ErrorState, InsufficientData, SkeletonCard, SkeletonScreen } from "@/components/states";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
 import { DeltaBadge } from "@/components/common/DeltaBadge";
 import { IncomeExpenseChart } from "@/components/charts/IncomeExpenseChart";
@@ -20,7 +20,13 @@ export default function CashflowPage() {
         <PeriodPicker />
       </div>
 
-      {loading && <Loading />}
+      {loading && (
+        <SkeletonScreen>
+          <SkeletonCard className="h-32" />
+          <SkeletonCard className="h-52" />
+          <SkeletonCard className="h-40" />
+        </SkeletonScreen>
+      )}
       {error && <ErrorState />}
 
       {!loading && !error && financials && (
@@ -39,6 +45,9 @@ export default function CashflowPage() {
                 Đang chờ xử lý: <Money amount={financials.cashflow.pendingExpense} className="text-warning" /> (chưa tính vào tổng)
               </p>
             )}
+            <div className="mt-3 border-t border-border pt-3">
+              <Freshness at={financials.cashflow.meta.freshness} />
+            </div>
           </Card>
 
           <section>

@@ -1,20 +1,34 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-/** Rounded surface container used as the base building block for sections. */
+type Variant = "plain" | "tint" | "hero";
+
+const VARIANTS: Record<Variant, string> = {
+  plain: "bg-surface text-text shadow-card",
+  tint: "bg-surface-tint text-text shadow-card",
+  hero: "brand-gradient text-primary-fg shadow-card",
+};
+
+/**
+ * Rounded surface container — MSB style: borderless, rất tròn, soft shadow.
+ * `variant`: plain (trắng) · tint (peach) · hero (gradient thương hiệu).
+ */
 export function Card({
   children,
   className,
   as: Tag = "div",
+  variant = "plain",
 }: {
   children: ReactNode;
   className?: string;
   as?: "div" | "section" | "article";
+  variant?: Variant;
 }) {
   return (
     <Tag
       className={cn(
-        "rounded-lg border border-border bg-surface p-4 shadow-sm",
+        "rounded-[24px] p-5",
+        VARIANTS[variant],
         className,
       )}
     >

@@ -7,13 +7,13 @@ import { usePeriod } from "@/state/period";
 export function PeriodPicker() {
   const { month, setMonth, options } = usePeriod();
   return (
-    <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm">
-      <Calendar size={16} className="text-muted" />
+    <label className="shadow-card inline-flex min-h-[44px] items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/50">
+      <Calendar size={16} className="text-primary" />
       <span className="sr-only">Chọn tháng</span>
       <select
         value={month}
         onChange={(e) => setMonth(e.target.value)}
-        className="bg-transparent text-sm font-medium text-text outline-none"
+        className="bg-transparent text-sm font-semibold text-text outline-none"
       >
         {options.map((o) => (
           <option key={o.key} value={o.key}>

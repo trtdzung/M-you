@@ -14,7 +14,7 @@ export function Empty({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface-muted px-6 py-12 text-center">
+    <div className="shadow-card flex flex-col items-center justify-center gap-3 rounded-[24px] bg-surface-tint px-6 py-12 text-center">
       <div className="text-muted">{icon ?? <Inbox size={40} strokeWidth={1.5} />}</div>
       <div>
         <p className="text-base font-semibold text-text">{title}</p>

@@ -17,10 +17,8 @@ export function Stat({
 }) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <span className="text-xs font-medium uppercase tracking-wide text-muted">
-        {label}
-      </span>
-      <span className="text-lg font-semibold text-text">{value}</span>
+      <span className="text-[13px] font-medium text-muted">{label}</span>
+      <span className="text-lg font-bold text-text">{value}</span>
       {(hint || badge) && (
         <span className="flex items-center gap-2 text-xs text-muted">
           {badge}
