@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
-import { PhoneShell } from "@/components/shell/PhoneShell";
-import { BottomNav } from "@/components/shell/BottomNav";
-import { AssistantFab } from "@/components/shell/AssistantFab";
 import { AppProviders } from "./providers";
 
 const beVietnam = Be_Vietnam_Pro({
@@ -25,15 +22,18 @@ export const viewport: Viewport = {
   themeColor: "#f26522",
 };
 
+/**
+ * Thin root: `<html><body>` + app providers only. No chrome — each route group
+ * ((festive) and pfm) mounts its own `PhoneShell` skin, so PFM can drop the
+ * festive photo + bottom nav while every other route keeps them.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi" className={beVietnam.variable}>
       <body>
-        <PhoneShell nav={<BottomNav />} fab={<AssistantFab />}>
-          <AppProviders>{children}</AppProviders>
-        </PhoneShell>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

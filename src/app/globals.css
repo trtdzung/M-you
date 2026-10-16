@@ -74,8 +74,8 @@ body {
 }
 
 body {
-  /* Nền do lớp phủ toàn màn "2/9" trong PhoneShell đảm nhận — body trong suốt để
-     ảnh nền hiện xuyên qua (thay cho blush đặc trước đây). */
+  /* Nền do lớp `background` slot của mỗi group layout đảm nhận (festive: ảnh 2/9;
+     PFM: peach wash). Body trong suốt để lớp nền trong PhoneShell hiện xuyên qua. */
   background-color: transparent;
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -89,6 +89,19 @@ body {
 /* Shared shell offsets: physical phone insets on mobile, reference insets elsewhere. */
 .shell-main {
   padding-bottom: calc(var(--spacing-shell-nav-clearance) + var(--safe-area-bottom));
+}
+
+/* PFM main: no bottom nav — only the floating FAB needs clearance, so content
+   reclaims the ~104px the 3-tab bar used to reserve. Must follow `.shell-main`
+   (equal specificity → source order wins). */
+.shell-main--pfm {
+  padding-bottom: calc(var(--spacing-shell-fab-clearance) + var(--safe-area-bottom));
+}
+
+/* Calm PFM shell: navy status-bar ink over the light peach surface (festive keeps
+   the default white ink over its dark 2/9 photo). */
+.shell-calm {
+  --shell-ink: var(--color-text);
 }
 
 .shell-bottom-nav {

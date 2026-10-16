@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
@@ -53,22 +53,22 @@ function renderScreen(ui: ReactElement) {
 
 describe("route smoke — all screens mount", () => {
   it("Home (/)", async () => {
-    const { default: Page } = await import("../page");
+    const { default: Page } = await import("../(festive)/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
   it("Accounts (/accounts)", async () => {
-    const { default: Page } = await import("../accounts/page");
+    const { default: Page } = await import("../(festive)/accounts/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
   it("Account detail (/accounts/[id])", async () => {
-    const { default: Page } = await import("../accounts/[id]/page");
+    const { default: Page } = await import("../(festive)/accounts/[id]/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
   it("Transactions (/transactions)", async () => {
-    const { default: Page } = await import("../transactions/page");
+    const { default: Page } = await import("../(festive)/transactions/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
@@ -82,47 +82,98 @@ describe("route smoke — all screens mount", () => {
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
-  it("PFM cashflow (/pfm/cashflow)", async () => {
+  it("PFM cashflow (/pfm/cashflow) redirects to the host tab param", async () => {
+    redirect.mockClear();
     const { default: Page } = await import("../pfm/cashflow/page");
-    expect(() => renderScreen(<Page />)).not.toThrow();
+    Page();
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=cashflow");
   });
 
-  it("PFM wealth (/pfm/wealth)", async () => {
+  it("PFM wealth (/pfm/wealth) redirects to the host tab param", async () => {
+    redirect.mockClear();
     const { default: Page } = await import("../pfm/wealth/page");
-    expect(() => renderScreen(<Page />)).not.toThrow();
+    Page();
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=wealth");
   });
 
-  it("PFM insights (/pfm/insights)", async () => {
+  it("PFM insights (/pfm/insights) redirects to the host tab param", async () => {
+    redirect.mockClear();
     const { default: Page } = await import("../pfm/insights/page");
-    expect(() => renderScreen(<Page />)).not.toThrow();
+    Page();
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=insights");
   });
 
   it("Settings (/settings)", async () => {
-    const { default: Page } = await import("../settings/page");
+    const { default: Page } = await import("../(festive)/settings/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
   it("Transfer confirm (/transfer-confirm)", async () => {
-    const { TransferConfirm } = await import("../transfer-confirm/TransferConfirm");
+    const { TransferConfirm } = await import("../(festive)/transfer-confirm/TransferConfirm");
     expect(() => renderScreen(<TransferConfirm />)).not.toThrow();
   });
 
   it("Transfer compose (/transfer)", async () => {
-    const { default: Page } = await import("../transfer/page");
+    const { default: Page } = await import("../(festive)/transfer/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
-  it("legacy /cashflow redirects to /pfm/cashflow", async () => {
+  it("legacy /cashflow redirects directly to /pfm?tab=cashflow", async () => {
     redirect.mockClear();
-    const { default: Page } = await import("../cashflow/page");
+    const { default: Page } = await import("../(festive)/cashflow/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm/cashflow");
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=cashflow");
   });
 
-  it("legacy /wealth redirects to /pfm/wealth", async () => {
+  it("legacy /wealth redirects directly to /pfm?tab=wealth", async () => {
     redirect.mockClear();
-    const { default: Page } = await import("../wealth/page");
+    const { default: Page } = await import("../(festive)/wealth/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm/wealth");
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=wealth");
+  });
+});
+
+/**
+ * Chrome-separation guards (plan 260908-pfm-chrome-redesign): the whole point of
+ * the route-group split is that `/pfm/*` sheds the festive photo + 3-tab bottom
+ * bar and gains a calm sub-app shell, while every other route keeps the festive
+ * chrome. These assertions fail if PFM ever regains the bottom nav / festive bg,
+ * or if the festive routes lose theirs.
+ */
+describe("chrome separation — PFM calm shell vs festive shell", () => {
+  it("PFM: PfmHeader + 4 tabs, no BottomNav, no 2/9 festive bg", async () => {
+    const { default: PfmLayout } = await import("../pfm/layout");
+    const { default: PfmPage } = await import("../pfm/page");
+    const { container } = renderScreen(
+      <PfmLayout>
+        <PfmPage />
+      </PfmLayout>,
+    );
+
+    // Back-arrow sub-app header → Home
+    expect(screen.getByLabelText("Về Trang chủ")).toHaveAttribute("href", "/");
+
+    // The 4 segmented tabs are the sole PFM navigation
+    const tablist = screen.getByRole("tablist", { name: "Phân mục PFM" });
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(4);
+    for (const label of ["Tổng quan", "Dòng tiền", "Tài sản", "Gợi ý"]) {
+      expect(within(tablist).getByText(label)).toBeInTheDocument();
+    }
+
+    // No 3-tab MSB bottom nav, no 2/9 festive photo background
+    expect(screen.queryByLabelText("Điều hướng chính")).toBeNull();
+    expect(container.innerHTML).not.toContain("bg-2-9");
+  });
+
+  it("Festive: BottomNav + 2/9 festive bg still present (regression guard)", async () => {
+    const { default: FestiveLayout } = await import("../(festive)/layout");
+    const { container } = renderScreen(
+      <FestiveLayout>
+        <div />
+      </FestiveLayout>,
+    );
+
+    expect(screen.getByLabelText("Điều hướng chính")).toBeInTheDocument();
+    expect(container.innerHTML).toContain("bg-2-9");
   });
 });
