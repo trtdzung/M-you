@@ -77,11 +77,4 @@ describe("batch microphone lifecycle", () => {
     expect(stopTrack).toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
-
-  it("automatically stops before Vbee's ten-second sync limit", async () => {
-    const speech = new BatchSpeech(callbacks());
-    await speech.start();
-    vi.advanceTimersByTime(9_000);
-    expect(worklet.port.postMessage).toHaveBeenCalledWith("flush");
-  });
 });

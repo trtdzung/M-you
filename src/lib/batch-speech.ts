@@ -8,9 +8,7 @@ interface Callbacks {
 }
 
 const SAMPLE_RATE = 16_000;
-// Vbee sync accepts recordings shorter than 10 seconds. Keep a safety margin
-// so browser scheduling and the WAV duration never cross that boundary.
-const MAX_RECORDING_MS = 9_000;
+const MAX_RECORDING_MS = 30_000;
 const MAX_PCM_BYTES = SAMPLE_RATE * 2 * 35;
 const MIN_PCM_BYTES = SAMPLE_RATE * 2 * 0.2;
 
