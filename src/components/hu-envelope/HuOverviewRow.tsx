@@ -45,12 +45,13 @@ export function HuOverviewRow({
   const { pending, jars } = financials.jarEnvelope;
   const overAllocated = financials.unallocatedPool.overAllocated;
 
-  // The "Chưa gắn nhãn" card is a data-quality prompt, not a jar — it must show
-  // even when NO jars exist (RT#11: the old `jars.length===0` early-return hid it
-  // exactly when 100% of spend is unlabeled). Optional-chained so partial-
-  // `Financials` fixtures (no `unlabeled`) simply skip it.
+  // The "Chưa gắn nhãn" (hũ "chờ chia") card is a data-quality prompt, not a jar.
+  // It ALWAYS shows whenever the engine computed `unlabeled` — even when NO jars
+  // exist (RT#11) and even at count 0 (it renders its own "đã gắn nhãn hết" empty
+  // state). Optional-chained so partial-`Financials` fixtures (no `unlabeled`)
+  // simply skip it.
   const unlabeledCount = financials.unlabeled?.count ?? 0;
-  const showUnlabeled = unlabeledCount > 0;
+  const showUnlabeled = financials.unlabeled != null;
 
   // Nothing to surface at all → the row doesn't render.
   if (jars.length === 0 && !showUnlabeled) return null;
@@ -81,7 +82,7 @@ export function HuOverviewRow({
         {showUnlabeled && (
           <UnlabeledSpendCard
             count={unlabeledCount}
-            amount={financials.unlabeled.amount}
+            amount={financials.unlabeled?.amount ?? 0}
             onOpen={() => setLabelSheetOpen(true)}
           />
         )}

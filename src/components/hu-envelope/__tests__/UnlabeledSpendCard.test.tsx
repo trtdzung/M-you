@@ -16,4 +16,16 @@ describe("UnlabeledSpendCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Gắn nhãn/ }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
+
+  it("renders an empty state at count 0 (đã gắn nhãn hết) with a disabled CTA", () => {
+    const onOpen = vi.fn();
+    render(<UnlabeledSpendCard count={0} amount={0} onOpen={onOpen} />);
+    expect(screen.getByText("Chưa gắn nhãn")).toBeInTheDocument();
+    expect(screen.getByText("Đã gắn nhãn hết")).toBeInTheDocument();
+    expect(screen.getByText("0 ₫")).toBeInTheDocument();
+    const cta = screen.getByRole("button", { name: /Gắn nhãn/ });
+    expect(cta).toBeDisabled();
+    fireEvent.click(cta);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
 });

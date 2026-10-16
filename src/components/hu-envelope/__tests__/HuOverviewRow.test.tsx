@@ -163,9 +163,12 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("1,2 tr")).toBeInTheDocument();
   });
 
-  it("hides the 'Chưa gắn nhãn' card when count is 0", () => {
+  it("always shows the 'Chưa gắn nhãn' card at count 0 with an 'Đã gắn nhãn hết' empty state", () => {
     render(<HuOverviewRow financials={withUnlabeled(0, 0)} />);
-    expect(screen.queryByText("Chưa gắn nhãn")).not.toBeInTheDocument();
+    expect(screen.getByText("Chưa gắn nhãn")).toBeInTheDocument();
+    expect(screen.getByText("Đã gắn nhãn hết")).toBeInTheDocument();
+    // Nothing to label → the CTA is disabled, not a live sheet trigger.
+    expect(screen.getByRole("button", { name: /Gắn nhãn/ })).toBeDisabled();
   });
 
   it("[RT#11] shows the card even with NO jars when unlabeled spend exists", () => {
