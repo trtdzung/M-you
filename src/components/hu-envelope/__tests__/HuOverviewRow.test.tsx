@@ -17,6 +17,11 @@ const config: JarConfig = {
 };
 // The sheet (opened by "Chia ngay") reads config + the batch `updateJars` writer.
 vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config, updateJars: vi.fn().mockResolvedValue(undefined) }) }));
+// The labeling sheet reads the corrections hooks — stub them so the row is pure.
+vi.mock("@/state/corrections", () => ({
+  useConfirmCategory: () => vi.fn(),
+  useCorrections: () => ({ unsaved: false }),
+}));
 
 import { HuOverviewRow } from "../HuOverviewRow";
 
@@ -139,5 +144,40 @@ describe("HuOverviewRow", () => {
   it("hides the 'Vượt phân bổ' badge when unallocatedPool.overAllocated is false", () => {
     render(<HuOverviewRow financials={withEnvelope(envelope({}), false)} />);
     expect(screen.queryByText("Vượt phân bổ")).not.toBeInTheDocument();
+  });
+
+  // --- "Chưa gắn nhãn" card (unlabeled spend) ---
+
+  function withUnlabeled(count: number, amount: number, jars = [line({})]): Financials {
+    return {
+      jarEnvelope: envelope({ jars }),
+      unallocatedPool: { amount: 0, overAllocated: false, source: "mock" },
+      unlabeled: { count, amount, source: "mock" },
+    } as unknown as Financials;
+  }
+
+  it("renders the 'Chưa gắn nhãn' card with count + compact amount when count > 0", () => {
+    render(<HuOverviewRow financials={withUnlabeled(3, 1_200_000)} />);
+    expect(screen.getByText("Chưa gắn nhãn")).toBeInTheDocument();
+    expect(screen.getByText("3 giao dịch chưa vào hũ")).toBeInTheDocument();
+    expect(screen.getByText("1,2 tr")).toBeInTheDocument();
+  });
+
+  it("hides the 'Chưa gắn nhãn' card when count is 0", () => {
+    render(<HuOverviewRow financials={withUnlabeled(0, 0)} />);
+    expect(screen.queryByText("Chưa gắn nhãn")).not.toBeInTheDocument();
+  });
+
+  it("[RT#11] shows the card even with NO jars when unlabeled spend exists", () => {
+    render(<HuOverviewRow financials={withUnlabeled(2, 500_000, [])} />);
+    expect(screen.getByText("Chưa gắn nhãn")).toBeInTheDocument();
+    // No jars → no pending card, but the section still renders the label card.
+    expect(screen.queryByText("Chờ phân bổ")).not.toBeInTheDocument();
+  });
+
+  it("opens the labeling sheet when the card CTA is clicked", () => {
+    render(<HuOverviewRow financials={withUnlabeled(2, 500_000)} unlabeledItems={[]} />);
+    fireEvent.click(screen.getByRole("button", { name: /Gắn nhãn/ }));
+    expect(screen.getByText("Gắn nhãn chi tiêu")).toBeInTheDocument();
   });
 });

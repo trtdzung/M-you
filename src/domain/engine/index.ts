@@ -15,6 +15,7 @@ export * from "./jar-spendable";
 export * from "./jar-envelope";
 export * from "./casa-balance";
 export * from "./unallocated-pool";
+export * from "./unlabeled-spend";
 export * from "./jar-funding";
 export * from "./allocation-plan";
 export * from "./jar-input";

@@ -8,7 +8,7 @@ import { CashflowOverviewCard } from "@/components/cashflow/CashflowOverviewCard
 import { CashflowTrendCard } from "@/components/cashflow/CashflowTrendCard";
 import { HuOverviewRow } from "@/components/hu-envelope/HuOverviewRow";
 import type { JarDonutDatum } from "@/components/report/SpendingDonut";
-import { cashflowTrend } from "@/domain/engine";
+import { cashflowTrend, monthPeriodFromKey, selectUnlabeledSpend } from "@/domain/engine";
 import type { PfmTabId } from "./PfmTabs";
 import { useInsights } from "@/state/useInsights";
 import { currentMonthKey } from "@/lib/demo-clock";
@@ -28,6 +28,12 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
   const monthKey = financials?.monthKey ?? currentMonthKey();
   // 12 months so the trend card can toggle two 6-month windows.
   const trend = useMemo(() => cashflowTrend(transactions, monthKey, 12), [transactions, monthKey]);
+  // The labeling sheet's list — the SAME selector, same inputs as the card's
+  // `financials.unlabeled.count` (parity by construction, RT#1).
+  const unlabeledItems = useMemo(
+    () => selectUnlabeledSpend(transactions, monthPeriodFromKey(monthKey)).items,
+    [transactions, monthKey],
+  );
 
   if (loading) {
     return (
@@ -59,7 +65,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
     <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
       <CashflowOverviewCard cashflow={cashflow} prevCashflow={prevCashflow} />
 
-      <HuOverviewRow financials={financials} onNavigate={onNavigate} />
+      <HuOverviewRow financials={financials} unlabeledItems={unlabeledItems} onNavigate={onNavigate} />
 
       <SpendingSection expense={expenseSide} onOpenReport={() => setReportOpen(true)} />
 

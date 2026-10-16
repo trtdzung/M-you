@@ -37,7 +37,8 @@ export interface CashflowResult {
 
 const EXPENSE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee"]);
 
-function inPeriod(txn: Transaction, period: Period): boolean {
+/** True when `txn.postedAt` falls within `period` (inclusive bounds). */
+export function inPeriod(txn: Transaction, period: Period): boolean {
   return txn.postedAt >= period.from && txn.postedAt <= period.to;
 }
 

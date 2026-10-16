@@ -34,6 +34,7 @@ import {
   jarSpendable,
   monthPeriodFromKey,
   networthTrend,
+  selectUnlabeledSpend,
   spendingByCategory,
   upcomingObligations,
   type BudgetLine,
@@ -49,6 +50,7 @@ import {
   type Obligation,
   type RecurringSeries,
   type UnallocatedPool,
+  type UnlabeledSpend,
 } from "./index";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
 
@@ -110,6 +112,18 @@ export interface Financials {
    * kept as-is (invariant #6); the UI presents available as 0.
    */
   unallocatedPool: UnallocatedPool;
+  /**
+   * Current-month expenses spent straight from CASA that never got a category
+   * ("Chưa gắn nhãn"). Posted-only, in-period (`selectUnlabeledSpend`). The
+   * overview card reads `count`/`amount`; the labeling sheet re-runs the SAME
+   * selector for the list (parity by construction).
+   *
+   * CLIENT-ONLY: corrections live in localStorage, so only the client hook feeds
+   * correction-applied txns here. The server/AI-facade path sees RAW txns and
+   * would over-count already-labeled ones — do NOT wire an AI tool to this field
+   * until corrections have a server representation.
+   */
+  unlabeled: UnlabeledSpend;
   /**
    * Financial-health indicators (runway, surplus, essential coverage, asset
    * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
@@ -212,6 +226,10 @@ export function computeFinancials(
     spendableTotal,
   });
 
+  // Current-month unlabeled spend — count/amount only; the sheet re-runs the
+  // same selector for `items` (parity, client-only per the `unlabeled` doc).
+  const unlabeled = selectUnlabeledSpend(txns, period);
+
   return {
     monthKey: month,
     cashflow,
@@ -230,6 +248,7 @@ export function computeFinancials(
     jarBudget,
     jarEnvelope,
     unallocatedPool,
+    unlabeled: { count: unlabeled.count, amount: unlabeled.amount, source: unlabeled.source },
     health: financialHealth(cashflow, raw.accounts, networth),
     goals: [...raw.goals, ...(options.userGoals ?? [])],
   };

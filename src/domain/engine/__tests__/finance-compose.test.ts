@@ -10,6 +10,7 @@ import {
   evaluateJarBudget,
   financialHealth,
   monthPeriodFromKey,
+  selectUnlabeledSpend,
   spendingByCategory,
   upcomingObligations,
 } from "..";
@@ -53,6 +54,17 @@ describe("computeFinancials", () => {
     expect(f.obligations).toEqual(
       upcomingObligations(recurring, raw.liabilities, { now: DEMO_NOW, horizonDays: 30 }),
     );
+  });
+
+  it("[RT#1] unlabeled summary equals the shared selector (card/sheet parity)", async () => {
+    const raw = await loadRaw("stable");
+    const f = computeFinancials(raw, MONTH);
+    const selection = selectUnlabeledSpend(raw.transactions, monthPeriodFromKey(MONTH));
+
+    // The card reads `f.unlabeled.count`; the sheet reads `selection.items` — same
+    // selector, same inputs ⇒ equal by construction.
+    expect(f.unlabeled).toEqual({ count: selection.count, amount: selection.amount, source: "mock" });
+    expect(selection.items.length).toBe(f.unlabeled.count);
   });
 
   it("is deterministic across runs and personas", async () => {
