@@ -12,7 +12,7 @@
  * the HTTP/DB transport is faked.
  */
 
-import { backfillActualAmount, dedupeCategories, healOrphanCategories, resyncActualOnRaise, stripCategories, uniqueJarId } from "@/domain/jar-rules";
+import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import { fitsCasaCap } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
 import type { Account, Jar, JarConfig } from "@/domain/models";
@@ -50,10 +50,10 @@ let store: JarConfig = freshConfig();
 let originalFetch: typeof globalThis.fetch | undefined;
 
 function freshConfig(): JarConfig {
-  return backfillActualAmount({
+  return {
     version: 3,
     jars: DEFAULT_JAR_CONFIG.jars.map((j) => ({ ...j, categoryIds: [...j.categoryIds] })),
-  });
+  };
 }
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -70,7 +70,7 @@ function jsonResponse(data: unknown, status = 200): Response {
  * here, instead of each branch below needing to remember to normalize.
  */
 function commit(next: JarConfig): JarConfig {
-  store = backfillActualAmount(healOrphanCategories(dedupeCategories(next)));
+  store = healOrphanCategories(dedupeCategories(next));
   return store;
 }
 
@@ -101,8 +101,8 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
       return jsonResponse(commit({ version: 3, jars: (body?.jars as Jar[]) ?? [] }));
     }
     if (method === "PATCH") {
-      // Batch "Chia ngay": apply each patch (undefined-clears via null), resync
-      // actualAmount on raise, enforce Σ budgetLimit ≤ CASA (422), one write.
+      // Batch "Chia ngay": apply each patch (undefined-clears via null), enforce
+      // Σ budgetLimit ≤ CASA (422), one write.
       const patches = (body?.patches ?? {}) as Record<string, Record<string, unknown>>;
       const byId = new Map(store.jars.map((j) => [j.id, j]));
       const merged = new Map<string, Jar>();
@@ -115,7 +115,7 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
           if (value === null) delete next[key];
           else next[key] = value;
         }
-        merged.set(jarId, resyncActualOnRaise(prev, next as unknown as Jar));
+        merged.set(jarId, next as unknown as Jar);
       }
       const nextJars = store.jars.map((j) => merged.get(j.id) ?? j);
       const cap = fitsCasaCap(nextJars, casaFor(cif), {});
@@ -150,7 +150,7 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
         if (value === null) delete next[key];
         else next[key] = value;
       }
-      return resyncActualOnRaise(target, next as unknown as Jar); // H3
+      return next as unknown as Jar;
     });
     if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds as string[], id);
     if (typeof patch.budgetLimit === "number") {

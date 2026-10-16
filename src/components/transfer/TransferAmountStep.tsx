@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { Card, Money, Sheet, SourceBadge } from "@/components/primitives";
 import { formatVnd } from "@/lib/format";
 import { avatarColor, initialOf } from "@/lib/avatar";
@@ -10,6 +11,7 @@ import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
 import { BankLogo } from "./BankLogo";
 import type { Account, Jar } from "@/domain/models";
+import type { UnallocatedPool } from "@/domain/engine";
 import type { SelectedRecipient } from "./RecipientPicker";
 
 const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
@@ -18,8 +20,15 @@ const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
   credit_card: "Thẻ tín dụng",
 };
 
-/** Either a real account or a jar (Chuyển tiền Phần 1 — a jar with a real `actualAmount` may be chosen as a source too). */
-export type TransferSource = { kind: "account" | "jar"; id: string };
+export const POOL_SOURCE_LABEL = "Chưa phân bổ";
+
+/**
+ * A transfer source: a real account, a jar (a jar with a derived spendable
+ * balance = `max(0, remaining)`), or the virtual "Chưa phân bổ" pool (the CASA
+ * money no jar claims — a no-jar transfer debits the account and lets the derived
+ * pool shrink).
+ */
+export type TransferSource = { kind: "account" | "jar"; id: string } | { kind: "pool" };
 
 /**
  * Bước cuối của Chuyển tiền (sau khi đã có người nhận): chọn tài khoản/hũ
@@ -30,6 +39,7 @@ export function TransferAmountStep({
   recipient,
   accounts,
   jars = [],
+  pool = null,
   source,
   amount,
   memo,
@@ -42,8 +52,10 @@ export function TransferAmountStep({
 }: {
   recipient: SelectedRecipient;
   accounts: Account[];
-  /** A jar with a real `actualAmount` is selectable as a source (Phần 1); one without (no `budgetLimit` yet set) stays view-only. */
-  jars?: (Jar & { remaining: number | null })[];
+  /** A jar with a set limit is selectable as a source (its derived `spendable = max(0, remaining)`); one with no limit (`remaining == null`) stays view-only. */
+  jars?: (Jar & { remaining: number | null; spendable: number | null })[];
+  /** The virtual "Chưa phân bổ" pool (null/omitted while jars are still loading — RT#14). */
+  pool?: UnallocatedPool | null;
   source: TransferSource | null;
   amount: string;
   memo: string;
@@ -58,6 +70,10 @@ export function TransferAmountStep({
   const [scheduled, setScheduled] = useState(false);
   const sourceAccount = source?.kind === "account" ? accounts.find((account) => account.id === source.id) : undefined;
   const sourceJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
+  const sourcePool = source?.kind === "pool";
+  // Over-allocated → available is 0 (invariant #6: the true negative is not shown
+  // as a spendable balance; the pool row carries the "Vượt phân bổ" badge).
+  const poolAvailable = pool ? Math.max(0, pool.amount) : 0;
   const recipientBank = findBankByName(recipient.bankName);
   const showRecipientBankName = Boolean(recipient.bankName) && recipient.bankName !== recipient.name;
 
@@ -104,11 +120,14 @@ export function TransferAmountStep({
                 {sourceAccount
                   ? `${sourceAccount.accountNumber} · ${ACCOUNT_TYPE_LABEL[sourceAccount.type]}`
                   : sourceJar
-                    ? `Hũ ${sourceJar.label} · Thực tế`
-                    : "Chọn tài khoản"}
+                    ? `Hũ ${sourceJar.label} · Còn lại`
+                    : sourcePool
+                      ? `${POOL_SOURCE_LABEL} · Số dư khả dụng`
+                      : "Chọn tài khoản"}
               </p>
               {sourceAccount && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceAccount.balance)}</p>}
-              {sourceJar && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceJar.actualAmount)}</p>}
+              {sourceJar && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceJar.spendable ?? 0)}</p>}
+              {sourcePool && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(poolAvailable)}</p>}
             </div>
             <ChevronDown size={16} className="shrink-0 text-muted" />
           </button>
@@ -177,6 +196,35 @@ export function TransferAmountStep({
 
       {sourceSheetOpen && (
         <Sheet title="Chọn tài khoản nguồn" onClose={() => setSourceSheetOpen(false)}>
+          {pool && (
+            <button
+              type="button"
+              onClick={() => {
+                onSourceChange({ kind: "pool" });
+                setSourceSheetOpen(false);
+              }}
+              className="flex w-full items-center gap-3 border-b border-border px-1 py-3 text-left"
+            >
+              <span
+                aria-hidden
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"
+              >
+                <Wallet size={16} strokeWidth={1.9} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold text-text">{POOL_SOURCE_LABEL}</p>
+                <p className="mt-0.5 text-base font-bold tabular-nums text-text">{formatVnd(poolAvailable)}</p>
+                {/* Spendable-lens subtitle — distinguishes this pool (CASA − Σ còn-lại-các-hũ)
+                    from the Tổng quan "Chờ phân bổ" budget-headroom card (CASA − Σ hạn mức). */}
+                <p className="mt-0.5 text-[11px] text-muted">số dư khả dụng ngoài hũ</p>
+              </div>
+              {pool.overAllocated && (
+                <span className="shrink-0 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
+                  Vượt phân bổ
+                </span>
+              )}
+            </button>
+          )}
           <ul className="flex flex-col divide-y divide-border">
             {accounts.map((account) => (
               <li key={account.id}>
@@ -210,7 +258,7 @@ export function TransferAmountStep({
                 {jars.map((jar) => {
                   const Icon = jarIcon(jar.icon);
                   const accent = jarAccent(jar);
-                  const fundable = jar.actualAmount !== undefined;
+                  const fundable = jar.remaining != null;
                   const row = (
                     <>
                       <span
@@ -223,10 +271,10 @@ export function TransferAmountStep({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-semibold text-text">{jar.label}</p>
                         {fundable ? (
-                          // Source picker → only the transferable balance matters; the
-                          // spending limit ("đã set") is irrelevant here and confusing.
+                          // Source picker → the derived "còn lại" (= max(0, remaining)),
+                          // the SAME number the Tổng quan overview shows for this jar.
                           <Money
-                            amount={jar.actualAmount}
+                            amount={jar.spendable}
                             unknownLabel="—"
                             className="mt-0.5 block text-base font-bold tabular-nums text-text"
                           />

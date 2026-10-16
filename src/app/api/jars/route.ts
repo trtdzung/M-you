@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  backfillActualAmount,
-  dedupeCategories,
-  healOrphanCategories,
-  resyncActualOnRaise,
-  stripCategories,
-  uniqueJarId,
-} from "@/domain/jar-rules";
+import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import { fitsCasaCap } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { readJarConfig, sanitizeJar, sanitizeJarPatch, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
@@ -51,10 +44,10 @@ export async function POST(req: NextRequest) {
 
   const current = readJarConfig(cif);
   const created = { ...jar, id: uniqueJarId(current.jars, jar.id) };
-  const next = backfillActualAmount({
+  const next: { version: 3; jars: Jar[] } = {
     version: 3,
     jars: [...stripCategories(current.jars, created.categoryIds), created],
-  });
+  };
   return NextResponse.json(writeJarConfig(cif, next), { status: 201 });
 }
 
@@ -74,7 +67,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "duplicate jar id" }, { status: 422 });
   }
 
-  const next = backfillActualAmount(healOrphanCategories(dedupeCategories({ version: 3, jars })));
+  const next = healOrphanCategories(dedupeCategories({ version: 3, jars }));
   return NextResponse.json(writeJarConfig(cif, next));
 }
 
@@ -83,7 +76,6 @@ export async function PUT(req: NextRequest) {
  * patches: {jarId: patch}}`), used by "Chia ngay" to set every jar's
  * `budgetLimit` in one transaction. Server enforces the cap: if Σ budgetLimit of
  * the resulting set would exceed CASA it rejects 422 (client check is only UX).
- * `budgetLimit` raises re-sync `actualAmount` when the jar is undrawn (H3).
  * `categoryIds` are NOT honoured here — category moves go through the per-jar
  * route so the one-category-one-jar invariant stays in one place.
  */
@@ -107,12 +99,13 @@ export async function PATCH(req: NextRequest) {
     const patch = sanitizeJarPatch(rawPatch);
     if (!patch) return NextResponse.json({ error: `patch for ${jarId} is invalid` }, { status: 422 });
     delete patch.categoryIds; // category moves are not a batch concern
-    merged.set(jarId, resyncActualOnRaise(prev, { ...prev, ...patch }));
+    merged.set(jarId, { ...prev, ...patch });
   }
 
   const nextJars = current.jars.map((j) => merged.get(j.id) ?? j);
+  const casaPool = casaPoolForCif(cif) ?? "unknown";
 
-  const cap = fitsCasaCap(nextJars, casaPoolForCif(cif) ?? "unknown", {});
+  const cap = fitsCasaCap(nextJars, casaPool, {});
   if (!cap.ok) {
     return NextResponse.json(
       { error: "over CASA cap", overBy: cap.overBy ?? null },
@@ -120,5 +113,5 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars: nextJars })));
+  return NextResponse.json(writeJarConfig(cif, { version: 3, jars: nextJars }));
 }

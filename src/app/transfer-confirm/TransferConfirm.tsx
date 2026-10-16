@@ -12,6 +12,8 @@ import { TransferCategorizeSection } from "@/components/transfer/TransferCategor
 import { usePersona, useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useManualTxns } from "@/state/manual-txns";
+import { useFinancials } from "@/state/useFinancials";
+import { casaBalance, evaluateFunding, jarSpendable, POOL_DONOR_ID, type JarSpendable } from "@/domain/engine";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
@@ -58,8 +60,9 @@ export function TransferConfirm() {
   const router = useRouter();
   const params = useSearchParams();
   const providers = useProviders();
-  const { config: jarConfig, spendFromJar } = useJarConfig();
+  const { config: jarConfig } = useJarConfig();
   const { add: addManualTxn } = useManualTxns();
+  const { financials } = useFinancials();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
   const draftIdParam = params.get("draftId") ?? "";
@@ -112,49 +115,124 @@ export function TransferConfirm() {
     setSubmitting(true);
     try {
       // Mock-only: no real money moves, no API call, no facade involvement.
-      // Every transfer now records exactly ONE self-reported txn (like the ＋
-      // manual entry) AND debits the real source account, so the balance shown
-      // everywhere (transfer picker, Tổng quan, net worth) actually drops — the
-      // money leaves the account for real (envelope-label model: hũ are labels
-      // on the CASA account). Jar-sourced ADDITIONALLY draws down the jar's real
-      // balance (`actualAmount`) and defaults the category to the jar's first
-      // category so "Ngân sách" (from txn history, `evaluateJarBudget`) tracks
-      // "Thực tế". Account-sourced defaults to "Chuyển khoản" (type:transfer,
-      // excluded from spend so it doesn't inflate expense — invariant #6).
+      // Every transfer debits the real source account AND records self-reported
+      // txn(s), so the balance shown everywhere (transfer picker, Tổng quan, net
+      // worth) actually drops — the money leaves the account for real
+      // (envelope-label model: hũ are labels on the CASA account). There is NO
+      // stored jar balance any more: a jar's spendable = max(0, remaining) is
+      // DERIVED from txn history (invariant #1), so the ONLY thing a jar-sourced
+      // transfer does is book its spend into the jar's first category (which drops
+      // that jar's derived `remaining`). Account/pool-sourced spend books into
+      // "Chuyển khoản" (type:transfer, excluded from spend so it doesn't inflate
+      // expense — invariant #6); the account debit alone shrinks the derived pool.
       //
-      // Do the fail-prone async work (account lookup + debit) BEFORE any local
-      // ledger write, so a provider failure leaves nothing partially applied and
-      // the retry (after the catch releases the latch) can't double-debit.
+      // Accepted top-up ("gợi ý rót", Approach A — spread-as-spend): charge each
+      // JAR contributor its funding portion as a self-reported expense (source
+      // jar's own portion + each donor's `take`), never mutating `budgetLimit`
+      // (invariant #5). The pool portion needs NO txn — the account debit already
+      // shrinks the derived pool by exactly `poolTake`.
+      //
+      // Do the fail-prone async work (re-validate → debit) BEFORE any local ledger
+      // write, so a provider failure leaves nothing partially applied and the retry
+      // (after the catch releases the latch) can't double-debit. Fetch accounts
+      // ONLY when needed — a top-up/overspend re-check (needs casaBalance) or the
+      // legacy source-account fallback.
+      const sourceJarId = draft?.sourceJarId ?? null;
+      const needsAccounts = Boolean(draft?.plannedReallocation || draft?.overspend || !draft?.sourceAccountId);
+      const accounts = needsAccounts ? await providers.listAccounts() : [];
+
+      // Derived per-jar spendable from the SAME jarBudget.lines every screen reads
+      // (invariant #1) — the input to the fresh funding re-check and the top-up
+      // charge plan below. No stored balance is consulted.
+      const spendables: JarSpendable[] = (financials?.jarBudget.lines ?? []).map((line) => ({
+        id: line.huId,
+        label: line.label,
+        categoryIds: line.categoryIds,
+        spendable: jarSpendable(line.remaining),
+      }));
+      const spendableById = new Map(spendables.map((s) => [s.id, s.spendable]));
+
+      // Top-up / overspend drafts assumed a shortfall computed at popup time. Re-run
+      // the engine on the FRESHEST state (RT#2) so a drifted state can't let a stale
+      // plan push charges past what CASA holds. The freshly-computed donor chain
+      // (never the stale draft one) drives the charge plan (RT#1/#3/#4).
+      let donorCharges: { categoryId: string; amount: number }[] = [];
+      let acceptedTopup = false;
+      if (draft?.plannedReallocation || draft?.overspend) {
+        const assessment = evaluateFunding({
+          amount,
+          sourceJarId,
+          casaBalance: casaBalance(accounts),
+          jars: spendables,
+        });
+        if (assessment.tier === "insufficient") {
+          committedRef.current = false;
+          setSubmitting(false);
+          return setError("Số dư không đủ để hoàn tất giao dịch. Vui lòng kiểm tra lại.");
+        }
+        // Apply the top-up ONLY when the user accepted it (`plannedReallocation`)
+        // and the fresh assessment still needs one. "Bỏ qua, vượt hũ" (`overspend`)
+        // explicitly DECLINED it — it falls through to the single-txn path so the
+        // jar goes over-budget (remaining negative) and the pool absorbs the
+        // shortfall. tier "ok" → state improved, no top-up needed either way.
+        if (draft?.plannedReallocation && assessment.tier === "topup") {
+          acceptedTopup = true;
+          // Each JAR donor is charged its `take` into its first category (the pool
+          // donor produces NO txn — the account debit already shrinks the pool).
+          // Donors always have a category (category-less jars are excluded upstream).
+          donorCharges = assessment.donors
+            .filter((d) => d.jarId !== POOL_DONOR_ID)
+            .map((d) => {
+              const donorJar = jarConfig.jars.find((j) => j.id === d.jarId);
+              return { categoryId: donorJar?.categoryIds[0] ?? CATEGORY.transfer, amount: d.take };
+            });
+        }
+      }
+
       let accountToDebit = draft?.sourceAccountId ?? null;
       if (!accountToDebit) {
         // Legacy draft without an explicit source account → the single current account.
-        const accounts = await providers.listAccounts();
         accountToDebit = accounts.find((a) => a.type === "current")?.id ?? null;
       }
       if (accountToDebit) await providers.applyAccountDebit(accountToDebit, amount);
 
-      let defaultCategoryId: string;
-      if (draft?.sourceJarId) {
-        spendFromJar(draft.sourceJarId, amount);
-        const sourceJar = jarConfig.jars.find((j) => j.id === draft.sourceJarId);
-        defaultCategoryId = sourceJar?.categoryIds[0] ?? CATEGORY.transfer; // 0-category jar → transfer
+      // Build the charge list. The FIRST charge is the categorizable ("primary")
+      // txn shown on the success card:
+      //  - jar source: its own portion into its first category. On an accepted
+      //    top-up that portion is min(amount, spendable) so `remaining` lands
+      //    exactly at the limit (not over); ok/overspend charge the full amount.
+      //  - pool/account source: the full amount into "Chuyển khoản" (type:transfer,
+      //    excluded from spend); donor jar takes follow as expense txns.
+      const sourceJar = sourceJarId ? jarConfig.jars.find((j) => j.id === sourceJarId) : undefined;
+      const charges: { categoryId: string; amount: number }[] = [];
+      if (sourceJarId) {
+        const spendableSource = spendableById.get(sourceJarId) ?? 0;
+        const primaryAmount = acceptedTopup ? Math.min(amount, spendableSource) : amount;
+        charges.push({ categoryId: sourceJar?.categoryIds[0] ?? CATEGORY.transfer, amount: primaryAmount });
       } else {
-        defaultCategoryId = CATEGORY.transfer;
+        charges.push({ categoryId: CATEGORY.transfer, amount });
       }
-      const txnId = addManualTxn({
-        amount,
-        direction: "debit",
-        categoryId: defaultCategoryId,
-        type: typeForCategory(defaultCategoryId), // derived from kind, never hardcoded
-        merchantName: name.trim(),
-        postedAt: new Date().toISOString(),
-        // Keep the memo as a signal for AI purpose suggestion (data, not a command).
-        ...(draft?.memo ? { note: draft.memo } : {}),
-      });
-      setCreatedTxnId(txnId);
-      // Jar-sourced always debits its source jar above (regardless of category
-      // count), so the categorize section seeds `appliedJarId` from this directly.
-      setCreatedSourceJarId(draft?.sourceJarId ?? null);
+      charges.push(...donorCharges);
+
+      let primaryTxnId: string | null = null;
+      for (const charge of charges) {
+        if (charge.amount <= 0) continue; // a source already at its limit contributes 0
+        const id = addManualTxn({
+          amount: charge.amount,
+          direction: "debit",
+          categoryId: charge.categoryId,
+          type: typeForCategory(charge.categoryId), // derived from kind, never hardcoded
+          merchantName: name.trim(),
+          postedAt: new Date().toISOString(),
+          // Keep the memo as a signal for AI purpose suggestion (data, not a command).
+          ...(draft?.memo ? { note: draft.memo } : {}),
+        });
+        if (primaryTxnId === null) primaryTxnId = id;
+      }
+      setCreatedTxnId(primaryTxnId);
+      // Seeds the categorize section's allowed-category picker (constrained to the
+      // source jar's categories); null for a pool/account source.
+      setCreatedSourceJarId(sourceJarId);
       // Consume the draft immediately so a reload/replay can't resubmit (F#2).
       if (draftIdParam) deleteTransferDraft(draftIdParam);
 

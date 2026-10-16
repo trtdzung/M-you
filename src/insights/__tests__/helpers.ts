@@ -122,6 +122,8 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     networthSeriesMeta: over.networthSeriesMeta ?? { source: null, count: 0, freshness: null },
     jarBudget: over.jarBudget ?? EMPTY_JAR_BUDGET,
     jarEnvelope: over.jarEnvelope ?? EMPTY_JAR_ENVELOPE,
+    unallocatedPool: over.unallocatedPool ?? { amount: 0, overAllocated: false, source: "mock" },
+    unlabeled: over.unlabeled ?? { count: 0, amount: 0, source: "mock" },
     health: over.health ?? EMPTY_HEALTH,
     goals: over.goals ?? [],
   };

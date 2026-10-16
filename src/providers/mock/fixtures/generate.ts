@@ -124,6 +124,10 @@ export function generateDataset(meta: PersonaMeta): Dataset {
       add({ accountId: accCurrent, postedAt: iso(year, month, randInt(rng, 12, 22)), amount: jitter(rng, p.salaryBase * 0.3, 0.5, 100_000), direction: "credit", type: "income", merchantName: "Thu nhập thêm", merchantNormalizedName: "side income", categoryId: INCOME, status: "posted", isRecurring: false, userEdited: false });
     }
 
+    // A fresh account has income only — skip every bill, spend, transfer and
+    // pending item for this month (invariant #6: the absence is real, not a 0).
+    if (p.incomeOnly) return;
+
     // Recurring fixed bills
     add({ accountId: accCurrent, postedAt: iso(year, month, 3), amount: jitter(rng, p.housingBase, 0.02, 100_000), direction: "debit", type: "expense", merchantName: "Chủ nhà / Vay nhà", merchantNormalizedName: "housing", categoryId: CATEGORY.housing, status: "posted", isRecurring: true, userEdited: false });
     add({ accountId: accCurrent, postedAt: iso(year, month, 10), amount: jitter(rng, 900_000, 0.25, 10_000), direction: "debit", type: "expense", merchantName: "EVN / Nước / Internet", merchantNormalizedName: "utilities", categoryId: CATEGORY.utilities, status: "posted", isRecurring: true, userEdited: false });

@@ -3,11 +3,16 @@
 /**
  * Spending-jar configuration state. A thin client over `/api/jars*`
  * (SQLite-backed, see `data/jars/schema.md`) — every business invariant
- * (one-category-one-jar, `actualAmount` backfill) is enforced SERVER-SIDE
- * now (`src/domain/jar-rules.ts`, used by the route handlers); this provider
- * just calls the matching endpoint and stores whatever `JarConfig` comes
- * back. Loads on mount and whenever the persona changes (provider identity
- * change); every mutation re-syncs from that call's response.
+ * (one-category-one-jar) is enforced SERVER-SIDE now (`src/domain/jar-rules.ts`,
+ * used by the route handlers); this provider just calls the matching endpoint
+ * and stores whatever `JarConfig` comes back. Loads on mount and whenever the
+ * persona changes (provider identity change); every mutation re-syncs from that
+ * call's response.
+ *
+ * A jar has NO stored balance: its spendable = max(0, remaining) is DERIVED from
+ * txn history (invariant #1), so there is no `spendFromJar`/`applyReallocation`
+ * mutator here — a transfer's effect on a jar is expressed purely as the
+ * self-reported txn(s) `TransferConfirm` writes (see `jar-spendable.ts`).
  */
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -17,6 +22,12 @@ import { useProviders } from "@/providers/context";
 
 interface JarConfigContextValue {
   config: JarConfig;
+  /**
+   * False until the first fetch for the current persona resolves. The transfer
+   * flow must not compute the unallocated pool or classify "insufficient" while
+   * jars are still empty-by-loading (would misread `jars: []` — RT#14).
+   */
+  loaded: boolean;
   addJar: (jar: Jar) => void;
   updateJar: (id: string, patch: Partial<Omit<Jar, "id">>) => void;
   /**
@@ -37,21 +48,13 @@ interface JarConfigContextValue {
   /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
   applyTemplate: (templateId: JarTemplate["id"]) => void;
   resetToSeed: () => void;
-  /**
-   * Debit `amount` from a jar's real balance (Chuyển tiền Phần 1 — chosen as
-   * a transfer source). No-op if the jar is missing or has no `actualAmount`
-   * yet — the UI already validates "đủ tiền" before this is ever called;
-   * this is only a defensive backstop, never the source of that check.
-   */
-  spendFromJar: (id: string, amount: number) => void;
 }
 
 const EMPTY_CONFIG: JarConfig = { version: 3, jars: [] };
 
 /**
- * Every mutator below is fire-and-forget from its caller's point of view
- * (none of them are awaited — e.g. `TransferConfirm`'s `spendFromJar` call
- * during a money transfer). Without a `.catch`, a rejected fetch (offline, a
+ * Every config mutator below is fire-and-forget from its caller's point of view
+ * (none of them are awaited). Without a `.catch`, a rejected fetch (offline, a
  * 404/422/500) becomes an unhandled promise rejection and the failure is
  * invisible — the UI silently keeps stale data instead of surfacing that the
  * write never happened.
@@ -65,6 +68,7 @@ const JarConfigContext = createContext<JarConfigContextValue | null>(null);
 export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   const providers = useProviders();
   const [config, setConfig] = useState<JarConfig>(EMPTY_CONFIG);
+  const [loaded, setLoaded] = useState(false);
 
   // Load on mount and on persona switch (providers identity changes per
   // persona). Reset to empty FIRST, synchronously, before the async fetch —
@@ -73,10 +77,14 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
     setConfig(EMPTY_CONFIG);
+    setLoaded(false);
     providers
       .getJarConfig()
       .then((next) => {
-        if (active) setConfig(next);
+        if (active) {
+          setConfig(next);
+          setLoaded(true);
+        }
       })
       .catch((err: unknown) => {
         console.error("Failed to load jar config", err);
@@ -89,6 +97,7 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<JarConfigContextValue>(
     () => ({
       config,
+      loaded,
       addJar: (jar) => {
         providers.createJar(jar).then(setConfig).catch(logJarMutationError);
       },
@@ -115,16 +124,8 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
       resetToSeed: () => {
         providers.replaceJars(DEFAULT_JAR_CONFIG.jars).then(setConfig).catch(logJarMutationError);
       },
-      spendFromJar: (id, amount) => {
-        const jar = config.jars.find((j) => j.id === id);
-        if (!jar || jar.actualAmount === undefined) return;
-        providers
-          .updateJar(id, { actualAmount: Math.max(0, jar.actualAmount - amount) })
-          .then(setConfig)
-          .catch(logJarMutationError);
-      },
     }),
-    [config, providers],
+    [config, loaded, providers],
   );
 
   return <JarConfigContext.Provider value={value}>{children}</JarConfigContext.Provider>;

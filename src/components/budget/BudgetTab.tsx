@@ -72,7 +72,14 @@ export function BudgetTab() {
           <Card className="flex flex-col items-center gap-3" role="region" aria-label="Tổng ngân sách">
             <div className="flex w-full items-center justify-between">
               <span className="text-sm font-semibold text-text">Tổng đã tiêu</span>
-              <SourceBadge source={financials.jarBudget.meta.sourceCoverage.sources[0] ?? "mock"} />
+              <div className="flex items-center gap-2">
+                {financials.unallocatedPool.overAllocated && (
+                  <span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
+                    Vượt phân bổ
+                  </span>
+                )}
+                <SourceBadge source={financials.jarBudget.meta.sourceCoverage.sources[0] ?? "mock"} />
+              </div>
             </div>
             <BudgetGauge
               pct={summary.pctUsed}

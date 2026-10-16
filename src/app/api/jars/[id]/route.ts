@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backfillActualAmount, healOrphanCategories, resyncActualOnRaise, stripCategories } from "@/domain/jar-rules";
+import { healOrphanCategories, stripCategories } from "@/domain/jar-rules";
 import { fitsCasaCap } from "@/domain/engine";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
 import { casaPoolForCif } from "@/lib/casa-pool";
@@ -31,8 +31,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ error: `jar ${id} not found` }, { status: 404 });
   }
 
-  // H3: a budgetLimit raise on an undrawn jar pulls actualAmount up with it.
-  let jars = current.jars.map((j) => (j.id === id ? resyncActualOnRaise(prev, { ...prev, ...patch }) : j));
+  let jars = current.jars.map((j) => (j.id === id ? { ...prev, ...patch } : j));
   if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds, id);
 
   // Cap only when this patch SETS a numeric budgetLimit (the only way to raise Σ);
@@ -44,7 +43,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       return NextResponse.json({ error: "over CASA cap", overBy: cap.overBy ?? null }, { status: 422 });
     }
   }
-  return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars })));
+  return NextResponse.json(writeJarConfig(cif, { version: 3, jars }));
 }
 
 /**
@@ -64,5 +63,5 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const next = target.categoryIds.length > 0 ? healOrphanCategories(remaining) : remaining;
   // The jar's categories heal into "Khác" above; there is no allocation ledger to
   // repoint any more (single-number model — budgetLimit lives on the jar itself).
-  return NextResponse.json(writeJarConfig(cif, backfillActualAmount(next)));
+  return NextResponse.json(writeJarConfig(cif, next));
 }

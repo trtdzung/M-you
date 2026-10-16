@@ -6,7 +6,7 @@ import { usePersona } from "@/providers/context";
 import { LoginScreen } from "./LoginScreen";
 
 /**
- * Login-screen display names for the 3 sample customers — distinct from each
+ * Login-screen display names for the sample customers — distinct from each
  * persona's `label` (a financial-profile description used elsewhere, e.g. the
  * Settings persona switcher), so that switcher keeps its own copy untouched.
  */
@@ -14,10 +14,11 @@ export const LOGIN_DISPLAY_NAME: Record<string, string> = {
   CIF_0001: "Ly Lã",
   CIF_0002: "Toàn Trần",
   CIF_0003: "Đào Nguyên",
+  CIF_0004: "Tân Vũ",
 };
 
 /**
- * The app's front door: renders `LoginScreen` until one of the 3 sample
+ * The app's front door: renders `LoginScreen` until one of the sample
  * customers logs in, then switches the active persona to match and reveals
  * `children`. Session-only (plain `useState`, no localStorage) — a reload
  * always starts back at login, and there is no logout affordance.

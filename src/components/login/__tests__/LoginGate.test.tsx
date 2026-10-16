@@ -40,13 +40,14 @@ describe("LoginGate", () => {
     expect(screen.queryByText(/Persona hiện tại/)).not.toBeInTheDocument();
   });
 
-  it("lists the 3 sample customers by name, in CIF order", () => {
+  it("lists the sample customers by name, in CIF order", () => {
     renderGate();
 
     const combobox = screen.getByRole("combobox", { name: "Khách hàng" });
     expect(within(combobox).getByRole("option", { name: "Ly Lã · CIF_0001" })).toBeInTheDocument();
     expect(within(combobox).getByRole("option", { name: "Toàn Trần · CIF_0002" })).toBeInTheDocument();
     expect(within(combobox).getByRole("option", { name: "Đào Nguyên · CIF_0003" })).toBeInTheDocument();
+    expect(within(combobox).getByRole("option", { name: "Tân Vũ · CIF_0004" })).toBeInTheDocument();
   });
 
   it("logs in with a correct CIF + password and switches to the matching persona", () => {

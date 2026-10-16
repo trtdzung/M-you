@@ -86,6 +86,10 @@ function Bar({
         className="relative flex w-full flex-col items-center rounded-t-row pt-3 text-primary-fg"
         style={{
           height: `${heightPct}%`,
+          // Floor the bar tall enough to always hold its pill + amount on the
+          // colored surface. Without it, a tiny/zero bar collapses below the pill
+          // and the white amount text spills onto the white card — invisible.
+          minHeight: 76,
           backgroundImage: `linear-gradient(180deg, ${gradient.from} 0%, ${gradient.to} 100%)`,
         }}
       >

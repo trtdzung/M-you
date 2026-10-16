@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { JarConfig } from "@/domain/models";
 import { evaluateJarBudget } from "../jar-budget";
+import { jarSpendable } from "../jar-spendable";
 import { monthPeriod } from "../types";
 import { txn } from "./helpers";
+
+describe("jarSpendable (derived: max(0, remaining), null stays null)", () => {
+  it("null remaining (no limit) → null (non-fundable, never 0)", () => {
+    expect(jarSpendable(null)).toBeNull();
+  });
+  it("negative remaining (over budget) → 0 (never negative)", () => {
+    expect(jarSpendable(-1)).toBe(0);
+    expect(jarSpendable(-500_000)).toBe(0);
+  });
+  it("zero remaining → 0", () => {
+    expect(jarSpendable(0)).toBe(0);
+  });
+  it("positive remaining → passthrough", () => {
+    expect(jarSpendable(1_210_000)).toBe(1_210_000);
+  });
+});
 
 const JUNE = monthPeriod(2026, 5);
 const MAY = monthPeriod(2026, 4);

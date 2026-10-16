@@ -7,11 +7,12 @@ import type { Jar, JarConfig } from "@/domain/models";
 /**
  * Route-level integration for the two cap-enforcing write doors — batch
  * `PATCH /api/jars` and single `PATCH /api/jars/:id`. The other suites cover
- * `fitsCasaCap`, `resyncActualOnRaise` and the seeded-DB invariant in isolation
- * (unit + committed-sqlite); this exercises the ACTUAL handlers end-to-end so
- * the wiring the red team cared about (C2 — server derives CASA itself and
- * rejects an over-cap write; H3 runs before the cap check; 404-vs-422 status;
- * `categoryIds` dropped from a batch) is load-bearing, not just inspected.
+ * `fitsCasaCap` and the seeded-DB invariant in isolation (unit + committed
+ * -sqlite); this exercises the ACTUAL handlers end-to-end so the wiring the red
+ * team cared about (C2 — server derives CASA itself and rejects an over-cap
+ * write; 404-vs-422 status; `categoryIds` dropped from a batch) is load-bearing,
+ * not just inspected. A jar has NO stored balance — the Σ budgetLimit ≤ CASA cap
+ * is the only ceiling (spendable is derived, bounded by budgetLimit).
  *
  * `@/lib/db` is mocked to an in-memory SQLite so the real `jars-store` runs for
  * real; `server-only` is neutralised (it throws outside a Server Component).
@@ -32,7 +33,7 @@ const CASA = 18_000_000;
 
 const JARS_DDL = `CREATE TABLE jars (
   id TEXT NOT NULL, cif TEXT NOT NULL, label TEXT NOT NULL, category_ids TEXT NOT NULL,
-  budget_limit REAL, actual_amount REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL,
+  budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL,
   PRIMARY KEY (cif, id)
 );`;
 
@@ -126,12 +127,15 @@ describe("PATCH /api/jars (batch cap door)", () => {
     expect(findJar(config, "b")?.budgetLimit).toBe(8_000_000);
   });
 
-  it("re-syncs actualAmount up when a raise lands on an undrawn jar (H3)", async () => {
-    seed([{ id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000, actualAmount: 5_000_000 }]);
-    const res = await batchPatch({ a: { budgetLimit: 8_000_000 } });
-    expect(res.status).toBe(200);
-    const config: JarConfig = await res.json();
-    expect(findJar(config, "a")?.actualAmount).toBe(8_000_000);
+  it("rejects a negative budgetLimit patch as invalid (422) rather than silently swallowing it (RT#6)", async () => {
+    seed([{ id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 }]);
+    const res = await batchPatch({ a: { budgetLimit: -1 } });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBe("patch for a is invalid");
+    // Store untouched.
+    const after = await readConfig();
+    expect(findJar(after, "a")?.budgetLimit).toBe(5_000_000);
   });
 });
 

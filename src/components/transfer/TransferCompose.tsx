@@ -6,22 +6,24 @@ import { Home, QrCode } from "lucide-react";
 import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
-import { putTransferDraft } from "@/lib/transfer-draft-store";
+import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
 import { assessTransferRisk } from "@/lib/transfer-risk";
+import { casaBalance, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
 import { TransferHeader } from "./TransferHeader";
 import { type SelectedRecipient } from "./RecipientPicker";
 import { TransferAccountPicker } from "./TransferAccountPicker";
 import { TransferBankEntry } from "./TransferBankEntry";
 import { TransferSaveRecipient } from "./TransferSaveRecipient";
-import { TransferAmountStep, type TransferSource } from "./TransferAmountStep";
+import { TransferAmountStep, POOL_SOURCE_LABEL, type TransferSource } from "./TransferAmountStep";
+import { JarTopupSuggestionSheet } from "./JarTopupSuggestionSheet";
 
 type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
 
 export function TransferCompose() {
   const providers = useProviders();
   const router = useRouter();
-  const { config: jarConfig } = useJarConfig();
+  const { config: jarConfig, loaded: jarsLoaded } = useJarConfig();
   const { financials } = useFinancials();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -80,30 +82,78 @@ export function TransferCompose() {
     return () => { active = false; };
   }, [providers]);
 
+  // The single derived quantity every jar number keys off (invariant #1): built
+  // from the SAME `jarBudget.lines` the Tổng quan overview reads, so the picker
+  // and the overview can never disagree. `spendable = max(0, remaining)`; null
+  // (no limit) is non-fundable ("Chưa có số dư"), never a fabricated 0 (#6).
+  const jarSpendables = useMemo<JarSpendable[]>(
+    () =>
+      (financials?.jarBudget.lines ?? []).map((line) => ({
+        id: line.huId,
+        label: line.label,
+        categoryIds: line.categoryIds,
+        spendable: jarSpendable(line.remaining),
+      })),
+    [financials],
+  );
+
   const jars = useMemo(
     () =>
-      jarConfig.jars.map((jar) => ({
-        ...jar,
-        remaining: financials?.jarBudget.lines.find((line) => line.huId === jar.id)?.remaining ?? null,
-      })),
+      jarConfig.jars.map((jar) => {
+        const remaining = financials?.jarBudget.lines.find((line) => line.huId === jar.id)?.remaining ?? null;
+        return { ...jar, remaining, spendable: jarSpendable(remaining) };
+      }),
     [jarConfig, financials],
   );
 
   const numericAmount = Number(amount);
   const selectedAccount = source?.kind === "account" ? accounts.find((account) => account.id === source.id) : undefined;
   const selectedJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
-  // Can't send more than the source holds — an over-source transfer would drive
-  // the displayed balance negative ("không fit thực tế"). Jar → its real balance
-  // (actualAmount); account → its (adjustment-applied) balance.
-  const sourceValid =
-    source?.kind === "jar"
-      ? Boolean(selectedJar && selectedJar.actualAmount !== undefined && numericAmount <= selectedJar.actualAmount)
-      : Boolean(selectedAccount && numericAmount <= selectedAccount.balance);
-  const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
-  const canContinue = Boolean(recipient && Number.isFinite(numericAmount) && numericAmount > 0 && sourceValid);
+  // The virtual "Chưa phân bổ" pool — computed HERE from the shared selector on
+  // the already-current-filtered `accounts` (never via useFinancials' unfiltered
+  // RawData.accounts — RT#9), and only once jars have loaded AND financials have
+  // arrived (else `spendableTotal: 0` would report the whole CASA as unallocated
+  // — RT#14). Σ derived spendable, the same number the overview shows.
+  const pool = useMemo(
+    () =>
+      jarsLoaded && financials
+        ? computeUnallocatedPool({
+            casaBalance: casaBalance(accounts),
+            spendableTotal: jarSpendables.reduce((sum, jar) => sum + (jar.spendable ?? 0), 0),
+          })
+        : null,
+    [jarsLoaded, financials, accounts, jarSpendables],
+  );
 
-  function continueToConfirm() {
-    if (!recipient || !canContinue) return;
+  // Funding assessment for jar/pool sources (RT — Câu 2). An account source is a
+  // plain balance check (no jar-model shortfall). `undefined` = account source.
+  const fundingSourceJarId = source?.kind === "jar" ? source.id : source?.kind === "pool" ? null : undefined;
+  const assessment = useMemo(() => {
+    if (source?.kind === "account" || !jarsLoaded || !financials || !(numericAmount > 0)) return null;
+    return evaluateFunding({
+      amount: numericAmount,
+      sourceJarId: fundingSourceJarId ?? null,
+      casaBalance: casaBalance(accounts),
+      jars: jarSpendables,
+    });
+  }, [source?.kind, fundingSourceJarId, jarsLoaded, financials, numericAmount, accounts, jarSpendables]);
+
+  const accountSourceValid = source?.kind === "account" && Boolean(selectedAccount && numericAmount <= selectedAccount.balance);
+  const insufficient = assessment?.tier === "insufficient";
+  // Continue is allowed when: an account source has the balance, OR a jar/pool
+  // source is `ok` or `topup` (topup routes through the suggestion popup).
+  const canContinue = Boolean(
+    recipient &&
+      Number.isFinite(numericAmount) &&
+      numericAmount > 0 &&
+      (source?.kind === "account" ? accountSourceValid : assessment !== null && assessment.tier !== "insufficient"),
+  );
+  const [topupOpen, setTopupOpen] = useState(false);
+  const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
+
+  /** Write the draft (with optional planned reallocation / overspend) and navigate to confirm. */
+  function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation" | "overspend"> = {}) {
+    if (!recipient) return;
     const id = `form_${Date.now()}`;
     putTransferDraft({
       id,
@@ -115,17 +165,33 @@ export function TransferCompose() {
       memo: memo.trim() || null,
       sourceLabel: selectedJar
         ? `Hũ ${selectedJar.label}`
-        : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
+        : source?.kind === "pool"
+          ? POOL_SOURCE_LABEL
+          : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
       // Jar money physically sits in the CASA account, so a jar source debits the
       // (single, current-only `accounts`) CASA account too; an account source
-      // debits the account the user picked.
+      // debits the account the user picked. A pool source debits the CASA account
+      // with NO `sourceJarId` (like no-jar today: the account drops, the derived
+      // pool self-shrinks).
       sourceAccountId: selectedAccount?.id ?? accounts[0]?.id,
       sourceJarId: selectedJar?.id,
       recipientSource: recipient.source,
       riskFlags,
       source: "mock",
+      ...extras,
     });
     router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`);
+  }
+
+  function continueToConfirm() {
+    if (!recipient || !canContinue) return;
+    // Account source, or a jar/pool source that already has enough → straight to
+    // confirm. A `topup` opens the suggestion popup; `insufficient` is blocked.
+    if (source?.kind === "account" || assessment?.tier === "ok") {
+      writeDraftAndGo();
+    } else if (assessment?.tier === "topup") {
+      setTopupOpen(true);
+    }
   }
 
   let content: React.ReactNode;
@@ -151,10 +217,16 @@ export function TransferCompose() {
     content = (
       <>
         {accounts.length === 0 && <p role="alert" className="mx-4 mb-2 text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
+        {insufficient && (
+          <p role="alert" className="mx-4 mb-2 text-sm text-negative">
+            Không đủ số dư để chuyển số tiền này.
+          </p>
+        )}
         <TransferAmountStep
           recipient={recipient}
           accounts={accounts}
           jars={jars}
+          pool={pool}
           source={source}
           amount={amount}
           memo={memo}
@@ -165,6 +237,24 @@ export function TransferCompose() {
           onMemoChange={setMemo}
           onContinue={continueToConfirm}
         />
+        {topupOpen && assessment?.tier === "topup" && (
+          <JarTopupSuggestionSheet
+            assessment={assessment}
+            targetLabel={selectedJar ? `Hũ ${selectedJar.label}` : POOL_SOURCE_LABEL}
+            onClose={() => setTopupOpen(false)}
+            onAccept={() => {
+              setTopupOpen(false);
+              writeDraftAndGo({
+                plannedReallocation: { donors: assessment.donors, targetJarId: assessment.targetJarId },
+              });
+            }}
+            onOverspend={() => {
+              setTopupOpen(false);
+              writeDraftAndGo({ overspend: true });
+            }}
+            onChooseAnother={() => setTopupOpen(false)}
+          />
+        )}
       </>
     );
   }

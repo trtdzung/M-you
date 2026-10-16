@@ -21,7 +21,9 @@ import type {
 import {
   aggregateCashflow,
   calculateNetWorth,
+  casaBalance,
   cashRunwayMonths,
+  computeUnallocatedPool,
   dateToMonthKey,
   detectRecurring,
   estimateEndOfMonth,
@@ -29,8 +31,10 @@ import {
   evaluateJarBudget,
   evaluateJarEnvelope,
   financialHealth,
+  jarSpendable,
   monthPeriodFromKey,
   networthTrend,
+  selectUnlabeledSpend,
   spendingByCategory,
   upcomingObligations,
   type BudgetLine,
@@ -45,6 +49,8 @@ import {
   type NetWorthTrendMeta,
   type Obligation,
   type RecurringSeries,
+  type UnallocatedPool,
+  type UnlabeledSpend,
 } from "./index";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
 
@@ -97,6 +103,27 @@ export interface Financials {
    * account balances — never the stored `actualAmount` (invariant #1, RT-1/2).
    */
   jarEnvelope: JarEnvelopeResult;
+  /**
+   * The virtual "Chưa phân bổ" pool = casaBalance(current) − Σ jar spendable
+   * (`max(0, remaining)`, the SAME number the overview + picker show). Derived
+   * (never stored), so every screen showing jar totals / CASA reads one truth —
+   * including `overAllocated` ("Vượt phân bổ"), which must surface on every such
+   * surface, not just the transfer sheet (Red Team #13). Negative `amount` is
+   * kept as-is (invariant #6); the UI presents available as 0.
+   */
+  unallocatedPool: UnallocatedPool;
+  /**
+   * Current-month expenses spent straight from CASA that never got a category
+   * ("Chưa gắn nhãn"). Posted-only, in-period (`selectUnlabeledSpend`). The
+   * overview card reads `count`/`amount`; the labeling sheet re-runs the SAME
+   * selector for the list (parity by construction).
+   *
+   * CLIENT-ONLY: corrections live in localStorage, so only the client hook feeds
+   * correction-applied txns here. The server/AI-facade path sees RAW txns and
+   * would over-count already-labeled ones — do NOT wire an AI tool to this field
+   * until corrections have a server representation.
+   */
+  unlabeled: UnlabeledSpend;
   /**
    * Financial-health indicators (runway, surplus, essential coverage, asset
    * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
@@ -188,6 +215,20 @@ export function computeFinancials(
   const jarBudget = evaluateJarBudget(jarConfig, txns, period, prevPeriod, now);
   const spentByJar = new Map(jarBudget.lines.map((l) => [l.huId, l.spent]));
   const jarEnvelope = evaluateJarEnvelope(jarConfig, raw.accounts, spentByJar, period);
+  // Unallocated pool: CASA (current-only, via the shared selector so it never
+  // swallows savings/credit — RT#9) minus what jars actually claim (Σ derived
+  // spendable = Σ max(0, remaining), the same jarBudget.lines the overview +
+  // picker read). Derived here once so every screen reads the same
+  // `overAllocated` (RT#13).
+  const spendableTotal = jarBudget.lines.reduce((sum, l) => sum + (jarSpendable(l.remaining) ?? 0), 0);
+  const unallocatedPool = computeUnallocatedPool({
+    casaBalance: casaBalance(raw.accounts),
+    spendableTotal,
+  });
+
+  // Current-month unlabeled spend — count/amount only; the sheet re-runs the
+  // same selector for `items` (parity, client-only per the `unlabeled` doc).
+  const unlabeled = selectUnlabeledSpend(txns, period);
 
   return {
     monthKey: month,
@@ -206,6 +247,8 @@ export function computeFinancials(
     networthSeriesMeta: trend.meta,
     jarBudget,
     jarEnvelope,
+    unallocatedPool,
+    unlabeled: { count: unlabeled.count, amount: unlabeled.amount, source: unlabeled.source },
     health: financialHealth(cashflow, raw.accounts, networth),
     goals: [...raw.goals, ...(options.userGoals ?? [])],
   };
