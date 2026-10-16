@@ -1,0 +1,101 @@
+/**
+ * Cash-flow aggregation — the core income/expense truth.
+ *
+ * Rules enforced here (architectural invariants):
+ *  - internal transfers and credit-card payments are excluded from income/expense
+ *  - refunds reverse the matching expense category (applied as negative expense)
+ *  - reversed transactions are excluded from all totals
+ *  - pending is kept separate from posted
+ */
+
+import type { Transaction } from "@/domain/models";
+import { FIXED_CATEGORY_IDS } from "@/domain/models";
+import { coverageOf, type AggregateMeta, type Period } from "./types";
+
+export interface CategoryAmount {
+  categoryId: string;
+  amount: number;
+}
+
+export interface CashflowResult {
+  income: number;
+  /** Net expense (gross expense − refunds), excludes transfers/card payments. */
+  expense: number;
+  net: number;
+  /** Net expense per category (may include refunds), positive-ish, sorted desc. */
+  byCategory: CategoryAmount[];
+  fixed: number;
+  discretionary: number;
+  /** Pending expense, reported separately from posted totals. */
+  pendingExpense: number;
+  meta: AggregateMeta;
+}
+
+const EXPENSE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee"]);
+
+function inPeriod(txn: Transaction, period: Period): boolean {
+  return txn.postedAt >= period.from && txn.postedAt <= period.to;
+}
+
+/** Net expense per category for posted transactions (gross − refunds). */
+export function netExpenseByCategory(txns: Transaction[], period: Period): Map<string, number> {
+  const byCat = new Map<string, number>();
+  for (const t of txns) {
+    if (t.status !== "posted" || !inPeriod(t, period)) continue;
+    if (EXPENSE_TYPES.has(t.type)) {
+      byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amount);
+    } else if (t.type === "refund") {
+      byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) - t.amount);
+    }
+  }
+  return byCat;
+}
+
+export function aggregateCashflow(txns: Transaction[], period: Period): CashflowResult {
+  let income = 0;
+  let pendingExpense = 0;
+  let latest: string | null = null;
+  const sources: Transaction["source"][] = [];
+
+  for (const t of txns) {
+    if (!inPeriod(t, period) || t.status === "reversed") continue;
+
+    if (t.status === "pending") {
+      if (EXPENSE_TYPES.has(t.type)) pendingExpense += t.amount;
+      continue;
+    }
+    if (t.status !== "posted") continue;
+
+    sources.push(t.source);
+    if (!latest || t.postedAt > latest) latest = t.postedAt;
+    if (t.type === "income") income += t.amount;
+  }
+
+  const byCatMap = netExpenseByCategory(txns, period);
+  let expense = 0;
+  let fixed = 0;
+  const byCategory: CategoryAmount[] = [];
+  for (const [categoryId, amount] of byCatMap) {
+    expense += amount;
+    if (FIXED_CATEGORY_IDS.has(categoryId)) fixed += amount;
+    byCategory.push({ categoryId, amount });
+  }
+  byCategory.sort((a, b) => b.amount - a.amount);
+
+  const meta: AggregateMeta = {
+    period,
+    sourceCoverage: coverageOf(sources, sources.length, 0),
+    freshness: latest,
+  };
+
+  return {
+    income,
+    expense,
+    net: income - expense,
+    byCategory,
+    fixed,
+    discretionary: expense - fixed,
+    pendingExpense,
+    meta,
+  };
+}
