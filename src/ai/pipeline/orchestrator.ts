@@ -16,6 +16,7 @@ import { checkRequiredData } from "./required-data";
 import { buildSystemPrompt } from "./system-prompt";
 import { validateNumeric, validateSafety } from "./validator";
 import { offlineAnswer } from "./fallback";
+import { toPlainText } from "./plain-text";
 import { buildChart } from "./whatif-chart";
 import { recordAuditEvent, newRequestId } from "@/ai/audit/log";
 import { CONSENT_VERSION } from "@/lib/consent";
@@ -139,7 +140,7 @@ async function* llmLoop(input: RunInput, trace: RequestTrace): AsyncGenerator<As
     return;
   }
 
-  for (const chunk of chunkText(finalText)) yield { type: "text", delta: chunk };
+  for (const chunk of chunkText(toPlainText(finalText))) yield { type: "text", delta: chunk };
   yield { type: "done" };
 }
 

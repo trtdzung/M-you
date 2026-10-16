@@ -8,6 +8,7 @@
 import type { ConsentScope } from "@/lib/consent";
 
 export type IntentKind =
+  | "smalltalk"
   | "explain_month"
   | "top_category"
   | "upcoming"
@@ -83,12 +84,37 @@ const RULES: Rule[] = [
   },
 ];
 
+// Capability/identity questions — smalltalk regardless of length.
+const SMALLTALK_META: RegExp[] = [
+  /bạn\s*là\s*ai/i,
+  /bạn\s*tên\s*(là\s*)?gì/i,
+  /bạn\s*(có\s*thể\s*)?(làm|giúp|hỗ\s*trợ)\s*(được\s*)?(gì|như\s*thế\s*nào)/i,
+  /(giúp|hỗ\s*trợ)\s*(được\s*)?(gì|như\s*thế\s*nào)\b/i,
+  /\b(who\s*are\s*you|what\s*can\s*you\s*do|how\s*can\s*you\s*help)\b/i,
+];
+// Pure greetings/thanks — only smalltalk when the message is short (no finance ask riding along).
+const GREETING = /^\s*(hi+|hello+|hey+|helo|alo+|chào|xin\s*chào|hế\s*lô)\b/i;
+const THANKS = /^\s*(cảm\s*ơn|cám\s*ơn|thanks?|thank\s*you|tks)\b/i;
+
+/** True for greetings, thanks and capability/identity questions (no tools needed). */
+export function isSmalltalk(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (!t) return false;
+  if (SMALLTALK_META.some((p) => p.test(t))) return true;
+  const words = t.split(/\s+/).filter(Boolean).length;
+  return (GREETING.test(t) || THANKS.test(t)) && words <= 6;
+}
+
 export function classifyIntent(text: string): Intent {
   const t = text ?? "";
+  // A real financial intent ALWAYS wins over a greeting prefix or a capability
+  // phrase, so a genuine request ("chào, tiêu nhiều nhất ở đâu?", "giúp gì để tôi
+  // chuyển 5 triệu cho Lan") is never swallowed into a canned smalltalk reply.
   for (const rule of RULES) {
     if (rule.patterns.some((p) => p.test(t))) {
       return { kind: rule.kind, needsScopes: rule.needsScopes, toolHints: rule.toolHints };
     }
   }
+  if (isSmalltalk(t)) return { kind: "smalltalk", needsScopes: [], toolHints: [] };
   return { kind: "unknown", needsScopes: ["transactions"], toolHints: [] };
 }

@@ -11,6 +11,7 @@
 
 import "server-only";
 import { createAnthropicClient } from "./anthropic-client";
+import { createOpenAiCompatibleClient } from "./openai-compatible-client";
 import type { LlmClient } from "./types";
 
 export type { LlmClient, LlmMessage, LlmTool, LlmStreamEvent, LlmContentBlock } from "./types";
@@ -28,6 +29,12 @@ function select(): LlmClient | null {
       // No key → treat as "not configured" and fall back offline (not an error).
       if (!process.env.ANTHROPIC_API_KEY) return null;
       return createAnthropicClient();
+    case "vng":
+    case "greennode":
+    case "openai-compatible":
+      // OpenAI-compatible endpoint (VNG GreenNode: Qwen/GLM/…). No key → offline.
+      if (!process.env.AI_PLATFORM_API_KEY) return null;
+      return createOpenAiCompatibleClient();
     default:
       throw new Error(
         `LLM_PROVIDER "${provider}" chưa được hỗ trợ. Thêm một adapter trong src/ai/llm/ rồi khai báo ở đây.`,

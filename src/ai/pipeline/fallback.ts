@@ -16,7 +16,14 @@ const INTENT_TO_PROMPT: Partial<Record<IntentKind, string>> = {
   networth: "networth",
 };
 
+const CAPABILITY_HINT =
+  "Mình có thể giúp bạn xem dòng tiền, chi tiêu theo danh mục, tài sản/nợ và mục tiêu tiết kiệm.";
+
 export function offlineAnswer(intent: Intent, ctx: AiContext): AssistantAnswer {
+  if (intent.kind === "smalltalk") {
+    return { lines: [`Chào bạn 👋 ${CAPABILITY_HINT} Bạn muốn bắt đầu từ đâu?`], sources: [] };
+  }
+
   const promptId = INTENT_TO_PROMPT[intent.kind];
   if (promptId) return answerPrompt(promptId, ctx.financials);
 
@@ -30,6 +37,6 @@ export function offlineAnswer(intent: Intent, ctx: AiContext): AssistantAnswer {
     };
   }
 
-  // Unknown / action: safe default explanation of the month.
-  return answerPrompt("explain_month", ctx.financials);
+  // Unknown: don't guess — ask what they want rather than dumping a full report.
+  return { lines: [`Mình chưa rõ ý bạn. ${CAPABILITY_HINT} Bạn muốn xem phần nào?`], sources: [] };
 }
