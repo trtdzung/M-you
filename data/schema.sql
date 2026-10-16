@@ -58,6 +58,23 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 CREATE INDEX IF NOT EXISTS idx_accounts_cif ON accounts (cif);
 
+-- Self-reported transactions per persona (`cif`) — the records a user enters via
+-- the ＋ FAB or that a confirmed transfer writes on the success card. NOT money
+-- movement (invariant #3): every row is `source: 'self_reported'`, never
+-- bank-verified (#5). Previously localStorage-only; now a real table so they
+-- persist across reloads/dev-server restarts/devices. The rich, evolving
+-- `Transaction` shape is stored as a JSON `payload` (same JSON-in-column pattern
+-- as `jars.category_ids`); `posted_at` is a column purely for newest-first order.
+CREATE TABLE IF NOT EXISTS manual_transactions (
+  cif TEXT NOT NULL,
+  id TEXT NOT NULL,
+  posted_at TEXT NOT NULL,          -- ISO 8601; ordering only (newest first)
+  payload TEXT NOT NULL,            -- full JSON Transaction (source: self_reported)
+  PRIMARY KEY (cif, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_manual_txns_cif ON manual_transactions (cif);
+
 -- NOTE: the legacy `jar_allocations` table was retired with the single-number
 -- ("một con số") jar model — a jar's `budget_limit` IS its allocation now, so
 -- there is no separate earmark ledger. `db.ts` drops the old table on connect.

@@ -55,6 +55,29 @@ re-seeded by `accounts-store.ts` if a persona has no rows yet.
 
 ¹ Composite primary key `(cif, id)`.
 
+## `manual_transactions`
+
+One row per **self-reported** transaction, scoped by `cif` — the records a user
+enters via the ＋ FAB or that a confirmed transfer writes on its success card.
+NOT money movement (invariant #3): every row is `source: "self_reported"`, forced
+server-side so it can never look bank-verified (#5). Previously localStorage-only;
+now a real table so records survive reloads, dev-server restarts, and devices.
+Reached only through `/api/manual-transactions` (`src/lib/manual-txns-store.ts`);
+the client hook (`src/state/manual-txns.tsx`) writes optimistically and persists
+in the background, and imports any legacy localStorage rows once on first load.
+
+| column | type | notes |
+|---|---|---|
+| `cif` | TEXT PK¹ | owner |
+| `id` | TEXT PK¹ | client-generated `manual-<uuid>` |
+| `posted_at` | TEXT | ISO timestamp; ordering only (list is newest-first) |
+| `payload` | TEXT | full JSON `Transaction` (same JSON-in-column pattern as `jars.category_ids`), letting the rich/evolving shape persist without schema churn |
+
+¹ Composite primary key `(cif, id)`. Writes are `INSERT OR REPLACE` (idempotent on
+a replayed create); PATCH is a read-modify-write over a whitelist
+(`categoryId` / `type` / `transferPurpose` / `note`), where a `null` value CLEARS
+an optional field. No seed — a persona starts with zero self-reported rows.
+
 ## `jars`
 
 See `data/jars/schema.md` — documented in its own file/folder rather than
