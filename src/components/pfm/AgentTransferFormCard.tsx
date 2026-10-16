@@ -42,7 +42,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * agent's proposal, then "Chuyển" hands the (possibly edited) values to
  * `/transfer` (`TransferCompose`, prefilled via the query string) so the
  * SAME screen and steps as a human-initiated transfer apply (source-account
- * pick, "Tiếp tục", OTP) — no separate/short-circuited screen.
+ * pick, "Tiếp tục", confirm) — no separate/short-circuited screen.
  */
 export function AgentTransferFormCard({ form }: { form: TransferFormUi }) {
   const router = useRouter();

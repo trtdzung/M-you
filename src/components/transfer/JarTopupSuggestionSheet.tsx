@@ -12,8 +12,8 @@ import type { FundingAssessment } from "@/domain/engine";
  * component only presents them and records the user's choice. It NEVER moves
  * money: "Đồng ý rót" attaches a PLANNED reallocation to the draft (applied
  * atomically at confirm, RT#1); "Bỏ qua, vượt hũ" flags an overspend. Relabeling
- * jars is an internal, non-OTP action; the outward payment still runs the MSB
- * confirm + OTP flow.
+ * jars is an internal action; the outward payment still runs the MSB confirm
+ * flow.
  *
  * Copy is static (deterministic) for the MVP — Phase 03 may swap in an
  * AI-narrated line WITHOUT changing any figure.
@@ -90,7 +90,7 @@ export function JarTopupSuggestionSheet({
         </div>
 
         <p className="text-[11px] text-muted">
-          Rót hũ chỉ đổi nhãn nội bộ, không cần OTP. Giao dịch chuyển tiền vẫn cần bạn xác nhận và nhập OTP ở bước sau.
+          Rót hũ chỉ đổi nhãn nội bộ. Giao dịch chuyển tiền vẫn cần bạn xác nhận ở bước sau.
         </p>
       </div>
     </Sheet>

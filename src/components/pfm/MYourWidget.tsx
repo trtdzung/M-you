@@ -84,6 +84,8 @@ export function MYourWidget() {
   const idRef = useRef(0);
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voicePrefix = useRef("");
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revealedTranscriptRef = useRef("");
@@ -153,6 +155,33 @@ export function MYourWidget() {
   useEffect(() => {
     if (isOpen) loadHistory();
   }, [isOpen, loadHistory]);
+
+  // Jump to the newest message whenever the overlay opens, its history finishes
+  // loading, or the thread grows — and keep following the bottom as the
+  // message list's actual height changes afterward (a card like
+  // `AgentTransferFormCard` resolves its beneficiary lookup, or a bank logo
+  // image loads, AFTER the message is added, growing the list past where a
+  // one-shot scroll already landed). A `ResizeObserver` on the scroll
+  // container catches every one of those instead of only the react-state
+  // change that added the message.
+  useEffect(() => {
+    if (!isOpen) return;
+    const scrollToBottom = () => {
+      // jsdom (unit tests) has no scrollIntoView implementation — guard it out
+      // rather than skip the effect, so the scroll-on-new-message behavior is
+      // still exercised by anything that does mock it.
+      messagesEndRef.current?.scrollIntoView?.({ block: "end" });
+    };
+    scrollToBottom();
+    // Observe the intrinsic-height message LIST, not the fixed-size scroll
+    // viewport around it (that one never resizes — the whole point of
+    // `overflow-y-auto` — so it would never fire here).
+    const container = messagesContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(scrollToBottom);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isOpen, historyStatus]);
 
   function close() {
     cancelVoice();
@@ -285,7 +314,7 @@ export function MYourWidget() {
             )}
 
             {historyStatus === "ready" && (
-              <div className="flex flex-col gap-3">
+              <div ref={messagesContainerRef} className="flex flex-col gap-3">
                 {messages.length === 0 && (
                   <div className="shadow-card max-w-[85%] rounded-2xl rounded-bl-sm bg-surface-muted px-3.5 py-2.5 text-sm text-text">
                     {GREETING}
@@ -316,6 +345,7 @@ export function MYourWidget() {
                     </div>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
             )}
           </div>

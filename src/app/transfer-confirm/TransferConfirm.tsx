@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Home, Lock, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Home, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { formatDateTime } from "@/lib/format";
 import { avatarColor, initialOf } from "@/lib/avatar";
@@ -20,10 +20,11 @@ import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/li
 import { CATEGORY, CURRENCY_VND, type DataSource } from "@/domain/models";
 
 /**
- * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field,
- * enters a simulated OTP THEY type, and explicitly confirms. "Executing" here
- * only builds a local `source: "mock"` record; no facade/API is ever called and
- * the assistant never reaches this code. Cancel returns control with no effect.
+ * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field
+ * and explicitly confirms (no OTP step — dropped from this prototype).
+ * "Executing" here only builds a local `source: "mock"` record; no facade/API
+ * is ever called and the assistant never reaches this code. Cancel returns
+ * control with no effect.
  */
 
 interface MockExecutedTransfer {
@@ -75,7 +76,6 @@ export function TransferConfirm() {
   const [acct] = useState(draft?.accountMasked ?? "");
   const [amount, setAmount] = useState<number>(draft?.amount ?? 0);
   const [memo, setMemo] = useState(draft?.memo ?? "");
-  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<MockExecutedTransfer | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -109,7 +109,6 @@ export function TransferConfirm() {
     if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
-    if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (ít nhất 4 chữ số).");
     setError(null);
     committedRef.current = true; // latch before any await — blocks a synchronous re-entry
     setSubmitting(true);
@@ -442,7 +441,7 @@ export function TransferConfirm() {
       <Card className="bg-primary-soft/40">
         <p className="flex items-start gap-2 text-xs text-text">
           <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
-          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận và nhập OTP, trợ lý không làm bước này.
+          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận, trợ lý không làm bước này.
         </p>
       </Card>
 
@@ -467,22 +466,6 @@ export function TransferConfirm() {
         <Labeled label="Từ tài khoản">
           <input value={sourceLabel} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
         </Labeled>
-      </Card>
-
-      <Card className="flex flex-col gap-2">
-        <Labeled label="Mã OTP">
-          <div className="flex items-center gap-2">
-            <Lock size={15} className="text-muted" />
-            <input
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              inputMode="numeric"
-              placeholder="Bạn tự nhập OTP"
-              className={`${inputCls} tabular-nums`}
-            />
-          </div>
-        </Labeled>
-        <p className="text-[11px] text-muted">OTP do bạn tự nhập, không gửi đi đâu.</p>
       </Card>
 
       {error && <p className="text-sm text-negative">{error}</p>}
