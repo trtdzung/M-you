@@ -19,6 +19,13 @@ interface JarConfigContextValue {
   config: JarConfig;
   addJar: (jar: Jar) => void;
   updateJar: (id: string, patch: Partial<Omit<Jar, "id">>) => void;
+  /**
+   * Patch several jars in ONE atomic write ("Chia ngay" sets every jar's
+   * budgetLimit at once). Server enforces the CASA cap and returns the full
+   * config; a single `setConfig` applies it (no `Promise.all` race). Returns the
+   * promise so callers can surface a rejected write (e.g. a 422 over-cap).
+   */
+  updateJars: (patches: Record<string, Partial<Omit<Jar, "id">>>) => Promise<void>;
   /** Remove a jar; its categories are force-moved to "Khác" first (exactly-one). */
   removeJar: (id: string) => void;
   /**
@@ -88,6 +95,12 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
       updateJar: (id, patch) => {
         providers.updateJar(id, patch).then(setConfig).catch(logJarMutationError);
       },
+      updateJars: (patches) =>
+        // One setConfig from the batch response (H1). The promise is returned so
+        // the caller (AllocationSheet) can keep its draft on a rejected write.
+        providers.updateJars(patches).then((next) => {
+          setConfig(next);
+        }),
       removeJar: (id) => {
         providers.removeJar(id).then(setConfig).catch(logJarMutationError);
       },

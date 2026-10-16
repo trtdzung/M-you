@@ -240,32 +240,6 @@ export interface JarConfig {
   jars: Jar[];
 }
 
-/**
- * One envelope-allocation record: "một phần của income transaction `txnId` đã
- * được người dùng phân bổ vào hũ `jarId`, bao nhiêu VND". Keyed to a concrete
- * `txnId` so "N giao dịch chưa vào hũ" is an EXACT count over the ledger, never
- * a proxy over a pooled sum. A user action ⇒ `source: self_reported` (never
- * `msb`-verified). This is bookkeeping of money already received — it moves no
- * real money and never touches a transfer/OTP (invariant #3).
- *
- * NOTE (post-red-team): the funded "còn lại trong hũ" the Overview widget shows
- * is DERIVED by the engine from these rows + jar-budget spend — it is NOT the
- * stored `Jar.actualAmount` (which stays the Chuyển-tiền spendable balance).
- */
-export interface JarAllocation {
-  id: string;
-  /** The income `Transaction` this allocation draws from. */
-  txnId: string;
-  /** Destination jar id. An id no longer in config folds into "Khác" (engine). */
-  jarId: string;
-  /** VND allocated (finite, > 0). */
-  amount: number;
-  /** ISO 8601 timestamp of when the allocation was recorded. */
-  createdAt: string;
-  /** Always `self_reported` — a user-entered allocation, never bank-verified. */
-  source: DataSource;
-}
-
 export interface Goal {
   id: string;
   name: string;

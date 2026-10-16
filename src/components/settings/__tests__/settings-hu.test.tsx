@@ -58,6 +58,21 @@ describe("HuCategoryTab", () => {
     expect(within(dialog).getByText(/Để trống = chưa đặt/)).toBeInTheDocument();
   });
 
+  it("blocks a monthly limit that would push Σ over CASA and surfaces an over-balance error", async () => {
+    render(<HuCategoryTab />, { wrapper });
+    await waitFor(() => expect(screen.getByText("Ăn uống")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Ăn uống"));
+    const dialog = await screen.findByRole("dialog");
+    const limit = within(dialog).getByLabelText("Hạn mức mỗi tháng");
+
+    // CIF_0001 CASA is 18tr and the seed already allocates 17tr across the other
+    // jars; pushing Ăn uống to 20tr would blow the cap → the client rejects it.
+    fireEvent.change(limit, { target: { value: "20000000" } });
+    fireEvent.blur(limit);
+    expect(await within(dialog).findByText(/Vượt số dư/)).toBeInTheDocument();
+  });
+
   it("adds a new jar and opens its editor", async () => {
     render(<HuCategoryTab />, { wrapper });
     await waitFor(() => expect(screen.getByText("Ăn uống")).toBeInTheDocument());

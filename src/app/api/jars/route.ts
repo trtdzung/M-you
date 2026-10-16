@@ -3,10 +3,14 @@ import {
   backfillActualAmount,
   dedupeCategories,
   healOrphanCategories,
+  resyncActualOnRaise,
   stripCategories,
   uniqueJarId,
 } from "@/domain/jar-rules";
-import { readJarConfig, sanitizeJar, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
+import { fitsCasaCap } from "@/domain/engine";
+import type { Jar } from "@/domain/models";
+import { readJarConfig, sanitizeJar, sanitizeJarPatch, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
+import { casaPoolForCif } from "@/lib/casa-pool";
 
 /**
  * Spending jars ("hũ") for one persona (`cif`), backed by `data/pfm.sqlite3`
@@ -72,4 +76,49 @@ export async function PUT(req: NextRequest) {
 
   const next = backfillActualAmount(healOrphanCategories(dedupeCategories({ version: 3, jars })));
   return NextResponse.json(writeJarConfig(cif, next));
+}
+
+/**
+ * PATCH /api/jars?cif= — apply several jar patches ATOMICALLY (body `{cif,
+ * patches: {jarId: patch}}`), used by "Chia ngay" to set every jar's
+ * `budgetLimit` in one transaction. Server enforces the cap: if Σ budgetLimit of
+ * the resulting set would exceed CASA it rejects 422 (client check is only UX).
+ * `budgetLimit` raises re-sync `actualAmount` when the jar is undrawn (H3).
+ * `categoryIds` are NOT honoured here — category moves go through the per-jar
+ * route so the one-category-one-jar invariant stays in one place.
+ */
+export async function PATCH(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  const cif = req.nextUrl.searchParams.get("cif") ?? (typeof body?.cif === "string" ? body.cif : null);
+  if (!cif) return missingCif();
+
+  const rawPatches = body?.patches;
+  if (typeof rawPatches !== "object" || rawPatches === null || Array.isArray(rawPatches)) {
+    return NextResponse.json({ error: "patches is invalid" }, { status: 422 });
+  }
+
+  const current = readJarConfig(cif);
+  const byId = new Map(current.jars.map((j) => [j.id, j]));
+  const merged = new Map<string, Jar>();
+
+  for (const [jarId, rawPatch] of Object.entries(rawPatches as Record<string, unknown>)) {
+    const prev = byId.get(jarId);
+    if (!prev) return NextResponse.json({ error: `jar ${jarId} not found` }, { status: 404 });
+    const patch = sanitizeJarPatch(rawPatch);
+    if (!patch) return NextResponse.json({ error: `patch for ${jarId} is invalid` }, { status: 422 });
+    delete patch.categoryIds; // category moves are not a batch concern
+    merged.set(jarId, resyncActualOnRaise(prev, { ...prev, ...patch }));
+  }
+
+  const nextJars = current.jars.map((j) => merged.get(j.id) ?? j);
+
+  const cap = fitsCasaCap(nextJars, casaPoolForCif(cif) ?? "unknown", {});
+  if (!cap.ok) {
+    return NextResponse.json(
+      { error: "over CASA cap", overBy: cap.overBy ?? null },
+      { status: 422 },
+    );
+  }
+
+  return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars: nextJars })));
 }

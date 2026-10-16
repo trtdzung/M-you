@@ -224,6 +224,24 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       if (!res.ok) throw new Error(`updateJar failed: ${res.status}`);
       return res.json();
     },
+    async updateJars(patches) {
+      // Same `undefined` → `null` wire-encoding as `updateJar` (clear a field),
+      // per patch. Batched into ONE PATCH so the server applies them in a single
+      // transaction with one cap check (invariant: no partial/racy write).
+      const wirePatches = Object.fromEntries(
+        Object.entries(patches).map(([jarId, patch]) => [
+          jarId,
+          Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, value === undefined ? null : value])),
+        ]),
+      );
+      const res = await fetch(`/api/jars?cif=${encodeURIComponent(cif)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, patches: wirePatches }),
+      });
+      if (!res.ok) throw new Error(`updateJars failed: ${res.status}`);
+      return res.json();
+    },
     async removeJar(id) {
       const res = await fetch(`/api/jars/${encodeURIComponent(id)}?cif=${encodeURIComponent(cif)}`, {
         method: "DELETE",
@@ -247,20 +265,6 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         body: JSON.stringify({ cif, jars }),
       });
       if (!res.ok) throw new Error(`replaceJars failed: ${res.status}`);
-      return res.json();
-    },
-    async getJarAllocations() {
-      const res = await fetch(`/api/jar-allocations?cif=${encodeURIComponent(cif)}`);
-      if (!res.ok) return [];
-      return res.json();
-    },
-    async allocateIncome(allocations) {
-      const res = await fetch("/api/jar-allocations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cif, allocations }),
-      });
-      if (!res.ok) throw new Error(`allocateIncome failed: ${res.status}`);
       return res.json();
     },
     async getAccountAdjustments() {

@@ -13,7 +13,6 @@ import type {
   Budget,
   Goal,
   Jar,
-  JarAllocation,
   JarConfig,
   Liability,
   MockProduct,
@@ -117,24 +116,19 @@ export interface Providers
   createJar(jar: Jar): Promise<JarConfig>;
   /** Patch an existing jar's fields. Returns the full updated config. */
   updateJar(id: string, patch: Partial<Omit<Jar, "id">>): Promise<JarConfig>;
+  /**
+   * Patch several jars ATOMICALLY in one transaction — used by "Chia ngay" to set
+   * every jar's `budgetLimit` in a single write (no `Promise.all` race). The
+   * server enforces `fitsCasaCap` on the resulting set and rejects (422) if Σ
+   * budgetLimit would exceed CASA. Returns the full updated config.
+   */
+  updateJars(patches: Record<string, Partial<Omit<Jar, "id">>>): Promise<JarConfig>;
   /** Remove a jar (its categories move to "Khác"). Returns the full updated config. */
   removeJar(id: string): Promise<JarConfig>;
   /** Move `categoryId` into `jarId`, removing it from every other jar first. Returns the full updated config. */
   assignCategory(categoryId: string, jarId: string): Promise<JarConfig>;
   /** Replace the whole jar set (template apply / reset to default). Returns the full updated config. */
   replaceJars(jars: Jar[]): Promise<JarConfig>;
-  /**
-   * Read the persona's envelope allocations ("phân bổ thu nhập vào hũ"), oldest
-   * first. Backed by `data/pfm.sqlite3` via `/api/jar-allocations` (invariant
-   * #4). The engine derives "chờ phân bổ" and funded "còn lại trong hũ" from
-   * these — no money movement is implied (invariant #3).
-   */
-  getJarAllocations(): Promise<JarAllocation[]>;
-  /**
-   * Append a batch of allocations (one "Chia ngay" submit). Returns the full
-   * updated list. Bookkeeping only — never a transfer/execute/OTP.
-   */
-  allocateIncome(allocations: { txnId: string; jarId: string; amount: number }[]): Promise<JarAllocation[]>;
   /**
    * Cumulative amount already debited from each account via a jar-sourced
    * transfer (Chuyển tiền Phần 1) — a mock ledger overlay on top of the

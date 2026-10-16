@@ -42,7 +42,19 @@ const SEED_JARS = [
   { id: "health", label: "Sức khỏe", categoryIds: ["health"], budgetLimit: 1_000_000 },
   { id: "savings", label: "Tiết kiệm", categoryIds: [], budgetLimit: undefined },
 ];
-const CIFS = ["CIF_0001", "CIF_0002", "CIF_0003"];
+
+// salaryBase per CIF, duplicated from src/providers/mock/personas.ts (same reason
+// as SEED_BENEFICIARIES: plain .mjs, no TS loader). scale = salaryBase / 25tr —
+// the SAME factor fixtures/generate.ts applies to the CASA balance (18tr × scale).
+// Scaling the seed by it keeps Σ budgetLimit tracking CASA per persona
+// (Σ/CASA ≈ 0.94, dư về "Chờ phân bổ") and fixes CIF_0002 over-allocation.
+const SALARY_BASE_BY_CIF = {
+  CIF_0001: 25_000_000,
+  CIF_0002: 22_000_000,
+  CIF_0003: 80_000_000,
+};
+const SALARY_REF = 25_000_000;
+const CIFS = Object.keys(SALARY_BASE_BY_CIF);
 
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
@@ -67,14 +79,18 @@ const insertJar = db.prepare(
 );
 const insertAllJars = db.transaction(() => {
   for (const cif of CIFS) {
+    const scale = SALARY_BASE_BY_CIF[cif] / SALARY_REF;
     SEED_JARS.forEach((jar, index) => {
+      // Scale each jar's single number by the persona's factor; an unset limit
+      // (savings) stays NULL — never coerced to 0 (invariant #6).
+      const scaledLimit = jar.budgetLimit === undefined ? null : Math.round(jar.budgetLimit * scale);
       insertJar.run({
         id: jar.id,
         cif,
         label: jar.label,
         categoryIds: JSON.stringify(jar.categoryIds),
-        budgetLimit: jar.budgetLimit ?? null,
-        actualAmount: jar.budgetLimit ?? null, // backfilled at seed time too
+        budgetLimit: scaledLimit,
+        actualAmount: scaledLimit, // backfilled at seed time too
         sortOrder: index,
       });
     });

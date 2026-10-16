@@ -8,7 +8,6 @@ import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
-import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
 import { PfmTxnList } from "../PfmTxnList";
@@ -43,7 +42,6 @@ function renderList() {
         <CategoryMemoryProvider>
           <ManualTxnsProvider>
             <JarConfigProvider>
-              <JarAllocationsProvider>
                 <AssetLiabilityProvider>
                   <GoalProvider>
                     <PeriodProvider>
@@ -53,7 +51,6 @@ function renderList() {
                     </PeriodProvider>
                   </GoalProvider>
                 </AssetLiabilityProvider>
-              </JarAllocationsProvider>
             </JarConfigProvider>
           </ManualTxnsProvider>
         </CategoryMemoryProvider>
@@ -111,9 +108,9 @@ describe("Auto-categorize accept flow ('ai' consent granted)", () => {
 describe("Auto-categorize consent gate (no 'ai' scope — memory-only)", () => {
   it("never calls the remote categorize endpoint and shows no auto-suggested badge without 'ai' consent", async () => {
     setConsent(["transactions"]);
-    // Wrap real fetch (the app's own JarConfig/JarAllocations providers fetch
-    // their own same-origin routes regardless of AI consent — that's expected
-    // and unrelated) so we can isolate calls to the categorize endpoint only.
+    // Wrap real fetch (the app's own JarConfig provider fetches its own
+    // same-origin routes regardless of AI consent — that's expected and
+    // unrelated) so we can isolate calls to the categorize endpoint only.
     const realFetch = global.fetch;
     const fetchSpy = vi.fn((...args: Parameters<typeof fetch>) => realFetch(...args));
     vi.stubGlobal("fetch", fetchSpy);
