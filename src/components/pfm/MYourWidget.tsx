@@ -336,7 +336,13 @@ export function MYourWidget() {
             )}
             {(voiceBusy || voice.error) && (
               <p role={voice.error ? "alert" : "status"} className={cn("mt-2 text-xs", voice.error ? "text-negative" : "text-muted")}>
-                {voice.error || (voice.state === "connecting" ? "Đang mở micro…" : voice.state === "recording" ? "Đang ghi âm… Bấm dừng khi nói xong (tối đa 30 giây)." : "Đang nhận dạng toàn bộ bản ghi âm…")}
+                {voice.error || (voice.state === "connecting"
+                  ? "Đang mở micro…"
+                  : voice.state === "recording"
+                    ? "Đang ghi âm… Bấm dừng khi nói xong (tối đa 9 giây)."
+                    : voice.processingSlow
+                      ? "Vbee đang xử lý batch, kết quả có thể mất khoảng một phút…"
+                      : "Đang nhận dạng toàn bộ bản ghi âm…")}
               </p>
             )}
           </div>

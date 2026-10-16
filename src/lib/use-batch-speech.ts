@@ -9,6 +9,7 @@ export function useBatchSpeech(onTranscript: (text: string) => void) {
   const [state, setState] = useState<BatchSpeechState>("idle");
   const [error, setError] = useState("");
   const [levels, setLevels] = useState<number[]>(() => Array(WAVEFORM_SAMPLES).fill(0));
+  const [processingSlow, setProcessingSlow] = useState(false);
   const session = useRef<BatchSpeech | null>(null);
   const callback = useRef(onTranscript);
   callback.current = onTranscript;
@@ -37,5 +38,14 @@ export function useBatchSpeech(onTranscript: (text: string) => void) {
   const stop = useCallback(() => session.current?.stop(), []);
   useEffect(() => () => session.current?.cancel(), []);
 
-  return { state, error, levels, start, stop, cancel };
+  useEffect(() => {
+    if (state !== "processing") {
+      setProcessingSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setProcessingSlow(true), 8_000);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  return { state, error, levels, processingSlow, start, stop, cancel };
 }

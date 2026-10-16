@@ -42,7 +42,7 @@ export function VoiceFab() {
   }, [openChatWithDraft]);
 
   const voice = useBatchSpeech(acceptVoiceTranscript);
-  const { state: voiceState, error: voiceError, levels, start: startVoice, stop: stopVoice, cancel: cancelVoice } = voice;
+  const { state: voiceState, error: voiceError, levels, processingSlow, start: startVoice, stop: stopVoice, cancel: cancelVoice } = voice;
   const voiceBusy = voiceState !== "idle";
 
   useEffect(() => {
@@ -145,7 +145,9 @@ export function VoiceFab() {
             ) : voiceState === "connecting" ? (
               <span className="text-sm text-muted">Đang mở micro…</span>
             ) : voiceState === "processing" ? (
-              <span className="text-sm text-muted">Đang nhận dạng bản ghi âm…</span>
+              <span className="text-center text-sm text-muted">
+                {processingSlow ? "Vbee đang xử lý batch, kết quả có thể mất khoảng một phút…" : "Đang nhận dạng bản ghi âm…"}
+              </span>
             ) : (
               <span className="text-sm text-muted">Đang chờ…</span>
             )}
