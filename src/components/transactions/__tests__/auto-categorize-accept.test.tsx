@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { mockStoredCorrections } from "@/test-utils/mock-corrections-fetch";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
@@ -97,11 +98,10 @@ describe("Auto-categorize accept flow ('ai' consent granted)", () => {
     await waitFor(() => expect(firstAccept).not.toBeInTheDocument());
     expect(screen.queryAllByText(/Gợi ý tự động/).length).toBe(badgeCountBefore - 1);
 
-    // Persisted as a real "user" correction under the per-cif key.
-    const raw = window.localStorage.getItem("msb-pfm.corrections.CIF_0001");
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw as string) as Record<string, { categoryId?: string; origin?: string }>;
-    expect(Object.values(parsed).some((c) => c.origin === "user" && !!c.categoryId)).toBe(true);
+    // Persisted server-side as a real "user" correction for the persona.
+    await waitFor(() =>
+      expect(Object.values(mockStoredCorrections("CIF_0001")).some((c) => c.origin === "user" && !!c.categoryId)).toBe(true),
+    );
   });
 });
 

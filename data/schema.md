@@ -55,6 +55,66 @@ re-seeded by `accounts-store.ts` if a persona has no rows yet.
 
 ¹ Composite primary key `(cif, id)`.
 
+## `transactions`
+
+One row per **bank-provided** transaction (the provider history, standing in for
+MSB core-banking), scoped by `cif`. Served read-only by `GET /api/transactions`
+(`?cif=&from=&to=`, newest first); `mock-provider.ts` is the only caller and
+throws on a failed load so the UI shows its error state rather than an empty
+(silently-zero) history (invariant #6). Seeded lazily per persona by
+`transactions-store.ts` from the deterministic generator (`generateDataset` in
+`fixtures/generate.ts`) on first read; `npm run db:seed` clears the table so the
+next read re-seeds it. Self-reported records never land here — they stay in
+`manual_transactions` so provenance never mixes (invariant #5).
+
+| column | type | notes |
+|---|---|---|
+| `cif` | TEXT PK¹ | owner |
+| `id` | TEXT PK¹ | `tx_<personaId>_<seq>` |
+| `posted_at` | TEXT | ISO 8601; indexed with `cif` for period filtering + ordering |
+| `payload` | TEXT | full JSON `Transaction` (`source: "mock"`) |
+
+Category labels are never written back to this table — they live in the
+`transaction_corrections` overlay below.
+
+## `categories`
+
+The Vietnamese spending taxonomy as data (invariant #7). Seeded lazily by
+`categories-store.ts` from `CATEGORIES` (`src/domain/models/categories.ts`) with
+`INSERT OR IGNORE`: a category added in code appears on the next read, an
+existing row is never clobbered. Served by `GET /api/categories` and used
+server-side to validate every stored label. Sentinels (`unclassified`, `income`,
+`dieu-chinh-hu`) are not categories and are never stored. The client still
+renders from the bundled `CATEGORIES` constant (same source as the seed).
+
+| column | type | notes |
+|---|---|---|
+| `id` | TEXT PK | e.g. `dining`, `transport` |
+| `label` | TEXT | Vietnamese display name |
+| `kind` | TEXT | `expense` \| `transfer` |
+| `fixed` | INTEGER | 1 = fixed cost |
+| `sort_order` | INTEGER | display order |
+
+## `transaction_corrections`
+
+The per-transaction label overlay, scoped by `cif` — user corrections, AI /
+memory / heuristic assignments, and the `hidden` flag. An overlay, never an edit
+of the bank row in `transactions` (invariant #4). Read and written only by
+`src/state/corrections.tsx` via `GET /api/corrections?cif=` and
+`PATCH /api/corrections {cif, changes: {txnId: record | null}}` (one atomic
+batch; `null` deletes). The store `normalize`s each record (provenance defaults,
+#5), rejects the whole batch if a `categoryId` is not in `categories` (422), and
+never lets a non-user record overwrite a user one (user wins). Labels left in
+browser `localStorage` (`msb-pfm.corrections[.<cif>]`) by earlier builds are
+migrated up once on load. `npm run db:seed` clears this table with `transactions`.
+
+| column | type | notes |
+|---|---|---|
+| `cif` | TEXT PK¹ | owner |
+| `txn_id` | TEXT PK¹ | the labelled transaction's id |
+| `payload` | TEXT | JSON `Correction` (`categoryId?`, `hidden?`, `origin`, `status`, `confidence?`) |
+| `updated_at` | TEXT | ISO 8601 of the last write |
+
 ## `manual_transactions`
 
 One row per **self-reported** transaction, scoped by `cif` — the records a user

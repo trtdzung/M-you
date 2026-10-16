@@ -4,7 +4,7 @@
  * Header affordance for auto-categorization: an on-demand "Gắn nhãn giúp tôi"
  * button, the run summary (Red Team #15 — auto changes to totals are announced,
  * never silent), the four data states, and the honest "chưa lưu" warning when a
- * localStorage write failed (Red Team #12). No confidence numbers are shown.
+ * label write to the server failed (Red Team #12). No confidence numbers are shown.
  */
 
 import { Loader2, Sparkles, TriangleAlert, WandSparkles } from "lucide-react";
