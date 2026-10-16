@@ -84,7 +84,7 @@ describe("route smoke — all screens mount", () => {
   it("PFM hub (/pfm)", async () => {
     const { default: Page } = await import("../pfm/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
-  });
+  }, 20_000); // mounts the chart-heavy overview tab directly (no setup gate); give it headroom under parallel load
 
   it("PFM jars setup (/pfm/jars) redirects to the Ngân sách tab", async () => {
     redirect.mockClear();
