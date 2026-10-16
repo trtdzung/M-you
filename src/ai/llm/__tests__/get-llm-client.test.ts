@@ -12,6 +12,8 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV };
   delete process.env.LLM_PROVIDER;
   delete process.env.AI_PLATFORM_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_BASE_URL;
   delete process.env.LLM_BASE_URL;
   delete process.env.LLM_MODEL;
 });
@@ -57,6 +59,39 @@ describe("getLlmClient — provider resolution", () => {
     const { getLlmClient } = await import("../index");
     const client = getLlmClient();
     expect(client?.model).toBe("qwen/custom-model");
+  });
+
+  it("LLM_PROVIDER=openai WITHOUT OPENAI_API_KEY returns null (offline fallback)", async () => {
+    process.env.LLM_PROVIDER = "openai";
+    const { getLlmClient } = await import("../index");
+    expect(getLlmClient()).toBeNull();
+  });
+
+  it("LLM_PROVIDER=openai WITH a key returns a non-null client defaulting to gpt-4o-mini", async () => {
+    process.env.LLM_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "sk-openai-1";
+    const { getLlmClient } = await import("../index");
+    const client = getLlmClient();
+    expect(client).not.toBeNull();
+    expect(client?.model).toBe("gpt-4o-mini");
+  });
+
+  it("LLM_MODEL overrides the default model for the openai client", async () => {
+    process.env.LLM_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "sk-openai-1";
+    process.env.LLM_MODEL = "gpt-4o";
+    const { getLlmClient } = await import("../index");
+    const client = getLlmClient();
+    expect(client?.model).toBe("gpt-4o");
+  });
+
+  it("unset LLM_PROVIDER + OPENAI_API_KEY set infers openai (non-null, over vng)", async () => {
+    process.env.OPENAI_API_KEY = "sk-openai-1";
+    process.env.AI_PLATFORM_API_KEY = "sk-vng-1"; // openai wins the inference
+    const { getLlmClient } = await import("../index");
+    const client = getLlmClient();
+    expect(client).not.toBeNull();
+    expect(client?.model).toBe("gpt-4o-mini");
   });
 
   it("unset LLM_PROVIDER + AI_PLATFORM_API_KEY set infers vng (non-null)", async () => {
