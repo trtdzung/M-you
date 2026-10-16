@@ -156,7 +156,7 @@ function clone<T>(items: T[]): T[] {
   return items.map((item) => ({ ...item }));
 }
 
-export function createMockProvider(dataset: Dataset, personaId: PersonaId): Providers {
+export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: string): Providers {
   // Persistence-only user-record stores (client-local; a real MSB adapter maps
   // these to CRUD endpoints without changing the contract — invariant #4).
   const assetStore = userRecordStore<Asset>("assets", personaId, ASSET_STORE_VERSION, isValidAssetRecord);
@@ -226,7 +226,18 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId): Prov
       goalStore.remove(id);
     },
     async listBeneficiaries() {
-      return clone(dataset.beneficiaries);
+      const res = await fetch(`/api/beneficiaries?cif=${encodeURIComponent(cif)}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    async createBeneficiary(record) {
+      const res = await fetch("/api/beneficiaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, ...record }),
+      });
+      if (!res.ok) throw new Error(`createBeneficiary failed: ${res.status}`);
+      return res.json();
     },
     async getJarConfig() {
       if (typeof window === "undefined") return null;

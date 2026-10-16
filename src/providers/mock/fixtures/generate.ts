@@ -8,7 +8,6 @@
 import type {
   Account,
   Asset,
-  Beneficiary,
   Budget,
   Goal,
   Liability,
@@ -30,7 +29,6 @@ export interface Dataset {
   goals: Goal[];
   snapshots: MonthlySnapshot[];
   products: MockProduct[];
-  beneficiaries: Beneficiary[];
 }
 
 /**
@@ -178,7 +176,6 @@ export function generateDataset(meta: PersonaMeta): Dataset {
     goals: meta.goals,
     snapshots: buildSnapshots(meta, monthList),
     products: meta.products,
-    beneficiaries: meta.beneficiaries,
   };
 }
 

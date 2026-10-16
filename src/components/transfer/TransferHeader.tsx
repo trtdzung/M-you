@@ -12,11 +12,13 @@ import { ArrowLeft } from "lucide-react";
  */
 export function TransferHeader({
   onBack,
+  title = "Chuyển tiền",
   rightIcon,
   rightLabel,
   onRightClick,
 }: {
   onBack: () => void;
+  title?: string;
   rightIcon?: ReactNode;
   rightLabel?: string;
   onRightClick?: () => void;
@@ -31,7 +33,7 @@ export function TransferHeader({
       >
         <ArrowLeft size={22} strokeWidth={2} />
       </button>
-      <h1 className="text-xl font-bold tracking-tight text-text">Chuyển tiền</h1>
+      <h1 className="text-xl font-bold tracking-tight text-text">{title}</h1>
       <div className="ml-auto" aria-hidden={!rightIcon}>
         {rightIcon && (
           <button

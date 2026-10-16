@@ -4,11 +4,9 @@ import { useState } from "react";
 import { ChevronDown, IdCard } from "lucide-react";
 import { Sheet, Card } from "@/components/primitives";
 import { maskAccount } from "@/lib/mask-account";
-import { TRANSFER_BANKS, findBank } from "@/lib/transfer-banks";
+import { ACCOUNT_NUMBER_PATTERN, TRANSFER_BANKS, findBank } from "@/lib/transfer-banks";
 import { BankLogo } from "./BankLogo";
 import type { SelectedRecipient } from "./RecipientPicker";
-
-const ACCOUNT_PATTERN = /^\d{8,19}$/;
 
 /**
  * Bước 2 của Chuyển tiền — ngân hàng ngoài MSB. Danh sách chỉ gồm các ngân
@@ -29,7 +27,7 @@ export function TransferBankEntry({
 
   const bank = bankId ? findBank(bankId) : undefined;
   const digits = accountNumber.replace(/[\s.]/g, "");
-  const accountValid = ACCOUNT_PATTERN.test(digits);
+  const accountValid = ACCOUNT_NUMBER_PATTERN.test(digits);
   const nameValid = recipientName.trim().length > 0;
   const canContinue = Boolean(bank) && accountValid && nameValid;
 

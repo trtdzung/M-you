@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import { maskAccount } from "@/lib/mask-account";
 import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBankByName } from "@/lib/transfer-banks";
@@ -34,10 +34,13 @@ export function RecipientPicker({
   beneficiaries,
   transactions,
   onChange,
+  onAddRecipient,
 }: {
   beneficiaries: Beneficiary[];
   transactions: Transaction[];
   onChange: (recipient: SelectedRecipient | null) => void;
+  /** Opens the manual bank/account-number entry flow to save a brand-new recipient — matches the "+" icon beside the search field in the reference screen. */
+  onAddRecipient?: () => void;
 }) {
   const [tab, setTab] = useState<"saved" | "recent">("saved");
   const [search, setSearch] = useState("");
@@ -102,16 +105,28 @@ export function RecipientPicker({
         ))}
       </div>
 
-      <label className="relative block">
-        <span className="sr-only">Tìm người nhận</span>
-        <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="h-[46px] w-full rounded-2xl border-none bg-surface-muted pl-10 pr-3.5 text-sm text-text outline-none placeholder:text-muted"
-          placeholder="Tên, số tài khoản"
-        />
-      </label>
+      <div className="flex items-center gap-2.5">
+        <label className="relative block min-w-0 flex-1">
+          <span className="sr-only">Tìm người nhận</span>
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="h-[46px] w-full rounded-2xl border-none bg-surface-muted pl-10 pr-3.5 text-sm text-text outline-none placeholder:text-muted"
+            placeholder="Tên, số tài khoản"
+          />
+        </label>
+        {onAddRecipient && (
+          <button
+            type="button"
+            onClick={onAddRecipient}
+            aria-label="Thêm người nhận"
+            className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-2xl text-text"
+          >
+            <UserPlus size={22} strokeWidth={1.8} />
+          </button>
+        )}
+      </div>
 
       {visible.length === 0 ? (
         <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">

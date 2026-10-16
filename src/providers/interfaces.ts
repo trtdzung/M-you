@@ -83,8 +83,10 @@ export interface MarketDataProvider {
 }
 
 export interface BeneficiaryDataProvider {
-  /** Saved payees the assistant may resolve a transfer recipient from (Level 3). */
+  /** Saved payees the assistant may resolve a transfer recipient from (Level 3). Backed by `data/pfm.sqlite3` via `/api/beneficiaries`, not a fixture. */
   listBeneficiaries(): Promise<Beneficiary[]>;
+  /** Persist a new saved recipient (or update its display name if the account is already saved). Returns the full updated list. */
+  createBeneficiary(record: { name: string; accountNumber: string; bankName: string }): Promise<Beneficiary[]>;
 }
 
 /**

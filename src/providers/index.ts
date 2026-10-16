@@ -15,7 +15,7 @@ export function getProviders(personaId: PersonaId = DEFAULT_PERSONA): Providers 
   const existing = cache.get(personaId);
   if (existing) return existing;
   const dataset = generateDataset(PERSONAS[personaId]);
-  const provider = createMockProvider(dataset, personaId);
+  const provider = createMockProvider(dataset, personaId, PERSONAS[personaId].cif);
   cache.set(personaId, provider);
   return provider;
 }
