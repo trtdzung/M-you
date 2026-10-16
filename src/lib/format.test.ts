@@ -4,8 +4,22 @@ import {
   formatVndCompact,
   formatRelativeDate,
   isUnknownAmount,
+  maskAccountNumber,
   UNKNOWN,
 } from "./format";
+
+describe("maskAccountNumber", () => {
+  it("keeps only the last 4 digits behind bullets", () => {
+    expect(maskAccountNumber("668812081991")).toBe("•••• 1991");
+    expect(maskAccountNumber("031010112345678")).toBe("•••• 5678");
+  });
+  it("strips non-digits before masking", () => {
+    expect(maskAccountNumber("0071-0009-9887-7")).toBe("•••• 8877");
+  });
+  it("handles empty input", () => {
+    expect(maskAccountNumber("")).toBe("••••");
+  });
+});
 
 describe("formatVnd", () => {
   it("formats a number as VND", () => {

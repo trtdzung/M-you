@@ -38,6 +38,8 @@ export interface PersonaMeta {
   id: PersonaId;
   label: string;
   description: string;
+  /** Display-only membership tier shown on the primary account (source: mock). */
+  tier: string;
   params: PersonaParams;
   assets: Asset[];
   liabilities: Liability[];
@@ -70,6 +72,7 @@ const STABLE: PersonaMeta = {
   id: "stable",
   label: "Minh — Lương ổn định",
   description: "Nhân viên văn phòng, lương cố định, ít nợ, chi tiêu đều đặn.",
+  tier: "M-FIRST GOLD",
   params: { seed: 1001, salaryBase: 25_000_000, salaryVariance: 0.02, discretionaryScale: 1, extraIncomeChance: 0.1, housingBase: 6_000_000 },
   assets: [
     { id: "a_stable_deposit", type: "deposit", name: "Tiền gửi 6 tháng", value: 80_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: false },
@@ -93,6 +96,7 @@ const IRREGULAR: PersonaMeta = {
   id: "irregular",
   label: "Lan — Thu nhập biến động",
   description: "Freelancer, thu nhập lên xuống, chi tiêu tùy hứng, hay vượt ngân sách.",
+  tier: "M-FIRST",
   params: { seed: 2002, salaryBase: 22_000_000, salaryVariance: 0.55, discretionaryScale: 1.6, extraIncomeChance: 0.5, housingBase: 7_500_000 },
   assets: [
     { id: "a_irr_cash", type: "cash", name: "Tiền mặt & ví", value: 12_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
@@ -115,6 +119,7 @@ const WEALTHY: PersonaMeta = {
   id: "wealthy",
   label: "Hùng — Tài sản cao",
   description: "Thu nhập cao, nhiều tài sản & nhiều khoản nợ, có tài sản chưa định giá.",
+  tier: "M-FIRST PRIVATE",
   params: { seed: 3003, salaryBase: 80_000_000, salaryVariance: 0.08, discretionaryScale: 2.2, extraIncomeChance: 0.4, housingBase: 22_000_000 },
   assets: [
     { id: "a_w_deposit", type: "deposit", name: "Tiền gửi kỳ hạn", value: 500_000_000, currency: "VND", source: "msb", lastUpdatedAt: NOW, isEstimated: false },

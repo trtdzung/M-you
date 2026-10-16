@@ -19,7 +19,7 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Sửa danh mục">
       <button type="button" aria-label="Đóng" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-phone rounded-t-2xl bg-surface p-4 pb-6 shadow-xl">
+      <div className="relative w-full max-w-device-width rounded-t-2xl bg-surface p-4 pb-6 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-text">Sửa danh mục</p>

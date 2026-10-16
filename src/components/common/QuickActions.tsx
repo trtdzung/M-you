@@ -9,54 +9,70 @@ export type QuickAction = {
   href?: string;
 };
 
+function ActionCell({ action, layout }: { action: QuickAction; layout: "grid" | "row" }) {
+  const Icon = action.icon;
+  const cell =
+    layout === "grid"
+      ? "flex min-h-[44px] flex-col items-center justify-center gap-2 rounded-[16px] px-2 py-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      : "flex min-h-[44px] items-center justify-center gap-2 rounded-[16px] px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
+  const inner = (
+    <>
+      <Icon size={layout === "grid" ? 26 : 22} strokeWidth={1.8} className="text-text" />
+      <span className="text-[12px] font-medium leading-tight text-text">{action.label}</span>
+    </>
+  );
+  if (action.href) {
+    // Hash = cuộn cùng trang (native anchor); route nội bộ = Link (client-side).
+    return action.href.startsWith("#") ? (
+      <a href={action.href} className={cell}>
+        {inner}
+      </a>
+    ) : (
+      <Link href={action.href} className={cell}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={action.onClick} className={cell}>
+      {inner}
+    </button>
+  );
+}
+
 /**
- * Lưới icon+label kiểu khối quick-actions MSB (peach card, 3 cột).
- * Reusable; presentation-only.
+ * Lưới icon+label kiểu khối quick-actions MSB (peach card, 3 cột), có thể kèm
+ * hàng chân (Rewards/Trợ lý AI/Xem thêm) ngăn bởi divider. Reusable; presentation-only.
  */
 export function QuickActions({
   actions,
+  footer,
   className,
 }: {
   actions: QuickAction[];
+  footer?: QuickAction[];
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-3 gap-x-2 gap-y-5 rounded-[24px] bg-surface-tint p-5",
-        className,
+    <div className={cn("rounded-[24px] bg-surface-tint p-5", className)}>
+      <div className="grid grid-cols-3 gap-x-2 gap-y-5">
+        {actions.map((a) => (
+          <ActionCell key={a.label} action={a} layout="grid" />
+        ))}
+      </div>
+      {footer && footer.length > 0 && (
+        <>
+          <div className="my-4 h-px bg-border" />
+          <div
+            className="flex items-center justify-around"
+            style={{ gap: "0.5rem" }}
+          >
+            {footer.map((a) => (
+              <ActionCell key={a.label} action={a} layout="row" />
+            ))}
+          </div>
+        </>
       )}
-    >
-      {actions.map((a) => {
-        const Icon = a.icon;
-        const cell =
-          "flex min-h-[44px] flex-col items-center justify-center gap-2 rounded-[16px] px-2 py-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
-        const inner = (
-          <>
-            <Icon size={26} strokeWidth={1.8} className="text-text" />
-            <span className="text-[12px] font-medium leading-tight text-text">
-              {a.label}
-            </span>
-          </>
-        );
-        if (a.href) {
-          // Hash = cuộn cùng trang (native anchor); route nội bộ = Link (client-side).
-          return a.href.startsWith("#") ? (
-            <a key={a.label} href={a.href} className={cell}>
-              {inner}
-            </a>
-          ) : (
-            <Link key={a.label} href={a.href} className={cell}>
-              {inner}
-            </Link>
-          );
-        }
-        return (
-          <button key={a.label} type="button" onClick={a.onClick} className={cell}>
-            {inner}
-          </button>
-        );
-      })}
     </div>
   );
 }

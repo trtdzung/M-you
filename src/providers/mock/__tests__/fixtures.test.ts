@@ -36,6 +36,16 @@ describe("mock fixtures", () => {
     const ds = generateDataset(PERSONAS.wealthy);
     expect(ds.assets.some((a) => a.value === null)).toBe(true);
   });
+
+  it("gives every account a masked number and mock-safe display fields", () => {
+    const ds = generateDataset(PERSONAS.stable);
+    expect(ds.accounts.every((a) => /^•••• \d{4}$/.test(a.maskedNumber))).toBe(true);
+    expect(ds.accounts.every((a) => a.source === "msb")).toBe(true);
+    // Only the primary current account carries a tier.
+    const current = ds.accounts.find((a) => a.type === "current");
+    expect(current?.tier).toBe(PERSONAS.stable.tier);
+    expect(ds.accounts.filter((a) => a.tier).length).toBe(1);
+  });
 });
 
 describe("provider factory", () => {

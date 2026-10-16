@@ -55,6 +55,17 @@ function trim(n: number): string {
     .replace(".", ",");
 }
 
+/**
+ * Mask an account number for display, keeping only the last 4 digits behind
+ * bullet dots, e.g. "668812081991" -> "•••• 1991". Non-digits are stripped;
+ * a number shorter than 4 digits is shown in full behind the dots.
+ */
+export function maskAccountNumber(accountNumber: string): string {
+  const digits = (accountNumber ?? "").replace(/\D/g, "");
+  if (!digits) return "••••";
+  return `•••• ${digits.slice(-4)}`;
+}
+
 /** Format a date as "dd/MM/yyyy" in Vietnamese locale. */
 export function formatDate(date: Date | string | number): string {
   const d = toDate(date);

@@ -50,9 +50,21 @@
   --radius-xl: 24px;
   --radius-card: 24px;
   --radius-row: 16px;
+  --radius-pill: 9999px;
 
-  /* Phone frame width — chuẩn iPhone 17 Pro Max (440pt) */
-  --spacing-phone: 440px;
+  /* iPhone 17 Pro Max logical viewport: 440×956 pt (1320×2868 px @3×). */
+  --spacing-device-width: 440px;
+  --spacing-device-height: 956px;
+  --spacing-shell-main-inset: 16px;
+  --spacing-shell-nav-inset: 16px;
+  --spacing-shell-nav-clearance: 104px;
+  --spacing-shell-fab-clearance: 96px;
+  --radius-screen: 28px;
+}
+
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html,
@@ -72,11 +84,55 @@ body {
   box-sizing: border-box;
 }
 
+/* Shared shell offsets: physical phone insets on mobile, reference insets elsewhere. */
+.shell-main {
+  padding-bottom: calc(var(--spacing-shell-nav-clearance) + var(--safe-area-bottom));
+}
+
+.shell-bottom-nav {
+  padding-bottom: calc(var(--spacing-shell-nav-inset) + var(--safe-area-bottom));
+}
+
+.shell-fab {
+  bottom: calc(var(--spacing-shell-fab-clearance) + var(--safe-area-bottom));
+}
+
+/* Desktop preview retains a 440×956 layout and uniformly zooms it to fit. */
+@media (min-width: 1024px) {
+  .device-canvas {
+    flex: none;
+    height: var(--spacing-device-height);
+    width: var(--spacing-device-width);
+    zoom: min(1, calc((100dvh - 2rem) / 956px));
+  }
+}
+
 /* Gradient thương hiệu — hero Overview, banner.
    Đủ tối để icon/logo trắng (large/UI) đạt ≥3:1 dọc toàn dải. Không đặt chữ
    thường (normal-size) lên gradient — số/nhãn nằm trên card trắng đè lên. */
 .brand-gradient {
   background-image: linear-gradient(135deg, #e2301c 0%, #f2621f 100%);
+}
+
+/* Hero Home MSB — cam ấm fade xuống peach/cream, GẦN DỌC (≈180°) khớp ref
+   `1.1`/`1.2`. Quầng sáng mờ phía trên-giữa. Đáy trùng --color-background (blush)
+   để card trắng đè lên liền mạch. Chỉ mang logo/watermark/icon trắng — không chữ
+   thường (số/nhãn nằm trên card trắng đè lên). */
+.hero-gradient {
+  background-image:
+    radial-gradient(
+      120% 80% at 50% 2%,
+      rgba(255, 255, 255, 0.3) 0%,
+      rgba(255, 255, 255, 0) 46%
+    ),
+    linear-gradient(
+      180deg,
+      #f5822c 0%,
+      #f68a3c 28%,
+      #fac49e 70%,
+      #fbe4d4 92%,
+      #fbe9e3 100%
+    );
 }
 
 /* Soft shadow chuẩn MSB (dùng qua utility shadow-card / shadow-nav nếu cần) */
@@ -122,6 +178,15 @@ body {
 /* Fade nội dung khi đổi route / xuất hiện */
 @utility fade-in {
   animation: fade-in 0.24s ease-out;
+}
+
+/* Ẩn thanh cuộn (carousel ngang) — vẫn cuộn được, chỉ ẩn scrollbar */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Bắt buộc: vô hiệu hoá chuyển động khi người dùng yêu cầu giảm chuyển động */

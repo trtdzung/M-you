@@ -53,6 +53,40 @@ AI Facade (implemented, Tier A + Tier B)
   +-- Tier B draft-only transfer tools (Level 3, EPIC-13) — flag-gated, LLM cannot call them directly
 ```
 
+## UI information architecture (implemented)
+
+The mobile-first UI is a **3-tab MSB banking layout** (`src/components/shell/BottomNav.tsx`), replacing an earlier 5-tab PFM layout, so navigation matches the real MSB app. This is a presentation-layer reshuffle only — it does not change the module responsibilities, canonical models, or provider contracts below.
+
+```text
+src/app/
+  page.tsx                 Home ("Trang chủ") — hero header, primary account
+                            card, quick actions, promos/insights
+  accounts/page.tsx         Tài khoản tab: account list
+  accounts/[id]/page.tsx    Account detail: header + scoped transaction list
+  transactions/page.tsx     All-transactions view (shared list component)
+  pfm/page.tsx              PFM hub: net worth + cashflow summary +
+                            obligations + entry cards
+  pfm/cashflow/page.tsx     Cash Flow detail (extracted CashflowView)
+  pfm/wealth/page.tsx       Wealth detail (extracted WealthView)
+  pfm/insights/page.tsx     Insights detail
+  cashflow/page.tsx         Redirect -> /pfm/cashflow (legacy route kept alive)
+  wealth/page.tsx           Redirect -> /pfm/wealth (legacy route kept alive)
+  settings/page.tsx         Consent scope + revoke, persona switcher, About
+  assistant/                AI Assistant chat screen
+  transfer-confirm/         Native MSB transfer confirmation (draft handoff)
+```
+
+Key shared components introduced by the refactor:
+
+- `src/components/shell/BottomNav.tsx` — 3 tabs (Trang chủ `/`, Tài khoản `/accounts` + `/transactions`, PFM `/pfm`); active-tab matching is prefix-based per tab.
+- `src/components/shell/AssistantFab.tsx` — floating action button (Sparkles icon) rendered above the tab bar on every screen except `/assistant`, linking to `/assistant`.
+- `src/components/home/*` (`AccountSummaryCard`, `HomeQuickGrid`, `PromoCarousel`, `PromoCard`, `Dots`) — Home-specific presentation, not reused elsewhere.
+- `src/components/transactions/TransactionListSection.tsx` — shared transaction list, used by both `/transactions` (all accounts) and `/accounts/[id]` (scoped via an `accountId` filter prop).
+- `src/components/cashflow/CashflowView.tsx` and `src/components/wealth/WealthView.tsx` — cash flow and wealth detail views extracted out of the old top-level screens so `/pfm/cashflow` and `/pfm/wealth` render them directly; obligations, previously on Home, now live on the PFM hub (`src/app/pfm/page.tsx`) only.
+- `src/components/pfm/PfmHubNav.tsx` — entry cards from the PFM hub into Cash Flow / Wealth / Insights.
+- `src/lib/format.ts` (`maskAccountNumber`) — masks an account number to its last 4 digits for display (e.g. `•••• 1991`); used by the Home account card and account list/detail headers. Presentation-only; does not touch the calculation engine or provider data.
+- `src/lib/transfer-draft-store.ts` — session-scoped (`sessionStorage`) hand-off of a `TransferDraft`'s display fields (name, masked account, amount, memo, source label) from the chat `DraftCard` to `/transfer-confirm`, keyed by draft id. The draft's PII/financial fields never travel in the URL query string — only the `draftId` does. No account number (only the masked form) is ever stored, and nothing in this module executes a transfer; it purely carries display state across the client-side navigation boundary, consistent with the `TransferDraft` model and pipeline in "Tier B — draft-only tools" below.
+
 ## Module responsibilities
 
 ### Transaction module
@@ -134,6 +168,13 @@ balance
 availableBalance
 lastSyncedAt
 source
+tier?            # display-only membership tier (e.g. "M-FIRST GOLD"); marketing
+                 # metadata, source: mock, never read by the calculation engine;
+                 # absent for accounts with no tier
+maskedNumber     # display-safe account number, already masked to the last 4
+                 # digits (e.g. "•••• 1991"); the full number is never carried
+                 # on this UI-facing model; presentation-only, provenance
+                 # follows `source`
 ```
 
 ### Asset

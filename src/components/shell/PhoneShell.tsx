@@ -1,25 +1,30 @@
 import type { ReactNode } from "react";
 import { StatusBar } from "./StatusBar";
+import { DemoBadge } from "./DemoBadge";
 
 /**
- * Khung điện thoại **cố định chiều cao** (chuẩn iPhone 17 Pro Max 440×956pt).
- * Toàn bộ UI gói trong màn hình: chỉ `<main>` cuộn nội bộ, nav pill ghim đáy khung.
- * Mobile: full-screen (100dvh). Desktop: device có bezel, canh giữa, cao tối đa 956px.
+ * Logical app canvas. Mobile fills its real visual viewport; desktop uses the
+ * canonical 440×956 iPhone 17 Pro Max comparison canvas without simulated
+ * device hardware. Short desktop windows uniformly scale the full canvas.
  */
 export function PhoneShell({
   children,
   nav,
+  fab,
 }: {
   children: ReactNode;
   nav?: ReactNode;
+  fab?: ReactNode;
 }) {
   return (
-    <div className="flex h-[100dvh] items-center justify-center overflow-hidden bg-neutral-200 sm:p-4">
-      <div className="relative flex h-full w-full max-w-phone flex-col overflow-hidden bg-background shadow-2xl sm:h-full sm:max-h-[956px] sm:w-[440px] sm:rounded-[52px] sm:border-[10px] sm:border-neutral-900">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background lg:p-4">
+      <div className="device-canvas relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background lg:rounded-screen">
         <StatusBar />
-        <main className="fade-in min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-1">
+        <DemoBadge />
+        <main id="main-content" className="shell-main fade-in min-h-0 flex-1 overflow-y-auto px-shell-main-inset pt-1">
           {children}
         </main>
+        {fab}
         {nav}
       </div>
     </div>

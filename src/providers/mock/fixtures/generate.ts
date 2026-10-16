@@ -17,6 +17,7 @@ import type {
   Transaction,
 } from "@/domain/models";
 import { CATEGORY, CURRENCY_VND } from "@/domain/models";
+import { maskAccountNumber } from "@/lib/format";
 import type { PersonaMeta } from "../personas";
 import { chance, jitter, mulberry32, pick, randInt, type Rng } from "../rng";
 
@@ -181,13 +182,24 @@ export function generateDataset(meta: PersonaMeta): Dataset {
   };
 }
 
+/**
+ * Deterministic, real-shaped mock account number from the persona seed + a salt.
+ * Kept internal — only the masked form ever reaches the UI-facing `Account`.
+ */
+function acctNumber(seed: number, salt: number): string {
+  const base = String((seed * 1_000_003 + salt * 97) % 1_000_000_000_000).padStart(12, "0");
+  return base;
+}
+
 function buildAccounts(meta: PersonaMeta, current: string, savings: string, credit: string): Account[] {
   const now = "2026-09-15T00:00:00.000Z";
   const scale = meta.params.salaryBase / 25_000_000;
+  const seed = meta.params.seed;
+  const mask = (salt: number) => maskAccountNumber(acctNumber(seed, salt));
   return [
-    { id: current, type: "current", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(18_000_000 * scale), availableBalance: Math.round(18_000_000 * scale), lastSyncedAt: now, source: "msb" },
-    { id: savings, type: "savings", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(45_000_000 * scale), availableBalance: Math.round(45_000_000 * scale), lastSyncedAt: now, source: "msb" },
-    { id: credit, type: "credit_card", institution: "MSB", currency: CURRENCY_VND, balance: -Math.round(8_000_000 * scale), availableBalance: Math.round(50_000_000 * scale), lastSyncedAt: now, source: "msb" },
+    { id: current, type: "current", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(18_000_000 * scale), availableBalance: Math.round(18_000_000 * scale), lastSyncedAt: now, source: "msb", tier: meta.tier, maskedNumber: mask(1) },
+    { id: savings, type: "savings", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(45_000_000 * scale), availableBalance: Math.round(45_000_000 * scale), lastSyncedAt: now, source: "msb", maskedNumber: mask(2) },
+    { id: credit, type: "credit_card", institution: "MSB", currency: CURRENCY_VND, balance: -Math.round(8_000_000 * scale), availableBalance: Math.round(50_000_000 * scale), lastSyncedAt: now, source: "msb", maskedNumber: mask(3) },
   ];
 }
 

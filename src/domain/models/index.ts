@@ -87,6 +87,18 @@ export interface Account {
   availableBalance: number;
   lastSyncedAt: string;
   source: DataSource;
+  /**
+   * Display-only membership tier (e.g. "M-FIRST GOLD"). Marketing metadata,
+   * `source: mock` — never used by the calculation engine. Absent for accounts
+   * with no tier (savings/credit sub-accounts).
+   */
+  tier?: string;
+  /**
+   * Display-safe account number, already masked to the last 4 digits
+   * (e.g. "•••• 1991"). The full number is never carried on this UI-facing model.
+   * Provenance follows `source`; presentation-only.
+   */
+  maskedNumber: string;
 }
 
 // ---------------------------------------------------------------------------

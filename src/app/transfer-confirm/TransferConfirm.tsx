@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Lock, ShieldCheck } from "lucide-react";
 import { Card, SourceBadge } from "@/components/primitives";
 import { formatVnd } from "@/lib/format";
+import { getTransferDraft } from "@/lib/transfer-draft-store";
 import { CURRENCY_VND, type DataSource } from "@/domain/models";
 
 /**
@@ -27,17 +28,23 @@ interface MockExecutedTransfer {
 export function TransferConfirm() {
   const router = useRouter();
   const params = useSearchParams();
+  // Draft fields come from session storage keyed by id (Red Team #11) — never
+  // from the URL. Only `draftId` is read from the query string.
+  const draft = useMemo(() => getTransferDraft(params.get("draftId") ?? ""), [params]);
+  const doneDestination = params.get("returnTo") === "/" || params.get("from") === "transfer" ? "/" : "/assistant";
+  const isValidDraft = Boolean(draft?.name.trim() && draft.accountMasked && Number.isFinite(draft.amount) && draft.amount > 0);
 
-  const [name, setName] = useState(params.get("name") ?? "");
-  const [acct] = useState(params.get("acct") ?? "");
-  const [amount, setAmount] = useState<number>(Number(params.get("amount") ?? 0));
-  const [memo, setMemo] = useState(params.get("memo") ?? "");
+  const [name, setName] = useState(draft?.name ?? "");
+  const [acct] = useState(draft?.accountMasked ?? "");
+  const [amount, setAmount] = useState<number>(draft?.amount ?? 0);
+  const [memo, setMemo] = useState(draft?.memo ?? "");
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<MockExecutedTransfer | null>(null);
-  const sourceLabel = params.get("src") ?? "Tài khoản MSB";
+  const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
 
   function confirm() {
+    if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
     if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (mô phỏng, ≥ 4 chữ số).");
@@ -71,10 +78,24 @@ export function TransferConfirm() {
         </Card>
         <button
           type="button"
-          onClick={() => router.push("/assistant")}
+          onClick={() => router.push(doneDestination)}
           className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white"
         >
-          Về trợ lý
+          {doneDestination === "/" ? "Về trang chủ" : "Về trợ lý"}
+        </button>
+      </div>
+    );
+  }
+
+  if (!isValidDraft) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Card className="bg-warning-soft" role="alert">
+          <p className="text-sm font-semibold text-warning">Không tìm thấy bản nháp hợp lệ</p>
+          <p className="mt-1 text-xs text-warning">Để bảo vệ thông tin người nhận, hãy tạo lại bản nháp từ luồng chuyển tiền.</p>
+        </Card>
+        <button type="button" onClick={() => router.push(doneDestination === "/" ? "/transfer" : "/assistant")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
+          {doneDestination === "/" ? "Tạo lại bản nháp" : "Về trợ lý"}
         </button>
       </div>
     );

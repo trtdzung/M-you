@@ -1,14 +1,10 @@
 import { Signal, Wifi, BatteryFull } from "lucide-react";
 
-/** Mock iOS status bar (iPhone 17 Pro Max) với Dynamic Island để củng cố khung điện thoại. */
+/** Compact status strip; intentionally no simulated hardware or Dynamic Island. */
 export function StatusBar() {
   return (
-    <div className="relative flex shrink-0 items-center justify-between px-6 pb-1 pt-3 text-sm font-semibold text-text">
+    <div className="relative flex min-h-12 shrink-0 items-center justify-between bg-brand-orange px-6 pb-1 pt-[calc(var(--safe-area-top)+0.5rem)] text-sm font-semibold text-text">
       <span>9:41</span>
-      <span
-        className="absolute left-1/2 top-2.5 h-6 w-24 -translate-x-1/2 rounded-full bg-neutral-900"
-        aria-hidden="true"
-      />
       <div className="flex items-center gap-1.5" aria-hidden="true">
         <Signal size={15} />
         <Wifi size={15} />

@@ -2,29 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutGrid,
-  ArrowLeftRight,
-  TrendingUp,
-  Wallet,
-  Sparkles,
-  type LucideIcon,
-} from "lucide-react";
+import { Home, Wallet, PieChart, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-type Tab = { href: string; label: string; icon: LucideIcon };
+type Tab = { href: string; label: string; icon: LucideIcon; match: string[] };
 
+/**
+ * 3-tab MSB IA (quyết định #1): Trang chủ · Tài khoản · PFM. Cài đặt dời vào
+ * sheet từ account card (không nằm trên bar). Giao dịch tổng hợp thuộc tab Tài khoản.
+ */
 const TABS: Tab[] = [
-  { href: "/", label: "Tổng quan", icon: LayoutGrid },
-  { href: "/transactions", label: "Giao dịch", icon: ArrowLeftRight },
-  { href: "/cashflow", label: "Dòng tiền", icon: TrendingUp },
-  { href: "/wealth", label: "Tài sản", icon: Wallet },
-  { href: "/assistant", label: "Trợ lý", icon: Sparkles },
+  { href: "/", label: "Trang chủ", icon: Home, match: [] },
+  { href: "/accounts", label: "Tài khoản", icon: Wallet, match: ["/accounts", "/transactions"] },
+  { href: "/pfm", label: "PFM", icon: PieChart, match: ["/pfm"] },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, tab: Tab): boolean {
+  if (tab.href === "/") return pathname === "/";
+  return tab.match.some((m) => pathname === m || pathname.startsWith(`${m}/`));
 }
 
 /** Floating pill nav chuẩn MSB — nổi cách đáy, tab active = pill peach + cam. */
@@ -34,11 +29,11 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Điều hướng chính"
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-3 pb-3"
+      className="shell-bottom-nav pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-shell-main-inset"
     >
-      <ul className="shadow-nav pointer-events-auto flex w-full items-stretch justify-between gap-0.5 rounded-full bg-surface px-2 py-1.5">
+      <ul className="shadow-nav pointer-events-auto flex w-full items-stretch justify-between gap-1 rounded-full bg-surface px-2 py-2">
         {TABS.map((tab) => {
-          const active = isActive(pathname, tab.href);
+          const active = isActive(pathname, tab);
           const Icon = tab.icon;
           return (
             <li key={tab.href} className="flex-1">
@@ -46,13 +41,18 @@ export function BottomNav() {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-[44px] flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1.5 text-[10px] font-semibold transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  "flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                   active
-                    ? "bg-primary-soft text-primary-strong"
+                    ? "bg-primary-soft text-primary"
                     : "text-muted hover:text-text",
                 )}
               >
-                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
+                <Icon
+                  size={22}
+                  strokeWidth={active ? 2.4 : 1.8}
+                  className={active ? "text-primary" : "text-text"}
+                  {...(active ? { fill: "currentColor", fillOpacity: 0.14 } : {})}
+                />
                 <span className="leading-none">{tab.label}</span>
               </Link>
             </li>

@@ -161,6 +161,10 @@ Use several explainable indicators instead of one authoritative score:
 - Eligibility-aware product discovery using mock products.
 - **Assisted transfer drafting**: the agent prepares a transfer draft; the human reviews, confirms, and authenticates. Feature-gated by `ENABLE_TRANSFER_DRAFTING` (default on in the prototype); when off, transfer requests are refused as before.
 
+### Structured transfer entry (implemented)
+
+The Home **Chuyển tiền** entry opens a deterministic, single-screen form. A recipient can only come from a saved beneficiary, the user's transaction history, or a user-entered 8–19 digit account number. The form stores and displays only a masked number, warns for a new payee or amount at the shared transfer threshold, and creates a local mock draft. It never invokes the AI facade; it converges with assisted drafting at the same editable mock confirmation screen.
+
 ### Assisted transfer drafting (implemented, `EPIC-13`)
 
 The read/explain/simulate assistant described in the AI product contract above is implemented. This subsection describes assisted transfer drafting, also implemented. When the `ENABLE_TRANSFER_DRAFTING` flag is off, the assistant refuses any transfer request and points the user to the native MSB transfer flow, exactly as before this feature shipped.
@@ -215,14 +219,34 @@ PFM entry
   -> existing MSB action flow executes
 ```
 
+## Information architecture (implemented)
+
+The prototype ships a **3-tab MSB banking layout**, matching the real MSB app rather than a generic 5-tab PFM layout. The IA refactor is complete:
+
+| Tab | Route(s) | Purpose |
+|---|---|---|
+| **Trang chủ** (Home) | `/` | MSB-style home: hero header, primary account card, quick actions, promos/insights. Not a PFM dashboard. |
+| **Tài khoản** (Accounts) | `/accounts`, `/accounts/[id]`, `/transactions` | Account list → account detail (with per-account transactions) → all-transactions view. |
+| **PFM** | `/pfm`, `/pfm/cashflow`, `/pfm/wealth`, `/pfm/insights` | Hub with net worth + cash flow summary + upcoming obligations, plus entry cards into cash flow, wealth, and insights detail. |
+
+A floating **Assistant FAB** (sparkle icon) sits above the tab bar on every screen and links to `/assistant`; it hides itself on the assistant screen. **Settings** (`/settings`) is not a tab — it holds consent scope + revoke, the demo persona switcher, and About, and is reachable in at most two taps (tap the account tier row on the account card, or navigate directly to `/settings`).
+
+Legacy routes `/cashflow` and `/wealth` still exist as thin redirects to `/pfm/cashflow` and `/pfm/wealth` respectively, so old links and bookmarks keep working.
+
+### Masked account number (implemented)
+
+The primary account card on Home shows a display-safe, masked account number (e.g. `•••• 1991` — last 4 digits only, non-digits stripped) rather than the full number, with the balance hidden by default behind an eye toggle. This is a presentation-only decision: the full account number is never carried on the UI-facing account model, and masking has no effect on provenance or the calculation engine.
+
 ## Primary screens
 
-1. **PFM Overview:** net worth, available cash, income, expense, upcoming obligations, and top insights.
-2. **Transactions:** searchable feed with category correction and recurring markers.
-3. **Cash Flow:** income/expense chart, forecast, category trend, and monthly comparison.
-4. **Wealth:** assets, liabilities, allocation, and balance-sheet trend.
-5. **Goals:** progress, required monthly contribution, and scenarios.
-6. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off.
+1. **Home (Trang chủ):** hero header, primary account card (masked number, hide/show balance, tier as marketing metadata only), quick-action grid, promo carousel with a top insight surfaced inline. Obligations are not shown here — they live on the PFM hub.
+2. **Tài khoản (Accounts):** account list → account detail with a scoped transaction list; a shared "all transactions" entry point.
+3. **PFM hub:** net worth, monthly cash flow summary, "Sắp phải trả" (upcoming obligations), and entry cards into Cash Flow, Wealth, and Insights.
+4. **Cash Flow (`/pfm/cashflow`):** income/expense chart, forecast, category trend, and monthly comparison.
+5. **Wealth (`/pfm/wealth`):** assets, liabilities, allocation, and balance-sheet trend.
+6. **Goals:** progress, required monthly contribution, and scenarios.
+7. **Settings:** consent scope view + revoke, demo persona switcher, About — reachable from the account card, not a tab.
+8. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off.
 
 ## AI product contract
 

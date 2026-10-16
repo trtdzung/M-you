@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, ShieldAlert, TriangleAlert } from "lucide-react";
 import { formatVnd } from "@/lib/format";
 import { SourceBadge } from "@/components/primitives";
+import { putTransferDraft } from "@/lib/transfer-draft-store";
 import type { TransferDraftView } from "@/ai/pipeline/events";
 import type { TransferRiskFlag } from "@/domain/models";
 
@@ -19,25 +20,31 @@ const SOURCE_LABEL: Record<TransferDraftView["recipientSource"], string> = {
   user_typed: "Số tài khoản bạn nhập",
 };
 
-function confirmHref(draft: TransferDraftView): string {
-  const params = new URLSearchParams({
-    draftId: draft.id,
-    name: draft.recipientName,
-    acct: draft.recipientAccountMasked,
-    amount: String(draft.amount),
-    src: draft.sourceAccountLabel,
-    source: draft.recipientSource,
-  });
-  if (draft.memo) params.set("memo", draft.memo);
-  return `/transfer-confirm?${params.toString()}`;
-}
-
 /**
  * In-chat transfer DRAFT card. It is a review affordance only — tapping the CTA
  * navigates to the (mock) MSB confirm screen where the human edits, confirms, and
- * authenticates. This card never submits or executes anything.
+ * authenticates. This card never submits or executes anything. The draft fields
+ * are handed off via session storage (Red Team #11), NOT the URL — only the draft
+ * id travels in the query string.
  */
 export function DraftCard({ draft }: { draft: TransferDraftView }) {
+  const router = useRouter();
+
+  function reviewAndConfirm() {
+    putTransferDraft({
+      id: draft.id,
+      name: draft.recipientName,
+      accountMasked: draft.recipientAccountMasked,
+      amount: draft.amount,
+      memo: draft.memo ?? null,
+      sourceLabel: draft.sourceAccountLabel,
+      recipientSource: draft.recipientSource,
+      riskFlags: draft.riskFlags,
+      source: "mock",
+    });
+    router.push(`/transfer-confirm?draftId=${encodeURIComponent(draft.id)}`);
+  }
+
   return (
     <div className="shadow-card mt-2 rounded-[24px] bg-surface p-4">
       <div className="flex items-center justify-between">
@@ -62,12 +69,13 @@ export function DraftCard({ draft }: { draft: TransferDraftView }) {
         </div>
       )}
 
-      <Link
-        href={confirmHref(draft)}
-        className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+      <button
+        type="button"
+        onClick={reviewAndConfirm}
+        className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         Xem lại &amp; xác nhận <ArrowRight size={15} />
-      </Link>
+      </button>
 
       <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-muted">
         <ShieldAlert size={12} className="mt-0.5 shrink-0 text-primary" />

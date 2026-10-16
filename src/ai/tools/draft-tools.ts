@@ -17,6 +17,9 @@ import type {
 } from "@/domain/models";
 import { CURRENCY_VND } from "@/domain/models";
 import type { AiContext } from "@/ai/server/load-financials";
+import { maskAccount } from "@/lib/mask-account";
+
+export { maskAccount } from "@/lib/mask-account";
 
 /** Names of the Tier B tools — asserted absent from the LLM schema in tests. */
 export const TIER_B_TOOL_NAMES = ["findRecipient", "prepareTransferDraft"] as const;
@@ -35,12 +38,6 @@ export type FindRecipientResult =
   | { status: "resolved"; recipient: ResolvedRecipient }
   | { status: "ambiguous"; candidates: { name: string; masked: string }[] }
   | { status: "not_found" };
-
-/** Mask an account number for display: keep only the last 4 digits. */
-export function maskAccount(accountNumber: string): string {
-  const digits = accountNumber.replace(/\D/g, "");
-  return `****${digits.slice(-4)}`;
-}
 
 /** Lowercase + strip Vietnamese diacritics for lenient name matching. */
 function fold(s: string): string {

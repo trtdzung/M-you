@@ -34,5 +34,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local working docs (plans, backlog, research reports — not part of the codebase)
-/plans/

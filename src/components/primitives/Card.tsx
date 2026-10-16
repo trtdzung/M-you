@@ -18,14 +18,17 @@ export function Card({
   className,
   as: Tag = "div",
   variant = "plain",
+  role,
 }: {
   children: ReactNode;
   className?: string;
   as?: "div" | "section" | "article";
   variant?: Variant;
+  role?: string;
 }) {
   return (
     <Tag
+      role={role}
       className={cn(
         "rounded-[24px] p-5",
         VARIANTS[variant],
