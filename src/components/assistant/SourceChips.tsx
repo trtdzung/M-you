@@ -10,9 +10,11 @@ export interface SourceChip {
 }
 
 /**
- * Provenance chips under an assistant message. Each number in the answer came
- * from a tool result; these chips show the source/period behind them. Tapping a
- * chip reveals the full source lines (period · source · freshness).
+ * Provenance pill under an assistant message. Each number in the answer came from
+ * a tool result; this pill shows how many sources back it, and taps open the full
+ * source lines (period · source · freshness). Styled with the neutral `source-mock`
+ * provenance palette — prototype data is mock, so it is never dressed as
+ * bank-verified (invariant: every number carries honest provenance).
  */
 export function SourceChips({ chips }: { chips: SourceChip[] }) {
   const [open, setOpen] = useState(false);
@@ -25,17 +27,17 @@ export function SourceChips({ chips }: { chips: SourceChip[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2.5 py-1 text-[11px] font-medium text-muted transition-colors hover:text-text"
+        className="inline-flex items-center gap-1.5 rounded-full bg-source-mock-soft px-2.5 py-1 text-[11px] font-medium text-source-mock transition-opacity hover:opacity-80"
         aria-expanded={open}
       >
-        <FileText size={12} className="text-primary" />
+        <FileText size={12} />
         {chips.length} nguồn dữ liệu
       </button>
       {open && (
         <ul className="mt-2 flex flex-col gap-1">
           {allSources.map((s, i) => (
             <li key={i} className="flex gap-1.5 text-[11px] leading-snug text-muted">
-              <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-primary" />
+              <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-source-mock" />
               {s}
             </li>
           ))}

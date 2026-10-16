@@ -108,6 +108,18 @@ describe("route smoke — all screens mount", () => {
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
+  it("Assistant (/assistant)", async () => {
+    const { default: Layout } = await import("../assistant/layout");
+    const { default: Page } = await import("../assistant/page");
+    expect(() =>
+      renderScreen(
+        <Layout>
+          <Page />
+        </Layout>,
+      ),
+    ).not.toThrow();
+  });
+
   it("Transfer confirm (/transfer-confirm)", async () => {
     const { TransferConfirm } = await import("../(festive)/transfer-confirm/TransferConfirm");
     expect(() => renderScreen(<TransferConfirm />)).not.toThrow();
@@ -163,6 +175,30 @@ describe("chrome separation — PFM calm shell vs festive shell", () => {
     // No 3-tab MSB bottom nav, no 2/9 festive photo background
     expect(screen.queryByLabelText("Điều hướng chính")).toBeNull();
     expect(container.innerHTML).not.toContain("bg-2-9");
+  });
+
+  it("Assistant: warm app-bar + trust strip + docked composer, no BottomNav, no 2/9 bg, no insight list", async () => {
+    const { default: AssistantLayout } = await import("../assistant/layout");
+    const { default: AssistantPage } = await import("../assistant/page");
+    const { container } = renderScreen(
+      <AssistantLayout>
+        <AssistantPage />
+      </AssistantLayout>,
+    );
+
+    // Own warm chrome: app-bar title + persistent trust strip
+    expect(screen.getByRole("heading", { name: "Trợ lý MSB" })).toBeInTheDocument();
+    expect(screen.getByText(/Chỉ đọc · không chuyển tiền/)).toBeInTheDocument();
+
+    // Docked composer present
+    expect(screen.getByLabelText("Gửi")).toBeInTheDocument();
+
+    // No 3-tab MSB bottom nav, no 2/9 festive photo background
+    expect(screen.queryByLabelText("Điều hướng chính")).toBeNull();
+    expect(container.innerHTML).not.toContain("bg-2-9");
+
+    // The "Đáng chú ý" insight list is gone from this screen
+    expect(screen.queryByText("Đáng chú ý")).toBeNull();
   });
 
   it("Festive: BottomNav + 2/9 festive bg still present (regression guard)", async () => {

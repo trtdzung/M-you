@@ -52,9 +52,11 @@ export function DraftCard({ draft }: { draft: TransferDraftView }) {
         <SourceBadge source="mock" />
       </div>
 
-      <p className="mt-2 text-2xl font-bold tabular-nums text-primary">{formatVnd(draft.amount)}</p>
+      <p className="mt-3 text-center text-[28px] font-bold leading-tight tabular-nums text-primary">
+        {formatVnd(draft.amount)}
+      </p>
 
-      <dl className="mt-3 flex flex-col gap-2 text-sm">
+      <dl className="mt-4 flex flex-col gap-2 border-t border-border pt-3 text-sm">
         <Field label="Người nhận" value={draft.recipientName} hint={SOURCE_LABEL[draft.recipientSource]} />
         <Field label="Số tài khoản" value={draft.recipientAccountMasked} mono />
         <Field label="Từ tài khoản" value={draft.sourceAccountLabel} />
@@ -72,9 +74,9 @@ export function DraftCard({ draft }: { draft: TransferDraftView }) {
       <button
         type="button"
         onClick={reviewAndConfirm}
-        className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        className="brand-gradient mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-semibold text-white transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        Xem lại &amp; xác nhận <ArrowRight size={15} />
+        Xem &amp; xác nhận <ArrowRight size={15} />
       </button>
 
       <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-muted">

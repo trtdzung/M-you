@@ -1,7 +1,8 @@
-import { describe, expect, it, vi, beforeAll } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PersonaProvider } from "@/providers/context";
 import { PeriodProvider } from "@/state/period";
+import { setConsent } from "@/lib/consent";
 import { ChatPanel } from "../ChatPanel";
 import type { AssistantEvent } from "@/ai/pipeline/events";
 
@@ -37,6 +38,11 @@ beforeAll(() => {
   } as unknown as typeof ResizeObserver;
 });
 
+beforeEach(() => {
+  window.localStorage.clear();
+  setConsent(); // grant the AI scope so the panel is interactive (not the no-scope state)
+});
+
 function renderPanel() {
   return render(
     <PersonaProvider>
@@ -51,6 +57,16 @@ describe("ChatPanel", () => {
   it("shows starters in the empty state", () => {
     renderPanel();
     expect(screen.getByText("Giải thích tháng này")).toBeInTheDocument();
+  });
+
+  it("shows the no-scope state and disables the composer when AI consent is missing", async () => {
+    window.localStorage.clear();
+    setConsent(["transactions"]); // no "ai" scope
+    renderPanel();
+    await waitFor(() => {
+      expect(screen.getByText("Chưa cấp quyền cho trợ lý")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Gửi")).toBeDisabled();
   });
 
   it("streams an answer with source chips and a what-if chart", async () => {

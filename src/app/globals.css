@@ -98,6 +98,13 @@ body {
   padding-bottom: calc(var(--spacing-shell-fab-clearance) + var(--safe-area-bottom));
 }
 
+/* Assistant: full-bleed chat surface — app-bar + docked composer own the edges,
+   so main carries no padding and reserves no nav clearance. Must follow
+   `.shell-main` (equal specificity → source order wins). */
+.shell-main--assistant {
+  padding: 0;
+}
+
 /* Calm PFM shell: navy status-bar ink over the light peach surface (festive keeps
    the default white ink over its dark 2/9 photo). */
 .shell-calm {

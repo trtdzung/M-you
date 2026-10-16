@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# browser automation artifacts (screenshots, console/network logs)
+/.playwright-mcp/
+
 # misc
 .DS_Store
 *.pem

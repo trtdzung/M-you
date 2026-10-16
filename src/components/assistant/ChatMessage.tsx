@@ -17,7 +17,7 @@ export function ChatMessage({ message }: { message: UiMessage }) {
         className={cn(
           "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
           isUser
-            ? "rounded-br-sm bg-primary text-white"
+            ? "brand-gradient rounded-br-sm text-white"
             : "shadow-card rounded-bl-sm bg-surface text-text",
         )}
       >
