@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORY_BY_ID } from "@/domain/models";
+import type { Jar } from "@/domain/models";
 import {
+  budgetsFromJars,
   configFromTemplate,
   DEFAULT_JAR_CONFIG,
   JAR_TEMPLATES,
@@ -49,5 +51,45 @@ describe("jar templates (BIDV wallet model / v3)", () => {
   it("configFromTemplate returns a version 3 config", () => {
     expect(configFromTemplate(JAR_TEMPLATES.giaDinh).version).toBe(3);
     expect(configFromTemplate(JAR_TEMPLATES.kinhDoanh).version).toBe(3);
+  });
+});
+
+describe("budgetsFromJars (hũ IS the budget)", () => {
+  it("splits a jar limit evenly across its categories from the Cá nhân template", () => {
+    const budgets = budgetsFromJars(DEFAULT_JAR_CONFIG.jars);
+    const byCat = Object.fromEntries(budgets.map((b) => [b.categoryId, b.limit]));
+    // Thiết yếu 8tr / 4 = 2tr each; Ăn uống 4tr / 2 = 2tr each; Di chuyển 1.5tr;
+    // Hưởng thụ 2.5tr / 2 = 1.25tr each; Sức khỏe 1tr.
+    expect(byCat).toEqual({
+      housing: 2_000_000,
+      utilities: 2_000_000,
+      insurance: 2_000_000,
+      subscriptions: 2_000_000,
+      dining: 2_000_000,
+      groceries: 2_000_000,
+      transport: 1_500_000,
+      entertainment: 1_250_000,
+      shopping: 1_250_000,
+      health: 1_000_000,
+    });
+    expect(budgets.every((b) => b.period === "monthly")).toBe(true);
+  });
+
+  it("skips jars with no limit or no categories (never a silent 0 — invariant #6)", () => {
+    // "Tiết kiệm" has categories:[] and no budgetLimit → contributes nothing.
+    const savingsCats = new Set(
+      DEFAULT_JAR_CONFIG.jars.find((j) => j.id === "savings")?.categoryIds ?? [],
+    );
+    const budgets = budgetsFromJars(DEFAULT_JAR_CONFIG.jars);
+    expect(budgets.some((b) => savingsCats.has(b.categoryId))).toBe(false);
+    expect(budgets.some((b) => b.limit === 0)).toBe(false);
+  });
+
+  it("per-category budgets always sum EXACTLY back to each jar limit (no rounding drift)", () => {
+    // A deliberately non-divisible limit: 1,000,000 / 3 = 333,333 r1.
+    const jars: Jar[] = [{ id: "x", label: "X", categoryIds: ["a", "b", "c"], budgetLimit: 1_000_000 }];
+    const budgets = budgetsFromJars(jars);
+    expect(budgets.map((b) => b.limit)).toEqual([333_334, 333_333, 333_333]);
+    expect(budgets.reduce((sum, b) => sum + b.limit, 0)).toBe(1_000_000);
   });
 });

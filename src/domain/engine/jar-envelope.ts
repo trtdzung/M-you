@@ -1,29 +1,32 @@
 /**
  * Envelope engine — the deterministic truth for the Tổng quan "hũ (phong bì)"
- * widget (plan 260914-1436). Two things, both DERIVED from the allocation ledger
- * (no stored balance, no proxy — post-red-team RT-1/RT-2):
+ * widget (plan 260914-1436). "Hũ IS the budget": a jar's per-period funding is
+ * its configured `budgetLimit` (the plan set in Cài đặt), so the widget mirrors
+ * that division WITHOUT a manual "Chia ngay". An explicit allocation OVERRIDES
+ * the plan for that jar this period. Two outputs:
  *
- *  1. "Chờ phân bổ" — the period's income not yet allocated into a jar, plus the
- *     EXACT count of income transactions still "chưa chia hết" (ledger-keyed to a
- *     concrete `txnId`, never a proxy over a pooled sum).
- *  2. Per-jar "còn lại trong hũ" = `fundedThisPeriod − spentThisPeriod`, where
- *     funded is the period-income allocated INTO the jar and spent reuses the
+ *  1. "Chờ phân bổ" — the period's income the plan (limits) + explicit
+ *     allocations do not yet cover, plus the count of income transactions still
+ *     "chưa chia hết" (ledger-keyed to a concrete `txnId`, never a proxy).
+ *  2. Per-jar "còn lại trong hũ" = `funded − spent`, where funded is the jar's
+ *     explicit allocation if any, else its `budgetLimit`, and spent reuses the
  *     jar-budget net expense (DRY, invariant #2). Never the raw `actualAmount`.
  *
  * Everything is scoped to one period (OverviewTab pins the current month).
  *
  * Invariants honoured:
  *  - Engine is the sole source of these numbers (invariant #1); the UI renders.
- *  - Coherence identity (tested): `pending.amount + Σ fundedThisPeriod == income`.
- *    Each allocation is capped at its income txn's remaining capacity (FIFO), so
- *    over-allocation (corrupt data) can never inflate funded past income.
+ *  - "Chờ phân bổ" identity (tested): `pending.amount + Σ absorbed == income`,
+ *    where `absorbed` is the income actually consumed by explicit allocations
+ *    (FIFO, capped per txn) plus the planned limits (a pooled FIFO absorb). The
+ *    plan may EXCEED income; the pool simply runs out (pending floors at 0) while
+ *    a jar's card still shows its full limit — the plan, not the consumed income.
  *  - An allocation whose `txnId` is not an in-period income txn is INERT — it
  *    neither reduces pending nor credits a jar (defends the un-validated route,
- *    RT-3). An allocation whose `jarId` is not in config folds into "Khác" so the
- *    money is never lost from the identity (RT-4).
+ *    RT-3). An allocation whose `jarId` is not in config folds into "Khác" (RT-4).
  *  - No income data → pending amount is genuinely "unknown", never a fabricated 0
- *    (invariant #6). A jar with no funding this period → `funded`/`remaining` are
- *    `null` ("chưa có số dư"), never 0.
+ *    (invariant #6). A jar with no limit AND no allocation → `funded`/`remaining`
+ *    are `null` ("chưa có số dư"), never 0.
  */
 
 import type { DataSource, JarAllocation, JarConfig, Transaction } from "@/domain/models";
@@ -60,13 +63,13 @@ export interface PendingAllocation {
 export interface JarEnvelopeLine {
   jarId: string;
   label: string;
-  /** Period income allocated into this jar; `null` = chưa nạp kỳ này (never 0). */
+  /** Jar funding: explicit allocation, else `budgetLimit`; `null` = chưa đặt & chưa nạp (never 0). */
   funded: number | null;
   /** Net expense over this jar's categories this period (from jar-budget). */
   spent: number;
-  /** "còn lại trong hũ" = funded − spent; `null` when not funded. May be negative. */
+  /** "còn lại trong hũ" = funded − spent; `null` when unfunded. May be negative. */
   remaining: number | null;
-  /** True when funded this period (`funded !== null` ⇔ funded > 0). Drives "ĐANG DÙNG". */
+  /** True when the jar has spending this period (spent > 0). Drives "ĐANG DÙNG". */
   inUse: boolean;
   source: DataSource;
   freshness: string | null;
@@ -141,8 +144,15 @@ export function computePendingAllocation(
 
 /**
  * Per-jar envelope lines. `spentByJar` reuses jar-budget's net expense per jar
- * (huId → spent), so this never re-derives spend (DRY, invariant #2). Funded to a
- * `jarId` not in config folds into "Khác" so the coherence identity holds (RT-4).
+ * (huId → spent), so this never re-derives spend (DRY, invariant #2).
+ *
+ * A jar's funding is its per-period PLAN — the configured `budgetLimit` ("hũ IS
+ * the budget") — so the Tổng quan card reflects what was already divided in Cài
+ * đặt without a manual "Chia ngay" (funded = hạn mức, "còn lại" = hạn mức −
+ * đã tiêu). An EXPLICIT allocation for the jar OVERRIDES that plan (the user
+ * chose to split income differently this period). A jar with neither a limit nor
+ * an allocation stays `null` ("chưa có số dư"), never a fabricated 0 (invariant
+ * #6). Allocation funded to a `jarId` not in config folds into "Khác" (RT-4).
  */
 export function jarEnvelopeLines(
   config: JarConfig,
@@ -150,15 +160,18 @@ export function jarEnvelopeLines(
   spentByJar: Map<string, number>,
 ): JarEnvelopeLine[] {
   const configIds = new Set(config.jars.map((j) => j.id));
-  // Funded to jars no longer in config → fold into "Khác".
+  // Allocation funded to jars no longer in config → fold into "Khác".
   let orphanFunded = 0;
   for (const [jarId, amount] of fundedByJar) {
     if (!configIds.has(jarId)) orphanFunded += amount;
   }
 
   const lines = config.jars.map((jar) => {
-    let funded = fundedByJar.get(jar.id) ?? 0;
-    if (jar.id === KHAC_JAR_ID) funded += orphanFunded;
+    // Explicit allocation overrides the plan; otherwise fall back to the jar's
+    // configured limit; a jar with neither stays unfunded (null).
+    const allocated = fundedByJar.get(jar.id);
+    let funded: number | null = allocated ?? jar.budgetLimit ?? null;
+    if (jar.id === KHAC_JAR_ID && orphanFunded > 0) funded = (funded ?? 0) + orphanFunded;
     return buildLine(jar.id, jar.label, funded, spentByJar.get(jar.id) ?? 0);
   });
 
@@ -170,20 +183,39 @@ export function jarEnvelopeLines(
   return lines;
 }
 
-function buildLine(jarId: string, label: string, funded: number, spent: number): JarEnvelopeLine {
-  const inUse = funded > 0;
+function buildLine(jarId: string, label: string, funded: number | null, spent: number): JarEnvelopeLine {
+  const hasPlan = funded !== null;
   return {
     jarId,
     label,
-    funded: inUse ? funded : null,
+    funded,
     spent,
-    remaining: inUse ? funded - spent : null,
-    // Funded jars are user allocations (self_reported); an unfunded jar's line
-    // carries the prototype baseline.
-    inUse,
-    source: inUse ? "self_reported" : "mock",
+    remaining: hasPlan ? funded - spent : null,
+    // "ĐANG DÙNG" now means "có phát sinh chi tiêu kỳ này" (most jars carry a
+    // plan, so a plan alone is not a useful signal).
+    inUse: spent > 0,
+    // A planned/allocated jar reflects user configuration (self_reported); an
+    // unfunded jar's line carries the prototype baseline.
+    source: hasPlan ? "self_reported" : "mock",
     freshness: null,
   };
+}
+
+/**
+ * Reduce each income txn's "còn lại" by a shared pool (the jars' planned funding
+ * that has no explicit allocation), FIFO in income order and capped per txn — so
+ * "chờ phân bổ" is the income the plan does not yet cover. The plan can exceed
+ * income; the pool simply runs out and the excess is ignored (a jar's card still
+ * shows its full limit — the plan, not the consumed income).
+ */
+function absorbPool(perTxn: PendingTxn[], pool: number): PendingTxn[] {
+  let left = pool;
+  return perTxn.map((p) => {
+    if (left <= 0 || p.remaining <= 0) return p;
+    const take = Math.min(left, p.remaining);
+    left -= take;
+    return { ...p, allocated: p.allocated + take, remaining: p.remaining - take };
+  });
 }
 
 /**
@@ -199,7 +231,16 @@ export function evaluateJarEnvelope(
 ): JarEnvelopeResult {
   const incomeTxns = txns.filter((t) => isPeriodIncome(t, period));
   const { perTxn, fundedByJar } = foldAllocations(incomeTxns, allocations);
-  const pending = computePendingAllocation(incomeTxns, perTxn, period);
+
+  // Jars funded by their PLAN (budgetLimit) rather than an explicit allocation
+  // still reserve income — otherwise "chờ phân bổ" would ignore Cài đặt. Pool
+  // those planned limits (excluding jars the user explicitly split) and absorb
+  // them against the income left after explicit allocations.
+  const budgetPool = config.jars.reduce(
+    (sum, jar) => sum + (jar.budgetLimit !== undefined && !fundedByJar.has(jar.id) ? jar.budgetLimit : 0),
+    0,
+  );
+  const pending = computePendingAllocation(incomeTxns, absorbPool(perTxn, budgetPool), period);
   const jars = jarEnvelopeLines(config, fundedByJar, spentByJar);
 
   return { pending, jars, meta: pending.meta };

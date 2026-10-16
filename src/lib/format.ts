@@ -43,7 +43,7 @@ export function formatVndCompact(amount: MaybeAmount): string {
     return `${sign}${trim(abs / 1_000_000)} tr`;
   }
   if (abs >= 1_000) {
-    return `${sign}${trim(abs / 1_000)} ng`;
+    return `${sign}${trim(abs / 1_000)}K`;
   }
   return `${sign}${vndFormatter.format(abs)} ₫`;
 }

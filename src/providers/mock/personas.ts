@@ -13,7 +13,7 @@ import type {
   Liability,
   MockProduct,
 } from "@/domain/models";
-import { CATEGORY } from "@/domain/models";
+import { budgetsFromJars, DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 
 export type PersonaId = "stable" | "irregular" | "wealthy";
 export const DEFAULT_PERSONA: PersonaId = "stable";
@@ -57,9 +57,15 @@ const MSB_PRODUCTS: MockProduct[] = [
   { id: "p_fund_balanced", name: "Quỹ cân bằng MSB", type: "fund", summary: "Danh mục cổ phiếu/trái phiếu cân bằng, rủi ro trung bình." },
 ];
 
-function budget(categoryId: string, limit: number): Budget {
-  return { categoryId, limit, period: "monthly" };
-}
+/**
+ * Per-category budgets DERIVED from the "Cá nhân" jar template (hũ IS the
+ * budget). Identical across personas because that is the same 6-jar config the
+ * app actually runs on — SQLite seeds it (see scripts/seed-db.mjs) and the
+ * Ngân sách tab renders it (`financials.jarBudget`). Deriving the legacy
+ * per-category `Budget[]` from here keeps the two representations in lockstep
+ * instead of hand-authoring a second, drifting source of truth.
+ */
+const SEED_BUDGETS: Budget[] = budgetsFromJars(DEFAULT_JAR_CONFIG.jars);
 
 // ---------------------------------------------------------------------------
 
@@ -78,7 +84,7 @@ const STABLE: PersonaMeta = {
   liabilities: [
     { id: "l_stable_loan", type: "personal_loan", name: "Vay tiêu dùng", outstandingPrincipal: 40_000_000, interestRate: 0.14, minimumPayment: 3_500_000, dueDate: "2026-09-25", remainingTerm: 12, source: "self_reported", lastUpdatedAt: NOW },
   ],
-  budgets: [budget(CATEGORY.dining, 4_000_000), budget(CATEGORY.groceries, 3_500_000), budget(CATEGORY.transport, 1_500_000), budget(CATEGORY.shopping, 2_500_000), budget(CATEGORY.entertainment, 1_500_000)],
+  budgets: SEED_BUDGETS,
   goals: [{ id: "g_stable_fund", name: "Quỹ dự phòng 6 tháng", targetAmount: 90_000_000, currentAmount: 55_000_000, targetDate: "2027-06-30", source: "self_reported" }],
   products: MSB_PRODUCTS,
 };
@@ -98,7 +104,7 @@ const IRREGULAR: PersonaMeta = {
     { id: "l_irr_card", type: "credit_card", name: "Thẻ tín dụng MSB", outstandingPrincipal: 18_500_000, interestRate: 0.32, minimumPayment: 1_850_000, dueDate: "2026-09-20", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
     { id: "l_irr_instal", type: "instalment", name: "Trả góp điện thoại", outstandingPrincipal: 9_000_000, interestRate: 0, minimumPayment: 1_500_000, dueDate: "2026-09-28", remainingTerm: 6, source: "self_reported", lastUpdatedAt: NOW },
   ],
-  budgets: [budget(CATEGORY.dining, 3_000_000), budget(CATEGORY.groceries, 2_500_000), budget(CATEGORY.transport, 1_200_000), budget(CATEGORY.shopping, 2_000_000), budget(CATEGORY.entertainment, 1_500_000)],
+  budgets: SEED_BUDGETS,
   goals: [{ id: "g_irr_buffer", name: "Đệm thu nhập 3 tháng", targetAmount: 60_000_000, currentAmount: 12_000_000, targetDate: null, source: "self_reported" }],
   products: MSB_PRODUCTS,
 };
@@ -122,7 +128,7 @@ const WEALTHY: PersonaMeta = {
     { id: "l_w_card", type: "credit_card", name: "Thẻ tín dụng hạng vàng", outstandingPrincipal: 45_000_000, interestRate: 0.30, minimumPayment: 4_500_000, dueDate: "2026-09-22", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
     { id: "l_w_loan", type: "personal_loan", name: "Vay đầu tư", outstandingPrincipal: 200_000_000, interestRate: 0.12, minimumPayment: 10_000_000, dueDate: "2026-10-05", remainingTerm: 24, source: "self_reported", lastUpdatedAt: NOW },
   ],
-  budgets: [budget(CATEGORY.dining, 12_000_000), budget(CATEGORY.groceries, 6_000_000), budget(CATEGORY.transport, 5_000_000), budget(CATEGORY.shopping, 15_000_000), budget(CATEGORY.entertainment, 8_000_000)],
+  budgets: SEED_BUDGETS,
   goals: [{ id: "g_w_house", name: "Trả trước nhà nghỉ dưỡng", targetAmount: 2_000_000_000, currentAmount: 650_000_000, targetDate: "2028-12-31", source: "self_reported" }],
   products: MSB_PRODUCTS,
 };

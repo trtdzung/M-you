@@ -125,6 +125,54 @@ describe("evaluateJarEnvelope — funded / còn lại trong hũ", () => {
   });
 });
 
+describe("evaluateJarEnvelope — hũ IS the budget (funded defaults to budgetLimit)", () => {
+  const CONFIG_BUDGET: JarConfig = {
+    version: 3,
+    jars: [
+      { id: "food", label: "Ăn uống", categoryIds: ["food"], budgetLimit: 4_000_000 },
+      { id: "bills", label: "Hóa đơn", categoryIds: ["bills"], budgetLimit: 2_000_000 },
+      { id: "savings", label: "Tiết kiệm", categoryIds: [] }, // no limit → chưa có số dư
+    ],
+  };
+
+  it("funds a jar from its budgetLimit (Cài đặt) with no explicit allocation", () => {
+    const spent = new Map([["food", 1_500_000]]);
+    const res = evaluateJarEnvelope(CONFIG_BUDGET, [income("i1", 10_000_000)], [], spent, PERIOD);
+    const food = res.jars.find((j) => j.jarId === "food")!;
+    expect(food.funded).toBe(4_000_000); // = hạn mức
+    expect(food.remaining).toBe(2_500_000); // 4tr − 1.5tr đã tiêu
+    expect(food.inUse).toBe(true); // có chi tiêu kỳ này
+    const bills = res.jars.find((j) => j.jarId === "bills")!;
+    expect(bills.remaining).toBe(2_000_000); // chưa tiêu
+    expect(bills.inUse).toBe(false);
+  });
+
+  it("a jar with no limit and no allocation stays 'chưa có số dư' (null, never 0)", () => {
+    const res = evaluateJarEnvelope(CONFIG_BUDGET, [income("i1", 10_000_000)], [], NO_SPEND, PERIOD);
+    const savings = res.jars.find((j) => j.jarId === "savings")!;
+    expect(savings.funded).toBeNull();
+    expect(savings.remaining).toBeNull();
+  });
+
+  it("an explicit allocation OVERRIDES the jar's budgetLimit (Chia ngay = ghi đè)", () => {
+    const allocs = [alloc("i1", "food", 1_000_000)];
+    const res = evaluateJarEnvelope(CONFIG_BUDGET, [income("i1", 10_000_000)], allocs, NO_SPEND, PERIOD);
+    expect(res.jars.find((j) => j.jarId === "food")!.funded).toBe(1_000_000); // not the 4tr limit
+  });
+
+  it("'chờ phân bổ' = income minus the planned limits (floored at 0)", () => {
+    // limits: food 4tr + bills 2tr = 6tr; income 10tr → pending 4tr.
+    const res = evaluateJarEnvelope(CONFIG_BUDGET, [income("i1", 10_000_000)], [], NO_SPEND, PERIOD);
+    expect(res.pending.amount).toBe(4_000_000);
+  });
+
+  it("plan exceeding income → pending 0, but cards still show the full limit", () => {
+    const res = evaluateJarEnvelope(CONFIG_BUDGET, [income("i1", 5_000_000)], [], NO_SPEND, PERIOD);
+    expect(res.pending.amount).toBe(0); // 5tr income < 6tr plan
+    expect(res.jars.find((j) => j.jarId === "food")!.funded).toBe(4_000_000); // full limit, not capped
+  });
+});
+
 describe("evaluateJarEnvelope — robustness (RT-3 inert, RT-4 orphan fold)", () => {
   it("allocation to a non-income / unknown txn is inert (no pending drop, no funding)", () => {
     const txns = [income("i1", 5_000_000), expense("e1", 999, "food")];

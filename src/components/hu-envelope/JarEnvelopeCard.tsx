@@ -3,10 +3,11 @@ import { formatVndCompact } from "@/lib/format";
 
 /**
  * One jar's envelope card for the Tổng quan row: the jar's accent colour with
- * white text, an "ĐANG DÙNG" badge when funded this period, and "còn lại trong
- * hũ" = `remaining` (nạp − đã tiêu, from the engine). A jar not funded this
- * period shows "Chưa có số dư" — never a fabricated 0₫ (invariant #6). All
- * numbers come from `Financials.jarEnvelope`; this card never computes.
+ * white text, an "ĐANG DÙNG" badge when the jar has spending this period, and
+ * "còn lại trong hũ" = `remaining` (hạn mức/nạp − đã tiêu, from the engine). A
+ * jar with no limit and no allocation shows "Chưa có số dư" — never a fabricated
+ * 0₫ (invariant #6). All numbers come from `Financials.jarEnvelope`; this card
+ * never computes.
  */
 export function JarEnvelopeCard({
   label,
@@ -17,7 +18,7 @@ export function JarEnvelopeCard({
 }: {
   label: string;
   accent: string;
-  /** "còn lại trong hũ"; `null` = chưa nạp kỳ này. May be negative (overspent). */
+  /** "còn lại trong hũ"; `null` = chưa đặt hạn mức & chưa nạp. May be negative (overspent). */
   remaining: number | null;
   inUse: boolean;
   Icon: LucideIcon;

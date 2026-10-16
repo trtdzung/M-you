@@ -12,7 +12,7 @@
  * never seeds an unknown id into a jar.
  */
 
-import type { Jar, JarConfig } from "./index";
+import type { Budget, Jar, JarConfig } from "./index";
 import { CATEGORY_BY_ID } from "./categories";
 
 /** Keep only ids that currently exist as an expense category. */
@@ -95,3 +95,26 @@ export function configFromTemplate(template: JarTemplate): JarConfig {
 
 /** First-load default: Cá nhân. The setup screen lets the user switch template. */
 export const DEFAULT_JAR_CONFIG: JarConfig = configFromTemplate(caNhan);
+
+/**
+ * Derive per-category monthly `Budget`s from jars — the "hũ IS the budget" map.
+ * A jar carries ONE group `budgetLimit` spanning several expense categories, so
+ * the limit is split evenly across the jar's categories, with any rounding
+ * remainder folded into the first category. The per-category budgets therefore
+ * always sum EXACTLY back to the jar limit (no drift). A jar with no limit
+ * ("chưa đặt", e.g. "Tiết kiệm") or no categories contributes nothing — its
+ * limit stays genuinely unknown rather than a silent 0 (invariant #6).
+ */
+export function budgetsFromJars(jars: Jar[]): Budget[] {
+  const budgets: Budget[] = [];
+  for (const jar of jars) {
+    if (jar.budgetLimit === undefined || jar.categoryIds.length === 0) continue;
+    const count = jar.categoryIds.length;
+    const base = Math.floor(jar.budgetLimit / count);
+    const remainder = jar.budgetLimit - base * count;
+    jar.categoryIds.forEach((categoryId, i) => {
+      budgets.push({ categoryId, limit: base + (i === 0 ? remainder : 0), period: "monthly" });
+    });
+  }
+  return budgets;
+}
