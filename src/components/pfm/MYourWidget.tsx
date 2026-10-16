@@ -55,7 +55,7 @@ export function MYourWidget() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Mở trợ lý M-Your"
-          className="pointer-events-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-surface shadow-nav ring-2 ring-white/80 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2"
+          className="pointer-events-auto flex h-[68px] w-[68px] items-center justify-center overflow-hidden rounded-full bg-surface shadow-nav ring-2 ring-white/80 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon_agent.png" alt="" className="h-full w-full object-cover" />

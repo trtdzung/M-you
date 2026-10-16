@@ -127,8 +127,7 @@ export function LoginScreen<T extends LoginCustomer>({
             <button
               type="button"
               onClick={handleLogin}
-              disabled={!cif}
-              className="brand-gradient flex h-12 w-full items-center justify-center rounded-full text-base font-bold text-white transition-opacity disabled:opacity-40"
+              className="brand-gradient flex h-12 w-full items-center justify-center rounded-full text-base font-bold text-white"
             >
               Đăng nhập
             </button>

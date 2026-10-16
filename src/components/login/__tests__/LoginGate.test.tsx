@@ -59,6 +59,19 @@ describe("LoginGate", () => {
     expect(screen.getByText("Persona hiện tại: irregular")).toBeInTheDocument();
   });
 
+  it("stays clickable and shows an error when the password is typed before a customer is chosen", () => {
+    renderGate();
+
+    fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
+      target: { value: LOGIN_PASSWORD },
+    });
+    expect(screen.getByRole("button", { name: "Đăng nhập" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+
+    expect(screen.getByText("Vui lòng chọn khách hàng")).toBeInTheDocument();
+  });
+
   it("shows an error and stays on the login screen for a wrong password", () => {
     renderGate();
 
