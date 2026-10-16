@@ -74,9 +74,14 @@ export function MYourWidget() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/icon_agent.png" alt="" className="h-full w-full object-cover" />
             </span>
-            <h2 id={titleId} className="text-base font-bold tracking-tight text-text">
-              M-Your
-            </h2>
+            <div className="min-w-0">
+              <p className="truncate text-xs text-muted">
+                Trợ lý Tài chính của bạn
+              </p>
+              <h2 id={titleId} className="text-base font-bold tracking-tight text-text">
+                M-Your
+              </h2>
+            </div>
             <div className="ml-auto flex items-center gap-1">
               <button
                 type="button"
@@ -96,10 +101,6 @@ export function MYourWidget() {
               </button>
             </div>
           </header>
-
-          <p className="shrink-0 bg-surface-muted px-4 py-2 text-xs text-muted">
-            Trợ lý đồng hành giúp bạn nắm rõ tình hình tài chính — hỏi bất kỳ điều gì bạn quan tâm.
-          </p>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             <div className="flex flex-col gap-3">

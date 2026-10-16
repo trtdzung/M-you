@@ -18,7 +18,7 @@ describe("MYourWidget", () => {
     expect(screen.getByRole("dialog", { name: "M-Your" })).toBeInTheDocument();
   });
 
-  it("shows a short intro line under the header", () => {
+  it("shows a short intro line above the M-Your title", () => {
     render(<MYourWidget />);
     fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý M-Your" }));
 
