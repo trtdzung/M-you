@@ -126,6 +126,30 @@ describe("/api/manual-transactions", () => {
     expect(rows[0].note).toBe("ok"); // the one valid field applied
   });
 
+  it("round-trips a rebalance txn's meta through create → list (Phase 03 allowlist)", async () => {
+    const rebalance = { fromJarId: "savings", toJarId: "food", triggerTxnId: "manual-trigger", origin: "auto" as const };
+    await post({ cif: CIF, txn: txn({ id: "manual-rb", categoryId: "dieu-chinh-hu", rebalance }) });
+    const rows = (await (await list()).json()) as Transaction[];
+    expect(rows[0].categoryId).toBe("dieu-chinh-hu");
+    expect(rows[0].rebalance).toEqual(rebalance); // survives POST payload round-trip, not dropped
+  });
+
+  it("patches rebalance meta and clears it with null (Phase 03 allowlist)", async () => {
+    await post({ cif: CIF, txn: txn({ id: "manual-rb2" }) });
+    const rebalance = { fromJarId: "buffer", toJarId: "pool", triggerTxnId: "t2", origin: "manual" as const };
+    await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance } });
+    let rows = (await (await list()).json()) as Transaction[];
+    expect(rows[0].rebalance).toEqual(rebalance);
+    // A malformed rebalance patch is dropped, not written (shape guard).
+    await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance: { fromJarId: 1 } } });
+    rows = (await (await list()).json()) as Transaction[];
+    expect(rows[0].rebalance).toEqual(rebalance); // unchanged
+    // null clears it (Phase 05 unwind).
+    await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance: null } });
+    rows = (await (await list()).json()) as Transaction[];
+    expect(rows[0].rebalance).toBeUndefined();
+  });
+
   it("deletes a txn (204) and it disappears from the list", async () => {
     await post({ cif: CIF, txn: txn() });
     expect((await del("manual-1")).status).toBe(204);

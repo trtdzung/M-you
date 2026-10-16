@@ -11,7 +11,7 @@
  */
 
 import type { Transaction } from "@/domain/models";
-import { FIXED_CATEGORY_IDS } from "@/domain/models";
+import { FIXED_CATEGORY_IDS, isRebalanceCategory } from "@/domain/models";
 import { coverageOf, type AggregateMeta, type Period } from "./types";
 
 export interface CategoryAmount {
@@ -47,6 +47,10 @@ export function netExpenseByCategory(txns: Transaction[], period: Period): Map<s
   const byCat = new Map<string, number>();
   for (const t of txns) {
     if (t.status !== "posted" || !inPeriod(t, period)) continue;
+    // Inter-jar rebalance txns are a bookkeeping move, NOT spend — excluded from
+    // spend-by-category + jar `spent` + cashflow expense exactly like a transfer
+    // (invariant #6). The engine folds them into `remaining` via `rebalanceNetByJar`.
+    if (isRebalanceCategory(t.categoryId)) continue;
     if (EXPENSE_TYPES.has(t.type)) {
       byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amount);
     } else if (t.type === "refund") {

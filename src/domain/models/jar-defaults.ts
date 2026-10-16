@@ -12,7 +12,7 @@
  * never seeds an unknown id into a jar.
  */
 
-import type { Budget, Jar, JarConfig } from "./index";
+import type { Budget, Jar, JarConfig, JarRole } from "./index";
 import { CATEGORY_BY_ID } from "./categories";
 
 /** Keep only ids that currently exist as an expense category. */
@@ -24,11 +24,13 @@ const jar = (
   id: string,
   label: string,
   categoryIds: string[],
+  role: JarRole,
   budgetLimit?: number,
 ): Jar => ({
   id,
   label,
   categoryIds: expenseOnly(categoryIds),
+  role,
   ...(budgetLimit !== undefined ? { budgetLimit } : {}),
 });
 
@@ -45,12 +47,12 @@ const caNhan: JarTemplate = {
   label: "Cá nhân",
   description: "6 hũ cho chi tiêu cá nhân",
   jars: [
-    jar("essentials", "Thiết yếu", ["housing", "utilities", "insurance", "subscriptions"], 8_000_000),
-    jar("food", "Ăn uống", ["dining", "groceries"], 4_000_000),
-    jar("transport", "Di chuyển", ["transport"], 1_500_000),
-    jar("lifestyle", "Hưởng thụ", ["entertainment", "shopping"], 2_500_000),
-    jar("health", "Sức khỏe", ["health"], 1_000_000),
-    jar("savings", "Tiết kiệm", []), // no categories → no meaningful limit (unset)
+    jar("essentials", "Thiết yếu", ["housing", "utilities", "insurance", "subscriptions"], "essential", 8_000_000),
+    jar("food", "Ăn uống", ["dining", "groceries"], "spending", 4_000_000),
+    jar("transport", "Di chuyển", ["transport"], "spending", 1_500_000),
+    jar("lifestyle", "Hưởng thụ", ["entertainment", "shopping"], "spending", 2_500_000),
+    jar("health", "Sức khỏe", ["health"], "spending", 1_000_000),
+    jar("savings", "Tiết kiệm", [], "buffer"), // no categories → no meaningful limit (unset)
   ],
 };
 
@@ -60,10 +62,10 @@ const giaDinh: JarTemplate = {
   label: "Gia đình",
   description: "4 hũ cho chi tiêu gia đình",
   jars: [
-    jar("household", "Thiết yếu", ["housing", "utilities", "insurance", "subscriptions", "groceries"], 12_000_000),
-    jar("care", "Ăn uống & sức khỏe", ["dining", "health"], 4_000_000),
-    jar("mobility", "Đi lại & mua sắm", ["transport", "shopping"], 3_000_000),
-    jar("leisure", "Hưởng thụ", ["entertainment"], 2_000_000),
+    jar("household", "Thiết yếu", ["housing", "utilities", "insurance", "subscriptions", "groceries"], "essential", 12_000_000),
+    jar("care", "Ăn uống & sức khỏe", ["dining", "health"], "spending", 4_000_000),
+    jar("mobility", "Đi lại & mua sắm", ["transport", "shopping"], "spending", 3_000_000),
+    jar("leisure", "Hưởng thụ", ["entertainment"], "spending", 2_000_000),
   ],
 };
 
@@ -73,9 +75,9 @@ const kinhDoanh: JarTemplate = {
   label: "Kinh doanh",
   description: "3 hũ cho chủ hộ kinh doanh",
   jars: [
-    jar("fixed", "Chi phí cố định", ["housing", "utilities", "insurance", "subscriptions"], 15_000_000),
-    jar("operations", "Vận hành", ["transport", "groceries", "dining"], 8_000_000),
-    jar("reserve", "Dự phòng & khác", ["health", "shopping", "entertainment"], 3_000_000),
+    jar("fixed", "Chi phí cố định", ["housing", "utilities", "insurance", "subscriptions"], "essential", 15_000_000),
+    jar("operations", "Vận hành", ["transport", "groceries", "dining"], "spending", 8_000_000),
+    jar("reserve", "Dự phòng & khác", ["health", "shopping", "entertainment"], "buffer", 3_000_000),
   ],
 };
 

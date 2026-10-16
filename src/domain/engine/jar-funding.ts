@@ -7,15 +7,21 @@
  * Three tiers:
  *  - `ok`         — the source (a jar's `spendable`, or the pool) already
  *                   holds `amount`. No popup.
- *  - `topup`      — the source is short BUT source + pool + other DONATABLE jars
- *                   can cover it. A donor chain is proposed (never auto-applied).
- *  - `insufficient` — even the reachable `coverable` ceiling (source + pool +
- *                   donatable jars) can't cover `amount`. Hard block.
+ *  - `topup`      — the source is short BUT source + pool + non-goal DONATABLE
+ *                   jars can cover it. A donor chain is proposed (never auto-applied).
+ *  - `insufficient` — even the reachable non-goal ceiling can't cover `amount`.
+ *                   Blocked for auto-apply; may still carry `requiresManualGoal`
+ *                   when tapping a protected `goal` jar would close the gap.
  *
- * Donor priority (cover the shortfall, cheapest-social-cost first):
- *   (1) the pool ("Chưa phân bổ") → (2) discretionary jars, largest balance
- *   first → (3) fixed ("thiết yếu") jars, last resort. Each donor takes
- *   `min(available, còn thiếu)`; the chain stops the moment the shortfall is met.
+ * Donor priority (role-based waterfall, RT#5 — cheapest-social-cost first):
+ *   (1) the pool ("Chưa phân bổ") → then jars by `role`:
+ *   (2) `buffer` (dự phòng/tiết kiệm) → (3) `spending` (chi tiêu linh hoạt) →
+ *   (4) `essential` (thiết yếu), last resort. Within a role tier, largest
+ *   `spendable` first. `goal` jars are PROTECTED — never in the auto chain; a
+ *   shortfall only a `goal` jar can close sets `requiresManualGoal` and carries a
+ *   separate `goalDonors` chain the write path (Phase 04) applies on explicit
+ *   confirm. Each donor takes `min(available, còn thiếu)`; the chain stops the
+ *   moment the shortfall is met.
  *
  * Pool direction (RT#8): `sourceJarId === null` means the POOL is the source (a
  * no-jar transfer). The shortfall is `amount − poolAvailable`; donors are jars
@@ -23,7 +29,7 @@
  * applies the same one-batch mechanic — only donor decrements, no target credit.
  */
 
-import { FIXED_CATEGORY_IDS } from "@/domain/models";
+import type { JarRole } from "@/domain/models";
 import type { JarSpendable } from "./jar-spendable";
 
 export type FundingTier = "ok" | "topup" | "insufficient";
@@ -40,8 +46,18 @@ export interface FundingAssessment {
   tier: FundingTier;
   /** VND the source is short by (0 when `ok`). */
   shortfall: number;
-  /** Donor chain covering `shortfall`, in priority order (empty when ok/insufficient). */
+  /** Non-goal donor chain covering `shortfall`, in priority order (empty when ok/insufficient). */
   donors: DonorProposal[];
+  /**
+   * The protected `goal` jar chain that would close the residual gap ON EXPLICIT
+   * human confirm (Phase 04). Non-empty only when `requiresManualGoal`.
+   */
+  goalDonors: DonorProposal[];
+  /**
+   * True when the non-goal ceiling can't cover `amount` but adding `goal` jars
+   * would — i.e. only a protected jar can close the gap. Gates auto-apply.
+   */
+  requiresManualGoal: boolean;
   /** The jar the shortfall funds (the transfer source jar); `null` for a pool transfer. */
   targetJarId: string | null;
   source: "mock";
@@ -50,15 +66,20 @@ export interface FundingAssessment {
 export const POOL_DONOR_ID = "pool" as const;
 export const POOL_DONOR_LABEL = "Chưa phân bổ";
 
-/**
- * A jar is "thiết yếu" (protected from donation until last) only when EVERY
- * category it holds is fixed — a mixed jar is treated as discretionary so it can
- * still be tapped (RT#5: `Jar` has no `fixed` field; it is DERIVED from
- * `categoryIds`). A jar with no categories is not protected (nothing marks it
- * essential).
- */
-export function isJarFixed(jar: Pick<JarSpendable, "categoryIds">): boolean {
-  return jar.categoryIds.length > 0 && jar.categoryIds.every((id) => FIXED_CATEGORY_IDS.has(id));
+/** Auto-donation order by role; `goal` is absent (protected from the auto chain). */
+const ROLE_ORDER: Record<Exclude<JarRole, "goal">, number> = {
+  buffer: 0,
+  spending: 1,
+  essential: 2,
+};
+
+/** A missing role defaults to `spending` (back-compat; never crashes). */
+function roleOf(jar: JarSpendable): JarRole {
+  return jar.role ?? "spending";
+}
+
+function isGoal(jar: JarSpendable): boolean {
+  return roleOf(jar) === "goal";
 }
 
 /** A jar's derived spendable balance (0 when its limit is unset — `spendable == null`). */
@@ -77,58 +98,112 @@ function canDonate(jar: JarSpendable): boolean {
   return jar.spendable != null && jar.categoryIds.length > 0;
 }
 
-/**
- * Build the donor chain covering `shortfall` from candidate jars (already
- * excluding the source jar) plus an optional pool contribution. Priority:
- * pool → discretionary (largest first) → fixed (largest first). Stops as soon as
- * the shortfall is met. `includePool` is the pool's available balance (>= 0);
- * pass 0 to leave the pool out (e.g. a pool-source transfer, where the pool is
- * what's short).
- */
-function buildDonorChain(shortfall: number, candidates: JarSpendable[], poolAvailable: number): DonorProposal[] {
+/** Donatable, NON-goal candidates ordered by role then largest spendable first. */
+function orderDonors(candidates: JarSpendable[]): JarSpendable[] {
+  return candidates
+    .filter(canDonate)
+    .filter((j) => !isGoal(j))
+    .sort((a, b) => ROLE_ORDER[roleOf(a) as Exclude<JarRole, "goal">] - ROLE_ORDER[roleOf(b) as Exclude<JarRole, "goal">] || jarAvailable(b) - jarAvailable(a));
+}
+
+/** Donatable `goal` candidates only (largest spendable first) — the manual chain. */
+function orderGoalDonors(candidates: JarSpendable[]): JarSpendable[] {
+  return candidates
+    .filter(canDonate)
+    .filter(isGoal)
+    .sort((a, b) => jarAvailable(b) - jarAvailable(a));
+}
+
+/** Draw pool (if any) then the pre-ordered jars until `shortfall` is met. */
+function chainFrom(shortfall: number, ordered: JarSpendable[], poolAvailable: number): DonorProposal[] {
   const donors: DonorProposal[] = [];
   let remaining = shortfall;
-
   const push = (jarId: string | "pool", label: string, available: number) => {
     if (remaining <= 0 || available <= 0) return;
     const take = Math.min(available, remaining);
     donors.push({ jarId, label, take });
     remaining -= take;
   };
-
   push(POOL_DONOR_ID, POOL_DONOR_LABEL, poolAvailable);
-
-  // Only jars that can be honestly charged (a real spendable balance + a category
-  // to book the top-up spend into) are eligible donors (Phase 03's spend model).
-  const eligible = candidates.filter(canDonate);
-  const byBalanceDesc = (a: JarSpendable, b: JarSpendable) => jarAvailable(b) - jarAvailable(a);
-  const discretionary = eligible.filter((j) => !isJarFixed(j)).sort(byBalanceDesc);
-  const fixed = eligible.filter((j) => isJarFixed(j)).sort(byBalanceDesc);
-  for (const jar of [...discretionary, ...fixed]) push(jar.id, `Hũ ${jar.label}`, jarAvailable(jar));
-
+  for (const jar of ordered) push(jar.id, `Hũ ${jar.label}`, jarAvailable(jar));
   return donors;
 }
 
-/** Σ spendable of the jars that can actually DONATE (real balance + a category). */
-function donatableTotal(candidates: JarSpendable[]): number {
-  return candidates.filter(canDonate).reduce((sum, j) => sum + jarAvailable(j), 0);
+/**
+ * Build the non-goal donor chain covering `shortfall` (candidates already exclude
+ * the source jar; `goal` jars are excluded here — they're protected). `poolAvailable`
+ * is the pool's balance (>= 0); pass 0 to leave the pool out (a pool-source transfer).
+ */
+function buildDonorChain(shortfall: number, candidates: JarSpendable[], poolAvailable: number): DonorProposal[] {
+  return chainFrom(shortfall, orderDonors(candidates), poolAvailable);
 }
 
 /**
- * Classify a transfer against what can ACTUALLY cover it, then (for a shortfall)
- * propose the donor chain. The `topup` vs `insufficient` boundary is a ceiling
- * bounded by TWO limits, whichever is tighter:
- *   1. `casaBalance` — the real cash in the account; nothing can be transferred
- *      beyond it (this bites when jars are over-allocated / drifted: their claimed
- *      spendable can exceed the CASA that actually backs it — the RT#2 case the
- *      confirm re-check exists to catch).
- *   2. `coverable = sourceAvailable + poolAvailable + Σ spendable(donatable OTHER
- *      jars)` — the money genuinely REACHABLE. This deliberately EXCLUDES a
- *      non-donatable jar's spendable (a category-less-but-limited jar, or one with
- *      no limit): that money is claimed away from the pool yet can never be donated
- *      (`buildDonorChain` only draws `canDonate` jars), so counting it would let the
- *      engine report `topup` with a chain that under-covers the shortfall (Warning 2).
- * `ceiling = min(casaBalance, coverable)`; `amount > ceiling` ⇒ `insufficient`.
+ * Σ spendable of donatable jars. `includeGoal` controls whether protected `goal`
+ * jars count toward the ceiling — the C2 dual-ceiling fix needs BOTH totals so the
+ * `topup`/`insufficient` classifier never reports a chain that under-covers.
+ */
+function donatableTotal(candidates: JarSpendable[], includeGoal: boolean): number {
+  return candidates
+    .filter(canDonate)
+    .filter((j) => includeGoal || !isGoal(j))
+    .reduce((sum, j) => sum + jarAvailable(j), 0);
+}
+
+/**
+ * Shared classifier for both a jar source and the pool source. `sourceAvailable`
+ * is the money already at the source; `poolForDonors` is what the pool can add to
+ * the DONOR chain (the pool balance for a jar source, 0 for a pool source, whose
+ * balance is already `sourceAvailable`). `candidates` are the other jars.
+ *
+ * The `topup` vs `insufficient` boundary is a ceiling bounded by two limits,
+ * whichever is tighter: `casaBalance` (real cash, bites when jars are
+ * over-allocated / drifted — RT#2) and the reachable donatable money. The C2 fix
+ * computes it BOTH ways — excluding and including protected `goal` jars:
+ *   - `ceilingExclGoal` classifies the tier (a `topup` chain never under-covers,
+ *     since `buildDonorChain` also excludes `goal`).
+ *   - `ceilingInclGoal` detects `requiresManualGoal`: the non-goal ceiling can't
+ *     cover but a `goal` jar would, so the write path can prompt for confirm.
+ */
+function assess(input: {
+  amount: number;
+  casaBalance: number;
+  sourceAvailable: number;
+  poolForDonors: number;
+  candidates: JarSpendable[];
+  targetJarId: string | null;
+}): FundingAssessment {
+  const { amount, casaBalance, sourceAvailable, poolForDonors, candidates, targetJarId } = input;
+  const base = { requiresManualGoal: false, goalDonors: [] as DonorProposal[], targetJarId, source: "mock" as const };
+  const reachableBase = sourceAvailable + poolForDonors;
+  const ceilingExclGoal = Math.min(casaBalance, reachableBase + donatableTotal(candidates, false));
+  const ceilingInclGoal = Math.min(casaBalance, reachableBase + donatableTotal(candidates, true));
+
+  if (amount <= sourceAvailable) {
+    return { tier: "ok", shortfall: 0, donors: [], ...base };
+  }
+  const shortfall = amount - sourceAvailable;
+
+  if (amount > ceilingExclGoal) {
+    // Non-goal donors can't cover. Only a protected `goal` jar might close the gap.
+    if (amount <= ceilingInclGoal) {
+      const donors = buildDonorChain(shortfall, candidates, poolForDonors);
+      const coveredByNonGoal = donors.reduce((s, d) => s + d.take, 0);
+      const goalDonors = chainFrom(shortfall - coveredByNonGoal, orderGoalDonors(candidates), 0);
+      return { tier: "insufficient", shortfall, donors, ...base, goalDonors, requiresManualGoal: true };
+    }
+    // Even every donatable jar (incl. goal) falls short (C1 over-allocated residual).
+    return { tier: "insufficient", shortfall: amount - ceilingInclGoal, donors: [], ...base };
+  }
+
+  const donors = buildDonorChain(shortfall, candidates, poolForDonors);
+  return { tier: "topup", shortfall, donors, ...base };
+}
+
+/**
+ * Classify a transfer against what can ACTUALLY cover it, then propose the donor
+ * chain. See `assess` for the dual-ceiling (C2) role logic; `evaluateFunding` just
+ * derives the pool and maps a jar source vs a pool source onto it.
  */
 export function evaluateFunding(input: {
   amount: number;
@@ -138,36 +213,18 @@ export function evaluateFunding(input: {
   jars: JarSpendable[];
 }): FundingAssessment {
   const { amount, sourceJarId, casaBalance, jars } = input;
-  const base = { source: "mock" as const };
 
   const claimed = jars.reduce((sum, j) => sum + jarAvailable(j), 0);
   const poolAvailable = Math.max(0, casaBalance - claimed);
 
   if (sourceJarId === null) {
     // Pool source (RT#8): the pool IS the source; donatable jars are pulled down to
-    // lift it. Coverable = pool + every donatable jar (no separate source jar).
-    const ceiling = Math.min(casaBalance, poolAvailable + donatableTotal(jars));
-    if (amount > ceiling) {
-      return { tier: "insufficient", shortfall: amount - ceiling, donors: [], targetJarId: null, ...base };
-    }
-    if (amount <= poolAvailable) return { tier: "ok", shortfall: 0, donors: [], targetJarId: null, ...base };
-    const shortfall = amount - poolAvailable;
-    const donors = buildDonorChain(shortfall, jars, 0);
-    return { tier: "topup", shortfall, donors, targetJarId: null, ...base };
+    // lift it. `sourceAvailable` is the pool; no separate pool contribution to donors.
+    return assess({ amount, casaBalance, sourceAvailable: poolAvailable, poolForDonors: 0, candidates: jars, targetJarId: null });
   }
 
   const sourceJar = jars.find((j) => j.id === sourceJarId);
   const sourceAvailable = sourceJar ? jarAvailable(sourceJar) : 0;
   const candidates = jars.filter((j) => j.id !== sourceJarId);
-  const ceiling = Math.min(casaBalance, sourceAvailable + poolAvailable + donatableTotal(candidates));
-  if (amount > ceiling) {
-    return { tier: "insufficient", shortfall: amount - ceiling, donors: [], targetJarId: sourceJarId, ...base };
-  }
-  if (amount <= sourceAvailable) {
-    return { tier: "ok", shortfall: 0, donors: [], targetJarId: sourceJarId, ...base };
-  }
-
-  const shortfall = amount - sourceAvailable;
-  const donors = buildDonorChain(shortfall, candidates, poolAvailable);
-  return { tier: "topup", shortfall, donors, targetJarId: sourceJarId, ...base };
+  return assess({ amount, casaBalance, sourceAvailable, poolForDonors: poolAvailable, candidates, targetJarId: sourceJarId });
 }

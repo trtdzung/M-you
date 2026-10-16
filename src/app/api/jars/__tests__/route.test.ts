@@ -33,7 +33,7 @@ const CASA = 18_000_000;
 
 const JARS_DDL = `CREATE TABLE jars (
   id TEXT NOT NULL, cif TEXT NOT NULL, label TEXT NOT NULL, category_ids TEXT NOT NULL,
-  budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL,
+  budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL, role TEXT,
   PRIMARY KEY (cif, id)
 );`;
 

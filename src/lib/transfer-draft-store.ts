@@ -22,6 +22,8 @@ export interface StoredTransferDraft {
   sourceAccountId?: string;
   /** Set when the chosen source was a jar — `/transfer-confirm` books the spend into this jar's first category (dropping its derived `remaining`) alongside the `sourceAccountId` debit. */
   sourceJarId?: string;
+  /** Which source kind the user picked — lets `/transfer-confirm` auto-fund a short jar/pool source (never an account source). */
+  sourceKind?: "jar" | "pool" | "account";
   recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed";
   riskFlags?: import("@/domain/models").TransferRiskFlag[];
   /**
@@ -32,8 +34,6 @@ export interface StoredTransferDraft {
    * `targetJarId` is the jar to credit, or `null` for a pool-source transfer.
    */
   plannedReallocation?: { donors: import("@/domain/engine").DonorProposal[]; targetJarId: string | null };
-  /** Set when the user chose "Bỏ qua, vượt hũ" — spend past the jar's balance. */
-  overspend?: boolean;
   /**
    * Category to record the resulting transaction under, when the draft
    * already carries one (currently only agent-proposed transfers, Feature 3 —

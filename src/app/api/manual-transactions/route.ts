@@ -28,11 +28,28 @@ function isTxn(v: unknown): v is Transaction {
   return typeof t.id === "string" && typeof t.postedAt === "string" && typeof t.amount === "number";
 }
 
+/** Shape-guard for the rebalance meta so a malformed object never lands in the store. */
+function isRebalanceMeta(v: unknown): v is NonNullable<Transaction["rebalance"]> {
+  if (!v || typeof v !== "object") return false;
+  const m = v as Record<string, unknown>;
+  return (
+    typeof m.fromJarId === "string" &&
+    typeof m.toJarId === "string" &&
+    typeof m.triggerTxnId === "string" &&
+    (m.origin === "auto" || m.origin === "manual")
+  );
+}
+
+/** The four valid txn statuses — a refund/reversal PATCH must land in this set (H3). */
+const TXN_STATUSES: ReadonlySet<string> = new Set(["pending", "posted", "refunded", "reversed"]);
+
 /**
  * Keep only correctly-typed whitelisted fields from an untrusted PATCH body — a
  * mistyped value (e.g. `type: 123`) is dropped rather than written into the JSON
  * payload and silently corrupting the record. `null` is preserved as the CLEAR
- * signal for the optional fields.
+ * signal for the optional fields. The `rebalance` meta (Phase 03) must be on the
+ * allowlist or a rebalance PATCH would be silently dropped; `status`/`amount`
+ * (RT-fix H3/H5) join it so a refund/reversal or amount edit is never dropped.
  */
 function sanitizePatch(raw: Record<string, unknown>): ManualTxnPatch {
   const patch: ManualTxnPatch = {};
@@ -41,6 +58,12 @@ function sanitizePatch(raw: Record<string, unknown>): ManualTxnPatch {
   if (raw.transferPurpose === null || typeof raw.transferPurpose === "string")
     patch.transferPurpose = raw.transferPurpose as string | null;
   if (raw.note === null || typeof raw.note === "string") patch.note = raw.note as string | null;
+  if (raw.rebalance === null || isRebalanceMeta(raw.rebalance))
+    patch.rebalance = raw.rebalance as Transaction["rebalance"] | null;
+  if (typeof raw.status === "string" && TXN_STATUSES.has(raw.status))
+    patch.status = raw.status as Transaction["status"];
+  if (typeof raw.amount === "number" && Number.isFinite(raw.amount) && raw.amount >= 0)
+    patch.amount = raw.amount;
   return patch;
 }
 

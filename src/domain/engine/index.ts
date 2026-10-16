@@ -12,6 +12,7 @@ export * from "./pressure";
 export * from "./budget";
 export * from "./jar-budget";
 export * from "./jar-spendable";
+export * from "./jar-rebalance";
 export * from "./jar-envelope";
 export * from "./casa-balance";
 export * from "./unallocated-pool";

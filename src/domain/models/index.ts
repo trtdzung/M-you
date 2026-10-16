@@ -17,7 +17,10 @@ export {
   UNCLASSIFIED_LABEL,
   INCOME,
   INCOME_LABEL,
+  REBALANCE_CATEGORY,
+  REBALANCE_CATEGORY_LABEL,
   isUnclassifiedCategory,
+  isRebalanceCategory,
   categoryLabel,
 } from "./categories";
 export type { CategoryDef, CategoryKind } from "./categories";
@@ -56,6 +59,33 @@ export type TransactionType =
   | "fee"
   | "card_payment";
 export type TransactionStatus = "pending" | "posted" | "refunded" | "reversed";
+
+/**
+ * Meta on a REBALANCE transaction — an inter-jar coverage move recorded as ONE
+ * `Transaction` tagged `categoryId: REBALANCE_CATEGORY` (plan 260918-1120, Phase
+ * 03). NOT a separate ledger: it rides the existing manual-txns store/API. The one
+ * record encodes both legs — the engine applies `−amount` to `fromJarId`'s
+ * remaining (cho) and `+amount` to `toJarId`'s remaining (nhận).
+ *
+ * `"pool"` sentinel: an end pointing at the DERIVED "Chưa phân bổ" pool. It is
+ * never credited/debited as a bucket (the pool is `casaBalance − Σ spendable`, so a
+ * jar→pool move already lifts the pool via the donor's reduced spendable — invariant
+ * #1). Only real jar ids get a remaining net.
+ *
+ * `origin` is provenance (invariant #5): an engine-`auto` rebalance is NOT presented
+ * as user-typed even though the txn's `source` is `self_reported` (it's not bank
+ * data). `triggerTxnId` links back to the overspend/categorize txn that caused it.
+ */
+export interface RebalanceMeta {
+  /** Donor jar id (gives −amount), or `"pool"` when the pool is the donor. */
+  fromJarId: string | "pool";
+  /** Target jar id (receives +amount), or `"pool"` when the lift goes to the pool. */
+  toJarId: string | "pool";
+  /** The txn whose overspend/categorization triggered this rebalance. */
+  triggerTxnId: string;
+  /** Who created it: `auto` (engine waterfall) vs `manual` (explicit user action). */
+  origin: "auto" | "manual";
+}
 
 export interface Transaction {
   id: string;
@@ -97,6 +127,12 @@ export interface Transaction {
    * engine never reads it; it does not affect income/expense. Absent until set.
    */
   transferPurpose?: string;
+  /**
+   * Set ONLY on an inter-jar rebalance txn (`categoryId: REBALANCE_CATEGORY`). See
+   * `RebalanceMeta`. The engine reads this to fold `Σ nhận − Σ cho` into each jar's
+   * remaining; the amount stays excluded from spend/thu/chi. Absent on every other txn.
+   */
+  rebalance?: RebalanceMeta;
 }
 
 export interface TransactionQuery {
@@ -217,6 +253,19 @@ export interface Budget {
  * unknown limit, NEVER a silent 0 (invariant #6). A limit is set at onboarding /
  * settings. The legacy balance-lens `allocation` share was dropped in phase 08.
  */
+/**
+ * A jar's donation role — the DETERMINISTIC donor-waterfall order (invariant #1),
+ * replacing the old `isJarFixed` derivation from `categoryIds` (RT#5). When a
+ * transfer is short, auto-donation drains jars in this order:
+ *   `buffer` (dự phòng/tiết kiệm) → `spending` (chi tiêu linh hoạt) →
+ *   `essential` (thiết yếu, last resort). `goal` is PROTECTED: it is never in the
+ *   auto chain — a shortfall that only a `goal` jar can close requires explicit
+ *   human confirmation (the engine surfaces `requiresManualGoal`).
+ * Self-reported config metadata (invariant #5); a missing role defaults to
+ * `spending` in the engine (never crashes on a legacy jar without one).
+ */
+export type JarRole = "buffer" | "spending" | "essential" | "goal";
+
 export interface Jar {
   id: string;
   label: string;
@@ -224,6 +273,12 @@ export interface Jar {
   categoryIds: string[];
   /** Monthly spending limit in VND. `undefined` = chưa đặt (unknown, never 0). */
   budgetLimit?: number;
+  /**
+   * Donor-waterfall role (see `JarRole`). Optional for back-compat with stored
+   * jars; seeds always set it. A missing role is treated as `spending` by the
+   * engine — a `goal` jar is the only role protected from auto-donation.
+   */
+  role?: JarRole;
   /** Optional presentation overrides (settings). Absent = derive from category. */
   color?: string;
   icon?: string;

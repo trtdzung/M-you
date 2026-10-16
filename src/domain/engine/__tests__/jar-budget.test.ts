@@ -211,6 +211,73 @@ describe("evaluateJarBudget — summary gauge counts only jars with a set limit"
   });
 });
 
+describe("evaluateJarBudget — rebalance fold (Phase 03): remaining += Σnhận − Σcho, spent UNCHANGED", () => {
+  it("a jar that received a covering rebalance shows a LIFTED remaining while `spent` stays the raw spend-vs-limit truth", () => {
+    const net = new Map([["food", 1_000_000]]); // received 1tr from a donor
+    const r = evaluateJarBudget(
+      config,
+      [txn({ categoryId: "dining", amount: 4_500_000 })], // over the 4M limit by 500k
+      JUNE,
+      MAY,
+      NOW,
+      net,
+    );
+    const j = byId(r);
+    expect(j.food.spent).toBe(4_500_000); // the REAL spend — untouched by the rebalance
+    expect(j.food.status).toBe("over"); // usage gauge still reads spend-vs-limit truth
+    expect(j.food.remaining).toBe(500_000); // (4M − 4.5M) + 1M nhận = 0.5M — no longer negative
+  });
+
+  it("a jar that DONATED shows a lowered remaining, spend on its own category untouched", () => {
+    const net = new Map([["transport", -300_000]]); // gave 300k away
+    const r = evaluateJarBudget(config, [txn({ categoryId: "transport", amount: 200_000 })], JUNE, MAY, NOW, net);
+    const j = byId(r);
+    expect(j.transport.spent).toBe(200_000); // unaffected by the donation
+    expect(j.transport.remaining).toBe(1_000_000 - 200_000 - 300_000); // 500k
+  });
+
+  it("a jar with NO limit stays `remaining: null` even if it appears in the rebalance net map (non-fundable, never a fabricated number)", () => {
+    const net = new Map([["savings", 500_000]]);
+    const j = byId(evaluateJarBudget(config, [], JUNE, MAY, NOW, net));
+    expect(j.savings.remaining).toBeNull();
+    expect(j.savings.limitState).toBe("unset");
+  });
+
+  it("no `rebalanceNetByJar` argument (undefined) preserves the pre-Phase-03 result (net treated as 0 everywhere)", () => {
+    const withUndefined = evaluateJarBudget(config, [txn({ categoryId: "dining", amount: 1_000_000 })], JUNE, MAY, NOW);
+    const withEmptyMap = evaluateJarBudget(config, [txn({ categoryId: "dining", amount: 1_000_000 })], JUNE, MAY, NOW, new Map());
+    expect(withUndefined).toEqual(withEmptyMap);
+  });
+
+  it("totalRemaining folds every set jar's net (Σ of per-line remaining, not a re-derived Σlimit−Σspent)", () => {
+    const net = new Map([
+      ["food", 1_000_000], // food received
+      ["transport", -1_000_000], // transport donated
+    ]);
+    const r = evaluateJarBudget(
+      config,
+      [txn({ categoryId: "dining", amount: 1_400_000 }), txn({ categoryId: "transport", amount: 1_000_000 })],
+      JUNE,
+      MAY,
+      NOW,
+      net,
+    );
+    // food: 4M − 1.4M + 1M = 3.6M; transport: 1M − 1M − 1M = −1M. Sum = 2.6M.
+    expect(r.summary.totalRemaining).toBe(2_600_000);
+    // The net rebalance is zero-sum across the two jars (one gave what the other
+    // received) — the total gauge moves by exactly 0 vs the no-rebalance baseline
+    // ONLY when donor/receiver are both `set` jars (conservation, not a leak).
+    const baseline = evaluateJarBudget(
+      config,
+      [txn({ categoryId: "dining", amount: 1_400_000 }), txn({ categoryId: "transport", amount: 1_000_000 })],
+      JUNE,
+      MAY,
+      NOW,
+    );
+    expect(r.summary.totalRemaining).toBe(baseline.summary.totalRemaining); // 1M given == 1M received
+  });
+});
+
 describe("evaluateJarBudget — provenance per line (invariant #5)", () => {
   it("carries the lowest-trust source and the freshest contributing date", () => {
     const j = byId(

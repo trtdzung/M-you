@@ -12,9 +12,16 @@ import "server-only";
  * order-preserving code path instead of six bespoke UPDATE statements.
  */
 
-import type { Jar, JarConfig } from "@/domain/models";
+import type { Jar, JarConfig, JarRole } from "@/domain/models";
 import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
 import { getDb } from "./db";
+
+/** The four donor-waterfall roles (plan 260918-1120, Phase 04 persistence). */
+const JAR_ROLES: ReadonlySet<string> = new Set(["buffer", "spending", "essential", "goal"]);
+
+function asRole(value: unknown): JarRole | undefined {
+  return typeof value === "string" && JAR_ROLES.has(value) ? (value as JarRole) : undefined;
+}
 
 interface JarRow {
   id: string;
@@ -22,6 +29,7 @@ interface JarRow {
   label: string;
   category_ids: string;
   budget_limit: number | null;
+  role: string | null;
   color: string | null;
   icon: string | null;
   sort_order: number;
@@ -46,6 +54,8 @@ function parseCategoryIds(raw: string): string[] {
 function toJar(row: JarRow): Jar {
   const jar: Jar = { id: row.id, label: row.label, categoryIds: parseCategoryIds(row.category_ids) };
   if (row.budget_limit !== null) jar.budgetLimit = row.budget_limit;
+  const role = asRole(row.role);
+  if (role) jar.role = role;
   if (row.color !== null) jar.color = row.color;
   if (row.icon !== null) jar.icon = row.icon;
   return jar;
@@ -72,6 +82,8 @@ export function sanitizeJar(input: unknown): Jar | null {
   const jar: Jar = { id: j.id, label: j.label, categoryIds: categoryIds as string[] };
   const budgetLimit = amount(j.budgetLimit);
   if (budgetLimit !== undefined) jar.budgetLimit = budgetLimit;
+  const role = asRole(j.role);
+  if (role) jar.role = role;
   if (typeof j.color === "string") jar.color = j.color;
   if (typeof j.icon === "string") jar.icon = j.icon;
   return jar;
@@ -105,6 +117,15 @@ export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | nul
       if (typeof p.budgetLimit === "number" && (!Number.isFinite(p.budgetLimit) || p.budgetLimit < 0)) return null;
       const value = amount(p.budgetLimit);
       if (value !== undefined) patch.budgetLimit = value;
+    }
+  }
+  if ("role" in p) {
+    // `null` clears back to "unset" (engine treats it as `spending`); a valid role
+    // string is honoured; anything else is ignored (never writes a garbage role).
+    if (p.role === null) patch.role = undefined;
+    else {
+      const role = asRole(p.role);
+      if (role) patch.role = role;
     }
   }
   for (const key of ["color", "icon"] as const) {
@@ -154,8 +175,8 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
   const db = getDb();
   const del = db.prepare("DELETE FROM jars WHERE cif = ?");
   const insert = db.prepare(
-    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, color, icon, sort_order)
-     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @color, @icon, @sortOrder)`,
+    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, role, color, icon, sort_order)
+     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @role, @color, @icon, @sortOrder)`,
   );
   const replaceAll = db.transaction((jars: Jar[]) => {
     del.run(cif);
@@ -168,6 +189,7 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
         // `undefined` is not a bindable value in better-sqlite3 — an unset
         // limit is stored as NULL, which reads back as `undefined` again.
         budgetLimit: jar.budgetLimit ?? null,
+        role: jar.role ?? null,
         color: jar.color ?? null,
         icon: jar.icon ?? null,
         sortOrder: index,

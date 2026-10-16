@@ -65,6 +65,12 @@ export type ManualTxnPatch = {
   type?: Transaction["type"];
   transferPurpose?: string | null;
   note?: string | null;
+  /** Inter-jar rebalance meta (Phase 03). `null` over the wire ⇒ CLEAR the field. */
+  rebalance?: Transaction["rebalance"] | null;
+  /** Refund/reversal of a trigger txn (RT-fix H3) — non-clearable. */
+  status?: Transaction["status"];
+  /** Amount edit of a trigger txn (RT-fix H5) — non-clearable. */
+  amount?: number;
 };
 
 export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): Transaction | null {
@@ -86,6 +92,10 @@ export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): 
     else if (patch.transferPurpose !== undefined) next.transferPurpose = patch.transferPurpose;
     if (patch.note === null) delete next.note;
     else if (patch.note !== undefined) next.note = patch.note;
+    if (patch.rebalance === null) delete next.rebalance;
+    else if (patch.rebalance !== undefined) next.rebalance = patch.rebalance;
+    if (patch.status !== undefined) next.status = patch.status;
+    if (patch.amount !== undefined) next.amount = Math.abs(patch.amount);
     upsertManualTxn(cif, next);
     return next;
   });

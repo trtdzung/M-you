@@ -17,7 +17,7 @@
  *  - Every line carries provenance (source + freshness) over its own spend.
  */
 
-import type { DataSource, JarConfig, Transaction } from "@/domain/models";
+import type { DataSource, JarConfig, JarRole, Transaction } from "@/domain/models";
 import { netExpenseByCategory } from "./cashflow";
 import { categoryToJarMap } from "./category-jars";
 import { NEAR_THRESHOLD, daysLeftIn, type PressureStatus } from "./pressure";
@@ -31,6 +31,12 @@ export interface JarBudgetLine {
   huId: string;
   label: string;
   categoryIds: string[];
+  /**
+   * Donor-waterfall role from `JarConfig` (see `JarRole`), threaded through so the
+   * transfer picker's `JarSpendable` carries the REAL role (not a `spending`
+   * fallback). Optional for a legacy jar stored without one.
+   */
+  role?: JarRole;
   /** Net expense over this jar's categories for the period (whole VND). */
   spent: number;
   /** Net expense last period — the MoM comparison base. */
@@ -42,7 +48,11 @@ export interface JarBudgetLine {
   /** Monthly limit, or `null` when unset (unknown — never coerced to 0). */
   limit: number | null;
   limitState: LimitState;
-  /** `limit - spent` when set, else `null`. */
+  /**
+   * `limit − spent + Σ nhận − Σ cho` (rebalance net) when set, else `null`. Folds
+   * inter-jar rebalance coverage so the derived `spendable`/pool every screen reads
+   * reflects a rebalance instantly (Phase 03). `spent` itself is UNCHANGED.
+   */
   remaining: number | null;
   /** `spent / limit` in [0, ∞), or `null` when unset. */
   pct: number | null;
@@ -122,6 +132,12 @@ export function evaluateJarBudget(
   period: Period,
   prevPeriod: Period,
   now: Date,
+  /**
+   * Net inter-jar rebalance per jar (`Σ nhận − Σ cho`, from `rebalanceNetByJar`).
+   * Folded into each line's `remaining` (+ `totalRemaining`); `spent` is untouched.
+   * Absent → no rebalances (every jar's net is 0), preserving the pre-Phase-03 result.
+   */
+  rebalanceNetByJar?: Map<string, number>,
 ): JarBudgetResult {
   const spendNow = netExpenseByCategory(txns, period);
   const spendPrev = netExpenseByCategory(txns, prevPeriod);
@@ -133,6 +149,9 @@ export function evaluateJarBudget(
     const prevSpent = jar.categoryIds.reduce((s, c) => s + (spendPrev.get(c) ?? 0), 0);
     const momDelta = spent - prevSpent;
     const momPct = prevSpent > 0 ? momDelta / prevSpent : null;
+    // Rebalance coverage (Σ nhận − Σ cho) lifts/lowers remaining only — `spent`
+    // (đã tiêu) and the budget usage gauge (status/pct) stay spend-vs-limit truth.
+    const rebalanceNet = rebalanceNetByJar?.get(jar.id) ?? 0;
 
     const hasLimit = jar.budgetLimit !== undefined;
     const limit = hasLimit ? (jar.budgetLimit as number) : null;
@@ -149,13 +168,14 @@ export function evaluateJarBudget(
       huId: jar.id,
       label: jar.label,
       categoryIds: jar.categoryIds,
+      role: jar.role,
       spent,
       prevSpent,
       momDelta,
       momPct,
       limit,
       limitState: hasLimit ? "set" : "unset",
-      remaining: hasLimit ? (limit as number) - spent : null,
+      remaining: hasLimit ? (limit as number) - spent + rebalanceNet : null,
       pct,
       status,
       thresholdHit: pct !== null && pct >= NEAR_THRESHOLD,
@@ -168,12 +188,16 @@ export function evaluateJarBudget(
   const totalLimit = setLines.length > 0 ? setLines.reduce((s, l) => s + (l.limit as number), 0) : null;
   const totalSpentSet = setLines.reduce((s, l) => s + l.spent, 0);
   const totalSpent = lines.reduce((s, l) => s + l.spent, 0);
+  // Sum the per-line remaining (each already folds its rebalance net) so the gauge
+  // total matches `Σ(limit − spent + net)`, not the pre-rebalance `limit − spent`.
+  const totalRemaining =
+    totalLimit !== null ? setLines.reduce((s, l) => s + (l.remaining as number), 0) : null;
 
   const summary: JarBudgetSummary = {
     totalLimit,
     totalSpent,
     totalSpentSet,
-    totalRemaining: totalLimit !== null ? totalLimit - totalSpentSet : null,
+    totalRemaining,
     pctUsed: totalLimit !== null && totalLimit > 0 ? totalSpentSet / totalLimit : null,
     daysLeft: daysLeftIn(period, now),
     setCount: setLines.length,

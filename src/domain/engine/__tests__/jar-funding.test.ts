@@ -1,27 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { evaluateFunding, isJarFixed, POOL_DONOR_ID } from "../jar-funding";
+import type { JarRole } from "@/domain/models";
+import { evaluateFunding, POOL_DONOR_ID } from "../jar-funding";
 import type { JarSpendable } from "../jar-spendable";
 
 /** A jar reduced to its derived spendable (`null` = no limit / non-fundable). */
-function jar(id: string, spendable: number | null, categoryIds: string[] = []): JarSpendable {
-  return { id, label: id, categoryIds, spendable };
+function jar(
+  id: string,
+  spendable: number | null,
+  categoryIds: string[] = [],
+  role?: JarRole,
+): JarSpendable {
+  return { id, label: id, categoryIds, spendable, role };
 }
-
-describe("isJarFixed", () => {
-  it("true only when EVERY category is fixed", () => {
-    expect(isJarFixed({ categoryIds: ["housing", "utilities"] })).toBe(true);
-    expect(isJarFixed({ categoryIds: ["insurance"] })).toBe(true);
-  });
-  it("mixed jar is discretionary (tappable)", () => {
-    expect(isJarFixed({ categoryIds: ["housing", "dining"] })).toBe(false);
-  });
-  it("all-discretionary is not fixed", () => {
-    expect(isJarFixed({ categoryIds: ["dining", "entertainment"] })).toBe(false);
-  });
-  it("empty jar is not protected", () => {
-    expect(isJarFixed({ categoryIds: [] })).toBe(false);
-  });
-});
 
 describe("evaluateFunding — jar source", () => {
   const CASA = 20_000_000;
@@ -77,13 +67,14 @@ describe("evaluateFunding — jar source", () => {
     ]);
   });
 
-  it("topup: fixed jars are the LAST resort (tapped only after discretionary)", () => {
-    // CASA=12tr; src=1tr, disc=2tr, fixedJar=9tr → claimed=12, pool=0.
-    // need 10tr from src(1tr) → shortfall 9tr. disc(2tr) then fixedJar(9tr→take 7tr).
+  it("topup: role waterfall — `essential` is the LAST resort, tapped only after `spending`", () => {
+    // CASA=12tr; src=1tr (spending), disc=2tr (spending), rent=9tr (essential) → claimed=12, pool=0.
+    // need 10tr from src(1tr) → shortfall 9tr. Same-tier `disc`(spending) drains
+    // FIRST; `rent`(essential) is the last-resort tier → tapped only for the residual.
     const jars = [
-      jar("src", 1_000_000, ["dining"]),
-      jar("disc", 2_000_000, ["entertainment"]),
-      jar("rent", 9_000_000, ["housing"]),
+      jar("src", 1_000_000, ["dining"], "spending"),
+      jar("disc", 2_000_000, ["entertainment"], "spending"),
+      jar("rent", 9_000_000, ["housing"], "essential"),
     ];
     const a = evaluateFunding({ amount: 10_000_000, sourceJarId: "src", casaBalance: 12_000_000, jars });
     expect(a.tier).toBe("topup");
@@ -207,5 +198,113 @@ describe("evaluateFunding — pool source (RT#8)", () => {
     expect(a.tier).toBe("insufficient");
     expect(a.shortfall).toBe(3_000_000); // 6tr − coverable 3tr
     expect(a.donors).toEqual([]);
+  });
+});
+
+describe("evaluateFunding — role waterfall (pool → buffer → spending → essential; goal protected)", () => {
+  it("drains the full role order: buffer before spending before essential", () => {
+    // CASA=21tr; src=1tr(spending), buf=4tr(buffer), spend=3tr(spending), ess=6tr(essential)
+    // → claimed=14tr, pool=7tr. need 15tr from src(1tr) → shortfall 14tr.
+    // Order: pool(7) → buf(4) → spend(3) → ess(6→take 0, already covered at 14).
+    const jars = [
+      jar("src", 1_000_000, ["dining"], "spending"),
+      jar("buf", 4_000_000, ["savings"], "buffer"),
+      jar("spend", 3_000_000, ["entertainment"], "spending"),
+      jar("ess", 6_000_000, ["housing"], "essential"),
+    ];
+    const a = evaluateFunding({ amount: 15_000_000, sourceJarId: "src", casaBalance: 21_000_000, jars });
+    expect(a.tier).toBe("topup");
+    expect(a.shortfall).toBe(14_000_000);
+    expect(a.donors).toEqual([
+      { jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 7_000_000 },
+      { jarId: "buf", label: "Hũ buf", take: 4_000_000 },
+      { jarId: "spend", label: "Hũ spend", take: 3_000_000 },
+    ]);
+    expect(a.donors.some((d) => d.jarId === "ess")).toBe(false);
+  });
+
+  it("a `goal` jar is NEVER in the auto `donors` chain even when it is the largest balance", () => {
+    // CASA=16tr; src=1tr(spending), goal=10tr(goal), spend=2tr(spending) → claimed=13, pool=3tr.
+    // need 6tr from src(1) → shortfall 5tr. pool(3) then spend(2) covers exactly 5tr;
+    // `goal`'s 10tr is never touched even though it dwarfs every other donor.
+    const jars = [
+      jar("src", 1_000_000, ["dining"], "spending"),
+      jar("goal", 10_000_000, ["goal-save"], "goal"),
+      jar("spend", 2_000_000, ["entertainment"], "spending"),
+    ];
+    const a = evaluateFunding({ amount: 6_000_000, sourceJarId: "src", casaBalance: 16_000_000, jars });
+    expect(a.tier).toBe("topup");
+    expect(a.donors).toEqual([
+      { jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 3_000_000 },
+      { jarId: "spend", label: "Hũ spend", take: 2_000_000 },
+    ]);
+    expect(a.donors.some((d) => d.jarId === "goal")).toBe(false);
+    expect(a.requiresManualGoal).toBe(false);
+  });
+
+  it("a missing `role` defaults to `spending` (back-compat, never crashes)", () => {
+    const jars = [jar("src", 1_000_000, ["dining"]), jar("noRole", 5_000_000, ["shopping"])];
+    const a = evaluateFunding({ amount: 4_000_000, sourceJarId: "src", casaBalance: 6_000_000, jars });
+    expect(a.tier).toBe("topup");
+    expect(a.donors).toEqual([{ jarId: "noRole", label: "Hũ noRole", take: 3_000_000 }]);
+  });
+});
+
+describe("evaluateFunding — C2 dual ceiling (goal-excl classifies tier; goal-incl gates requiresManualGoal)", () => {
+  it("a shortfall coverable ONLY by a `goal` jar → tier is NOT `topup`; requiresManualGoal true; goalDonors covers the gap", () => {
+    // CASA=13tr; src=1tr(spending), spend=2tr(spending), goal=8tr(goal) → claimed=11, pool=2tr.
+    // need 10tr from src(1) → shortfall 9tr. ceilingExclGoal = src(1)+pool(2)+spend(2) = 5tr
+    // < amount(10tr) → NOT topup. ceilingInclGoal = src(1)+pool(2)+spend(2)+goal(8) = 13tr ≥
+    // amount → requiresManualGoal. The non-goal chain (pool+spend = 4tr) under-covers the
+    // 9tr shortfall by itself; `goalDonors` closes exactly the 5tr residual gap.
+    const jars = [
+      jar("src", 1_000_000, ["dining"], "spending"),
+      jar("spend", 2_000_000, ["entertainment"], "spending"),
+      jar("goal", 8_000_000, ["goal-save"], "goal"),
+    ];
+    const a = evaluateFunding({ amount: 10_000_000, sourceJarId: "src", casaBalance: 13_000_000, jars });
+    expect(a.tier).toBe("insufficient");
+    expect(a.requiresManualGoal).toBe(true);
+    // Non-goal donors chain covers only what THEY can (never over-reports full coverage).
+    expect(a.donors).toEqual([
+      { jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 2_000_000 },
+      { jarId: "spend", label: "Hũ spend", take: 2_000_000 },
+    ]);
+    expect(a.donors.reduce((s, d) => s + d.take, 0)).toBe(4_000_000); // < shortfall (9tr) — under-covers on its own
+    // The goal chain closes exactly the residual gap (shortfall − non-goal coverage).
+    expect(a.goalDonors).toEqual([{ jarId: "goal", label: "Hũ goal", take: 5_000_000 }]);
+    expect(a.donors.reduce((s, d) => s + d.take, 0) + a.goalDonors.reduce((s, d) => s + d.take, 0)).toBe(
+      a.shortfall,
+    );
+  });
+
+  it("a shortfall coverable by non-goal jars alone → plain `topup`, requiresManualGoal false, even with a goal jar present", () => {
+    // CASA=13tr; src=1tr(spending), spend=5tr(spending), goal=7tr(goal) → claimed=13, pool=0.
+    // need 4tr from src(1) → shortfall 3tr. Non-goal ceiling = spend(5) ≥ 3tr → topup,
+    // fully via `spend` — `goal` is never touched, requiresManualGoal stays false.
+    const jars = [
+      jar("src", 1_000_000, ["dining"], "spending"),
+      jar("spend", 5_000_000, ["entertainment"], "spending"),
+      jar("goal", 7_000_000, ["goal-save"], "goal"),
+    ];
+    const a = evaluateFunding({ amount: 4_000_000, sourceJarId: "src", casaBalance: 13_000_000, jars });
+    expect(a.tier).toBe("topup");
+    expect(a.requiresManualGoal).toBe(false);
+    expect(a.donors).toEqual([{ jarId: "spend", label: "Hũ spend", take: 3_000_000 }]);
+    expect(a.donors.reduce((s, d) => s + d.take, 0)).toBe(a.shortfall);
+    expect(a.goalDonors).toEqual([]);
+  });
+
+  it("even the goal-inclusive ceiling can't cover → hard `insufficient`, requiresManualGoal false (C1 residual, no false promise)", () => {
+    // CASA=6tr; src=1tr(spending), goal=2tr(goal) → claimed=3tr, pool=3tr.
+    // need 10tr from src(1) → shortfall 9tr. ceilingInclGoal = min(CASA=6, 1+3+0+2)=6tr < 9tr
+    // → even every donatable jar (incl. goal) falls short. Never a false `requiresManualGoal`.
+    const jars = [jar("src", 1_000_000, ["dining"], "spending"), jar("goal", 2_000_000, ["goal-save"], "goal")];
+    const a = evaluateFunding({ amount: 10_000_000, sourceJarId: "src", casaBalance: 6_000_000, jars });
+    expect(a.tier).toBe("insufficient");
+    expect(a.requiresManualGoal).toBe(false);
+    expect(a.donors).toEqual([]);
+    expect(a.goalDonors).toEqual([]);
+    expect(a.shortfall).toBe(4_000_000); // 10tr − ceilingInclGoal(6tr)
   });
 });

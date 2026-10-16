@@ -23,5 +23,6 @@ export function txn(overrides: Partial<Transaction> = {}): Transaction {
     userEdited: overrides.userEdited ?? false,
     relatedTransactionId: overrides.relatedTransactionId,
     transferGroupId: overrides.transferGroupId,
+    ...(overrides.rebalance ? { rebalance: overrides.rebalance } : {}),
   };
 }

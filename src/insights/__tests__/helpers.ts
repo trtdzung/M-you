@@ -123,6 +123,7 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     jarBudget: over.jarBudget ?? EMPTY_JAR_BUDGET,
     jarEnvelope: over.jarEnvelope ?? EMPTY_JAR_ENVELOPE,
     unallocatedPool: over.unallocatedPool ?? { amount: 0, overAllocated: false, source: "mock" },
+    jarRebalances: over.jarRebalances ?? [],
     unlabeled: over.unlabeled ?? { count: 0, amount: 0, source: "mock" },
     health: over.health ?? EMPTY_HEALTH,
     goals: over.goals ?? [],

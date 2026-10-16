@@ -74,17 +74,26 @@ export interface JarEnvelopeResult {
   meta: AggregateMeta;
 }
 
-function buildLine(jarId: string, label: string, budgetLimit: number | null, spent: number): JarEnvelopeLine {
+function buildLine(
+  jarId: string,
+  label: string,
+  budgetLimit: number | null,
+  spent: number,
+  rebalanceNet: number,
+): JarEnvelopeLine {
   // `budgetLimit` là con số duy nhất: số dành cho hũ = trần chi = số dư gốc. Chưa
-  // đặt → "chưa có số dư" (null, không phải 0 — invariant #6).
+  // đặt → "chưa có số dư" (null, không phải 0 — invariant #6). Rebalance coverage
+  // (Σ nhận − Σ cho) folds into remaining; `overLimit` is recomputed against the
+  // POST-rebalance remaining, so a jar that has been covered is no longer "vượt".
   const hasLimit = budgetLimit !== null;
+  const remaining = hasLimit ? budgetLimit - spent + rebalanceNet : null;
   return {
     jarId,
     label,
     budgetLimit,
     spent,
-    remaining: hasLimit ? budgetLimit - spent : null,
-    overLimit: hasLimit && spent > budgetLimit,
+    remaining,
+    overLimit: remaining !== null && remaining < 0,
     inUse: spent > 0,
     // A budgetLimit is user-entered (self_reported); an empty jar carries the baseline.
     source: hasLimit ? "self_reported" : "mock",
@@ -98,9 +107,19 @@ function buildLine(jarId: string, label: string, budgetLimit: number | null, spe
  * spend (DRY, invariant #2). A jar with no `budgetLimit` stays `null` ("chưa có số
  * dư"), never a fabricated 0 (invariant #6).
  */
-export function jarEnvelopeLines(config: JarConfig, spentByJar: Map<string, number>): JarEnvelopeLine[] {
+export function jarEnvelopeLines(
+  config: JarConfig,
+  spentByJar: Map<string, number>,
+  rebalanceNetByJar?: Map<string, number>,
+): JarEnvelopeLine[] {
   return config.jars.map((jar) =>
-    buildLine(jar.id, jar.label, jar.budgetLimit ?? null, spentByJar.get(jar.id) ?? 0),
+    buildLine(
+      jar.id,
+      jar.label,
+      jar.budgetLimit ?? null,
+      spentByJar.get(jar.id) ?? 0,
+      rebalanceNetByJar?.get(jar.id) ?? 0,
+    ),
   );
 }
 
@@ -114,8 +133,10 @@ export function evaluateJarEnvelope(
   accounts: Account[],
   spentByJar: Map<string, number>,
   period: Period,
+  /** Net inter-jar rebalance per jar (`Σ nhận − Σ cho`); absent → all zero. */
+  rebalanceNetByJar?: Map<string, number>,
 ): JarEnvelopeResult {
-  const jars = jarEnvelopeLines(config, spentByJar);
+  const jars = jarEnvelopeLines(config, spentByJar, rebalanceNetByJar);
   const allocated = jars.reduce((s, l) => s + (l.budgetLimit ?? 0), 0);
   const { amount: pool, sources, freshness } = casaPool(accounts);
   const pendingAmount: Amount = pool === UNKNOWN ? UNKNOWN : Math.max(0, pool - allocated);
