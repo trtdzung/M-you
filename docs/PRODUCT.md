@@ -81,13 +81,18 @@ Typical needs:
 
 ### Hũ chi tiêu (spending jars) — implemented
 
-A jar-based budgeting layer that sits alongside the existing per-category Budget, not instead of it — two altitudes on the same spend: category limits (Budget) and jar buckets (Hũ chi tiêu). Fully deterministic, no AI in the calculation path.
+Hũ is **the single budgeting concept in the product** — there is no separate "Ngân sách" feature surfaced beside it (the earlier per-category Budget still exists in code but is dormant, not shown to the user). A jar earmarks a **share of the current primary-account balance** — a display-only snapshot partition, not a monthly spending envelope. Fully deterministic, no AI in the calculation path.
 
-- **2-layer model.** Named jars group one or more expense categories; each expense category belongs to at most one jar. Spend not assigned to any jar is never dropped — it rolls up into an implicit, neutral **"Chưa phân hũ"** (unassigned) bucket.
-- **Allocation per jar** is either a percentage of monthly income (default) or a fixed VND cap (override).
-- **Income basis** resolves in priority order: detected recurring salary → manual override → unknown. An unknown income basis **never** shows a false-healthy green jar — percent-mode jars show a neutral "chưa xác định thu nhập" state instead, so a jar is never falsely reported as "ok".
-- **Level 1:** jar pressure is tracked in a "Hũ chi tiêu" section on the Cashflow tab, plus a dedicated **jar-pressure insight** (e.g. "Hũ Giải trí đã dùng 82%, còn 12 ngày"), which only fires against the current month and skips jars with an unresolved income basis. Setup (create/edit/delete jars, assign categories, edit allocations, see a live total-allocation meter) lives on its own route, `/pfm/jars`, reachable from the Cashflow tab — kept off the main PFM tab bar so it stays at four tabs.
-- **Level 3:** a deterministic "phân bổ thặng dư" (surplus allocation) what-if lets the user simulate distributing the month's surplus across savings goals. It is a **read-only simulation** — no money movement, no transfer draft, no goal mutation. If income is unknown, surplus is reported as **"unknown", never 0₫**.
+- **Snapshot partition, not an envelope.** Each jar carries a `percent` (share of the primary account's current balance) or a fixed `amount` (VND). There is no income basis, no monthly anchor, no clock, no sub-account, and no jar balance — a jar never holds or moves money; it only labels a slice of the one real balance.
+- **Exact by construction.** `Σ(every jar earmark) + "Chưa phân bổ" ≡ số dư tài khoản chính`, always. "Chưa phân bổ" is the residual (`số dư − Σ earmarks`) and absorbs the whole-VND rounding remainder, so the identity holds exactly rather than approximately.
+- **Primary account.** The partition is drawn against the single `type: "current"` account. With zero or two-or-more current accounts, the balance to partition is genuinely **unknown** — the UI shows an explicit unknown state, never a fabricated split and never a silent 0.
+- **Two numbers per jar.** Each jar shows **chia** (its earmark, fixed) and **đã tiêu kỳ này** (an informational overlay: net expense over the jar's categories for the selected month, plus a month-over-month delta). The overlay follows the same spend rules as cash flow (internal transfers excluded, refunds reversed, reversed dropped, pending kept separate) and never changes the earmark or the Σ≡balance identity.
+- **Chia doubles as the monthly budget line.** `đã tiêu > chia` is a non-blocking "Vượt ngân sách" warning — this is the product's only budgeting signal. Over-allocation (`Σ chia > số dư`, i.e. a negative residual) is also a non-blocking warning, never a hard error.
+- **Level 1:** jars render as a "Hũ chi tiêu" section on the Cashflow tab, plus a jar-budget insight that flags an over-allocated residual or the most-breached jar; it only fires against the current month. Setup — pick one of three templates (Cá nhân: 6 hũ, default; Gia đình: 4 hũ; Kinh doanh: 3 hũ, each summing to ≤100% so applying one never starts over-allocated), then create/edit/delete jars, assign categories, and edit earmarks with a live balance-reconciliation meter — lives on its own route, `/pfm/jars`, reachable from the Cashflow tab and kept off the main PFM tab bar so it stays at four tabs. Applying a template replaces the current jar set (with a confirm step).
+- **Trust line:** "Hũ chỉ để bạn nhìn tiền rõ hơn — tiền vẫn nằm nguyên trong tài khoản của bạn."
+- **Level 3:** the deterministic "phân bổ thặng dư" (surplus allocation) what-if sources its number from the **"Chưa phân bổ" residual** (a stock, floored at 0), not `income − expense`. It is a **read-only simulation** — no money movement, no transfer draft, no goal mutation. An unknown primary balance yields **"unknown" surplus, never 0₫**.
+
+This is Model A (snapshot partition), which **supersedes** the earlier monthly spending-envelope design (allocation as % of income, "used" = period spend vs allocation, income-basis resolution) explored in `plans/260908-1311-spending-jars` — that design was not shipped.
 
 ### Basic net worth
 
@@ -102,7 +107,7 @@ Level 1 includes MSB-held cash and known liabilities. External assets are deferr
 Examples:
 
 - “Chi tiêu ăn uống tăng 24% so với tháng trước.”
-- “Bạn còn 12 ngày nhưng đã dùng 82% ngân sách giải trí.”
+- “Hũ Giải trí đã tiêu vượt phần chia tháng này.”
 - “Khoản thanh toán thẻ lớn nhất sẽ đến sau 5 ngày.”
 - “Có một khoản chi lặp lại mới xuất hiện trong 3 tháng gần đây.”
 
