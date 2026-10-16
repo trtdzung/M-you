@@ -47,6 +47,9 @@ export function rebalanceNetByJar(txns: Transaction[], period: Period): Map<stri
   };
   for (const t of txns) {
     if (!isActiveRebalance(t, period)) continue;
+    // F08b: a non-finite or ≤ 0 amount is dirty data — ignored, never allowed to
+    // invert direction (donor gaining) or leak NaN/Infinity into `remaining`.
+    if (!Number.isFinite(t.amount) || t.amount <= 0) continue;
     const meta = t.rebalance!;
     bump(meta.toJarId, t.amount); // nhận (+)
     bump(meta.fromJarId, -t.amount); // cho (−)

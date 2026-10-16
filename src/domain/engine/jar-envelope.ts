@@ -11,8 +11,8 @@
  * `budgetLimit`. Two outputs, scoped to one period (OverviewTab pins the current
  * month for `spent`; the pool is a running stock, not a per-period flow):
  *
- *  1. "Chờ phân bổ" — the CASA pool not yet earmarked into a jar
- *     (`pool − Σ budgetLimit`, floored at 0).
+ *  1. "Chờ phân bổ" — the CASA money no jar's spendable claims, the ONE
+ *     unallocated definition `CASA − Σ spendable` (`computeUnallocatedPool`).
  *  2. Per-jar "còn lại trong hũ" = `budgetLimit − spent`. `spent` reuses the
  *     jar-budget net expense (DRY, invariant #2). `overLimit = spent > budgetLimit`.
  *
@@ -24,6 +24,9 @@
  */
 
 import type { Account, DataSource, JarConfig } from "@/domain/models";
+import { validBudgetLimit } from "./jar-budget";
+import { jarSpendable } from "./jar-spendable";
+import { computeUnallocatedPool } from "./unallocated-pool";
 import { coverageOf, UNKNOWN, type AggregateMeta, type Amount, type Period } from "./types";
 
 /** CASA pool = tổng `availableBalance` các tài khoản `current`. Không có → unknown. */
@@ -42,11 +45,17 @@ export function casaPool(accounts: Account[]): { amount: Amount; sources: DataSo
 }
 
 export interface PendingAllocation {
-  /** Số dư CASA chưa phân bổ = `pool − allocated` (sàn 0); "unknown" khi không có tài khoản current. */
+  /**
+   * "Chờ phân bổ" = the ONE unallocated definition (`computeUnallocatedPool`):
+   * `CASA − Σ spendable(jar)`. May be negative (see `overAllocated`) — the UI
+   * decides how to present it; "unknown" khi không có tài khoản current.
+   */
   amount: Amount;
+  /** True when jars claim more spendable money than CASA holds. */
+  overAllocated: boolean;
   /** Tổng pool CASA (Σ availableBalance các tài khoản current); "unknown" khi không có. */
   pool: Amount;
-  /** Tổng đã phân bổ vào các hũ (Σ budgetLimit). */
+  /** Tổng hạn mức đã đặt cho các hũ (Σ budgetLimit) — the allocation-sheet total. */
   allocated: number;
   meta: AggregateMeta;
 }
@@ -116,7 +125,7 @@ export function jarEnvelopeLines(
     buildLine(
       jar.id,
       jar.label,
-      jar.budgetLimit ?? null,
+      validBudgetLimit(jar.budgetLimit),
       spentByJar.get(jar.id) ?? 0,
       rebalanceNetByJar?.get(jar.id) ?? 0,
     ),
@@ -126,7 +135,8 @@ export function jarEnvelopeLines(
 /**
  * Compose the full envelope result for `period`. Deterministic. `spentByJar` is
  * jar-budget's per-jar net expense (huId → spent); `accounts` supplies the CASA
- * pool. "Chờ phân bổ" = `pool − Σ budgetLimit`.
+ * pool. "Chờ phân bổ" delegates to `computeUnallocatedPool` (`CASA − Σ spendable`)
+ * so the overview and the transfer picker show the SAME number (D26/S12).
  */
 export function evaluateJarEnvelope(
   config: JarConfig,
@@ -139,14 +149,21 @@ export function evaluateJarEnvelope(
   const jars = jarEnvelopeLines(config, spentByJar, rebalanceNetByJar);
   const allocated = jars.reduce((s, l) => s + (l.budgetLimit ?? 0), 0);
   const { amount: pool, sources, freshness } = casaPool(accounts);
-  const pendingAmount: Amount = pool === UNKNOWN ? UNKNOWN : Math.max(0, pool - allocated);
+  const spendableTotal = jars.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
+  const unallocated = computeUnallocatedPool({ casaBalance: pool, spendableTotal });
 
   const meta: AggregateMeta = {
     period,
     sourceCoverage: coverageOf(sources, sources.length, pool === UNKNOWN ? 1 : 0),
     freshness,
   };
-  const pending: PendingAllocation = { amount: pendingAmount, pool, allocated, meta };
+  const pending: PendingAllocation = {
+    amount: unallocated.amount,
+    overAllocated: unallocated.overAllocated,
+    pool,
+    allocated,
+    meta,
+  };
 
   return { pending, jars, meta };
 }

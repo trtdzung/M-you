@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
-import { monthPeriodFromKey } from "@/domain/engine";
+import { isoInPeriod, monthPeriodFromKey } from "@/domain/engine";
 import { Card } from "@/components/primitives";
 import { Empty, SkeletonRow, SkeletonScreen } from "@/components/states";
 import { TxnRow } from "./TxnRow";
@@ -47,7 +47,7 @@ export function TransactionListSection({
   const periodTransactions = useMemo(
     () => transactions.filter((t) => {
       if (accountId && t.accountId !== accountId) return false;
-      return t.postedAt >= period.from && t.postedAt <= period.to;
+      return isoInPeriod(t.postedAt, period); // instants, never lexical ISO compare
     }),
     [transactions, period.from, period.to, accountId],
   );

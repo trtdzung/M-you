@@ -103,17 +103,23 @@ export const DEFAULT_JAR_CONFIG: JarConfig = configFromTemplate(caNhan);
  * A jar carries ONE group `budgetLimit` spanning several expense categories, so
  * the limit is split evenly across the jar's categories, with any rounding
  * remainder folded into the first category. The per-category budgets therefore
- * always sum EXACTLY back to the jar limit (no drift). A jar with no limit
+ * always sum EXACTLY back to the (whole-VND rounded) jar limit (no drift, no
+ * fractional đồng). A jar with no limit
  * ("chưa đặt", e.g. "Tiết kiệm") or no categories contributes nothing — its
  * limit stays genuinely unknown rather than a silent 0 (invariant #6).
  */
 export function budgetsFromJars(jars: Jar[]): Budget[] {
   const budgets: Budget[] = [];
   for (const jar of jars) {
-    if (jar.budgetLimit === undefined || jar.categoryIds.length === 0) continue;
+    const raw = jar.budgetLimit;
+    // A corrupt limit (non-finite / negative) is unknown, never split into NaN.
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) continue;
+    if (jar.categoryIds.length === 0) continue;
+    // Whole VND only (B13): round the limit, floor each split, remainder → first.
+    const limit = Math.round(raw);
     const count = jar.categoryIds.length;
-    const base = Math.floor(jar.budgetLimit / count);
-    const remainder = jar.budgetLimit - base * count;
+    const base = Math.floor(limit / count);
+    const remainder = limit - base * count;
     jar.categoryIds.forEach((categoryId, i) => {
       budgets.push({ categoryId, limit: base + (i === 0 ? remainder : 0), period: "monthly" });
     });

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { EyeOff } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { CATEGORY_BY_ID } from "@/domain/models";
-import { monthPeriodFromKey, categoryToJarMap, jarChipList, KHAC_JAR_ID } from "@/domain/engine";
+import { monthPeriodFromKey, categoryToJarMap, isoInPeriod, jarChipList, KHAC_JAR_ID, VN_UTC_OFFSET_MS } from "@/domain/engine";
 import { Card } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonScreen, SkeletonRow } from "@/components/states";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
@@ -20,8 +20,11 @@ import { TxnSuggestionBar } from "./TxnSuggestionBar";
 
 const ALL = "all";
 
+/** VN-calendar (UTC+7) day "YYYY-MM-DD" of an instant — matches the VN month periods. */
 function dayKey(iso: string): string {
-  return iso.slice(0, 10); // YYYY-MM-DD (UTC)
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso.slice(0, 10);
+  return new Date(t + VN_UTC_OFFSET_MS).toISOString().slice(0, 10);
 }
 function dayLabel(key: string): string {
   const d = new Date(`${key}T00:00:00.000Z`);
@@ -63,7 +66,7 @@ export function PfmTxnList() {
 
   const groups = useMemo(() => {
     const period = monthPeriodFromKey(month);
-    const inPeriod = allTransactions.filter((t) => t.postedAt >= period.from && t.postedAt <= period.to);
+    const inPeriod = allTransactions.filter((t) => isoInPeriod(t.postedAt, period));
     const filtered =
       jar === ALL ? inPeriod : inPeriod.filter((t) => (catToJar.get(t.categoryId) ?? KHAC_JAR_ID) === jar);
     return groupByDay(filtered);

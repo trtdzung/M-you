@@ -1,13 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
-import { Card, Money, SectionHeader, SourceBadge } from "@/components/primitives";
+import { SectionHeader } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/states";
-import { cn } from "@/lib/cn";
+import { AllocationSheet } from "@/components/hu-envelope/AllocationSheet";
 import { useFinancials } from "@/state/useFinancials";
-import { BudgetGauge } from "./BudgetGauge";
+import { useJarConfig } from "@/state/jars";
+import { BudgetSummaryCard } from "./BudgetSummaryCard";
 import { HuBudgetCard } from "./HuBudgetCard";
 import { makeJarLabelResolver } from "./JarRebalanceLines";
 
@@ -17,10 +19,15 @@ import { makeJarLabelResolver } from "./JarRebalanceLines";
  * `financials.jarBudget` (engine, phase 02) — the tab only presents. Jars with an
  * unset limit are listed separately (never counted in the gauge). Income was
  * removed — the tab is spending-only (no Thu segment).
+ *
+ * A failed jar load (`useJarConfig().error`, U10) renders an error state — never
+ * the "Chưa có hũ nào" empty state, which would misreport the user's jars.
  */
 export function BudgetTab() {
   const { loading, error, financials } = useFinancials();
+  const { config, error: jarError } = useJarConfig();
   const router = useRouter();
+  const [coverOpen, setCoverOpen] = useState(false);
 
   function openEditor(huId: string) {
     router.replace(`/pfm?tab=settings&hu=${huId}`, { scroll: false });
@@ -30,6 +37,9 @@ export function BudgetTab() {
   }
 
   if (error) return <ErrorState />;
+  if (jarError) {
+    return <ErrorState title="Không tải được hũ chi tiêu" description="Không thể tải cấu hình hũ. Vui lòng thử lại sau." />;
+  }
   if (loading || !financials) {
     return (
       <SkeletonScreen>
@@ -43,12 +53,12 @@ export function BudgetTab() {
   const { lines, summary } = financials.jarBudget;
   const setLines = lines.filter((l) => l.limitState === "set");
   const unsetLines = lines.filter((l) => l.limitState === "unset");
-  const pctLabel = summary.pctUsed !== null ? `${Math.round(summary.pctUsed * 100)}%` : "Chưa đặt";
   // The period's inter-jar rebalance txns — rendered as read-only "cho/nhận"
   // pseudo-lines on each jar card (Phase 02). Same engine-excluded txns already
   // folded into every jar's `remaining`; `?? []` guards partial-`Financials` fixtures.
   const rebalances = financials.jarRebalances ?? [];
   const labelOf = makeJarLabelResolver(lines);
+  const cardProps = { onEdit: openEditor, onCover: () => setCoverOpen(true), rebalances, labelOf };
 
   return (
     <div className="flex flex-col gap-5">
@@ -75,47 +85,11 @@ export function BudgetTab() {
         />
       ) : (
         <>
-          <Card className="flex flex-col items-center gap-3" role="region" aria-label="Tổng ngân sách">
-            <div className="flex w-full items-center justify-between">
-              <span className="text-sm font-semibold text-text">Tổng đã tiêu</span>
-              <div className="flex items-center gap-2">
-                {financials.unallocatedPool.overAllocated && (
-                  <span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
-                    Vượt phân bổ
-                  </span>
-                )}
-                <SourceBadge source={financials.jarBudget.meta.sourceCoverage.sources[0] ?? "mock"} />
-              </div>
-            </div>
-            <BudgetGauge
-              pct={summary.pctUsed}
-              centerLabel={pctLabel}
-              sublabel={summary.daysLeft > 0 ? `Còn ${summary.daysLeft} ngày trong kỳ` : "Đã hết kỳ"}
-            />
-            <div className="grid w-full grid-cols-3 gap-2 border-t border-border pt-3 text-center">
-              <GaugeStat label="Đã tiêu" node={<Money amount={summary.totalSpentSet} className="font-semibold text-text" />} />
-              <GaugeStat
-                label="Hạn mức"
-                node={summary.totalLimit !== null ? <Money amount={summary.totalLimit} className="font-semibold text-text" /> : <span className="text-muted">—</span>}
-              />
-              <GaugeStat
-                // A hũ holds money you put in — "còn lại" can't be negative. When
-                // spend exceeds the total limit, show the overspend as "Vượt X"
-                // (a positive figure) instead of a nonsensical negative balance.
-                label={summary.totalRemaining !== null && summary.totalRemaining < 0 ? "Vượt" : "Còn lại"}
-                node={
-                  summary.totalRemaining !== null ? (
-                    <Money
-                      amount={Math.abs(summary.totalRemaining)}
-                      className={cn("font-semibold", summary.totalRemaining < 0 ? "text-negative" : "text-text")}
-                    />
-                  ) : (
-                    <span className="text-muted">—</span>
-                  )
-                }
-              />
-            </div>
-          </Card>
+          <BudgetSummaryCard
+            summary={summary}
+            overAllocated={financials.unallocatedPool.overAllocated}
+            source={financials.jarBudget.meta.sourceCoverage.sources[0] ?? "mock"}
+          />
 
           <SectionHeader
             title="Hũ có hạn mức"
@@ -133,7 +107,7 @@ export function BudgetTab() {
           {setLines.length > 0 ? (
             <div className="flex flex-col gap-3">
               {setLines.map((line) => (
-                <HuBudgetCard key={line.huId} line={line} onEdit={openEditor} rebalances={rebalances} labelOf={labelOf} />
+                <HuBudgetCard key={line.huId} line={line} {...cardProps} />
               ))}
             </div>
           ) : (
@@ -145,22 +119,17 @@ export function BudgetTab() {
               <SectionHeader title="Chưa đặt hạn mức" />
               <div className="flex flex-col gap-3">
                 {unsetLines.map((line) => (
-                  <HuBudgetCard key={line.huId} line={line} onEdit={openEditor} rebalances={rebalances} labelOf={labelOf} />
+                  <HuBudgetCard key={line.huId} line={line} {...cardProps} />
                 ))}
               </div>
             </>
           )}
         </>
       )}
-    </div>
-  );
-}
 
-function GaugeStat({ label, node }: { label: string; node: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] text-muted">{label}</span>
-      <span className="text-sm">{node}</span>
+      {coverOpen && financials.jarEnvelope && (
+        <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setCoverOpen(false)} />
+      )}
     </div>
   );
 }

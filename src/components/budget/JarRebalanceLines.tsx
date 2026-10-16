@@ -3,8 +3,7 @@ import { formatVnd } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { REBALANCE_CATEGORY_LABEL } from "@/domain/models";
 import type { Transaction } from "@/domain/models";
-
-const POOL_LABEL = "Chưa phân bổ";
+import { POOL_DONOR_ID, POOL_DONOR_LABEL } from "@/domain/engine/jar-funding";
 
 /**
  * Read-only rebalance pseudo-lines for ONE jar (plan 260918-1120, Phase 02). Each
@@ -74,8 +73,12 @@ export function JarRebalanceLines({
   );
 }
 
-/** Label resolver shared by the jar cards: real jar label or the pool sentinel. */
+/**
+ * Label resolver shared by the jar cards: real jar label, the pool sentinel
+ * ("Chưa phân bổ" — a pool cover leg reads "Nhận từ Chưa phân bổ"), or — for a
+ * jar no longer in config — "hũ đã xoá" (never a raw id).
+ */
 export function makeJarLabelResolver(lines: { huId: string; label: string }[]) {
   return (jarId: string) =>
-    jarId === "pool" ? POOL_LABEL : (lines.find((l) => l.huId === jarId)?.label ?? "hũ khác");
+    jarId === POOL_DONOR_ID ? POOL_DONOR_LABEL : (lines.find((l) => l.huId === jarId)?.label ?? "hũ đã xoá");
 }

@@ -21,7 +21,7 @@ import type {
 import {
   aggregateCashflow,
   calculateNetWorth,
-  casaBalance,
+  casaBalanceOrUnknown,
   cashRunwayMonths,
   computeUnallocatedPool,
   dateToMonthKey,
@@ -51,7 +51,7 @@ import {
   type NetWorthTrendMeta,
   type Obligation,
   type RecurringSeries,
-  type UnallocatedPool,
+  type UnallocatedPoolResult,
   type UnlabeledSpend,
 } from "./index";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
@@ -112,9 +112,10 @@ export interface Financials {
    * (never stored), so every screen showing jar totals / CASA reads one truth —
    * including `overAllocated` ("Vượt phân bổ"), which must surface on every such
    * surface, not just the transfer sheet (Red Team #13). Negative `amount` is
-   * kept as-is (invariant #6); the UI presents available as 0.
+   * kept as-is (invariant #6); the UI presents available as 0. `amount` is
+   * "unknown" when the persona has no `current` account (D27).
    */
-  unallocatedPool: UnallocatedPool;
+  unallocatedPool: UnallocatedPoolResult;
   /**
    * The period's inter-jar rebalance txns (`categoryId: REBALANCE_CATEGORY`, posted,
    * in-period) — the same tagged txns already folded into every jar's `remaining`.
@@ -237,9 +238,11 @@ export function computeFinancials(
   // spendable = Σ max(0, remaining), the same jarBudget.lines the overview +
   // picker read). Derived here once so every screen reads the same
   // `overAllocated` (RT#13).
+  // No `current` account → "unknown" (D27), never a fabricated 0 → negative pool.
+  // Same formula as `jarEnvelope.pending` (one definition, D26).
   const spendableTotal = jarBudget.lines.reduce((sum, l) => sum + (jarSpendable(l.remaining) ?? 0), 0);
   const unallocatedPool = computeUnallocatedPool({
-    casaBalance: casaBalance(raw.accounts),
+    casaBalance: casaBalanceOrUnknown(raw.accounts),
     spendableTotal,
   });
 

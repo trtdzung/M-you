@@ -224,8 +224,14 @@ describe("evaluateJarBudget — rebalance fold (Phase 03): remaining += Σnhận
     );
     const j = byId(r);
     expect(j.food.spent).toBe(4_500_000); // the REAL spend — untouched by the rebalance
-    expect(j.food.status).toBe("over"); // usage gauge still reads spend-vs-limit truth
     expect(j.food.remaining).toBe(500_000); // (4M − 4.5M) + 1M nhận = 0.5M — no longer negative
+    // D24/L13: the verdict is post-rebalance — effective limit 5M, 4.5M/5M = 90% → near,
+    // NOT "over" (same verdict as the envelope's overLimit=false).
+    expect(j.food.rebalanceNet).toBe(1_000_000);
+    expect(j.food.effectiveLimit).toBe(5_000_000);
+    expect(j.food.limit).toBe(4_000_000); // raw limit kept
+    expect(j.food.status).toBe("near");
+    expect(j.food.pct).toBeCloseTo(0.9, 10);
   });
 
   it("a jar that DONATED shows a lowered remaining, spend on its own category untouched", () => {

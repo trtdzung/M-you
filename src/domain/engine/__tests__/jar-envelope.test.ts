@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Account, JarConfig } from "@/domain/models";
 import { monthPeriod } from "../types";
 import { evaluateJarEnvelope, jarEnvelopeLines, casaPool } from "../jar-envelope";
+import { computeUnallocatedPool } from "../unallocated-pool";
 
 const PERIOD = monthPeriod(2026, 8); // 09/2026
 const IN = "2026-09-10T00:00:00.000Z";
@@ -74,13 +75,56 @@ describe("evaluateJarEnvelope — CASA pool (chờ phân bổ)", () => {
     expect(res.pending.allocated).toBe(2_000_000);
   });
 
-  it("pending floors at 0 when Σ budgetLimit exceeds the pool (never negative)", () => {
+  it("jars claiming more than CASA → pending keeps the TRUE negative + overAllocated (one definition, no clamp)", () => {
+    // Previously floored at 0 (a second, budget-lens definition). Now it is the
+    // unallocated pool CASA − Σ spendable (D26) — the UI hides a ≤ 0 card.
     const cfg = config([
       { id: "food", label: "Ăn uống", budgetLimit: 4_000_000 },
       { id: "bills", label: "Hóa đơn", budgetLimit: 4_000_000 },
     ]);
     const res = evaluateJarEnvelope(cfg, CURRENT, NO_SPEND, PERIOD);
-    expect(res.pending.amount).toBe(0);
+    expect(res.pending.amount).toBe(-3_000_000);
+    expect(res.pending.overAllocated).toBe(true);
+  });
+});
+
+describe("evaluateJarEnvelope — pending is the ONE unallocated number (D26/S12/D27)", () => {
+  it("D26: spend frees nothing into pending — CASA 10tr, limit 5tr, spent 1tr → CASA − spendable(4tr) = 6tr", () => {
+    const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 5_000_000 }]);
+    const res = evaluateJarEnvelope(cfg, [account("cur", 10_000_000)], new Map([["food", 1_000_000]]), PERIOD);
+    expect(res.pending.amount).toBe(6_000_000);
+    expect(res.pending.amount).toBe(computeUnallocatedPool({ casaBalance: 10_000_000, spendableTotal: 4_000_000 }).amount);
+    expect(res.pending.allocated).toBe(5_000_000); // Σ hạn mức kept for the allocation sheet
+  });
+
+  it("S12: CASA 8tr, limit 3tr, spent 500k → 5.5tr (same as the picker pool)", () => {
+    const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 3_000_000 }]);
+    const res = evaluateJarEnvelope(cfg, [account("cur", 8_000_000)], new Map([["food", 500_000]]), PERIOD);
+    expect(res.pending.amount).toBe(5_500_000);
+  });
+
+  it("an overspent jar claims 0 (spendable floors at 0), unset jars claim nothing", () => {
+    const cfg = config([
+      { id: "food", label: "Ăn uống", budgetLimit: 1_000_000 },
+      { id: "bills", label: "Hóa đơn" },
+    ]);
+    const res = evaluateJarEnvelope(cfg, CURRENT, new Map([["food", 1_500_000]]), PERIOD);
+    expect(res.pending.amount).toBe(5_000_000);
+    expect(res.pending.overAllocated).toBe(false);
+  });
+
+  it("D27: no CASA account → pending 'unknown' and not overAllocated (never a fabricated negative)", () => {
+    const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 500_000 }]);
+    const res = evaluateJarEnvelope(cfg, [], NO_SPEND, PERIOD);
+    expect(res.pending.amount).toBe("unknown");
+    expect(res.pending.overAllocated).toBe(false);
+  });
+
+  it("a corrupt budgetLimit (NaN) is unset — never NaN in pending", () => {
+    const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: NaN }]);
+    const res = evaluateJarEnvelope(cfg, CURRENT, NO_SPEND, PERIOD);
+    expect(res.jars[0].budgetLimit).toBeNull();
+    expect(res.pending.amount).toBe(5_000_000);
   });
 });
 

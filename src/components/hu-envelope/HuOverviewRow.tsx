@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Financials } from "@/domain/engine/finance-compose";
 import type { Transaction } from "@/domain/models";
 import { useJarConfig } from "@/state/jars";
+import { ErrorState } from "@/components/states";
 import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
 import type { PfmTabId } from "@/components/pfm/PfmTabs";
@@ -39,11 +40,22 @@ export function HuOverviewRow({
   /** Jump to another PFM tab (a tapped jar card opens Ngân sách). */
   onNavigate?: (tab: PfmTabId) => void;
 }) {
-  const { config } = useJarConfig();
+  const { config, error: jarError } = useJarConfig();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const { pending, jars } = financials.jarEnvelope;
   const overAllocated = financials.unallocatedPool.overAllocated;
+
+  // U10: a failed jar load must not masquerade as "no jars" (nor show all of CASA
+  // as "Chờ phân bổ") — render an explicit error for the section instead.
+  if (jarError) {
+    return (
+      <section aria-label="Hũ chi tiêu" className="flex flex-col gap-2">
+        <h2 className="px-1 text-sm font-semibold text-text">Hũ chi tiêu</h2>
+        <ErrorState title="Không tải được hũ chi tiêu" description="Số dư các hũ tạm thời không hiển thị. Vui lòng thử lại sau." />
+      </section>
+    );
+  }
 
   // The "Chưa gắn nhãn" (hũ "chờ chia") card is a data-quality prompt, not a jar.
   // It ALWAYS shows whenever the engine computed `unlabeled` — even when NO jars
@@ -65,6 +77,8 @@ export function HuOverviewRow({
 
   // Pending + jar cards only make sense once jars exist (the unlabeled card can
   // stand alone — RT#11); with no jars the pending pool has no allocation target.
+  // `pending.amount` is the ONE unallocated number (CASA − Σ spendable), identical
+  // to the transfer picker's "Chưa phân bổ" (D26/S12/U14); ≤ 0 → card hidden.
   const hasJars = jars.length > 0;
   const showPending = hasJars && (pending.amount === "unknown" || pending.amount > 0);
 

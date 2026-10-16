@@ -108,3 +108,31 @@ describe("rebalanceTxns — the period's active rebalance records (display surfa
     expect(rebalanceTxns([txn({ categoryId: "dining" })], JUNE)).toEqual([]);
   });
 });
+
+describe("rebalanceNetByJar — dirty-amount guards (F08b) + pool donor (S2)", () => {
+  it.each([-500, 0, NaN, Infinity])("a leg with amount=%s is ignored (never inverts direction / leaks NaN)", (amount) => {
+    const net = rebalanceNetByJar([rebalance({ amount })], JUNE);
+    expect(net.size).toBe(0);
+  });
+
+  it("a valid leg alongside a dirty one still folds normally", () => {
+    const net = rebalanceNetByJar([rebalance({ id: "ok", amount: 200 }), rebalance({ id: "bad", amount: -500 })], JUNE);
+    expect(net.get("food")).toBe(200);
+    expect(net.get("buf")).toBe(-200);
+  });
+
+  it("a pool-donor leg (fromJarId 'pool') credits the target jar; the pool end is skipped", () => {
+    const net = rebalanceNetByJar(
+      [rebalance({ amount: 300, rebalance: { fromJarId: "pool", toJarId: "food", triggerTxnId: "t", origin: "auto" } })],
+      JUNE,
+    );
+    expect(net.get("food")).toBe(300);
+    expect(net.has("pool")).toBe(false);
+  });
+
+  it("a leg posted at 00:30 on the 1st VN time belongs to that VN month (not the previous)", () => {
+    const leg = rebalance({ postedAt: "2026-06-01T00:30:00+07:00" }); // = 31/05 17:30Z
+    expect(rebalanceNetByJar([leg], JUNE).get("food")).toBe(1_000_000);
+    expect(rebalanceNetByJar([leg], MAY).size).toBe(0);
+  });
+});

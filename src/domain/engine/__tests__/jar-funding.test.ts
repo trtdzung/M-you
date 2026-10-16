@@ -125,38 +125,38 @@ describe("evaluateFunding — jar source", () => {
     expect(a.donors.some((d) => d.jarId === "savings")).toBe(false);
   });
 
-  it("a category-less jar with a balance inflates claimed but can't donate → insufficient, not a short topup (Warning 2)", () => {
-    // CASA=12tr; src=1tr, blank=6tr (spendable but NO categories → non-donatable),
-    // disc=5tr → claimed=12, pool=0. need 10tr from src(1tr): the ONLY reachable
-    // money is src(1) + pool(0) + disc(5) = 6tr < 10tr. `blank`'s 6tr is claimed
-    // away from the pool yet can never be donated, so the transfer is a hard block —
-    // NOT a `topup` whose chain silently covers only 5tr of the 9tr shortfall.
+  it("S6/E11: a category-less jar with a balance DONATES (donor gate = spendable != null)", () => {
+    // CASA=12tr; src=1tr, blank=6tr (spendable, NO categories), disc=5tr → claimed=12,
+    // pool=0. need 10tr from src(1tr) → shortfall 9tr. A donor is charged by a
+    // rebalance leg (no category needed), so `blank` is a real donor: same `spending`
+    // tier, largest first → blank 6tr, then disc 3tr.
     const jars = [
       jar("src", 1_000_000, ["dining"]),
       jar("blank", 6_000_000, []),
       jar("disc", 5_000_000, ["entertainment"]),
     ];
     const a = evaluateFunding({ amount: 10_000_000, sourceJarId: "src", casaBalance: 12_000_000, jars });
-    expect(a.tier).toBe("insufficient");
-    expect(a.shortfall).toBe(4_000_000); // 10tr − coverable 6tr
-    expect(a.donors).toEqual([]);
+    expect(a.tier).toBe("topup");
+    expect(a.shortfall).toBe(9_000_000);
+    expect(a.donors).toEqual([
+      { jarId: "blank", label: "Hũ blank", take: 6_000_000 },
+      { jarId: "disc", label: "Hũ disc", take: 3_000_000 },
+    ]);
+    expect(a.donors.reduce((s, d) => s + d.take, 0)).toBe(a.shortfall); // chain fully covers
   });
 
-  it("same non-donatable balance present, but the amount is within reach → topup with a chain that sums to the FULL shortfall", () => {
-    // CASA=12tr; src=1tr, blank=6tr (non-donatable), disc=5tr → claimed=12, pool=0.
-    // need 6tr from src(1tr) → shortfall 5tr. coverable = 1 + 0 + 5 = 6tr ≥ 6tr → topup,
-    // and `disc` alone (5tr) covers the whole shortfall exactly (blank never tapped).
+  it("S6: a category-less `buffer` jar (Tiết kiệm) is tapped BEFORE spending jars", () => {
+    // CASA=12tr; src=1tr, savings=6tr (buffer, no categories), disc=5tr → pool=0.
+    // need 6tr from src → shortfall 5tr → buffer tier first → savings 5tr.
     const jars = [
       jar("src", 1_000_000, ["dining"]),
-      jar("blank", 6_000_000, []),
+      jar("savings", 6_000_000, [], "buffer"),
       jar("disc", 5_000_000, ["entertainment"]),
     ];
     const a = evaluateFunding({ amount: 6_000_000, sourceJarId: "src", casaBalance: 12_000_000, jars });
     expect(a.tier).toBe("topup");
     expect(a.shortfall).toBe(5_000_000);
-    expect(a.donors).toEqual([{ jarId: "disc", label: "Hũ disc", take: 5_000_000 }]);
-    expect(a.donors.reduce((s, d) => s + d.take, 0)).toBe(a.shortfall); // chain fully covers
-    expect(a.donors.some((d) => d.jarId === "blank")).toBe(false);
+    expect(a.donors).toEqual([{ jarId: "savings", label: "Hũ savings", take: 5_000_000 }]);
   });
 });
 
@@ -189,15 +189,14 @@ describe("evaluateFunding — pool source (RT#8)", () => {
     expect(a.tier).toBe("insufficient");
   });
 
-  it("insufficient from pool source when a non-donatable jar's balance blocks reach (Warning 2, symmetric)", () => {
-    // CASA=10tr; blank=7tr (spendable, NO categories → non-donatable), disc=1tr →
-    // claimed=8tr, pool=2tr. need 6tr from the pool: reachable = pool(2) + disc(1) = 3tr < 6tr.
-    // `blank`'s 7tr is claimed away yet can't be donated → hard block, not a short topup.
+  it("S6 (pool source): a category-less jar's balance lifts the pool like any donor", () => {
+    // CASA=10tr; blank=7tr (spendable, NO categories), disc=1tr → claimed=8tr, pool=2tr.
+    // need 6tr from the pool → shortfall 4tr → blank (largest spending) covers 4tr.
     const jars = [jar("blank", 7_000_000, []), jar("disc", 1_000_000, ["entertainment"])];
     const a = evaluateFunding({ amount: 6_000_000, sourceJarId: null, casaBalance: 10_000_000, jars });
-    expect(a.tier).toBe("insufficient");
-    expect(a.shortfall).toBe(3_000_000); // 6tr − coverable 3tr
-    expect(a.donors).toEqual([]);
+    expect(a.tier).toBe("topup");
+    expect(a.shortfall).toBe(4_000_000);
+    expect(a.donors).toEqual([{ jarId: "blank", label: "Hũ blank", take: 4_000_000 }]);
   });
 });
 
@@ -306,5 +305,40 @@ describe("evaluateFunding — C2 dual ceiling (goal-excl classifies tier; goal-i
     expect(a.donors).toEqual([]);
     expect(a.goalDonors).toEqual([]);
     expect(a.shortfall).toBe(4_000_000); // 10tr − ceilingInclGoal(6tr)
+  });
+});
+
+describe("evaluateFunding — non-finite / non-positive amount guards (E01)", () => {
+  const jars = [jar("src", 100_000, ["dining"]), jar("other", 500_000, ["shopping"])];
+
+  it.each([NaN, Infinity, -Infinity])("amount=%s → graceful insufficient, shortfall 0, no donors (no NaN/Infinity leak)", (amount) => {
+    const a = evaluateFunding({ amount, sourceJarId: "src", casaBalance: 1_000_000, jars });
+    expect(a.tier).toBe("insufficient");
+    expect(a.shortfall).toBe(0);
+    expect(a.donors).toEqual([]);
+    expect(a.goalDonors).toEqual([]);
+    expect(a.requiresManualGoal).toBe(false);
+    expect(a.targetJarId).toBe("src");
+  });
+
+  it("NaN amount from the pool source is also graceful", () => {
+    const a = evaluateFunding({ amount: NaN, sourceJarId: null, casaBalance: 1_000_000, jars });
+    expect(a.tier).toBe("insufficient");
+    expect(a.shortfall).toBe(0);
+    expect(a.targetJarId).toBeNull();
+  });
+
+  it.each([0, -100])("amount=%s (≤ 0) → ok, nothing to fund", (amount) => {
+    const a = evaluateFunding({ amount, sourceJarId: "src", casaBalance: 0, jars });
+    expect(a.tier).toBe("ok");
+    expect(a.shortfall).toBe(0);
+    expect(a.donors).toEqual([]);
+  });
+
+  it("a non-finite donor spendable is treated as 0 (never a NaN take)", () => {
+    const dirty = [jar("src", 0, ["dining"]), jar("bad", NaN, ["shopping"]), jar("ok", 300_000, ["health"])];
+    const a = evaluateFunding({ amount: 200_000, sourceJarId: "src", casaBalance: 300_000, jars: dirty });
+    expect(a.tier).toBe("topup");
+    expect(a.donors).toEqual([{ jarId: "ok", label: "Hũ ok", take: 200_000 }]);
   });
 });

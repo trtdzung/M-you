@@ -12,7 +12,7 @@
 
 import type { Transaction } from "@/domain/models";
 import { FIXED_CATEGORY_IDS, isRebalanceCategory } from "@/domain/models";
-import { coverageOf, type AggregateMeta, type Period } from "./types";
+import { coverageOf, isoInPeriod, type AggregateMeta, type Period } from "./types";
 
 export interface CategoryAmount {
   categoryId: string;
@@ -37,9 +37,13 @@ export interface CashflowResult {
 
 const EXPENSE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee"]);
 
-/** True when `txn.postedAt` falls within `period` (inclusive bounds). */
+/**
+ * True when `txn.postedAt` falls within `period` (inclusive bounds). Compares real
+ * instants (never ISO strings lexically), so a `+07:00`-suffixed timestamp lands in
+ * its true VN month; an unparseable `postedAt` is in no period.
+ */
 export function inPeriod(txn: Transaction, period: Period): boolean {
-  return txn.postedAt >= period.from && txn.postedAt <= period.to;
+  return isoInPeriod(txn.postedAt, period);
 }
 
 /** Net expense per category for posted transactions (gross − refunds). */

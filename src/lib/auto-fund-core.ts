@@ -60,7 +60,9 @@ export function snapshotForDate(
   postedAt: string,
   opts: { excludeIds?: ReadonlySet<string>; overrides?: Map<string, Partial<Transaction>> } = {},
 ): JarSnapshot {
-  const month = dateToMonthKey(new Date(postedAt));
+  // J06: an unparseable `postedAt` falls back to the injected clock's month (VN
+  // time) instead of throwing — never a crash in the funding path.
+  const month = dateToMonthKey(new Date(postedAt), deps.now);
   const period = monthPeriodFromKey(month);
   const prev = monthPeriodFromKey(addMonthsToKey(month, -1));
   const txns = deps.transactions
@@ -95,10 +97,12 @@ export function overspendOf(lines: JarBudgetLine[], jarId: string): number {
 
 /**
  * Turn a non-goal (or explicitly-confirmed goal) donor chain into `dieu-chinh-hu`
- * rebalance txn inputs — one per JAR donor. The pool donor produces NO record (the
- * derived pool self-shrinks via the account debit / the jar's reduced spendable —
- * the C1 identity `pool + Σ spendable = CASA` stays tautological). `toJarId` is the
- * target jar, or the `"pool"` sentinel for a pool-source lift.
+ * rebalance txn inputs — one per donor, INCLUDING the pool donor (S2/G01): a pool
+ * cover writes a `fromJarId: "pool"` → target leg so the target jar is credited
+ * (`rebalanceNetByJar` skips the pool end, so the pool itself is never debited
+ * twice — the C1 identity `pool + Σ spendable = CASA` stays tautological). Only a
+ * pool → pool leg (pool donor for a pool-source lift) is dropped as meaningless.
+ * `toJarId` is the target jar, or the `"pool"` sentinel for a pool-source lift.
  */
 export function rebalanceInputsFor(
   donors: DonorProposal[],
@@ -107,8 +111,10 @@ export function rebalanceInputsFor(
   postedAt: string,
   origin: "auto" | "manual",
 ): ManualTxnInput[] {
+  const toJarId = targetJarId ?? POOL_DONOR_ID;
   return donors
-    .filter((d) => d.jarId !== POOL_DONOR_ID && d.take > 0)
+    .filter((d) => Number.isFinite(d.take) && d.take > 0)
+    .filter((d) => !(d.jarId === POOL_DONOR_ID && toJarId === POOL_DONOR_ID))
     .map((d) => ({
       amount: d.take,
       direction: "debit" as const,
@@ -118,7 +124,7 @@ export function rebalanceInputsFor(
       postedAt,
       rebalance: {
         fromJarId: d.jarId,
-        toJarId: targetJarId ?? POOL_DONOR_ID,
+        toJarId,
         triggerTxnId,
         origin,
       },

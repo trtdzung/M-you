@@ -196,3 +196,40 @@ describe("jarOverspendCovered — C5 RESIDUAL shape (over-budget jar with NO cov
     expect(insights).toBeNull();
   });
 });
+
+describe("jarOverspendCovered — pool cover leg (S2/G01/M05)", () => {
+  it("a pool-covered jar reads as COVERED from 'Chưa phân bổ', never 'cần bù thủ công'", () => {
+    const insights = jarOverspendCovered(
+      makeFinancials({
+        monthKey: "2026-06",
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 150_000, limit: 100_000, limitState: "set", remaining: 0 }),
+          ],
+        }),
+        jarRebalances: [rebalanceTxn({ fromJarId: "pool", toJarId: "food", amount: 50_000, origin: "auto" })],
+      }),
+    );
+    expect(insights).not.toBeNull();
+    expect(insights!.some((i) => i.type === "jar_needs_manual_cover")).toBe(false);
+    const covered = insights!.find((i) => i.type === "jar_overspend_covered")!;
+    expect(covered.explanation).toContain('"Chưa phân bổ"');
+    expect(covered.explanation).not.toContain('"pool"');
+    expect(covered.sourceFacts.some((f) => f.label === 'Bù từ "Chưa phân bổ" (tự động)')).toBe(true);
+    assertGrounded(covered);
+  });
+
+  it("a donor jar no longer in config reads as 'hũ đã xoá', never a raw id", () => {
+    const insights = jarOverspendCovered(
+      makeFinancials({
+        jarBudget: makeJarBudgetResult({
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 150_000, limit: 100_000, limitState: "set", remaining: 0 })],
+        }),
+        jarRebalances: [rebalanceTxn({ fromJarId: "gone-123", toJarId: "food", amount: 50_000 })],
+      }),
+    );
+    const covered = insights!.find((i) => i.type === "jar_overspend_covered")!;
+    expect(covered.explanation).toContain('"hũ đã xoá"');
+    expect(covered.explanation).not.toContain("gone-123");
+  });
+});

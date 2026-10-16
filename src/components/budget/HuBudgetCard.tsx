@@ -1,8 +1,9 @@
-import { AlertTriangle, HandCoins, MoreVertical, Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, MoreVertical, Plus } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { DeltaBadge } from "@/components/common/DeltaBadge";
 import { PressureRow, type PressureVariant } from "./PressureRow";
 import { JarRebalanceLines } from "./JarRebalanceLines";
+import { ManualCoverNotice } from "./ManualCoverNotice";
 import { jarNeedsManualTopUp } from "@/domain/engine";
 import { formatVnd } from "@/lib/format";
 import type { JarBudgetLine } from "@/domain/engine/jar-budget";
@@ -20,15 +21,22 @@ const STATUS_COPY: Record<"near" | "over", string> = {
  * `jar-budget.ts` — the card never computes (invariant #2). A jar with an UNSET
  * limit renders a muted "Chưa đặt hạn mức" row + a CTA, never a 0%/ok bar
  * (invariant #6). The kebab / CTA open the jar editor (phase 06).
+ *
+ * The verdict is post-rebalance (D24/L13/U18): the bar reads đã tiêu vs the
+ * EFFECTIVE limit (hạn mức + bù/chuyển), and a jar whose overspend was covered
+ * shows "Đã bù", never "Vượt hạn mức … Đã vượt".
  */
 export function HuBudgetCard({
   line,
   onEdit,
+  onCover,
   rebalances = [],
   labelOf,
 }: {
   line: JarBudgetLine;
   onEdit: (huId: string) => void;
+  /** Opens the limit-reallocation surface for a "cần bù thủ công" jar (U15). */
+  onCover?: (huId: string) => void;
   /**
    * The period's inter-jar rebalance txns (`financials.jarRebalances`). Rendered as
    * read-only "cho/nhận" pseudo-lines (Phase 02) — they never touch `line.spent`.
@@ -39,12 +47,20 @@ export function HuBudgetCard({
 }) {
   const unset = line.limitState === "unset";
   const variant: PressureVariant = unset ? "unknown" : (line.status ?? "ok");
-  const warn = line.status === "near" || line.status === "over";
   // RT-fix (C5): a jar over-budget with no covering rebalance is the DERIVED
-  // "cần bù thủ công" state — an auto-fund that couldn't complete (uncoverable, or a
-  // declined goal raid). Surfaced here durably (re-appears until the user funds it or
-  // accepts the over-allocation), never a silent loss. Same condition Phase 07 reads.
+  // "cần bù thủ công" state — surfaced durably until funded or accepted.
   const needsManualTopUp = jarNeedsManualTopUp(line.remaining);
+  // Spent past its own limit but a rebalance brought it back to ≥ 0 → covered.
+  const overspend = line.limit !== null ? line.spent - line.limit : 0;
+  const covered = !unset && overspend > 0 && !needsManualTopUp;
+  const warn = !covered && (line.status === "near" || line.status === "over");
+  const statusLabel = covered ? "Đã bù vượt hạn mức" : warn ? STATUS_COPY[line.status as "near" | "over"] : undefined;
+  const net = line.rebalanceNet ?? 0;
+  const shownLimit = unset ? null : (line.effectiveLimit ?? line.limit);
+  const limitNote =
+    !unset && net !== 0 && line.limit !== null
+      ? `Hạn mức ${formatVnd(line.limit)} ${net > 0 ? "+ bù" : "− chuyển"} ${formatVnd(Math.abs(net))}`
+      : null;
   // Jar hue = its lead category's hue, so a jar reads the same colour on the card
   // and in the overview donut (grouped by jar). Empty jars fall back to neutral.
   const color = line.categoryIds[0] ? categoryColor(line.categoryIds[0]) : CATEGORY_COLOR_FALLBACK;
@@ -52,14 +68,15 @@ export function HuBudgetCard({
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <PressureRow
             label={line.label}
             used={line.spent}
-            limit={unset ? null : line.limit}
+            limit={shownLimit}
             pct={line.pct}
             variant={variant}
-            statusLabel={warn ? STATUS_COPY[line.status as "near" | "over"] : undefined}
+            statusLabel={statusLabel}
+            rightLabel={limitNote}
             limitLabel={unset ? "Chưa đặt hạn mức" : undefined}
             accent={<span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />}
           />
@@ -86,6 +103,12 @@ export function HuBudgetCard({
         ) : (
           <DeltaBadge current={line.spent} previous={line.prevSpent} goodWhenDown />
         )}
+        {covered && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-positive">
+            <CheckCircle2 size={13} aria-hidden />
+            Đã bù {formatVnd(overspend)}
+          </span>
+        )}
         {warn && (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
             <AlertTriangle size={13} aria-hidden />
@@ -95,15 +118,10 @@ export function HuBudgetCard({
       </div>
 
       {needsManualTopUp && (
-        <div className="flex items-start gap-2 rounded-row border border-warning/40 bg-warning-soft/50 px-3 py-2" role="status">
-          <HandCoins size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-warning">Cần bù thủ công</p>
-            <p className="text-[11px] text-warning">
-              Hũ đang vượt hạn mức {formatVnd(Math.abs(line.remaining ?? 0))} chưa được bù. Rót thêm từ hũ khác hoặc chấp nhận vượt.
-            </p>
-          </div>
-        </div>
+        <ManualCoverNotice
+          shortfall={Math.abs(line.remaining ?? 0)}
+          onCover={onCover ? () => onCover(line.huId) : undefined}
+        />
       )}
 
       {labelOf && (

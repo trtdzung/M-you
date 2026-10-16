@@ -44,6 +44,7 @@ const EMPTY_JAR_BUDGET: JarBudgetResult = {
     totalLimit: null,
     totalSpent: 0,
     totalSpentSet: 0,
+    totalRebalanceNet: 0,
     totalRemaining: null,
     pctUsed: null,
     daysLeft: 0,
@@ -55,7 +56,7 @@ const EMPTY_JAR_BUDGET: JarBudgetResult = {
 
 /** An empty envelope result — no CASA account, no funded jars. */
 const EMPTY_JAR_ENVELOPE: JarEnvelopeResult = {
-  pending: { amount: "unknown", pool: "unknown", allocated: 0, meta: META },
+  pending: { amount: "unknown", overAllocated: false, pool: "unknown", allocated: 0, meta: META },
   jars: [],
   meta: META,
 };
@@ -81,6 +82,8 @@ export function makeJarBudgetLine(over: Partial<JarBudgetLine> = {}): JarBudgetL
     momPct: over.momPct ?? null,
     limit: over.limit ?? null,
     limitState: over.limitState ?? "unset",
+    rebalanceNet: over.rebalanceNet ?? 0,
+    effectiveLimit: over.effectiveLimit ?? (over.limit != null ? over.limit + (over.rebalanceNet ?? 0) : null),
     remaining: over.remaining ?? null,
     pct: over.pct ?? null,
     status: over.status ?? null,

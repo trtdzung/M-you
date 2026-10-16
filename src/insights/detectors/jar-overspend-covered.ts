@@ -1,4 +1,5 @@
 import type { Insight } from "@/domain/models";
+import { POOL_DONOR_ID, POOL_DONOR_LABEL } from "@/domain/engine/jar-funding";
 import type { MultiDetector } from "../types";
 import { buildInsight, fact, money } from "../narrate";
 
@@ -30,7 +31,10 @@ const DONOR_ORIGIN_LABEL: Record<"auto" | "manual", string> = {
 export const jarOverspendCovered: MultiDetector = (f) => {
   const insights: Insight[] = [];
   const lineByJar = new Map(f.jarBudget.lines.map((l) => [l.huId, l]));
-  const labelOf = (id: string) => lineByJar.get(id)?.label ?? id;
+  // A pool donor (`fromJarId: "pool"`, S2) reads as "Chưa phân bổ"; a jar no longer
+  // in config reads as a deleted jar — never a raw id.
+  const labelOf = (id: string) =>
+    id === POOL_DONOR_ID ? POOL_DONOR_LABEL : (lineByJar.get(id)?.label ?? "hũ đã xoá");
 
   // Group covering rebalances by the jar that received them (`toJarId`). A `"pool"`
   // target is a jar→pool lift, not a covered overspend — skip it.

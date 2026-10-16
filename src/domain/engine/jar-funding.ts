@@ -84,18 +84,19 @@ function isGoal(jar: JarSpendable): boolean {
 
 /** A jar's derived spendable balance (0 when its limit is unset — `spendable == null`). */
 function jarAvailable(jar: JarSpendable): number {
-  return jar.spendable ?? 0;
+  const s = jar.spendable;
+  return s != null && Number.isFinite(s) && s > 0 ? s : 0;
 }
 
 /**
- * A jar can only DONATE to a top-up when it has a real spendable balance
- * (`spendable != null`) AND at least one category — Phase 03 charges a donor by
- * writing a self-reported expense into its `categoryIds[0]`, so a category-less
- * jar (which can't be honestly charged) is excluded, and a jar with no limit
- * (non-fundable) is excluded too.
+ * A jar can DONATE to a top-up when it has a real spendable balance
+ * (`spendable != null`). A donor is charged by a `dieu-chinh-hu` rebalance leg
+ * (`fromJarId` → target), which needs no category — so a category-less jar with
+ * money (e.g. a "Tiết kiệm" buffer) donates like any other (S6/E11). A jar with
+ * no limit (non-fundable, `spendable == null`) is still excluded.
  */
-function canDonate(jar: JarSpendable): boolean {
-  return jar.spendable != null && jar.categoryIds.length > 0;
+export function canDonate(jar: JarSpendable): boolean {
+  return jar.spendable != null;
 }
 
 /** Donatable, NON-goal candidates ordered by role then largest spendable first. */
@@ -213,6 +214,23 @@ export function evaluateFunding(input: {
   jars: JarSpendable[];
 }): FundingAssessment {
   const { amount, sourceJarId, casaBalance, jars } = input;
+
+  // E01c/E01d: a non-finite amount can't be funded — graceful `insufficient` with
+  // no NaN/Infinity leaking into `shortfall` or the donor chain. `amount ≤ 0` → ok.
+  if (!Number.isFinite(amount)) {
+    return {
+      tier: "insufficient",
+      shortfall: 0,
+      donors: [],
+      goalDonors: [],
+      requiresManualGoal: false,
+      targetJarId: sourceJarId,
+      source: "mock",
+    };
+  }
+  if (amount <= 0) {
+    return { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: sourceJarId, source: "mock" };
+  }
 
   const claimed = jars.reduce((sum, j) => sum + jarAvailable(j), 0);
   const poolAvailable = Math.max(0, casaBalance - claimed);

@@ -92,6 +92,56 @@ describe("snapshotForDate — H4: the snapshot is pinned to postedAt's month, ne
   });
 });
 
+describe("snapshotForDate — J06 invalid postedAt + VN month boundary", () => {
+  const deps: AutoFundDeps = {
+    transactions: [txn({ id: "sep", amount: 1_000_000, postedAt: "2026-09-05T10:00:00.000Z" })],
+    accounts: [account("cur", 10_000_000)],
+    jarConfig: JAR_CONFIG,
+    now: new Date("2026-09-15T00:00:00.000Z"),
+  };
+
+  it("an unparseable postedAt falls back to deps.now's month — never throws", () => {
+    expect(() => snapshotForDate(deps, "abc")).not.toThrow();
+    const snap = snapshotForDate(deps, "abc");
+    expect(snap.month).toBe("2026-09");
+    expect(snap.lines.find((l) => l.huId === "food")!.spent).toBe(1_000_000);
+  });
+
+  it("a trigger at 00:30 01/10 VN (= 30/09 17:30Z) is snapshotted in OCTOBER", () => {
+    expect(snapshotForDate(deps, "2026-09-30T17:30:00.000Z").month).toBe("2026-10");
+    expect(snapshotForDate(deps, "2026-10-01T00:30:00+07:00").month).toBe("2026-10");
+  });
+});
+
+describe("C1 identity with a pool cover leg (S2)", () => {
+  it("pool + Σ spendable = CASA still holds and the covered jar is back to 0", () => {
+    // CASA already debited to 6tr; food limit 4M, spent 4.3M → 300k over, pool covered it.
+    const trigger = txn({ id: "trig", amount: 4_300_000, postedAt: "2026-09-05T10:00:00.000Z" });
+    const [leg] = rebalanceInputsFor(
+      [{ jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 300_000 }],
+      "food",
+      "trig",
+      "2026-09-05T10:00:00.000Z",
+      "auto",
+    );
+    const legTxn = txn({ id: "leg", ...leg, source: "self_reported" });
+    const deps: AutoFundDeps = {
+      transactions: [trigger, legTxn],
+      accounts: [account("cur", 6_000_000)],
+      jarConfig: JAR_CONFIG,
+      now: new Date("2026-09-15T00:00:00.000Z"),
+    };
+    const snap = snapshotForDate(deps, "2026-09-05T10:00:00.000Z");
+    const food = snap.lines.find((l) => l.huId === "food")!;
+    expect(food.remaining).toBe(0);
+    expect(overspendOf(snap.lines, "food")).toBe(0);
+    const spendable = snap.spendables.reduce((s, j) => s + (j.spendable ?? 0), 0);
+    const pool = snap.casaBalance - spendable;
+    expect(pool + spendable).toBe(snap.casaBalance);
+    expect(pool).toBe(6_000_000); // the leg never debits the derived pool a second time
+  });
+});
+
 describe("snapshotForDate — overrides/excludeIds splice a not-yet-rerendered mutation synchronously", () => {
   const trigger = txn({ id: "trig", amount: 3_000_000, postedAt: "2026-09-05T10:00:00.000Z" });
   const oldRebalance = txn({
@@ -135,9 +185,9 @@ describe("snapshotForDate — overrides/excludeIds splice a not-yet-rerendered m
 
 describe("overspendOf", () => {
   const lines = [
-    { huId: "over", label: "Over", categoryIds: [], spent: 5_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, remaining: -1_000_000, pct: 1.25, status: "over" as const, thresholdHit: true, source: "mock" as const, freshness: null },
-    { huId: "ok", label: "Ok", categoryIds: [], spent: 1_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, remaining: 3_000_000, pct: 0.25, status: "ok" as const, thresholdHit: false, source: "mock" as const, freshness: null },
-    { huId: "unset", label: "Unset", categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null, limit: null, limitState: "unset" as const, remaining: null, pct: null, status: null, thresholdHit: false, source: "mock" as const, freshness: null },
+    { huId: "over", label: "Over", categoryIds: [], spent: 5_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, effectiveLimit: 4_000_000, remaining: -1_000_000, pct: 1.25, status: "over" as const, thresholdHit: true, source: "mock" as const, freshness: null },
+    { huId: "ok", label: "Ok", categoryIds: [], spent: 1_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, effectiveLimit: 4_000_000, remaining: 3_000_000, pct: 0.25, status: "ok" as const, thresholdHit: false, source: "mock" as const, freshness: null },
+    { huId: "unset", label: "Unset", categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null, limit: null, limitState: "unset" as const, rebalanceNet: 0, effectiveLimit: null, remaining: null, pct: null, status: null, thresholdHit: false, source: "mock" as const, freshness: null },
   ];
 
   it("returns the positive magnitude of a negative remaining", () => {
@@ -158,8 +208,27 @@ describe("overspendOf", () => {
 });
 
 describe("rebalanceInputsFor — donor chain → dieu-chinh-hu ManualTxnInput[]", () => {
-  it("the POOL donor produces NO record (it self-shrinks via the debit / lowered spendable)", () => {
+  it("S2/G01: the POOL donor WRITES a pool → target leg so the covered jar is credited", () => {
     const donors: DonorProposal[] = [{ jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 300_000 }];
+    const inputs = rebalanceInputsFor(donors, "food", "trig-1", "2026-09-10T00:00:00.000Z", "auto");
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toMatchObject({
+      amount: 300_000,
+      categoryId: REBALANCE_CATEGORY,
+      rebalance: { fromJarId: POOL_DONOR_ID, toJarId: "food", triggerTxnId: "trig-1", origin: "auto" },
+    });
+  });
+
+  it("only a pool → pool leg (pool donor on a pool-source lift) is dropped", () => {
+    const donors: DonorProposal[] = [{ jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 300_000 }];
+    expect(rebalanceInputsFor(donors, null, "trig-1", "2026-09-10T00:00:00.000Z", "auto")).toEqual([]);
+  });
+
+  it("a non-finite take is filtered out (never writes a NaN/Infinity leg)", () => {
+    const donors: DonorProposal[] = [
+      { jarId: "buf", label: "Hũ buf", take: NaN },
+      { jarId: "ess", label: "Hũ ess", take: Infinity },
+    ];
     expect(rebalanceInputsFor(donors, "food", "trig-1", "2026-09-10T00:00:00.000Z", "auto")).toEqual([]);
   });
 
@@ -194,14 +263,14 @@ describe("rebalanceInputsFor — donor chain → dieu-chinh-hu ManualTxnInput[]"
     expect(inputs[0].rebalance?.origin).toBe("manual");
   });
 
-  it("multiple jar donors each produce their own record, pool donors interleaved are dropped", () => {
+  it("multiple donors (pool + jars) each produce their own record, in chain order", () => {
     const donors: DonorProposal[] = [
       { jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 100_000 },
       { jarId: "buf", label: "Hũ buf", take: 200_000 },
       { jarId: "ess", label: "Hũ ess", take: 300_000 },
     ];
     const inputs = rebalanceInputsFor(donors, "food", "trig-1", "2026-09-10T00:00:00.000Z", "auto");
-    expect(inputs.map((i) => i.rebalance?.fromJarId)).toEqual(["buf", "ess"]);
+    expect(inputs.map((i) => i.rebalance?.fromJarId)).toEqual([POOL_DONOR_ID, "buf", "ess"]);
   });
 });
 
