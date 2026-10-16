@@ -6,6 +6,8 @@
  * banks with a real logo asset under `public/logos/`.
  */
 
+export const ACCOUNT_NUMBER_PATTERN = /^\d{8,19}$/;
+
 export interface TransferBank {
   id: string;
   name: string;

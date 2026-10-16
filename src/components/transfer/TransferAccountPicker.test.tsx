@@ -6,16 +6,18 @@ import type { Transaction } from "@/domain/models";
 function renderPicker(overrides: Partial<Parameters<typeof TransferAccountPicker>[0]> = {}) {
   const onSelectRecipient = vi.fn();
   const onEnterBankDetails = vi.fn();
+  const onAddRecipient = vi.fn();
   const view = render(
     <TransferAccountPicker
       beneficiaries={[]}
       transactions={[]}
       onSelectRecipient={onSelectRecipient}
       onEnterBankDetails={onEnterBankDetails}
+      onAddRecipient={onAddRecipient}
       {...overrides}
     />,
   );
-  return { onSelectRecipient, onEnterBankDetails, container: view.container };
+  return { onSelectRecipient, onEnterBankDetails, onAddRecipient, container: view.container };
 }
 
 const recentTransferTxn: Transaction = {

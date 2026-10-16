@@ -17,11 +17,14 @@ export function TransferAccountPicker({
   transactions,
   onSelectRecipient,
   onEnterBankDetails,
+  onAddRecipient,
 }: {
   beneficiaries: Beneficiary[];
   transactions: Transaction[];
   onSelectRecipient: (recipient: SelectedRecipient) => void;
   onEnterBankDetails: () => void;
+  /** The "+" icon beside the recipient search field — opens the dedicated "Lưu người nhận" screen, distinct from the "Tài khoản/Số thẻ" tile above. */
+  onAddRecipient: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6">
@@ -45,7 +48,12 @@ export function TransferAccountPicker({
       </Card>
 
       <Card className="flex flex-1 flex-col">
-        <RecipientPicker beneficiaries={beneficiaries} transactions={transactions} onChange={(r) => r && onSelectRecipient(r)} />
+        <RecipientPicker
+          beneficiaries={beneficiaries}
+          transactions={transactions}
+          onChange={(r) => r && onSelectRecipient(r)}
+          onAddRecipient={onAddRecipient}
+        />
       </Card>
     </div>
   );

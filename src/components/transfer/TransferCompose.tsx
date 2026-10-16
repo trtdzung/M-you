@@ -13,9 +13,10 @@ import { TransferHeader } from "./TransferHeader";
 import { type SelectedRecipient } from "./RecipientPicker";
 import { TransferAccountPicker } from "./TransferAccountPicker";
 import { TransferBankEntry } from "./TransferBankEntry";
+import { TransferSaveRecipient } from "./TransferSaveRecipient";
 import { TransferAmountStep } from "./TransferAmountStep";
 
-type Step = "pick" | "bank-entry" | "amount";
+type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
 
 export function TransferCompose() {
   const providers = useProviders();
@@ -104,10 +105,13 @@ export function TransferCompose() {
         transactions={transactions}
         onSelectRecipient={selectRecipient}
         onEnterBankDetails={() => setStep("bank-entry")}
+        onAddRecipient={() => setStep("save-recipient")}
       />
     );
   } else if (step === "bank-entry") {
     content = <TransferBankEntry onContinue={selectRecipient} onBack={() => setStep("pick")} />;
+  } else if (step === "save-recipient") {
+    content = <TransferSaveRecipient onContinue={selectRecipient} onBack={() => setStep("pick")} />;
   } else if (recipient) {
     content = (
       <>
@@ -135,7 +139,13 @@ export function TransferCompose() {
       {step === "pick" ? (
         <TransferHeader onBack={() => router.back()} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
       ) : (
-        <TransferHeader onBack={() => router.back()} rightIcon={<Home size={20} strokeWidth={2} />} rightLabel="Về trang chủ" onRightClick={() => router.push("/")} />
+        <TransferHeader
+          onBack={() => router.back()}
+          title={step === "save-recipient" ? "Lưu người nhận" : "Chuyển tiền"}
+          rightIcon={<Home size={20} strokeWidth={2} />}
+          rightLabel="Về trang chủ"
+          onRightClick={() => router.push("/")}
+        />
       )}
       <div className="flex min-h-0 flex-1 flex-col">{content}</div>
     </div>
