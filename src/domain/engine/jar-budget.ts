@@ -21,6 +21,7 @@ import type { DataSource, JarConfig, Transaction } from "@/domain/models";
 import { netExpenseByCategory } from "./cashflow";
 import { categoryToJarMap } from "./category-jars";
 import { NEAR_THRESHOLD, daysLeftIn, type PressureStatus } from "./pressure";
+import { lowestTrust } from "./provenance";
 import { coverageOf, type AggregateMeta, type Period } from "./types";
 
 export type LimitState = "set" | "unset";
@@ -80,9 +81,6 @@ export interface JarBudgetResult {
 
 const EXPENSE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee", "refund"]);
 
-/** Trust ranking — a lower rank is less verified, so it wins a "lowest-trust" fold. */
-const TRUST_RANK: Record<DataSource, number> = { estimated: 0, mock: 1, self_reported: 2, msb: 3 };
-
 /** Classify usage against a set limit. A set limit of 0 is "over" once anything is spent. */
 function jarStatus(spent: number, limit: number): PressureStatus {
   if (limit <= 0) return spent > 0 ? "over" : "ok";
@@ -111,12 +109,6 @@ function provenanceByCategory(
     map.set(t.categoryId, entry);
   }
   return map;
-}
-
-/** Lowest-trust source among a list, or "mock" (prototype baseline) when empty. */
-function lowestTrust(sources: DataSource[]): DataSource {
-  if (sources.length === 0) return "mock";
-  return sources.reduce((lo, s) => (TRUST_RANK[s] < TRUST_RANK[lo] ? s : lo), sources[0]);
 }
 
 /**

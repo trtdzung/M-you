@@ -249,6 +249,20 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       if (!res.ok) throw new Error(`replaceJars failed: ${res.status}`);
       return res.json();
     },
+    async getJarAllocations() {
+      const res = await fetch(`/api/jar-allocations?cif=${encodeURIComponent(cif)}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    async allocateIncome(allocations) {
+      const res = await fetch("/api/jar-allocations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, allocations }),
+      });
+      if (!res.ok) throw new Error(`allocateIncome failed: ${res.status}`);
+      return res.json();
+    },
     async getAccountAdjustments() {
       return accountAdjustments.load();
     },

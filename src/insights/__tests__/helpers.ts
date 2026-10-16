@@ -6,6 +6,7 @@ import type {
   HealthIndicator,
   JarBudgetLine,
   JarBudgetResult,
+  JarEnvelopeResult,
   NetWorthResult,
 } from "@/domain/engine";
 import type { Financials } from "@/state/useFinancials";
@@ -47,6 +48,13 @@ const EMPTY_JAR_BUDGET: JarBudgetResult = {
     setCount: 0,
     unsetCount: 0,
   },
+  meta: META,
+};
+
+/** An empty envelope result — no income data to allocate, no funded jars. */
+const EMPTY_JAR_ENVELOPE: JarEnvelopeResult = {
+  pending: { amount: "unknown", unallocatedCount: 0, unallocatedTxnIds: [], perTxn: [], meta: META },
+  jars: [],
   meta: META,
 };
 
@@ -113,6 +121,7 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     networthSeries: over.networthSeries ?? [],
     networthSeriesMeta: over.networthSeriesMeta ?? { source: null, count: 0, freshness: null },
     jarBudget: over.jarBudget ?? EMPTY_JAR_BUDGET,
+    jarEnvelope: over.jarEnvelope ?? EMPTY_JAR_ENVELOPE,
     health: over.health ?? EMPTY_HEALTH,
     goals: over.goals ?? [],
   };

@@ -11,6 +11,8 @@ export * from "./category-dedupe";
 export * from "./pressure";
 export * from "./budget";
 export * from "./jar-budget";
+export * from "./jar-envelope";
+export * from "./allocation-plan";
 export * from "./jar-input";
 export * from "./primary-account";
 export * from "./networth";

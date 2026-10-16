@@ -13,10 +13,11 @@
  */
 
 import { backfillActualAmount, dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
-import type { Jar, JarConfig } from "@/domain/models";
+import type { Jar, JarAllocation, JarConfig } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 
 let store: JarConfig = freshConfig();
+let allocationsStore: JarAllocation[] = [];
 let originalFetch: typeof globalThis.fetch | undefined;
 
 function freshConfig(): JarConfig {
@@ -108,18 +109,48 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
   return jsonResponse({ error: "unhandled" }, 500);
 }
 
+/**
+ * `/api/jar-allocations` stub (see `src/state/jar-allocations.tsx`). GET returns
+ * the in-memory ledger; POST appends the batch and returns the full list —
+ * mirroring the real route, minus the DB transport.
+ */
+async function handleAllocationsRequest(init?: RequestInit): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method === "GET") return jsonResponse(allocationsStore);
+  if (method === "POST") {
+    const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
+    const rows = (body?.allocations ?? []) as { txnId: string; jarId: string; amount: number }[];
+    const now = new Date().toISOString();
+    allocationsStore = [
+      ...allocationsStore,
+      ...rows.map((r, i) => ({
+        id: `alloc-${allocationsStore.length + i}`,
+        txnId: r.txnId,
+        jarId: r.jarId,
+        amount: r.amount,
+        source: "self_reported" as const,
+        createdAt: now,
+      })),
+    ];
+    return jsonResponse(allocationsStore, 201);
+  }
+  return jsonResponse({ error: "unhandled" }, 500);
+}
+
 /** Install the fetch stub — safe to call more than once (no-ops after the first). */
 export function installMockJarsApi(): void {
   if (originalFetch) return; // already installed
   originalFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
+    if (url.startsWith("/api/jar-allocations")) return handleAllocationsRequest(init);
     if (url.startsWith("/api/jars")) return handleJarsRequest(url, init);
     return originalFetch!(input as RequestInfo, init);
   }) as typeof fetch;
 }
 
-/** Reset the in-memory jar set back to the default template — call in `beforeEach`. */
+/** Reset the in-memory jar set + allocation ledger — call in `beforeEach`. */
 export function resetMockJarsApi(): void {
   store = freshConfig();
+  allocationsStore = [];
 }

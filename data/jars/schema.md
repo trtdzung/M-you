@@ -16,6 +16,7 @@ itself holds no constraints beyond its primary key and `NOT NULL` columns:
 - **`actual_amount` backfills from `budget_limit`** the first time a jar gets
   a real budget, so it becomes usable as a Chuyển tiền source immediately
   (`backfillActualAmount`).
+- **`actual_amount` is unrelated to, and untouched by, the `jar_allocations` table** (see `data/jar-allocations/schema.md`) — that table is a separate income→jar envelope ledger the engine derives "còn lại trong hũ" from; it never reads or writes `actual_amount`.
 
 | column | type | notes |
 |---|---|---|

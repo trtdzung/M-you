@@ -13,6 +13,7 @@ import type {
   Budget,
   Goal,
   Jar,
+  JarAllocation,
   JarConfig,
   Liability,
   MockProduct,
@@ -122,6 +123,18 @@ export interface Providers
   assignCategory(categoryId: string, jarId: string): Promise<JarConfig>;
   /** Replace the whole jar set (template apply / reset to default). Returns the full updated config. */
   replaceJars(jars: Jar[]): Promise<JarConfig>;
+  /**
+   * Read the persona's envelope allocations ("phân bổ thu nhập vào hũ"), oldest
+   * first. Backed by `data/pfm.sqlite3` via `/api/jar-allocations` (invariant
+   * #4). The engine derives "chờ phân bổ" and funded "còn lại trong hũ" from
+   * these — no money movement is implied (invariant #3).
+   */
+  getJarAllocations(): Promise<JarAllocation[]>;
+  /**
+   * Append a batch of allocations (one "Chia ngay" submit). Returns the full
+   * updated list. Bookkeeping only — never a transfer/execute/OTP.
+   */
+  allocateIncome(allocations: { txnId: string; jarId: string; amount: number }[]): Promise<JarAllocation[]>;
   /**
    * Cumulative amount already debited from each account via a jar-sourced
    * transfer (Chuyển tiền Phần 1) — a mock ledger overlay on top of the

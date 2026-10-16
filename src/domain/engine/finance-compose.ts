@@ -12,6 +12,7 @@ import type {
   Asset,
   Budget,
   Goal,
+  JarAllocation,
   JarConfig,
   Liability,
   MockProduct,
@@ -27,6 +28,7 @@ import {
   estimateEndOfMonth,
   evaluateBudget,
   evaluateJarBudget,
+  evaluateJarEnvelope,
   financialHealth,
   monthPeriodFromKey,
   networthTrend,
@@ -39,6 +41,7 @@ import {
   type EndOfMonthEstimate,
   type FinancialHealth,
   type JarBudgetResult,
+  type JarEnvelopeResult,
   type NetWorthResult,
   type NetWorthTrendMeta,
   type Obligation,
@@ -89,6 +92,13 @@ export interface Financials {
    */
   jarBudget: JarBudgetResult;
   /**
+   * Envelope view (plan 260914-1436) for the Tổng quan "hũ" widget: "chờ phân
+   * bổ" (period income not yet allocated) + per-jar funded "còn lại trong hũ"
+   * (= nạp kỳ này − đã tiêu kỳ này). DERIVED from the allocation ledger +
+   * `jarBudget` spend — never the stored `actualAmount` (invariant #1, RT-1/2).
+   */
+  jarEnvelope: JarEnvelopeResult;
+  /**
    * Financial-health indicators (runway, surplus, essential coverage, asset
    * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
    * (DRY) — no screen recomputes health locally. Missing inputs stay `null`.
@@ -117,6 +127,12 @@ export interface ComposeOptions {
    * compose stays pure and testable (config is user state, not provider data).
    */
   jarConfig?: JarConfig;
+  /**
+   * Envelope allocations (plan 260914-1436), threaded like `jarConfig` — user
+   * state, not provider `RawData`, so the compose stays pure/testable. Absent →
+   * no allocations, so all period income reads as "chờ phân bổ".
+   */
+  allocations?: JarAllocation[];
   /**
    * User-authored assets/liabilities (Phase 03), threaded like `jarConfig` — they
    * are context state merged with the seed here, NOT folded into the provider's
@@ -174,6 +190,12 @@ export function computeFinancials(
   // seed + user records (user assets/liabilities are context state, red-team #3).
   const networth = calculateNetWorth(assets, liabilities);
 
+  // Jar budget first — the envelope reuses its per-jar net expense as "đã tiêu
+  // kỳ này" (DRY, invariant #2) instead of re-deriving spend.
+  const jarBudget = evaluateJarBudget(jarConfig, txns, period, prevPeriod, now);
+  const spentByJar = new Map(jarBudget.lines.map((l) => [l.huId, l.spent]));
+  const jarEnvelope = evaluateJarEnvelope(jarConfig, txns, options.allocations ?? [], spentByJar, period);
+
   return {
     monthKey: month,
     cashflow,
@@ -189,7 +211,8 @@ export function computeFinancials(
     networthPrevious: trend.previous,
     networthSeries: trend.series,
     networthSeriesMeta: trend.meta,
-    jarBudget: evaluateJarBudget(jarConfig, txns, period, prevPeriod, now),
+    jarBudget,
+    jarEnvelope,
     health: financialHealth(cashflow, raw.accounts, networth),
     goals: [...raw.goals, ...(options.userGoals ?? [])],
   };

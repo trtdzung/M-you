@@ -33,3 +33,22 @@ CREATE TABLE IF NOT EXISTS jars (
 );
 
 CREATE INDEX IF NOT EXISTS idx_jars_cif ON jars (cif);
+
+-- Envelope allocations ("phân bổ thu nhập vào hũ"), per persona (`cif`). Each row
+-- records that part of an income transaction (`txn_id`) was allocated into a jar
+-- (`jar_id`) for `amount` VND. Keyed to a concrete transaction so "N GD chưa vào
+-- hũ" is an exact ledger count, not a proxy. Append-only bookkeeping of money the
+-- user already received — never a money movement (invariant #3). The funded
+-- balance the Overview widget shows is DERIVED from these rows by the engine, not
+-- stored in `jars.actual_amount` (which remains the Chuyển-tiền spendable balance).
+CREATE TABLE IF NOT EXISTS jar_allocations (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  txn_id TEXT NOT NULL,
+  jar_id TEXT NOT NULL,
+  amount REAL NOT NULL,             -- VND allocated (> 0)
+  source TEXT NOT NULL CHECK (source IN ('msb', 'self_reported', 'estimated', 'mock')),
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_jar_allocations_cif ON jar_allocations (cif);

@@ -11,6 +11,7 @@ import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
+import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { LoginGate } from "@/components/login/LoginGate";
@@ -22,13 +23,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <CorrectionsProvider>
           <ManualTxnsProvider>
             <JarConfigProvider>
-              <AssetLiabilityProvider>
-                <GoalProvider>
-                  <PeriodProvider>
-                    <ConsentGate>{children}</ConsentGate>
-                  </PeriodProvider>
-                </GoalProvider>
-              </AssetLiabilityProvider>
+              <JarAllocationsProvider>
+                <AssetLiabilityProvider>
+                  <GoalProvider>
+                    <PeriodProvider>
+                      <ConsentGate>{children}</ConsentGate>
+                    </PeriodProvider>
+                  </GoalProvider>
+                </AssetLiabilityProvider>
+              </JarAllocationsProvider>
             </JarConfigProvider>
           </ManualTxnsProvider>
         </CorrectionsProvider>

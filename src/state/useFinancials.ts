@@ -17,6 +17,7 @@ import { useCorrections, applyCorrections, isHidden } from "./corrections";
 import { useManualTxns } from "./manual-txns";
 import { useGoals } from "./goals";
 import { useJarConfig } from "./jars";
+import { useJarAllocations } from "./jar-allocations";
 import { usePeriod } from "./period";
 
 /** Re-exported so existing screens keep importing these from the hook. */
@@ -50,6 +51,7 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const { corrections } = useCorrections();
   const { manualTxns } = useManualTxns();
   const { config: jarConfig } = useJarConfig();
+  const { allocations } = useJarAllocations();
   const { assets: userAssets, liabilities: userLiabilities } = useAssetLiabilities();
   const { goals: userGoals } = useGoals();
   const { month: selectedMonth } = usePeriod();
@@ -111,12 +113,13 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
         ? computeFinancials(raw, month, {
             transactions,
             jarConfig,
+            allocations,
             userAssets,
             userLiabilities,
             userGoals,
           })
         : null,
-    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals],
+    [raw, transactions, month, jarConfig, allocations, userAssets, userLiabilities, userGoals],
   );
 
   return { loading, error, raw, transactions, allTransactions, financials };

@@ -5,6 +5,7 @@ import { PersonaProvider, usePersona } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { JarConfigProvider } from "@/state/jars";
+import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { AssetLiabilityProvider } from "@/state/assets";
 import type { GoalFields } from "@/domain/models/goal-input";
@@ -24,11 +25,13 @@ function wrapper({ children }: { children: ReactNode }) {
       <CorrectionsProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
-          <AssetLiabilityProvider>
-            <GoalProvider>
-              <PeriodProvider>{children}</PeriodProvider>
-            </GoalProvider>
-          </AssetLiabilityProvider>
+          <JarAllocationsProvider>
+            <AssetLiabilityProvider>
+              <GoalProvider>
+                <PeriodProvider>{children}</PeriodProvider>
+              </GoalProvider>
+            </AssetLiabilityProvider>
+          </JarAllocationsProvider>
         </JarConfigProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>

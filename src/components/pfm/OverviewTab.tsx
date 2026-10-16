@@ -6,6 +6,7 @@ import { SpendingSection, type DonutSide } from "@/components/report/SpendingSec
 import { SpendingReport } from "@/components/report/SpendingReport";
 import { CashflowOverviewCard } from "@/components/cashflow/CashflowOverviewCard";
 import { CashflowTrendCard } from "@/components/cashflow/CashflowTrendCard";
+import { HuOverviewRow } from "@/components/hu-envelope/HuOverviewRow";
 import type { JarDonutDatum } from "@/components/report/SpendingDonut";
 import { cashflowTrend, incomeByCategory, monthPeriodFromKey } from "@/domain/engine";
 import type { PfmTabId } from "./PfmTabs";
@@ -73,6 +74,8 @@ export function OverviewTab({ onNavigate: _onNavigate }: { onNavigate: (tab: Pfm
   return (
     <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
       <CashflowOverviewCard cashflow={cashflow} prevCashflow={prevCashflow} />
+
+      <HuOverviewRow financials={financials} />
 
       <SpendingSection expense={expenseSide} income={incomeSide} onOpenReport={() => setReportOpen(true)} />
 

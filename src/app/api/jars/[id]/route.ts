@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backfillActualAmount, healOrphanCategories, stripCategories } from "@/domain/jar-rules";
+import { KHAC_JAR_ID } from "@/domain/engine/category-jars";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
+import { reassignJar } from "@/lib/jar-allocations-store";
 
 /**
  * One jar of one persona. `cif` travels in the QUERY STRING on every `:id`
@@ -48,5 +50,9 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
 
   const remaining = { version: 3 as const, jars: current.jars.filter((j) => j.id !== id) };
   const next = target.categoryIds.length > 0 ? healOrphanCategories(remaining) : remaining;
+  // Keep the ledger tidy: repoint this jar's allocations at "Khác" (the engine
+  // would fold an unknown jarId there anyway — this just avoids dead ids). The
+  // stored `actualAmount` is deliberately untouched (envelope funded is derived).
+  if (id !== KHAC_JAR_ID) reassignJar(cif, id, KHAC_JAR_ID);
   return NextResponse.json(writeJarConfig(cif, backfillActualAmount(next)));
 }

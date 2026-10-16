@@ -6,6 +6,7 @@ import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
+import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { useFinancials } from "@/state/useFinancials";
 import { PfmTxnList } from "../PfmTxnList";
@@ -54,14 +55,16 @@ function renderList() {
       <CorrectionsProvider>
         <ManualTxnsProvider>
           <JarConfigProvider>
-            <AssetLiabilityProvider>
-              <GoalProvider>
-                <PeriodProvider>
-                  <CountProbe />
-                  <PfmTxnList />
-                </PeriodProvider>
-              </GoalProvider>
-            </AssetLiabilityProvider>
+            <JarAllocationsProvider>
+              <AssetLiabilityProvider>
+                <GoalProvider>
+                  <PeriodProvider>
+                    <CountProbe />
+                    <PfmTxnList />
+                  </PeriodProvider>
+                </GoalProvider>
+              </AssetLiabilityProvider>
+            </JarAllocationsProvider>
           </JarConfigProvider>
         </ManualTxnsProvider>
       </CorrectionsProvider>
