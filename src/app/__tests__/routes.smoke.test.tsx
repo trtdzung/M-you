@@ -165,8 +165,10 @@ describe("chrome separation — PFM wallet shell vs festive shell", () => {
     for (const label of ["Tổng quan", "Giao dịch", "Ngân sách", "Cài đặt"]) {
       expect(within(nav).getByText(label)).toBeInTheDocument();
     }
-    // Center ＋ FAB records a manual transaction (never moves money, invariant #3)
-    expect(within(nav).getByLabelText("Thêm giao dịch")).toBeInTheDocument();
+    // Center mic FAB opens the voice quick-action panel (Feature 5) — never
+    // moves money itself, only ever hands off to a real, human-confirmed flow
+    // (invariant #3). Retired the earlier "Thêm giao dịch" FAB entirely.
+    expect(within(nav).getByLabelText("Giữ để hỏi M-Your bằng giọng nói")).toBeInTheDocument();
 
     // Distinct from the festive 3-tab bar; no 2/9 festive photo background
     expect(screen.queryByLabelText("Điều hướng chính")).toBeNull();

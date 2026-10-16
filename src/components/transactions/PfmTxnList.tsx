@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { EyeOff } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { CATEGORY_BY_ID } from "@/domain/models";
@@ -16,7 +15,6 @@ import { usePeriod } from "@/state/period";
 import { cn } from "@/lib/cn";
 import { TxnRow } from "./TxnRow";
 import { TxnDetail } from "./TxnDetail";
-import { AddTxnForm } from "./AddTxnForm";
 
 const ALL = "all";
 
@@ -47,19 +45,16 @@ function groupByDay(txns: Transaction[]): { key: string; rows: Transaction[] }[]
  * Giao dịch panel: danh sách theo ngày, lọc theo hũ, GD chưa phân loại nổi bật.
  * Đọc `allTransactions` (đã áp override danh mục, GIỮ cả GD ẩn) — GD ẩn vẫn hiện
  * (mờ + nhãn "Đã ẩn") nhưng engine đã loại khỏi tính đã-tiêu. Tap → chi tiết
- * (đổi danh mục / ẩn). ＋ FAB (`?add=1`) mở form thêm thủ công.
+ * (đổi danh mục / ẩn).
  */
 export function PfmTxnList() {
   const { loading, error, allTransactions } = useFinancials();
   const { corrections } = useCorrections();
   const { config } = useJarConfig();
   const { month } = usePeriod();
-  const router = useRouter();
-  const params = useSearchParams();
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [jar, setJar] = useState<string>(ALL);
 
-  const addOpen = params?.get("add") === "1";
   const catToJar = useMemo(() => categoryToJarMap(config), [config]);
   const chips = useMemo(() => [{ jarId: ALL, label: "Tất cả" }, ...jarChipList(config)], [config]);
 
@@ -70,12 +65,6 @@ export function PfmTxnList() {
       jar === ALL ? inPeriod : inPeriod.filter((t) => (catToJar.get(t.categoryId) ?? KHAC_JAR_ID) === jar);
     return groupByDay(filtered);
   }, [allTransactions, month, jar, catToJar]);
-
-  function closeAdd() {
-    const next = new URLSearchParams(params?.toString());
-    next.delete("add");
-    router.replace(`/pfm?${next.toString()}`, { scroll: false });
-  }
 
   if (error) return <ErrorState />;
 
@@ -144,7 +133,6 @@ export function PfmTxnList() {
       )}
 
       {selected && <TxnDetail txn={selected} onClose={() => setSelected(null)} />}
-      {addOpen && <AddTxnForm onClose={closeAdd} />}
     </div>
   );
 }

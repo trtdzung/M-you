@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, Trash2, X } from "lucide-react";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
@@ -54,18 +55,25 @@ function sharedWordPrefix(left: string[], right: string[]) {
 /**
  * Floating "M-Your" chat button + full-screen overlay for `/pfm/*`, mounted via
  * the `PhoneShell` `fab` slot so it stays visible above the bottom nav on every
- * PFM tab without overlapping the center ＋ FAB. Wired to the real agent
- * (`src/lib/agent-api.ts`, proxied through `src/app/api/agent/chat` so the
- * client never sees `AGENT_API_KEY`) — `cif` is the active persona's CIF.
- * Opening the overlay always reloads real history from the agent (it has its
- * own server-side memory now, not just a local mock) and gates the composer
- * until that finishes loading.
+ * PFM tab without overlapping the center mic FAB (`VoiceFab`, in the bottom
+ * nav — a different `PhoneShell` slot, not in this component's own tree).
+ * `VoiceFab` opens this overlay via `?assistant=1` (both a plain tap and a
+ * press-and-hold do — same idiom as `HuCategoryTab`'s `?hu=`). Wired to the
+ * real agent (`src/lib/agent-api.ts`, proxied through `src/app/api/agent/chat`
+ * so the client never sees `AGENT_API_KEY`) — `cif` is the active persona's
+ * CIF. Opening the overlay always reloads real history from the agent (it has
+ * its own server-side memory now, not just a local mock) and gates the
+ * composer until that finishes loading.
  */
 export function MYourWidget() {
   const { persona } = usePersona();
   const cif = persona.cif;
+  const router = useRouter();
+  const params = useSearchParams();
+  const assistantParam = params?.get("assistant") === "1";
 
   const [open, setOpen] = useState(false);
+  const isOpen = open || assistantParam;
   const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">("loading");
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -122,7 +130,7 @@ export function MYourWidget() {
 
   useEffect(() => {
     cancelVoice();
-  }, [open, cif, cancelVoice]);
+  }, [isOpen, cif, cancelVoice]);
 
   const loadHistory = useCallback(() => {
     setHistoryStatus("loading");
@@ -143,8 +151,18 @@ export function MYourWidget() {
   }, [cif]);
 
   useEffect(() => {
-    if (open) loadHistory();
-  }, [open, loadHistory]);
+    if (isOpen) loadHistory();
+  }, [isOpen, loadHistory]);
+
+  function close() {
+    cancelVoice();
+    setOpen(false);
+    if (assistantParam) {
+      const next = new URLSearchParams(params?.toString());
+      next.delete("assistant");
+      router.replace(`/pfm?${next.toString()}`, { scroll: false });
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -211,7 +229,7 @@ export function MYourWidget() {
         </button>
       </div>
 
-      {open && (
+      {isOpen && (
         <div
           role="dialog"
           aria-modal="true"
@@ -241,7 +259,7 @@ export function MYourWidget() {
               </button>
               <button
                 type="button"
-                onClick={() => { cancelVoice(); setOpen(false); }}
+                onClick={close}
                 aria-label="Đóng"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >

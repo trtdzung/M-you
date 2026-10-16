@@ -4,6 +4,13 @@ import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
 
+// `?assistant=1` (Feature 5's VoiceFab hand-off) needs a router/search-params
+// context; this suite doesn't exercise that param, so a static empty one is enough.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const voice = vi.hoisted(() => ({
   callbacks: null as null | { onState: (state: string) => void; onTranscript: (text: string, final: boolean) => void; onError: (message: string) => void },
   cancel: vi.fn(), stop: vi.fn(),

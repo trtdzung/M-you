@@ -3,14 +3,15 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { PFM_TABS, resolveLegacyTab, type PfmTabId } from "./PfmTabs";
-import { AddTxnFab } from "./AddTxnFab";
+import { VoiceFab } from "./VoiceFab";
 
 /**
  * BIDV-style wallet bottom nav for `/pfm/*` (plan 260910-1626): 4 destinations —
- * Tổng quan · Giao dịch · (＋) · Ngân sách · Cài đặt — with a raised center ＋ FAB
- * for Thêm giao dịch. Pinned to the device-canvas bottom via the PhoneShell `nav`
- * slot (same pattern as the festive `BottomNav`), so it never scrolls with panel
- * content and both navs can coexist without overlap.
+ * Tổng quan · Giao dịch · (🎤) · Ngân sách · Cài đặt — with a raised center mic
+ * FAB (Feature 5) for a quick voice question to M-Your. Pinned to the
+ * device-canvas bottom via the PhoneShell `nav` slot (same pattern as the
+ * festive `BottomNav`), so it never scrolls with panel content and both navs
+ * can coexist without overlap.
  *
  * Navigation is URL-driven (`?tab=`): a tap replaces the tab param and the
  * single-route `PfmTabHost` switches the visible panel client-side with no
@@ -33,7 +34,6 @@ export function PfmBottomNav() {
     next.set("tab", id);
     next.delete("dock");
     next.delete("setup");
-    next.delete("add");
     router.replace(`/pfm?${next.toString()}`, { scroll: false });
   }
 
@@ -54,7 +54,7 @@ export function PfmBottomNav() {
           <NavItem key={tab.id} tab={tab} active={tab.id === active} onSelect={() => go(tab.id)} />
         ))}
         <div className="pointer-events-none absolute inset-x-0 -top-5 flex justify-center">
-          <AddTxnFab />
+          <VoiceFab />
         </div>
       </div>
     </nav>
