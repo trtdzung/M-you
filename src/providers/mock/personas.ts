@@ -8,7 +8,6 @@
 
 import type {
   Asset,
-  Beneficiary,
   Budget,
   Goal,
   Liability,
@@ -48,8 +47,6 @@ export interface PersonaMeta {
   budgets: Budget[];
   goals: Goal[];
   products: MockProduct[];
-  /** Saved payees (real-shaped mock account numbers) for transfer drafting. */
-  beneficiaries: Beneficiary[];
 }
 
 const NOW = "2026-09-15T00:00:00.000Z";
@@ -62,10 +59,6 @@ const MSB_PRODUCTS: MockProduct[] = [
 
 function budget(categoryId: string, limit: number): Budget {
   return { categoryId, limit, period: "monthly" };
-}
-
-function bene(id: string, name: string, accountNumber: string, bankName: string): Beneficiary {
-  return { id, name, accountNumber, bankName, source: "mock" };
 }
 
 // ---------------------------------------------------------------------------
@@ -88,11 +81,6 @@ const STABLE: PersonaMeta = {
   budgets: [budget(CATEGORY.dining, 4_000_000), budget(CATEGORY.groceries, 3_500_000), budget(CATEGORY.transport, 1_500_000), budget(CATEGORY.shopping, 2_500_000), budget(CATEGORY.entertainment, 1_500_000)],
   goals: [{ id: "g_stable_fund", name: "Quỹ dự phòng 6 tháng", targetAmount: 90_000_000, currentAmount: 55_000_000, targetDate: "2027-06-30", source: "self_reported" }],
   products: MSB_PRODUCTS,
-  beneficiaries: [
-    bene("b_stable_lan", "Nguyễn Thị Lan", "19012345678901", "MSB"),
-    bene("b_stable_binh", "Trần Văn Bình", "0071000123456", "Vietcombank"),
-    bene("b_stable_landlord", "Chủ nhà Phạm Văn Đức", "12010009988776", "MSB"),
-  ],
 };
 
 const IRREGULAR: PersonaMeta = {
@@ -113,10 +101,6 @@ const IRREGULAR: PersonaMeta = {
   budgets: [budget(CATEGORY.dining, 3_000_000), budget(CATEGORY.groceries, 2_500_000), budget(CATEGORY.transport, 1_200_000), budget(CATEGORY.shopping, 2_000_000), budget(CATEGORY.entertainment, 1_500_000)],
   goals: [{ id: "g_irr_buffer", name: "Đệm thu nhập 3 tháng", targetAmount: 60_000_000, currentAmount: 12_000_000, targetDate: null, source: "self_reported" }],
   products: MSB_PRODUCTS,
-  beneficiaries: [
-    bene("b_irr_khang", "Đỗ Minh Khang", "19088776655443", "MSB"),
-    bene("b_irr_studio", "Studio Ánh Dương", "0451000778899", "Techcombank"),
-  ],
 };
 
 const WEALTHY: PersonaMeta = {
@@ -141,11 +125,6 @@ const WEALTHY: PersonaMeta = {
   budgets: [budget(CATEGORY.dining, 12_000_000), budget(CATEGORY.groceries, 6_000_000), budget(CATEGORY.transport, 5_000_000), budget(CATEGORY.shopping, 15_000_000), budget(CATEGORY.entertainment, 8_000_000)],
   goals: [{ id: "g_w_house", name: "Trả trước nhà nghỉ dưỡng", targetAmount: 2_000_000_000, currentAmount: 650_000_000, targetDate: "2028-12-31", source: "self_reported" }],
   products: MSB_PRODUCTS,
-  beneficiaries: [
-    bene("b_w_quan", "Vũ Đình Quân", "19055443322110", "MSB"),
-    bene("b_w_broker", "Công ty CP Đầu tư An Phú", "0331000445566", "BIDV"),
-    bene("b_w_hoa", "Lê Thị Hoa", "0071000998877", "Vietcombank"),
-  ],
 };
 
 export const PERSONAS: Record<PersonaId, PersonaMeta> = {

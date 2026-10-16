@@ -44,6 +44,19 @@ export function TransferCompose() {
     setStep("pick");
   }
 
+  // "Lưu người nhận" (save-recipient step only) really persists the account —
+  // advance the UI immediately (non-blocking) and sync the saved-beneficiary
+  // list in the background so a later "Đổi" shows it under "Đã lưu" without a
+  // reload. `TransferBankEntry` ("Tài khoản/Số thẻ") never calls this — it was
+  // never a "save" action.
+  function saveAndSelectRecipient(next: SelectedRecipient) {
+    selectRecipient(next);
+    providers
+      .createBeneficiary({ name: next.name, accountNumber: next.accountNumber, bankName: next.bankName ?? "" })
+      .then(setBeneficiaries)
+      .catch(() => {});
+  }
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -111,7 +124,7 @@ export function TransferCompose() {
   } else if (step === "bank-entry") {
     content = <TransferBankEntry onContinue={selectRecipient} onBack={() => setStep("pick")} />;
   } else if (step === "save-recipient") {
-    content = <TransferSaveRecipient onContinue={selectRecipient} onBack={() => setStep("pick")} />;
+    content = <TransferSaveRecipient onContinue={saveAndSelectRecipient} onBack={() => setStep("pick")} />;
   } else if (recipient) {
     content = (
       <>
