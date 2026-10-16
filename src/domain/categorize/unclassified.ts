@@ -14,7 +14,7 @@ import type { Transaction } from "@/domain/models";
 import { UNCLASSIFIED } from "@/domain/models";
 
 /** Transaction types the assistant may propose a category for. */
-export const AI_ELIGIBLE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense"]);
+const AI_ELIGIBLE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense"]);
 
 /** True when a transaction lacks a label AND its type is AI-eligible. */
 export function isUnclassified(txn: Transaction): boolean {

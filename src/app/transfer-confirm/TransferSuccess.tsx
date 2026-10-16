@@ -34,7 +34,7 @@ function formatVndComma(amount: number): string {
 }
 
 /** Uppercase, diacritics-stripped — matches the real app's auto-generated memo style (e.g. "NGUYEN VIET DUNG chuyen tien"). */
-export function toPlainUpper(text: string): string {
+function toPlainUpper(text: string): string {
   return text
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")

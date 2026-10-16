@@ -19,7 +19,7 @@ import {
  * Presentation only — the engine never reads it. Keeping the map here (not in a
  * component) lets the list, editor, and picker share one source of truth.
  */
-export const JAR_ICONS: Record<string, LucideIcon> = {
+const JAR_ICONS: Record<string, LucideIcon> = {
   wallet: Wallet,
   food: Utensils,
   transport: Car,

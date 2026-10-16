@@ -22,7 +22,7 @@ export interface SnapshotOpts {
 }
 
 /** Σ take of a donor chain. */
-export function totalTake(donors: DonorProposal[]): number {
+function totalTake(donors: DonorProposal[]): number {
   return donors.reduce((s, d) => s + d.take, 0);
 }
 

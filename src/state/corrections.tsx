@@ -31,7 +31,7 @@ import {
 } from "./corrections-core";
 
 export type { Assignment, Correction, CorrectionOrigin, Corrections } from "./corrections-core";
-export { applyCorrections, isHidden, resolveEffective } from "./corrections-core";
+export { applyCorrections, isHidden } from "./corrections-core";
 
 /** localStorage keys of the pre-DB version — read once for migration, then removed. */
 const LOCAL_PREFIX = "msb-pfm.corrections";

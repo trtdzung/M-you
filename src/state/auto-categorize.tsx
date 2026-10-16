@@ -41,7 +41,7 @@ import { useAutoFundWith } from "./use-auto-fund";
  * not blocked by a user-authored record (the same race guard `mergeAssignments`
  * applies). These are the triggers whose jars must be reconciled.
  */
-export function labelsToReconcile(assignments: Assignment[], corrections: Corrections): { txnId: string; categoryId: string }[] {
+function labelsToReconcile(assignments: Assignment[], corrections: Corrections): { txnId: string; categoryId: string }[] {
   return assignments
     .filter((a) => a.status === "applied" && !isUserOrigin(corrections[a.txnId]))
     .map((a) => ({ txnId: a.txnId, categoryId: a.categoryId }));

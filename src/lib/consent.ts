@@ -4,7 +4,7 @@
  * (PFM-094) clears this record.
  */
 
-export const CONSENT_VERSION = "2026-09-01";
+const CONSENT_VERSION = "2026-09-01";
 
 export type ConsentScope = "transactions" | "assets" | "liabilities" | "ai";
 
@@ -33,7 +33,7 @@ function announceConsentChange(): void {
   }
 }
 
-export const ALL_SCOPES: ConsentScope[] = ["transactions", "assets", "liabilities", "ai"];
+const ALL_SCOPES: ConsentScope[] = ["transactions", "assets", "liabilities", "ai"];
 
 export function getConsent(): ConsentRecord | null {
   if (typeof window === "undefined") return null;

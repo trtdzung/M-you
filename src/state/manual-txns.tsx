@@ -28,7 +28,7 @@ import { usePersona } from "@/providers/context";
 
 const STORAGE_PREFIX = "msb-pfm.manual-txns";
 const API_PATH = "/api/manual-transactions";
-export const MANUAL_ACCOUNT_ID = "self-reported";
+const MANUAL_ACCOUNT_ID = "self-reported";
 
 /** The fields a user supplies in the Add-transaction form. */
 export interface ManualTxnInput {

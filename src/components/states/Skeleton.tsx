@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
  * `SkeletonScreen` (or a `role="status"` container) so screen readers announce
  * loading once instead of reading each block.
  */
-export function Skeleton({ className }: { className?: string }) {
+function Skeleton({ className }: { className?: string }) {
   return <span aria-hidden className={cn("shimmer block rounded-sm", className)} />;
 }
 
@@ -18,11 +18,6 @@ export function SkeletonCard({ className }: { className?: string }) {
 /** List-row sized block. */
 export function SkeletonRow({ className }: { className?: string }) {
   return <Skeleton className={cn("h-12 rounded-row", className)} />;
-}
-
-/** Text-line block; set width via `className` (e.g. `w-2/3`). */
-export function SkeletonText({ className }: { className?: string }) {
-  return <Skeleton className={cn("h-3 w-full rounded-full", className)} />;
 }
 
 /**

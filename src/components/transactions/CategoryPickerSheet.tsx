@@ -3,7 +3,6 @@
 import { Check, Plus } from "lucide-react";
 import type { CategoryKind } from "@/domain/models";
 import { CATEGORIES } from "@/domain/models";
-import { Sheet } from "@/components/primitives";
 import { categoryColor } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
 
@@ -100,32 +99,3 @@ export function CategoryOptionGrid({
   );
 }
 
-/** Standalone bottom-sheet wrapper around {@link CategoryOptionGrid}. */
-export function CategoryPickerSheet({
-  title,
-  description,
-  selectedId,
-  kind = "expense",
-  onSelect,
-  onClose,
-}: {
-  title: string;
-  description?: string;
-  selectedId?: string;
-  kind?: CategoryKind | "all";
-  onSelect: (categoryId: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <Sheet title={title} description={description} onClose={onClose}>
-      <CategoryOptionGrid
-        selectedId={selectedId}
-        kind={kind}
-        onSelect={(id) => {
-          onSelect(id);
-          onClose();
-        }}
-      />
-    </Sheet>
-  );
-}

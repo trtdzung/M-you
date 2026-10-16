@@ -30,7 +30,7 @@ export interface SwapOption {
 }
 
 /** The shortfall a swap must cover + the snapshot it's measured on. */
-export function swapBasis(deps: AutoFundDeps, p: SwapRequest): { snapshot: JarSnapshot; shortfall: number } {
+function swapBasis(deps: AutoFundDeps, p: SwapRequest): { snapshot: JarSnapshot; shortfall: number } {
   const excludeIds = new Set(p.oldIds);
   const snapshot = snapshotForDate(deps, p.postedAt, { excludeIds });
   const overspend = overspendOf(snapshot.lines, p.targetJarId);

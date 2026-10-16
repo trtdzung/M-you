@@ -53,7 +53,7 @@ export const UNCLASSIFIED_LABEL = "Chưa phân loại";
  * the UNCLASSIFIED "unenriched expense" bucket.
  */
 export const INCOME = "income" as const;
-export const INCOME_LABEL = "Tiền vào";
+const INCOME_LABEL = "Tiền vào";
 
 /**
  * System category tagging an inter-jar REBALANCE transaction (plan 260918-1120,
@@ -68,11 +68,6 @@ export const INCOME_LABEL = "Tiền vào";
  */
 export const REBALANCE_CATEGORY = "dieu-chinh-hu" as const;
 export const REBALANCE_CATEGORY_LABEL = "Điều chỉnh hũ";
-
-/** True for the unclassified sentinel (not a real taxonomy id). */
-export function isUnclassifiedCategory(id: string): boolean {
-  return id === UNCLASSIFIED;
-}
 
 /** True for the inter-jar rebalance system category (not a real spend category). */
 export function isRebalanceCategory(id: string): boolean {

@@ -199,7 +199,7 @@ Use several explainable indicators instead of one authoritative score:
 - Cash runway.
 - Concentration of assets and liabilities.
 
-Income was removed from the product, so the income-derived indicators that used to sit alongside these (monthly surplus, essential-expense coverage, debt-to-income ratio) were removed with it — only the two income-free indicators remain. Each indicator is `null` (rendered as `—`) rather than defaulted to zero when its inputs are missing. The `HealthPanel` UI (both indicators) lived on the same now-retired Kế hoạch tab as Goals above and remains unmounted; `Financials.health` composition is unaffected and unchanged. Only its runway figure has a separate display today, as a "Khả năng trang trải" KPI tile on the Tổng quan cockpit — concentration has no display outside the still-unmounted `HealthPanel`.
+Income was removed from the product, so the income-derived indicators that used to sit alongside these (monthly surplus, essential-expense coverage, debt-to-income ratio) were removed with it — only the two income-free indicators remain. Each indicator is `null` (rendered as `—`) rather than defaulted to zero when its inputs are missing. The `HealthPanel` UI was removed with the retired Kế hoạch tab; `Financials.health` composition is unchanged. Only the runway figure is displayed today ("Khả năng trang trải" on Tổng quan); concentration has no display.
 
 ## Level 3: Guided decisions
 
@@ -321,7 +321,7 @@ The primary account card on Home shows a display-safe, masked account number (e.
 
 ### Báo cáo tư vấn (monthly advisory brief) — implemented but currently unreachable in the UI
 
-A rule-based monthly brief (`ReportBriefSheet` / `composeMonthlyBrief`): positives, risks, and behavioral highlights drawn from the existing insight detectors and cashflow facts, each with evidence, a magnitude band, and templated "nghĩa là gì" (what it means) / "nên làm gì" (what to do) Vietnamese copy, with every "nên làm gì" a tappable deep-link CTA through the same whitelisted `resolveIntentRoute` used by the copilot FAB. **This brief lost its only mount point** (`CashflowChartView`, the old Dòng tiền tab) when the wallet reformat folded that tab's content into Tổng quan — the "Xem chi tiết báo cáo" CTA on Tổng quan now opens the plainer donut/breakdown sheet (`SpendingReport`), not this advisory brief. The engine, component, and tests remain intact and green; re-wiring a CTA to it is pending future work.
+A rule-based monthly advisory brief (positives, risks, highlights with "nghĩa là gì" / "nên làm gì" CTAs) existed but lost its mount point in the wallet reformat and was removed as dead code (2026-09-19). Tổng quan's "Xem chi tiết báo cáo" opens the donut/breakdown sheet (`SpendingReport`). Re-introducing it is future work.
 
 **This brief is fully deterministic/templated — there is no LLM in this pipeline.** LLM narration of the brief was scoped for an earlier redesign but deliberately deferred (prompt-injection, timeout, and pipeline-shape risk were judged not worth taking before the new IA is validated with users); see `EPIC-07`/`PFM-062` in `plans/project-backlog.md`.
 

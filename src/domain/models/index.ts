@@ -16,10 +16,8 @@ export {
   UNCLASSIFIED,
   UNCLASSIFIED_LABEL,
   INCOME,
-  INCOME_LABEL,
   REBALANCE_CATEGORY,
   REBALANCE_CATEGORY_LABEL,
-  isUnclassifiedCategory,
   isRebalanceCategory,
   categoryLabel,
 } from "./categories";
@@ -27,7 +25,6 @@ export type { CategoryDef, CategoryKind } from "./categories";
 
 export {
   TRANSFER_PURPOSES,
-  TRANSFER_PURPOSE_BY_ID,
   isTransferPurpose,
   isSpendingPurpose,
   purposeCategoryId,

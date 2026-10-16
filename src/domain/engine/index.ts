@@ -19,8 +19,6 @@ export * from "./unallocated-pool";
 export * from "./unlabeled-spend";
 export * from "./jar-funding";
 export * from "./allocation-plan";
-export * from "./jar-input";
-export * from "./primary-account";
 export * from "./networth";
 export * from "./recurring";
 export * from "./obligations";

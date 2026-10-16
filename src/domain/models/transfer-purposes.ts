@@ -33,7 +33,7 @@ export const TRANSFER_PURPOSES: TransferPurposeDef[] = [
   { id: "other", label: "Khác", spending: false },
 ];
 
-export const TRANSFER_PURPOSE_BY_ID: Record<string, TransferPurposeDef> = Object.fromEntries(
+const TRANSFER_PURPOSE_BY_ID: Record<string, TransferPurposeDef> = Object.fromEntries(
   TRANSFER_PURPOSES.map((p) => [p.id, p]),
 );
 
