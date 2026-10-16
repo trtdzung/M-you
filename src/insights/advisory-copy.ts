@@ -95,23 +95,6 @@ const ADVISORY: Record<string, CopyByBand> = {
       intentId: "open-hu",
     },
   },
-  income_change: {
-    low: {
-      meaning: "Thu nhập tháng này giảm nhẹ so với tháng trước.",
-      action: "Xem lại phân bổ các hũ cho phù hợp",
-      intentId: "open-hu",
-    },
-    medium: {
-      meaning: "Thu nhập giảm khá rõ, dòng tiền tháng này eo hẹp hơn.",
-      action: "Cân đối lại các hũ cho tháng",
-      intentId: "open-hu",
-    },
-    high: {
-      meaning: "Thu nhập giảm mạnh so với tháng trước.",
-      action: "Rà soát lại phân bổ chi tiêu trong hũ",
-      intentId: "open-hu",
-    },
-  },
   recurring_summary: {
     low: {
       meaning: "Bạn có một vài khoản chi định kỳ đều đặn mỗi tháng.",

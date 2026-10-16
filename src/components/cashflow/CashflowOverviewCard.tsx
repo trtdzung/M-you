@@ -4,16 +4,15 @@ import { ArrowDownRight, ArrowUpRight, Info, Minus } from "lucide-react";
 import { Card, SectionHeader } from "@/components/primitives";
 import type { CashflowResult } from "@/domain/engine";
 import { formatVndUnit } from "@/lib/format";
-import { EXPENSE_GRADIENT, INCOME_GRADIENT } from "@/lib/cashflow-colors";
+import { EXPENSE_GRADIENT } from "@/lib/cashflow-colors";
 import { cn } from "@/lib/cn";
 
 /**
- * "Tổng quan thu chi" — two gradient bars comparing Chi tiêu (cam) and Thu nhập
- * (xanh) for the month, each with a month-over-month pill and its amount, plus
- * the net balance in the header. Every number is the deterministic engine's
- * `cashflow` (invariant #1); the net keeps its sign (never a false 0, #6). Bar
- * heights use a sqrt scale so a small bar stays readable next to a large one —
- * the pill + label carry the exact figures, the bar is only a glance.
+ * "Tổng quan chi tiêu" — a gradient bar for the month's Chi tiêu (cam) with a
+ * month-over-month pill and its amount, plus pending expense in the header.
+ * Every number is the deterministic engine's `cashflow` (invariant #1). Income
+ * was removed — the app tracks spending only. Bar height uses a sqrt scale so a
+ * small bar stays readable; the pill + label carry the exact figures.
  */
 export function CashflowOverviewCard({
   cashflow,
@@ -22,18 +21,19 @@ export function CashflowOverviewCard({
   cashflow: CashflowResult;
   prevCashflow: CashflowResult;
 }) {
-  const max = Math.max(cashflow.expense, cashflow.income, 1);
+  const max = Math.max(cashflow.expense, prevCashflow.expense, 1);
+  const hasPending = cashflow.pendingExpense > 0;
 
   return (
-    <section aria-label="Tổng quan thu chi">
+    <section aria-label="Tổng quan chi tiêu">
       <SectionHeader
         title={
           <span className="inline-flex items-center gap-1.5">
-            Tổng quan thu chi
+            Tổng quan chi tiêu
             <Info size={15} className="text-muted" aria-hidden="true" />
           </span>
         }
-        subtitle={`Khoản dư: ${formatVndUnit(cashflow.net)}`}
+        subtitle={hasPending ? `Đang chờ ghi nhận: ${formatVndUnit(cashflow.pendingExpense)}` : undefined}
       />
       <Card>
         <div className="flex items-end justify-center gap-10" style={{ height: 200 }}>
@@ -44,13 +44,6 @@ export function CashflowOverviewCard({
             max={max}
             gradient={EXPENSE_GRADIENT}
             goodWhenDown
-          />
-          <Bar
-            label="Thu nhập"
-            amount={cashflow.income}
-            prev={prevCashflow.income}
-            max={max}
-            gradient={INCOME_GRADIENT}
           />
         </div>
       </Card>

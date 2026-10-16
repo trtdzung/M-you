@@ -9,5 +9,5 @@ import { CATEGORY_BY_ID, type Transaction } from "@/domain/models";
  */
 export function typeForCategory(categoryId: string): Transaction["type"] {
   const kind = CATEGORY_BY_ID[categoryId]?.kind;
-  return kind === "transfer" ? "transfer" : kind === "income" ? "income" : "expense";
+  return kind === "transfer" ? "transfer" : "expense";
 }

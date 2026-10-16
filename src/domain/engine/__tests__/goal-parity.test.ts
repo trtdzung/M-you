@@ -35,7 +35,7 @@ describe("financial health — nulls stay unknown, never zeroed", () => {
   it("keeps uncomputable indicators null (rendered '—'), never coerced to 0", async () => {
     const { health } = await financialsFor("irregular");
     // Whatever cannot be computed is null (rendered "—"), not coerced to 0.
-    for (const ind of [health.runwayMonths, health.surplus, health.essentialCoverage, health.concentration]) {
+    for (const ind of [health.runwayMonths, health.concentration]) {
       expect(ind.value === null || typeof ind.value === "number").toBe(true);
       if (ind.value === null) expect(ind.value).not.toBe(0);
     }

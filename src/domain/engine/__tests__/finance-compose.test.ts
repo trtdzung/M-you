@@ -65,7 +65,6 @@ describe("computeFinancials", () => {
   it("honours a caller-supplied transaction override (corrections path)", async () => {
     const raw = await loadRaw("stable");
     const empty = computeFinancials(raw, MONTH, { transactions: [] });
-    expect(empty.cashflow.income).toBe(0);
     expect(empty.cashflow.expense).toBe(0);
     expect(empty.categorySpend).toEqual([]);
   });
@@ -167,19 +166,12 @@ describe("computeFinancials", () => {
     // accounts / networth the rest of `Financials` exposes (DRY, no local recompute).
     expect(f.health).toEqual(financialHealth(f.cashflow, raw.accounts, f.networth));
 
-    // All four indicators are populated (not the null default) for this persona.
+    // Both indicators are populated (not the null default) for this persona.
     expect(f.health.runwayMonths.value).not.toBeNull();
-    expect(typeof f.health.surplus.value).toBe("number");
-    expect(f.health.essentialCoverage.value).not.toBeNull();
     expect(f.health.concentration.value).not.toBeNull();
 
     // Derived → provenance forced to "estimated" (invariant #5).
-    for (const ind of [
-      f.health.runwayMonths,
-      f.health.surplus,
-      f.health.essentialCoverage,
-      f.health.concentration,
-    ]) {
+    for (const ind of [f.health.runwayMonths, f.health.concentration]) {
       expect(ind.source).toBe("estimated");
     }
 

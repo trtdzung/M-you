@@ -23,7 +23,7 @@ The product is a financial cockpit, not a generic chatbot. Deterministic financi
 
 ### Primary persona
 
-Retail MSB customer with salary income, multiple accounts/cards, recurring bills, and limited time to review personal finances.
+Retail MSB customer with multiple accounts/cards, recurring bills, and limited time to review personal finances.
 
 Typical needs:
 
@@ -54,7 +54,7 @@ Typical needs:
 |---|---|---|---|
 | 1. Money visibility | Understand daily money movement | Transactions, categories, cash flow, budgets, recurring payments, basic net worth | Summary, anomaly detection, explanations |
 | 2. Wealth picture | Understand assets, debts, and resilience | Assets, liabilities, goals, allocation, debt health, emergency fund | Analysis, projections, prioritization |
-| 3. Guided decisions & assisted actions | Choose a sensible next action and act on it safely | Surplus allocation, debt-vs-saving scenarios, goal planning, investment education, product discovery, assisted transfer drafting | Bounded recommendation, scenario explanation; prepare transfer draft for human review/confirm/OTP |
+| 3. Guided decisions & assisted actions | Choose a sensible next action and act on it safely | Balance/goal allocation, debt-vs-saving scenarios, goal planning, investment education, product discovery, assisted transfer drafting | Bounded recommendation, scenario explanation; prepare transfer draft for human review/confirm/OTP |
 
 ## Level 1: Money visibility
 
@@ -63,16 +63,17 @@ Typical needs:
 - Unified feed for mock MSB current accounts, savings, and credit cards.
 - Search, date filter, account filter, amount filter, and category filter.
 - Merchant normalization.
-- Income, expense, transfer, refund, fee, and card-payment transaction types.
+- Expense, transfer, refund, fee, and card-payment transaction types (income was removed — the product tracks spending only).
 - Category assignment with user correction.
+- Auto-categorization (implemented): unclassified transactions get a suggested category from the user's own learned merchant history, or — with `"ai"` consent granted — a hosted LLM (falling back to an on-device heuristic when unavailable); a low-confidence suggestion is shown but never auto-applied, and unclassified spend stays visible and counted, never hidden or zeroed. See "Auto-categorization" below.
 - Recurring transaction detection.
-- Internal transfers excluded from income and expense totals.
+- Internal transfers excluded from spending totals.
 - Clear status for pending, posted, refunded, and reversed transactions.
 
 ### Cash flow
 
 - Daily, weekly, and monthly views.
-- Income versus expense.
+- Expense composition (spending only — income was removed from the product).
 - Fixed versus discretionary expense.
 - Category contribution to total spend.
 - Upcoming recurring obligations.
@@ -87,7 +88,7 @@ Hũ is **a category-grouping budget model**, delivered by the BIDV-style wallet 
 - **Every expense category belongs to exactly one jar.** An orphaned category (a stale config, a bad migration) heals into a catch-all **"Khác"** jar rather than silently dropping out of totals — a defensive fallback, not a normal assignment path.
 - **A limit stays unknown until the user sets it — never coerced to 0.** A jar with no limit renders "Chưa đặt hạn mức" with a CTA, never a false 0%/"ok" bar (invariant #6). A savings-type jar with no categories assigned has no meaningful spend to limit, so it also stays unset by design (the seed templates leave it that way).
 - **Ngân sách is the budget truth**, computed per jar for the selected month: **đã tiêu** vs **hạn mức**, a progress bar, a "Vượt hạn mức" warning at and above the limit, an 80% near-threshold warning, and a month-over-month delta — plus a total gauge (limits vs. spend) computed only over jars that have a set limit. The same per-jar numbers back the spending donut on Tổng quan.
-- **Reachable as its own bottom-nav tab** ("Ngân sách") — see "Information architecture" below — with a reserved (empty-state) "Thu" sub-tab for a future income/goal view.
+- **Reachable as its own bottom-nav tab** ("Ngân sách") — see "Information architecture" below. The tab is spending-only; the reserved "Thu" sub-tab from earlier revisions of this document was removed along with income.
 - **The insight layer warns per-jar only.** `jarPressure` (over-limit / near-limit per jar) is now the product's **sole** budgeting warning; the earlier per-category budget-pressure warning was retired in the same change to avoid warning the user twice about the same overspend. The underlying per-category budget engine is **retained as AI-facing structured data**, not as a competing warning.
 - **Setup and edits live in Cài đặt → "Hũ & danh mục":** create/edit/delete a jar (name, color, icon, monthly limit — deleting a jar force-moves its categories to "Khác" first, so none are ever orphaned) and reassign a category to a different jar (exactly-one is enforced: assigning drops it from the old jar automatically). Preset categories are locked (cannot be renamed or deleted); a duplicate jar/category label is flagged with a warning. **Creating a brand-new category is not yet shipped** — a known, deliberate limitation, deferred pending a change to how the category taxonomy is stored.
 - **Onboarding (implemented):** a one-screen first-run setup — pick a seed jar template (Cá nhân: 6 hũ, default; Gia đình: 4 hũ; Kinh doanh: 3 hũ) and review the accounts pulled from the account provider, then start. Template limits are suggested (labelled `estimated`) and fully editable afterward in Cài đặt. Shown once per install; every later visit skips straight to Tổng quan.
@@ -97,6 +98,24 @@ Hũ is **a category-grouping budget model**, delivered by the BIDV-style wallet 
 - **Not a revival of the retired balance-lens residual, and not the orphaned surplus engine below.** The single-number model is neither a resurrection of the "Model A" balance-partition jar retired above, nor a rewiring of the orphaned `simulateSurplusAllocation`/`surplus.ts` engine described in the next bullet, which remains untouched and still has no mount point.
 - **Both "còn lại" readings now share the exact same formula.** Ngân sách tab and the Tổng quan envelope card both compute "còn lại" = **hạn mức (budgetLimit) − đã tiêu**. There is no case where they can diverge — they read the same one number.
 - **Level 3 surplus allocation is currently orphaned, not shipped in this model.** The deterministic "phân bổ thặng dư" what-if sourced its number from the retired balance-partition's "Chưa phân bổ" residual, which no longer exists. The calculation engine and its tests still exist, but its UI was removed with the rest of the retired balance-lens screens and it has no data source in the new model — it is unwired pending a future redefinition of "surplus" (e.g. against monthly cashflow instead of a balance residual).
+
+### Transfer-purpose suggestion — implemented, hosted LLM with on-device heuristic fallback
+
+After confirming a transfer (Home **Chuyển tiền** → confirm screen), the success card's "Phân loại giao dịch" section can also suggest **why** the money was sent — a separate label from the spend category above, using its own small taxonomy: gia đình, tiết kiệm/đầu tư, trả nợ, chuyển giữa ví của tôi, biếu tặng, kinh doanh, khác (metadata only), plus tiền nhà, chia tiền, and trả tiền mua đồ/dịch vụ (each of which *is* really a spend, mapping to housing/dining/shopping).
+
+- **Always a pending suggestion, never auto-applied:** a "Gợi ý mục đích: … · chờ bạn xác nhận" banner appears with **[Đồng ý]** / **[Chọn khác]** — nothing about the transaction changes until the user taps one.
+- **Same consent gate as auto-categorization:** with `"ai"` consent granted, the recipient name and memo are sent off-device to the same hosted model (VNG GreenNode) to get a suggestion, labelled "AI đề xuất"; without consent, or if that call fails, an on-device keyword fallback runs instead, labelled "Đề xuất tự động" (never mislabelled as AI). An unrecognized transfer gets no guess rather than a forced default.
+- **Accepting a non-spending purpose only records metadata** — the transaction stays a `type:"transfer"`, still excluded from spending totals. **Accepting a "tính vào chi tiêu" purpose (tiền nhà / chia tiền / trả tiền mua đồ) reclassifies the transfer into its mapped spend category**, exactly as if the user had picked that category directly — it now counts as an expense and, if the transfer was jar-sourced, debits that jar's actual spend the same way a manual category pick does.
+- **Known prototype limitation (shared with auto-categorization, see PFM-145):** the `"ai"` consent check that gates this off-device call is enforced client-side only; there is no server-side session/consent check on the proxy yet.
+
+### Auto-categorization (Chưa phân loại) — implemented, hosted LLM with on-device heuristic fallback
+
+Every transaction lacking a label carries the `UNCLASSIFIED` sentinel ("Chưa phân loại") — a dedicated, always-visible spend bucket, never a hidden or zeroed amount (invariant #6). The product offers a **suggested** label for these transactions, never a silent auto-apply of a guess it isn't confident about:
+
+- **Learned first, for free:** a merchant the user has already confirmed or corrected is remembered per persona and re-applied automatically with no model call and no confidence gate — the concrete form of "user correction improves the product" (see Product principles above).
+- **Suggested, not asserted:** for everything else, a suggestion is offered — labelled "AI gợi ý" when it came from the hosted model (`"ai"` consent + configured key), or "Gợi ý tự động" when it came from the on-device keyword fallback (never mislabelled as AI) — with a one-tap "Đồng ý" to confirm. A low-confidence suggestion sits as **pending** — visibly flagged, excluded from totals — until the user accepts or corrects it; it is never counted as if it were confirmed.
+- **Consent-gated:** a merchant name can only be sent off-device for auto-categorization with the `"ai"` consent scope granted (Cài đặt → consent). With `"ai"` granted and a model configured, that merchant/note text IS sent off-device to a third-party hosted model (VNG GreenNode) to get a suggestion; if that call is unavailable or fails, the app falls back to the on-device heuristic above for that transaction. Without `"ai"` consent, nothing is sent off-device at all — only the user's own learned memory applies, and no new guesses appear (see `plans/project-backlog.md`, PFM-145, for the known prototype limitations on this path).
+- **Never changes a number:** accepting or rejecting a suggestion only changes which category a transaction is filed under; it never edits an amount, a balance, or a jar limit — the deterministic engine remains the sole source of financial truth (invariant #1).
 
 ### Basic net worth
 
@@ -158,26 +177,22 @@ Initial goal templates:
 
 Each goal has target amount, target date, current amount, monthly contribution, priority, and funding source.
 
-**Manual manager (engine + components implemented; UI currently unmounted):** users create, edit, and delete goals (name, target amount, target date, optional monthly contribution); each goal supports a direct-tap what-if projection (live contribution slider) that returns the identical result as the chat assistant's `simulateGoal` tool. This lived on a **Kế hoạch** tab that no longer exists in any revision of the `/pfm` tab bar (removed in the earlier 3-tab reformat, `plans/260909-2254-pfm-3tab-reformat/`, and not reintroduced by the later 4-tab wallet reformat) — the CRUD logic, `GoalProvider`, and `simulateGoal` parity test are all intact and unaffected; only the screen mount point is gone (`// DEFERRED:` banner on `PlanTab`), pending a re-mount somewhere in the current IA (a future "Thu" tab is one option under discussion, not committed).
+**Manual manager (engine + components implemented; UI currently unmounted):** users create, edit, and delete goals (name, target amount, target date, optional monthly contribution); each goal supports a direct-tap what-if projection (live contribution slider) that returns the identical result as the chat assistant's `simulateGoal` tool. This lived on a **Kế hoạch** tab that no longer exists in any revision of the `/pfm` tab bar (removed in the earlier 3-tab reformat, `plans/260909-2254-pfm-3tab-reformat/`, and not reintroduced by the later 4-tab wallet reformat) — the CRUD logic, `GoalProvider`, and `simulateGoal` parity test are all intact and unaffected; only the screen mount point is gone (`// DEFERRED:` banner on `PlanTab`), pending a re-mount somewhere in the current IA.
 
 ### Financial health indicators — engine implemented; UI deferred
 
 Use several explainable indicators instead of one authoritative score:
 
-- Monthly surplus.
-- Essential-expense coverage.
 - Cash runway.
-- Debt-to-income ratio.
-- Emergency-fund progress.
 - Concentration of assets and liabilities.
 
-Each indicator is `null` (rendered as `—`) rather than defaulted to zero when its inputs are missing. The `HealthPanel` UI (all six indicators) lived on the same now-retired Kế hoạch tab as Goals above and remains unmounted; `Financials.health` composition is unaffected and unchanged. Only its runway figure has a separate display today, as a "Khả năng trang trải" KPI tile on the Tổng quan cockpit — the other five indicators have no display outside the still-unmounted `HealthPanel`.
+Income was removed from the product, so the income-derived indicators that used to sit alongside these (monthly surplus, essential-expense coverage, debt-to-income ratio) were removed with it — only the two income-free indicators remain. Each indicator is `null` (rendered as `—`) rather than defaulted to zero when its inputs are missing. The `HealthPanel` UI (both indicators) lived on the same now-retired Kế hoạch tab as Goals above and remains unmounted; `Financials.health` composition is unaffected and unchanged. Only its runway figure has a separate display today, as a "Khả năng trang trải" KPI tile on the Tổng quan cockpit — concentration has no display outside the still-unmounted `HealthPanel`.
 
 ## Level 3: Guided decisions
 
 ### In prototype scope
 
-- Surplus allocation between spending, emergency fund, debt repayment, and savings.
+- Balance allocation between spending, emergency fund, debt repayment, and savings (goal-based, not an income surplus — see "Hũ chi tiêu" above for the shipped CASA-balance allocation model; the Level-3 surplus-allocation engine itself is currently orphaned, unwired pending a redefinition of "surplus" without income).
 - Debt repayment scenarios.
 - Saving versus investing scenarios.
 - Goal completion projection.
@@ -286,7 +301,7 @@ The primary account card on Home shows a display-safe, masked account number (e.
    - **＋ FAB:** opens the manual "Thêm giao dịch" form (self-reported, never executes money movement).
    - **Ngân sách:** the per-jar budget truth — total gauge + one card per jar (spent/limit, progress, "Vượt hạn mức" warning, MoM delta) — see "Hũ chi tiêu" above.
    - **Cài đặt:** "Hũ & danh mục" — jar CRUD (name/color/icon/monthly limit/delete) and category reassignment — see "Hũ chi tiêu" above. Distinct from the app-level Settings screen (item 5 below).
-   - **Kế hoạch and Trợ lý (still not mounted anywhere in `/pfm`):** Mục tiêu CRUD + per-goal what-if, the surplus what-if panel, and the 2×2 financial-health panel (formerly Kế hoạch), and the copilot entry + suggested prompts + insights feed (formerly Trợ lý). The underlying engine, providers, and tests are untouched; the components (`PlanTab`, `AssistantTab`) carry `// DEFERRED:` banners. The insights feed surfaces inside the `/assistant` chat's empty state instead.
+   - **Kế hoạch and Trợ lý (still not mounted anywhere in `/pfm`):** Mục tiêu CRUD + per-goal what-if, the surplus what-if panel, and the 2-tile financial-health panel (runway + concentration; formerly Kế hoạch), and the copilot entry + suggested prompts + insights feed (formerly Trợ lý). The underlying engine, providers, and tests are untouched; the components (`PlanTab`, `AssistantTab`) carry `// DEFERRED:` banners. The insights feed surfaces inside the `/assistant` chat's empty state instead.
 4. **Tài sản & Nợ (`/pfm/wealth`):** a manual manager — add/edit/delete self-reported assets and liabilities, net-worth strip, read-only seed section, provenance + freshness per row (provenance data unchanged; the visible pill is hidden app-wide — see "Information architecture" above). Drilled into from Tổng quan or the `open-wealth` copilot intent; not a tab.
 5. **Settings (app-level, `/settings`):** consent scope view + revoke, demo persona switcher, About — reachable from the account card, not a tab. Not to be confused with the PFM "Cài đặt" tab above, which only manages hũ and categories.
 6. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off. Reached via the Assistant FAB on Trang chủ/Tài khoản (no longer inside `/pfm`, whose FAB now adds transactions).
@@ -320,14 +335,48 @@ The assistant may not, and today cannot (enforced in code, not just prompted):
 
 The assistant may (implemented, Level 3, assisted transfer drafting): *prepare* a transfer draft (prefill recipient, amount, memo, source account) for the user to review, confirm, and authenticate, feature-gated by `ENABLE_TRANSFER_DRAFTING`. When the flag is off, any transfer-intent request is refused outright, with no draft produced.
 
+### Auto-categorization contract (implemented, Level 1)
+
+Separate from the chat assistant above — no chat, and its own model call outside that assistant's pipeline — this is a lightweight enrichment pipeline that only ever proposes a `categoryId` for an `UNCLASSIFIED` ("Chưa phân loại") transaction (see "Auto-categorization" under Level 1 above).
+
+It may:
+
+- Suggest a category label for enrichment only, sourced from the user's own confirmed history (memory) or, with `"ai"` consent granted, a hosted LLM (VNG GreenNode) with an on-device heuristic fallback.
+- Auto-apply a suggestion only when its confidence clears a fixed threshold; otherwise leave it as an unconfirmed, clearly badged, not-yet-counted suggestion.
+- Learn a merchant → category mapping only from an explicit user accept/correct action.
+
+It may not, and today cannot:
+
+- Change any amount, balance, net worth, or budget number — only a category label.
+- Send a merchant name off-device without the `"ai"` consent scope.
+- Auto-apply a low-confidence guess as if it were user-confirmed.
+- Hide or zero out unclassified spend — "Chưa phân loại" stays a visible, counted bucket until labelled.
+- Invent a category outside the fixed Vietnamese taxonomy.
+
+### Transfer-purpose suggestion contract (implemented, Level 1)
+
+Also separate from the chat assistant — same lightweight, no-chat enrichment shape as auto-categorization above, but proposing a `transferPurpose` label (a distinct taxonomy from `categoryId`, see "Transfer-purpose suggestion" under Level 1 above) for a self-reported `type:"transfer"` transaction.
+
+It may:
+
+- Suggest a transfer purpose, sourced from an on-device keyword heuristic or, with `"ai"` consent granted, the same hosted LLM (VNG GreenNode) used for auto-categorization.
+- Reclassify the transfer into a mapped spend category (and sync the jar it draws from) — but only after the user explicitly accepts a "tính vào chi tiêu" purpose; never on suggestion alone.
+
+It may not, and today cannot:
+
+- Auto-apply any purpose without a user tap — the suggestion is always shown as pending.
+- Change an amount, balance, or jar limit directly — only ever a category/type reclassification the user approved.
+- Send the recipient name or memo off-device without the `"ai"` consent scope.
+- Invent a purpose outside the fixed taxonomy, or guess "Khác" as a silent default when nothing matches.
+
 ## Mock-data strategy
 
 The prototype uses realistic but synthetic data:
 
-- One sample customer with salary income.
+- One sample customer, salaried in flavor, but the mock generates no income transactions — only spending and account balances (income was removed from the product).
 - Two current accounts, one savings account, one credit card.
 - Six months of transactions.
-- Recurring rent, utilities, subscriptions, salary, and debt payment.
+- Recurring rent, utilities, subscriptions, and debt payment.
 - Manually entered fund, gold, vehicle, and personal loan.
 - Mock product catalogue for savings and investment scenarios.
 

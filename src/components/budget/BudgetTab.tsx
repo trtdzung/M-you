@@ -1,29 +1,25 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Wallet } from "lucide-react";
+import { Plus } from "lucide-react";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
-import { Card, Money, SectionHeader, SegmentedControl, SourceBadge } from "@/components/primitives";
+import { Card, Money, SectionHeader, SourceBadge } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/states";
 import { cn } from "@/lib/cn";
 import { useFinancials } from "@/state/useFinancials";
 import { BudgetGauge } from "./BudgetGauge";
 import { HuBudgetCard } from "./HuBudgetCard";
 
-type Seg = "chi" | "thu";
-
 /**
  * Ngân sách tab (BIDV wallet model): a total gauge (đã tiêu vs tổng hạn mức) + a
  * card per jar with progress + ⚠ warnings. Every number comes from
  * `financials.jarBudget` (engine, phase 02) — the tab only presents. Jars with an
- * unset limit are listed separately (never counted in the gauge). The Thu segment
- * is a placeholder for a future income-goal feature.
+ * unset limit are listed separately (never counted in the gauge). Income was
+ * removed — the tab is spending-only (no Thu segment).
  */
 export function BudgetTab() {
   const { loading, error, financials } = useFinancials();
   const router = useRouter();
-  const [seg, setSeg] = useState<Seg>("chi");
 
   function openEditor(huId: string) {
     router.replace(`/pfm?tab=settings&hu=${huId}`, { scroll: false });
@@ -57,23 +53,7 @@ export function BudgetTab() {
         </span>
       </div>
 
-      <SegmentedControl
-        ariaLabel="Loại ngân sách"
-        value={seg}
-        onChange={setSeg}
-        options={[
-          { value: "chi", label: "Chi tiêu" },
-          { value: "thu", label: "Thu nhập" },
-        ]}
-      />
-
-      {seg === "thu" ? (
-        <Empty
-          title="Mục tiêu thu nhập — sắp có"
-          description="Đặt mục tiêu thu nhập theo tháng sẽ có trong bản cập nhật tới."
-          icon={<Wallet size={40} strokeWidth={1.5} />}
-        />
-      ) : lines.length === 0 ? (
+      {lines.length === 0 ? (
         <Empty
           title="Chưa có hũ nào"
           description="Tạo hũ và đặt hạn mức để theo dõi chi tiêu theo nhóm."

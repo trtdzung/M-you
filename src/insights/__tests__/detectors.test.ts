@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { currentMonthKey } from "@/lib/demo-clock";
 import { runDetectors } from "../run";
 import { spendingSpike } from "../detectors/spending-spike";
-import { incomeChange } from "../detectors/income-change";
 import { numbersIn, factValues } from "../narrate";
 import type { Insight } from "../types";
 import { makeCashflow, makeFinancials, makeJarBudgetLine, makeJarBudgetResult } from "./helpers";
@@ -41,16 +40,6 @@ describe("spendingSpike detector", () => {
       }),
     );
     expect(insight).toBeNull();
-  });
-});
-
-describe("incomeChange detector", () => {
-  it("flags a >=15% drop as attention and stays grounded", () => {
-    const insight = incomeChange(
-      makeFinancials({ cashflow: makeCashflow({ income: 15_000_000 }), prevCashflow: makeCashflow({ income: 25_000_000 }) }),
-    );
-    expect(insight?.severity).toBe("attention");
-    assertGrounded(insight!);
   });
 });
 

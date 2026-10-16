@@ -173,7 +173,7 @@ export function computeFinancials(
   // every caller (incl. the future AI facade), not just the Overview wiring.
   const isCurrentMonth = month === dateToMonthKey(now);
   const endOfMonth: EndOfMonthEstimate = isCurrentMonth
-    ? estimateEndOfMonth(raw.accounts, cashflow, recurring, obligations, now)
+    ? estimateEndOfMonth(raw.accounts, cashflow, obligations, now)
     : { value: "unknown", meta: { source: "estimated", freshness: cashflow.meta.freshness } };
 
   const jarConfig: JarConfig = options.jarConfig ?? { version: 3, jars: [] };

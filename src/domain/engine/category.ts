@@ -16,10 +16,6 @@ export interface CategorySpend {
   share: number;
 }
 
-function inPeriod(txn: Transaction, period: Period): boolean {
-  return txn.postedAt >= period.from && txn.postedAt <= period.to;
-}
-
 function toRows(byCat: Map<string, number>, topN?: number): CategorySpend[] {
   const total = Array.from(byCat.values()).reduce((s, v) => s + Math.max(0, v), 0);
   const rows: CategorySpend[] = Array.from(byCat.entries())
@@ -36,19 +32,4 @@ function toRows(byCat: Map<string, number>, topN?: number): CategorySpend[] {
 
 export function spendingByCategory(txns: Transaction[], period: Period, topN?: number): CategorySpend[] {
   return toRows(netExpenseByCategory(txns, period), topN);
-}
-
-/**
- * Income per category for posted transactions in the period (type === "income";
- * transfers and refunds are excluded, matching `aggregateCashflow`). Mirrors
- * `spendingByCategory` so the Báo cáo thu chi donut can toggle Thu nhập with the
- * same shape and provenance rules.
- */
-export function incomeByCategory(txns: Transaction[], period: Period, topN?: number): CategorySpend[] {
-  const byCat = new Map<string, number>();
-  for (const t of txns) {
-    if (t.status !== "posted" || t.type !== "income" || !inPeriod(t, period)) continue;
-    byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amount);
-  }
-  return toRows(byCat, topN);
 }

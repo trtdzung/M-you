@@ -1,8 +1,9 @@
 /**
- * Cash-flow aggregation — the core income/expense truth.
+ * Cash-flow aggregation — the core expense truth (income was removed; the product
+ * only tracks spending).
  *
  * Rules enforced here (architectural invariants):
- *  - internal transfers and credit-card payments are excluded from income/expense
+ *  - internal transfers and credit-card payments are excluded from expense
  *  - refunds reverse the matching expense category (applied as negative expense)
  *  - reversed transactions are excluded from all totals
  *  - pending is kept separate from posted
@@ -18,10 +19,8 @@ export interface CategoryAmount {
 }
 
 export interface CashflowResult {
-  income: number;
   /** Net expense (gross expense − refunds), excludes transfers/card payments. */
   expense: number;
-  net: number;
   /** Net expense per category (may include refunds), positive-ish, sorted desc. */
   byCategory: CategoryAmount[];
   fixed: number;
@@ -52,7 +51,6 @@ export function netExpenseByCategory(txns: Transaction[], period: Period): Map<s
 }
 
 export function aggregateCashflow(txns: Transaction[], period: Period): CashflowResult {
-  let income = 0;
   let pendingExpense = 0;
   let latest: string | null = null;
   const sources: Transaction["source"][] = [];
@@ -68,7 +66,6 @@ export function aggregateCashflow(txns: Transaction[], period: Period): Cashflow
 
     sources.push(t.source);
     if (!latest || t.postedAt > latest) latest = t.postedAt;
-    if (t.type === "income") income += t.amount;
   }
 
   const byCatMap = netExpenseByCategory(txns, period);
@@ -89,9 +86,7 @@ export function aggregateCashflow(txns: Transaction[], period: Period): Cashflow
   };
 
   return {
-    income,
     expense,
-    net: income - expense,
     byCategory,
     fixed,
     discretionary: expense - fixed,

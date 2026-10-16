@@ -9,7 +9,6 @@ describe("engine + fixtures integration", () => {
     const txns = await p.listTransactions();
     const cf = aggregateCashflow(txns, monthPeriodFromKey("2026-06"));
 
-    expect(cf.income).toBeGreaterThan(0);
     expect(cf.expense).toBeGreaterThan(0);
     // Internal transfers (2,000,000 each month) must not appear as expense.
     expect(cf.byCategory.some((c) => c.categoryId === "transfer")).toBe(false);

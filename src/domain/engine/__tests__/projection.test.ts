@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { Account } from "@/domain/models";
 import type { CashflowResult } from "../cashflow";
 import type { Obligation } from "../obligations";
-import type { RecurringSeries } from "../recurring";
 import { networthTrend } from "../networth";
 import { cashRunwayMonths, estimateEndOfMonth, liquidBalance } from "../projection";
 import type { MonthlySnapshot } from "@/domain/models";
@@ -26,9 +25,7 @@ function account(over: Partial<Account> = {}): Account {
 
 function cashflow(over: Partial<CashflowResult> = {}): CashflowResult {
   return {
-    income: over.income ?? 0,
     expense: over.expense ?? 0,
-    net: over.net ?? 0,
     byCategory: [],
     fixed: over.fixed ?? 0,
     discretionary: over.discretionary ?? 0,
@@ -38,21 +35,6 @@ function cashflow(over: Partial<CashflowResult> = {}): CashflowResult {
       sourceCoverage: { sources: [], knownCount: 0, unknownCount: 0 },
       freshness: over.meta?.freshness ?? "2026-09-14T00:00:00.000Z",
     },
-  };
-}
-
-function income(dayOfMonth: number, amount: number): RecurringSeries {
-  return {
-    merchantNormalizedName: `inc_${dayOfMonth}`,
-    label: "Lương",
-    categoryId: "salary",
-    direction: "credit",
-    occurrences: 6,
-    distinctMonths: 6,
-    averageAmount: amount,
-    averageDayOfMonth: dayOfMonth,
-    lastPostedAt: "2026-08-05T00:00:00.000Z",
-    isExpense: false,
   };
 }
 
@@ -77,16 +59,15 @@ describe("liquidBalance", () => {
 
 describe("estimateEndOfMonth", () => {
   it("applies the full run-rate formula and forces estimated provenance", () => {
-    // liquid 63M; income of 10M due day 25 (in window); oblig 5M due day 20;
-    // discretionary 3M over 15 days → run-rate 200k/day × 15 remaining = 3M.
+    // liquid 63M; oblig 5M due day 20; discretionary 3M over 15 days → run-rate
+    // 200k/day × 15 remaining = 3M. (Income was removed — no inflow term.)
     const r = estimateEndOfMonth(
       LIQUID_ACCTS,
       cashflow({ discretionary: 3_000_000, expense: 6_000_000 }),
-      [income(25, 10_000_000)],
       [obligation("2026-09-20T10:00:00.000Z", 5_000_000)],
       NOW,
     );
-    expect(r.value).toBe(63_000_000 + 10_000_000 - 5_000_000 - 3_000_000);
+    expect(r.value).toBe(63_000_000 - 5_000_000 - 3_000_000);
     expect(r.meta.source).toBe("estimated");
     expect(r.meta.freshness).toBe("2026-09-14T00:00:00.000Z"); // oldest input
   });
@@ -95,7 +76,6 @@ describe("estimateEndOfMonth", () => {
     const r = estimateEndOfMonth(
       LIQUID_ACCTS,
       cashflow({ discretionary: 1_000_000 }),
-      [],
       [obligation("2026-09-20T10:00:00.000Z", "unknown")],
       NOW,
     );
@@ -103,17 +83,9 @@ describe("estimateEndOfMonth", () => {
     expect(r.meta.source).toBe("estimated");
   });
 
-  it("excludes income whose next occurrence falls after month end", () => {
-    // income day 5: already passed this month → next occurrence is next month → excluded.
-    const early = estimateEndOfMonth(LIQUID_ACCTS, cashflow(), [income(5, 10_000_000)], [], NOW);
-    // income day 25: still ahead this month → included.
-    const later = estimateEndOfMonth(LIQUID_ACCTS, cashflow(), [income(25, 10_000_000)], [], NOW);
-    expect(later.value).toBe((early.value as number) + 10_000_000);
-  });
-
   it("excludes obligations due after month end", () => {
-    const inMonth = estimateEndOfMonth(LIQUID_ACCTS, cashflow(), [], [obligation("2026-09-28T10:00:00.000Z", 4_000_000)], NOW);
-    const nextMonth = estimateEndOfMonth(LIQUID_ACCTS, cashflow(), [], [obligation("2026-10-02T10:00:00.000Z", 4_000_000)], NOW);
+    const inMonth = estimateEndOfMonth(LIQUID_ACCTS, cashflow(), [obligation("2026-09-28T10:00:00.000Z", 4_000_000)], NOW);
+    const nextMonth = estimateEndOfMonth(LIQUID_ACCTS, cashflow(), [obligation("2026-10-02T10:00:00.000Z", 4_000_000)], NOW);
     expect((nextMonth.value as number) - (inMonth.value as number)).toBe(4_000_000);
   });
 
@@ -121,8 +93,8 @@ describe("estimateEndOfMonth", () => {
     const cf = cashflow({ discretionary: 3_000_000 });
     const earlyNow = new Date("2026-09-05T00:00:00.000Z"); // 5 elapsed, 25 remaining
     const lateNow = new Date("2026-09-25T00:00:00.000Z"); // 25 elapsed, 5 remaining
-    const early = estimateEndOfMonth(LIQUID_ACCTS, cf, [], [], earlyNow);
-    const late = estimateEndOfMonth(LIQUID_ACCTS, cf, [], [], lateNow);
+    const early = estimateEndOfMonth(LIQUID_ACCTS, cf, [], earlyNow);
+    const late = estimateEndOfMonth(LIQUID_ACCTS, cf, [], lateNow);
     // less spend projected late → higher end-of-month cash.
     expect(late.value as number).toBeGreaterThan(early.value as number);
   });

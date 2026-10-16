@@ -13,7 +13,6 @@
 import type { Account, DataSource } from "@/domain/models";
 import type { CashflowResult } from "./cashflow";
 import type { Obligation } from "./obligations";
-import type { RecurringSeries } from "./recurring";
 import { isKnown, type Amount } from "./types";
 
 /** Lightweight provenance for a derived projection. */
@@ -53,15 +52,6 @@ function endOfMonthMs(now: Date): number {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999);
 }
 
-/** Next occurrence of `dayOfMonth` on or after `now`, as ms. */
-function nextOccurrenceMs(now: Date, dayOfMonth: number): number {
-  const y = now.getUTCFullYear();
-  const m = now.getUTCMonth();
-  let ms = Date.UTC(y, m, dayOfMonth, 10);
-  if (ms < now.getTime()) ms = Date.UTC(y, m + 1, dayOfMonth, 10);
-  return ms;
-}
-
 export interface EndOfMonthEstimate {
   /** Projected liquid cash at month end, or "unknown" if an input is unknown. */
   value: Amount;
@@ -73,16 +63,15 @@ export interface EndOfMonthEstimate {
  * called when `now` and the displayed month coincide). Full run-rate formula
  * (Validation S1):
  *
- *   liquidNow + expectedIncome − remainingObligations − projectedDiscretionary
+ *   liquidNow − remainingObligations − projectedDiscretionary
  *
- * Assumptions (all disclosed via the "ước tính" badge): recurring income lands on
- * schedule, discretionary continues at the month-to-date daily run-rate, and
- * obligations are paid on their due date.
+ * Assumptions (all disclosed via the "ước tính" badge): discretionary continues
+ * at the month-to-date daily run-rate, and obligations are paid on their due
+ * date. (Income was removed from the product, so no inflow term is projected.)
  */
 export function estimateEndOfMonth(
   accounts: Account[],
   cashflow: CashflowResult,
-  recurring: RecurringSeries[],
   obligations: Obligation[],
   now: Date,
 ): EndOfMonthEstimate {
@@ -95,14 +84,6 @@ export function estimateEndOfMonth(
   };
 
   const liquidNow = liquidBalance(accounts);
-
-  // Recurring INCOME (credit) whose next occurrence still falls inside this month.
-  let expectedIncome = 0;
-  for (const r of recurring) {
-    if (r.direction !== "credit") continue;
-    const dueMs = nextOccurrenceMs(now, r.averageDayOfMonth);
-    if (dueMs >= nowMs && dueMs <= eomMs) expectedIncome += r.averageAmount;
-  }
 
   // Obligations due between now and month end. Red Team C1: any unknown amount
   // in the window poisons the whole estimate to "unknown" — never coerced to 0.
@@ -120,7 +101,7 @@ export function estimateEndOfMonth(
   const projDiscretionary =
     daysElapsed > 0 ? (cashflow.discretionary / daysElapsed) * daysRemaining : 0;
 
-  const value = Math.round(liquidNow + expectedIncome - remainingOblig - projDiscretionary);
+  const value = Math.round(liquidNow - remainingOblig - projDiscretionary);
   return { value, meta };
 }
 

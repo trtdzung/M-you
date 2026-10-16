@@ -9,13 +9,12 @@ import { SEVERITY_RANK } from "./types";
 import { jarPressure } from "./detectors/jar-pressure";
 import { upcomingObligation } from "./detectors/upcoming-obligation";
 import { spendingSpike } from "./detectors/spending-spike";
-import { incomeChange } from "./detectors/income-change";
 import { newRecurring } from "./detectors/new-recurring";
 
 // Per-hũ `jarPressure` is the sole budget warning (phase 08 retired the per-
 // category `budgetPressure` so the two never double-warn — H3). SEVERITY_RANK
-// orders the remaining detectors.
-const DETECTORS = [jarPressure, upcomingObligation, spendingSpike, incomeChange, newRecurring];
+// orders the remaining detectors. (income_change was removed with income.)
+const DETECTORS = [jarPressure, upcomingObligation, spendingSpike, newRecurring];
 
 export function runDetectors(f: Financials): Insight[] {
   return DETECTORS.map((d) => d(f))

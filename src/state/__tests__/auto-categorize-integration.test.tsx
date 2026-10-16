@@ -5,7 +5,6 @@ import { CorrectionsProvider, useCorrections, type Assignment } from "@/state/co
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { JarConfigProvider } from "@/state/jars";
-import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { GoalProvider } from "@/state/goals";
 import { PeriodProvider } from "@/state/period";
@@ -49,7 +48,6 @@ function renderStack() {
         <CategoryMemoryProvider>
           <ManualTxnsProvider>
             <JarConfigProvider>
-              <JarAllocationsProvider>
                 <AssetLiabilityProvider>
                   <GoalProvider>
                     <PeriodProvider>
@@ -57,7 +55,6 @@ function renderStack() {
                     </PeriodProvider>
                   </GoalProvider>
                 </AssetLiabilityProvider>
-              </JarAllocationsProvider>
             </JarConfigProvider>
           </ManualTxnsProvider>
         </CategoryMemoryProvider>

@@ -9,9 +9,8 @@ import { PERSONAS } from "@/providers/mock/personas";
 import { UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
 
 describe("isUnclassified (type gate — Red Team #4)", () => {
-  it("is true for an unclassified expense or income", () => {
+  it("is true for an unclassified expense", () => {
     expect(isUnclassified(txn({ categoryId: UNCLASSIFIED, type: "expense" }))).toBe(true);
-    expect(isUnclassified(txn({ categoryId: UNCLASSIFIED, type: "income" }))).toBe(true);
   });
 
   it("is false for structural types even when unlabelled", () => {

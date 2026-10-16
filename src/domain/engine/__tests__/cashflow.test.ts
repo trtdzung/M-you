@@ -6,24 +6,20 @@ import { txn } from "./helpers";
 const JUNE = monthPeriod(2026, 5); // 06/2026
 
 describe("aggregateCashflow", () => {
-  it("sums income and expense from posted transactions", () => {
+  it("sums expense from posted transactions", () => {
     const result = aggregateCashflow(
       [
-        txn({ type: "income", direction: "credit", categoryId: "salary", amount: 25_000_000 }),
         txn({ type: "expense", categoryId: "dining", amount: 200_000 }),
         txn({ type: "expense", categoryId: "housing", amount: 6_000_000 }),
       ],
       JUNE,
     );
-    expect(result.income).toBe(25_000_000);
     expect(result.expense).toBe(6_200_000);
-    expect(result.net).toBe(18_800_000);
   });
 
-  it("excludes internal transfers and card payments from income/expense", () => {
+  it("excludes internal transfers and card payments from expense", () => {
     const result = aggregateCashflow(
       [
-        txn({ type: "income", direction: "credit", categoryId: "salary", amount: 20_000_000 }),
         txn({ type: "transfer", categoryId: "transfer", amount: 2_000_000, transferGroupId: "g1" }),
         txn({ type: "transfer", direction: "credit", categoryId: "transfer", amount: 2_000_000, transferGroupId: "g1" }),
         txn({ type: "card_payment", categoryId: "transfer", amount: 1_500_000 }),
@@ -31,7 +27,6 @@ describe("aggregateCashflow", () => {
       ],
       JUNE,
     );
-    expect(result.income).toBe(20_000_000);
     expect(result.expense).toBe(300_000);
   });
 

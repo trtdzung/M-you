@@ -56,9 +56,6 @@ describe("provider factory", () => {
     const all = await providers.listTransactions();
     expect(all.length).toBeGreaterThan(0);
 
-    const income = await providers.listTransactions({ type: "income" });
-    expect(income.every((t) => t.type === "income")).toBe(true);
-
     const junePosted = await providers.listTransactions({
       from: "2026-06-01T00:00:00.000Z",
       to: "2026-06-30T23:59:59.000Z",

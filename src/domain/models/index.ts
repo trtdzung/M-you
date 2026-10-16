@@ -41,7 +41,6 @@ export const CURRENCY_VND = "VND" as const;
 
 export type TransactionDirection = "credit" | "debit";
 export type TransactionType =
-  | "income"
   | "expense"
   | "transfer"
   | "refund"

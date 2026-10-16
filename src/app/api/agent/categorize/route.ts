@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   const { user_id, items } = body;
   // "transfer_purpose" classifies transfers into the purpose taxonomy; default
-  // "spending" maps merchants into expense/income categories.
+  // "spending" maps merchants into expense categories (income was removed).
   const systemPrompt =
     body.mode === "transfer_purpose" ? TRANSFER_PURPOSE_SYSTEM_PROMPT : CATEGORIZE_SYSTEM_PROMPT;
   if (!user_id || typeof user_id !== "string") {

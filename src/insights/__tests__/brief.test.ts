@@ -33,7 +33,7 @@ describe("composeMonthlyBrief — insufficient data", () => {
 
 describe("composeMonthlyBrief — data suffices", () => {
   const spike = makeFinancials({
-    cashflow: makeCashflow({ income: 10_000_000, byCategory: [{ categoryId: "shopping", amount: 3_000_000 }] }),
+    cashflow: makeCashflow({ byCategory: [{ categoryId: "shopping", amount: 3_000_000 }] }),
     prevCashflow: makeCashflow({ byCategory: [{ categoryId: "shopping", amount: 1_000_000 }] }),
   });
 
@@ -55,13 +55,6 @@ describe("composeMonthlyBrief — data suffices", () => {
     for (const a of brief.actions) expect(isCopilotIntent(a.intentId)).toBe(true);
   });
 
-  it("surfaces a positive for a net surplus", () => {
-    const brief = composeMonthlyBrief(spike);
-    const pos = brief.positives.find((p) => p.title === "Dòng tiền dương");
-    expect(pos).toBeDefined();
-    expect(pos!.detail).toContain("10.000.000"); // net from the engine (cashflow.net)
-  });
-
   it("carries provenance on every finding and highlight", () => {
     const brief = composeMonthlyBrief(spike);
     for (const item of [...brief.positives, ...brief.risks]) {
@@ -74,15 +67,8 @@ describe("composeMonthlyBrief — data suffices", () => {
     }
   });
 
-  it("keeps every displayed number grounded in an engine fact", () => {
+  it("keeps every displayed number in a highlight grounded in an engine fact", () => {
     const brief = composeMonthlyBrief(spike);
-    const net = spike.cashflow.net;
-    for (const p of brief.positives) {
-      for (const n of numbersIn(p.detail)) {
-        if (n >= 1900 && n <= 2100) continue;
-        if (n >= 1000) expect(n).toBe(Math.abs(net));
-      }
-    }
     for (const h of brief.highlights) {
       const facts = factValues(h.insight);
       for (const n of numbersIn(h.insight.explanation)) {
@@ -94,26 +80,24 @@ describe("composeMonthlyBrief — data suffices", () => {
 });
 
 describe("composeMonthlyBrief — data-rich but detector-quiet month", () => {
-  it("still yields ≥1 grounded fallback action from net cash flow", () => {
-    const surplus = makeFinancials({ cashflow: makeCashflow({ income: 10_000_000 }) });
-    const brief = composeMonthlyBrief(surplus);
+  it("still yields ≥1 grounded fallback action from the jar envelope pending balance", () => {
+    const quiet = makeFinancials({ cashflow: makeCashflow({}) });
+    const brief = composeMonthlyBrief(quiet);
     expect(brief.highlights).toHaveLength(0);
     expect(brief.actions).toHaveLength(1);
-    // Red-team #1: the surplus fallback points at the Hũ intent, which now
-    // resolves to the Ngân sách tab (BIDV 4-tab IA, plan 260910-1626). Assert the
-    // RESOLVED ROUTE, not the intent string, so the CTA can never dead-link.
+    // Red-team #1: the fallback points at the Hũ intent, which now resolves to
+    // the Ngân sách tab (BIDV 4-tab IA, plan 260910-1626). Assert the RESOLVED
+    // ROUTE, not the intent string, so the CTA can never dead-link.
     expect(resolveIntentRoute(brief.actions[0].intentId)).toBe("/pfm?tab=budget");
   });
 });
 
 describe("advisory CTAs resolve to live routes (red-team #1)", () => {
-  it("routes the remapped upcoming_obligation / income_change CTAs to the Ngân sách tab, never a dead /pfm", () => {
-    for (const type of ["upcoming_obligation", "income_change"] as const) {
-      for (const band of ["low", "medium", "high"] as const) {
-        const copy = advisoryFor(type, band);
-        expect(copy).not.toBeNull();
-        expect(resolveIntentRoute(copy!.intentId)).toBe("/pfm?tab=budget");
-      }
+  it("routes the remapped upcoming_obligation CTA to the Ngân sách tab, never a dead /pfm", () => {
+    for (const band of ["low", "medium", "high"] as const) {
+      const copy = advisoryFor("upcoming_obligation", band);
+      expect(copy).not.toBeNull();
+      expect(resolveIntentRoute(copy!.intentId)).toBe("/pfm?tab=budget");
     }
   });
 });
