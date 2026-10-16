@@ -161,34 +161,39 @@ export interface Budget {
 }
 
 /**
- * A spending jar's allocation. `percent` is a share of resolved income (may be
- * unknown → engine reports it unknown, never 0); `amount` is a fixed VND cap.
+ * A jar's allocation — its SHARE of the current primary-account balance (Model
+ * A, snapshot partition). `percent` is a percentage of that balance; `amount` is
+ * a fixed VND earmark. It never moves money and never depends on income or a
+ * clock — the earmark is resolved fresh against the live balance on every eval.
  */
 export type JarAllocation =
   | { mode: "percent"; value: number }
   | { mode: "amount"; value: number };
 
 /**
- * A user-defined spending jar wrapping one or more real expense categories.
- * No colour/icon here — presentation assigns a palette by index (UI concern).
+ * A user-defined jar. A jar is a display-only LENS over the current balance: it
+ * earmarks a share of the balance and groups one or more real expense categories
+ * so a per-period "đã tiêu" overlay can show budget-vs-actual. No sub-account, no
+ * jar balance, no money movement. Presentation assigns a palette by index.
  */
 export interface Jar {
   id: string;
   label: string;
-  /** Real expense category IDs this jar covers (spend-only — see AD1). */
+  /** Real expense category IDs this jar covers (one-category-one-jar). */
   categoryIds: string[];
   allocation: JarAllocation;
 }
 
 /**
  * Persisted jar configuration (user state, threaded into the engine — never
- * provider RawData). `incomeBasis`: `"auto"` detects salary; a number is a
- * manual override for percent-mode allocations.
+ * provider RawData). Model A / v2: a flat list of jars that partition the
+ * current balance. No `incomeBasis`, no anchor, no clock — those belonged to the
+ * superseded spending-envelope model. Stored v1 configs are discarded and
+ * reseeded on load (see `state/jars` migration).
  */
 export interface JarConfig {
-  version: 1;
+  version: 2;
   jars: Jar[];
-  incomeBasis: "auto" | number;
 }
 
 export interface Goal {

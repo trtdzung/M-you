@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Goal } from "@/domain/models";
-import { computeSurplus, simulateSurplusAllocation } from "../surplus";
+import { simulateSurplusAllocation, surplusFromResidual } from "../surplus";
 
 const goal = (over: Partial<Goal> = {}): Goal => ({
   id: "g",
@@ -12,17 +12,17 @@ const goal = (over: Partial<Goal> = {}): Goal => ({
   ...over,
 });
 
-describe("computeSurplus (M12 formula)", () => {
-  it("is income − expense, floored at 0", () => {
-    expect(computeSurplus(20_000_000, 14_000_000)).toBe(6_000_000);
+describe("surplusFromResidual (Model A — residual as a stock, red-team #1)", () => {
+  it("is the residual itself when positive (no expense re-subtraction)", () => {
+    expect(surplusFromResidual(6_000_000)).toBe(6_000_000);
   });
 
-  it("[Security-F6] is 'unknown' when income is unknown — never 0", () => {
-    expect(computeSurplus("unknown", 14_000_000)).toBe("unknown");
+  it("[Security-F6] is 'unknown' when the balance/residual is unknown — never 0", () => {
+    expect(surplusFromResidual("unknown")).toBe("unknown");
   });
 
-  it("is 0 (never negative) on a deficit month", () => {
-    expect(computeSurplus(10_000_000, 14_000_000)).toBe(0);
+  it("floors an over-allocated (negative) residual to 0", () => {
+    expect(surplusFromResidual(-3_000_000)).toBe(0);
   });
 });
 

@@ -1,6 +1,6 @@
 /** Build Financials fixtures for insight tests. */
 
-import type { CashflowResult, NetWorthResult } from "@/domain/engine";
+import type { CashflowResult, JarPartitionResult, NetWorthResult } from "@/domain/engine";
 import type { Financials } from "@/state/useFinancials";
 
 const META = {
@@ -28,6 +28,14 @@ const NETWORTH: NetWorthResult = {
   meta: { ...META, period: { from: "", to: "", label: "Hiện tại" } },
 };
 
+const EMPTY_PARTITION: JarPartitionResult = {
+  status: "ok",
+  primaryBalance: 0,
+  lines: [],
+  total: 0,
+  meta: { source: "mock", freshness: null },
+};
+
 export function makeFinancials(over: Partial<Financials> = {}): Financials {
   return {
     monthKey: over.monthKey ?? "2026-06",
@@ -44,7 +52,6 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     networthPrevious: over.networthPrevious ?? null,
     networthSeries: over.networthSeries ?? [],
     networthSeriesMeta: over.networthSeriesMeta ?? { source: null, count: 0, freshness: null },
-    jarLines: over.jarLines ?? [],
-    jarIncomeBasis: over.jarIncomeBasis ?? { value: "unknown", source: "estimated" },
+    jarPartition: over.jarPartition ?? EMPTY_PARTITION,
   };
 }

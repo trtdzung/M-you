@@ -1,70 +1,82 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import type { JarLine } from "@/domain/engine";
+import type { JarPartitionLine, JarPartitionResult } from "@/domain/engine";
 import { JarList } from "../JarList";
 
-/** Minimal jar line; override the fields a case cares about. */
-function line(over: Partial<JarLine>): JarLine {
+function jarLine(over: Partial<JarPartitionLine>): JarPartitionLine {
   return {
-    jarId: "j",
-    label: "Hũ",
+    jarId: "food",
+    label: "Ăn uống",
     categoryIds: ["dining"],
-    allocated: 1_000_000,
-    used: 500_000,
-    pct: 0.5,
-    daysLeft: 5,
-    status: "ok",
-    perCategory: [{ categoryId: "dining", label: "Ăn uống", used: 500_000 }],
+    earmark: 3_000_000,
+    spentThisPeriod: 1_000_000,
+    spentPrevPeriod: 900_000,
+    isOverBudget: false,
+    perCategory: [{ categoryId: "dining", label: "Ăn uống", spent: 1_000_000 }],
     meta: { source: "mock", freshness: null },
     ...over,
   };
 }
 
-describe("JarList", () => {
-  it("offers a setup link when no jars are configured", () => {
-    render(<JarList lines={[]} stale={false} />);
+function residual(over: Partial<JarPartitionLine> = {}): JarPartitionLine {
+  return {
+    jarId: "unallocated",
+    label: "Chưa phân bổ",
+    categoryIds: [],
+    earmark: 7_000_000,
+    spentThisPeriod: 0,
+    spentPrevPeriod: 0,
+    isOverBudget: false,
+    perCategory: [],
+    meta: { source: "msb", freshness: null },
+    isResidual: true,
+    isOverAllocated: false,
+    ...over,
+  };
+}
+
+function partition(lines: JarPartitionLine[], status: JarPartitionResult["status"] = "ok"): JarPartitionResult {
+  return { status, primaryBalance: status === "ok" ? 10_000_000 : null, lines, total: 10_000_000, meta: { source: "msb", freshness: null } };
+}
+
+describe("JarList (snapshot partition)", () => {
+  it("shows an insufficient-data state when the primary balance is unknown", () => {
+    render(<JarList partition={partition([], "unknown")} />);
+    expect(screen.getByText(/Không xác định được tài khoản chính/)).toBeInTheDocument();
+  });
+
+  it("offers a setup link when no explicit jars are configured", () => {
+    render(<JarList partition={partition([residual({ earmark: 10_000_000 })])} />);
     expect(screen.getByText("Thiết lập hũ")).toBeInTheDocument();
   });
 
-  it("renders an over-budget jar with the over status", () => {
-    render(<JarList lines={[line({ used: 1_200_000, pct: 1.2, status: "over" })]} stale={false} />);
-    expect(screen.getByText("Vượt hạn mức")).toBeInTheDocument();
+  it("renders chia + đã tiêu and the trust line for a normal jar", () => {
+    render(<JarList partition={partition([jarLine({}), residual()])} periodLabel="Tháng 6/2026" />);
+    expect(screen.getByText("Ăn uống")).toBeInTheDocument();
+    expect(screen.getByText(/tiền vẫn nằm nguyên trong tài khoản/)).toBeInTheDocument();
+    expect(screen.getByText(/Phần chia theo số dư hiện tại/)).toBeInTheDocument();
   });
 
-  it("[C1] never shows a green 'ok' status for an unknown-income jar", () => {
+  it("marks an over-budget jar as a budget breach (non-blocking)", () => {
     render(
       <JarList
-        lines={[line({ allocated: null, pct: null, status: "unknown" })]}
-        stale={false}
+        partition={partition([jarLine({ spentThisPeriod: 4_000_000, earmark: 3_000_000, isOverBudget: true }), residual()])}
       />,
     );
-    expect(screen.queryByText("Trong hạn mức")).not.toBeInTheDocument();
-    expect(screen.getByText("đặt thu nhập")).toBeInTheDocument();
-    expect(screen.getByText(/chưa xác định TN/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Vượt ngân sách/).length).toBeGreaterThan(0);
   });
 
-  it("[M13] renders the unassigned bucket as a neutral label with no status", () => {
+  it("renders the over-allocated warning when Σ chia exceeds the balance", () => {
     render(
       <JarList
-        lines={[
-          line({
-            jarId: "unassigned",
-            label: "Chưa phân hũ",
-            allocated: null,
-            pct: null,
-            status: "unknown",
-            isUnassigned: true,
-          }),
-        ]}
-        stale={false}
+        partition={partition([jarLine({ earmark: 13_000_000 }), residual({ earmark: -3_000_000, isOverAllocated: true })])}
       />,
     );
-    expect(screen.getByText("Chưa phân hũ")).toBeInTheDocument();
-    expect(screen.queryByText("đặt thu nhập")).not.toBeInTheDocument();
+    expect(screen.getByText(/Đã chia vượt số dư/)).toBeInTheDocument();
   });
 
-  it("[H2] suppresses the days-left urgency label on a stale month", () => {
-    render(<JarList lines={[line({ daysLeft: 5, status: "near" })]} stale />);
-    expect(screen.queryByText(/Còn 5 ngày/)).not.toBeInTheDocument();
+  it("shows no income UI (Model A dropped the income basis)", () => {
+    render(<JarList partition={partition([jarLine({}), residual()])} />);
+    expect(screen.queryByText(/thu nhập/i)).not.toBeInTheDocument();
   });
 });

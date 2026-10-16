@@ -7,9 +7,9 @@ import {
   calculateNetWorth,
   detectRecurring,
   evaluateBudget,
-  evaluateJars,
+  evaluateJarPartition,
   monthPeriodFromKey,
-  resolveIncomeBasis,
+  resolvePrimaryAccount,
   spendingByCategory,
   upcomingObligations,
 } from "..";
@@ -87,29 +87,34 @@ describe("computeFinancials", () => {
     expect(past.endOfMonth.meta.source).toBe("estimated");
   });
 
-  it("yields no jar lines when no jarConfig is supplied (default empty config)", async () => {
+  it("yields a full-balance residual partition when no jarConfig is supplied", async () => {
     const raw = await loadRaw("stable");
     const f = computeFinancials(raw, MONTH);
-    expect(f.jarLines).toEqual([]);
+    const balance = resolvePrimaryAccount(raw.accounts)!.balance;
+    expect(f.jarPartition.status).toBe("ok");
+    expect(f.jarPartition.lines).toHaveLength(1); // residual only
+    expect(f.jarPartition.lines[0].isResidual).toBe(true);
+    expect(f.jarPartition.total).toBe(balance);
   });
 
-  it("threads a supplied jarConfig through to jarLines + jarIncomeBasis", async () => {
+  it("threads a supplied jarConfig through to jarPartition, reconciling to balance", async () => {
     const raw = await loadRaw("stable");
     const jarConfig: JarConfig = {
-      version: 1,
+      version: 2,
       jars: [
         { id: "food", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } },
       ],
-      incomeBasis: "auto",
     };
     const f = computeFinancials(raw, MONTH, { jarConfig });
 
     const period = monthPeriodFromKey(MONTH);
-    const recurring = detectRecurring(raw.transactions);
-    const basis = resolveIncomeBasis(jarConfig, { transactions: raw.transactions }, recurring);
+    const prevPeriod = monthPeriodFromKey(prevMonthKey(MONTH));
+    const primary = resolvePrimaryAccount(raw.accounts);
 
-    expect(f.jarLines).toEqual(evaluateJars(jarConfig, raw.transactions, period, DEMO_NOW, basis));
-    expect(f.jarLines.length).toBeGreaterThan(0);
-    expect(f.jarIncomeBasis).toEqual({ value: basis.value, source: basis.source });
+    expect(f.jarPartition).toEqual(
+      evaluateJarPartition(jarConfig, primary, raw.transactions, period, prevPeriod),
+    );
+    expect(f.jarPartition.total).toBe(primary!.balance); // Σ ≡ số dư
+    expect(f.jarPartition.lines.length).toBeGreaterThan(1); // explicit jar + residual
   });
 });

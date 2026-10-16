@@ -1,78 +1,56 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ChevronDown } from "lucide-react";
-import type { JarLine } from "@/domain/engine";
+import { AlertTriangle, ChevronDown } from "lucide-react";
+import type { JarPartitionLine } from "@/domain/engine";
 import { Freshness, Money, SourceBadge } from "@/components/primitives";
 import { PressureRow, type PressureVariant } from "@/components/budget/PressureRow";
+import { DeltaBadge } from "@/components/common/DeltaBadge";
 import { cn } from "@/lib/cn";
 
-const STATUS_LABEL: Record<string, string> = {
-  ok: "Trong hạn mức",
-  near: "Sắp vượt",
-  over: "Vượt hạn mức",
-};
-
 /**
- * One jar rendered as a pressure card with a per-category drill-down and a
- * provenance footer. Three special shapes, all from the engine line:
- *  - `isUnassigned` ("Chưa phân hũ") → NEUTRAL, amount-only, never a status (M13).
- *  - `status: "unknown"` (percent jar, income unresolved) → NEUTRAL grey with a
- *    "đặt thu nhập" prompt and the raw spend shown; never green "ok" (C1).
- *  - `stale` (viewing a past month) → suppress days-left/urgency (H2).
+ * One explicit jar rendered as two numbers over a period-spend overlay:
+ *  - **chia** (`earmark`) — this jar's share of the CURRENT balance. It does NOT
+ *    deplete as you spend (Model A); it only changes when the balance or the
+ *    allocation changes.
+ *  - **đã tiêu kỳ này** (`spentThisPeriod`) — informational overlay of the
+ *    period's spend over the jar's categories, with a MoM delta.
+ * `isOverBudget` (spent > chia) is a budget breach: a clear, non-blocking
+ * warning ("chia" doubles as the monthly spending reference). Provenance footer
+ * per invariant #5. The residual "Chưa phân bổ" line is rendered by the meter,
+ * never as a jar card.
  */
-export function JarCard({
-  line,
-  accent,
-  stale,
-}: {
-  line: JarLine;
-  accent: string;
-  stale: boolean;
-}) {
+export function JarCard({ line, accent }: { line: JarPartitionLine; accent: string }) {
   const [open, setOpen] = useState(false);
 
-  const isUnknown = line.status === "unknown" || line.allocated === null;
-  const variant: PressureVariant = line.isUnassigned
-    ? "neutral"
-    : isUnknown
-      ? "unknown"
-      : (line.status as PressureVariant);
-
-  const statusLabel = line.isUnassigned || isUnknown ? undefined : STATUS_LABEL[line.status];
-  const rightLabel =
-    stale || isUnknown || line.isUnassigned
-      ? undefined
-      : line.daysLeft > 0
-        ? `Còn ${line.daysLeft} ngày`
-        : "Đã hết kỳ";
-  const limitLabel = isUnknown && !line.isUnassigned ? "chưa xác định TN" : undefined;
+  const pct = line.earmark > 0 ? line.spentThisPeriod / line.earmark : null;
+  const variant: PressureVariant = line.isOverBudget ? "over" : line.spentThisPeriod > 0 ? "ok" : "neutral";
+  const over = line.spentThisPeriod - line.earmark;
 
   return (
     <div className="rounded-2xl bg-surface-muted/40 p-3">
       <PressureRow
         label={line.label}
-        used={line.used}
-        limit={line.allocated}
-        pct={line.pct}
+        used={line.spentThisPeriod}
+        limit={line.earmark}
+        pct={pct}
         variant={variant}
-        statusLabel={statusLabel}
-        rightLabel={rightLabel}
-        limitLabel={limitLabel}
-        accent={
-          line.isUnassigned ? undefined : (
-            <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", accent)} aria-hidden />
-          )
-        }
+        statusLabel={line.isOverBudget ? "Vượt ngân sách" : undefined}
+        accent={<span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", accent)} aria-hidden />}
       />
 
-      {isUnknown && !line.isUnassigned && (
-        <p className="mt-1.5 text-xs text-muted">
-          Chưa xác định thu nhập —{" "}
-          <Link href="/pfm/jars" className="font-medium text-primary underline">
-            đặt thu nhập
-          </Link>
+      <div className="mt-1.5 flex items-center justify-between text-xs">
+        <span className="text-muted">
+          đã tiêu <Money amount={line.spentThisPeriod} className="text-text" /> / chia{" "}
+          <Money amount={line.earmark} className="text-text" />
+        </span>
+        <DeltaBadge current={line.spentThisPeriod} previous={line.spentPrevPeriod} goodWhenDown />
+      </div>
+
+      {line.isOverBudget && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warning">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          Vượt ngân sách <Money amount={over} className="font-medium text-warning" /> so với phần chia.
         </p>
       )}
 
@@ -93,7 +71,7 @@ export function JarCard({
           {line.perCategory.map((c) => (
             <li key={c.categoryId} className="flex items-center justify-between text-xs">
               <span className="text-muted">{c.label}</span>
-              <Money amount={c.used} className="text-text" />
+              <Money amount={c.spent} className="text-text" />
             </li>
           ))}
         </ul>

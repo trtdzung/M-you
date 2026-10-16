@@ -19,21 +19,29 @@ const jarKey = (personaId: PersonaId) => `msb-pfm.jars.${personaId}`;
 function isValidJarConfig(value: unknown): value is JarConfig {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v.version !== 1 || !Array.isArray(v.jars)) return false;
-  if (!(v.incomeBasis === "auto" || typeof v.incomeBasis === "number")) return false;
+  // v2 (Model A). A stored v1 fails here → treated as absent → caller reseeds.
+  if (v.version !== 2 || !Array.isArray(v.jars)) return false;
   return v.jars.every((jar) => {
     if (typeof jar !== "object" || jar === null) return false;
     const j = jar as Record<string, unknown>;
     const a = j.allocation as Record<string, unknown> | undefined;
-    return (
-      typeof j.id === "string" &&
-      typeof j.label === "string" &&
-      Array.isArray(j.categoryIds) &&
-      j.categoryIds.every((c) => typeof c === "string") &&
-      !!a &&
-      (a.mode === "percent" || a.mode === "amount") &&
-      typeof a.value === "number"
-    );
+    if (
+      typeof j.id !== "string" ||
+      typeof j.label !== "string" ||
+      !Array.isArray(j.categoryIds) ||
+      !j.categoryIds.every((c) => typeof c === "string") ||
+      !a ||
+      !(a.mode === "percent" || a.mode === "amount") ||
+      typeof a.value !== "number"
+    ) {
+      return false;
+    }
+    // The value must be a real, sane allocation — a corrupted / hand-edited
+    // record must never smuggle a NaN/Infinity/negative (or a >100% percent) past
+    // this boundary and into `resolveAllocation`, where it would break the
+    // `Σ ≡ số dư` identity. `validateJarInput` guards the in-app UI path; this
+    // guards the storage path with the same contract.
+    return Number.isFinite(a.value) && a.value >= 0 && (a.mode !== "percent" || a.value <= 100);
   });
 }
 

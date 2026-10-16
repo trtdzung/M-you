@@ -11,7 +11,6 @@ import type {
   Account,
   Asset,
   Budget,
-  DataSource,
   Goal,
   JarConfig,
   Liability,
@@ -21,16 +20,17 @@ import type {
 } from "@/domain/models";
 import {
   aggregateCashflow,
+  assertPartitionBalances,
   calculateNetWorth,
   cashRunwayMonths,
   dateToMonthKey,
   detectRecurring,
   estimateEndOfMonth,
   evaluateBudget,
-  evaluateJars,
+  evaluateJarPartition,
   monthPeriodFromKey,
   networthTrend,
-  resolveIncomeBasis,
+  resolvePrimaryAccount,
   spendingByCategory,
   upcomingObligations,
   type BudgetLine,
@@ -38,7 +38,7 @@ import {
   type CashRunway,
   type CategorySpend,
   type EndOfMonthEstimate,
-  type JarLine,
+  type JarPartitionResult,
   type NetWorthResult,
   type NetWorthTrendMeta,
   type Obligation,
@@ -81,10 +81,12 @@ export interface Financials {
   networthSeries: number[];
   /** Lowest-trust provenance over the exact snapshots feeding the series (H2). */
   networthSeriesMeta: NetWorthTrendMeta;
-  /** Spending-jar lines (empty when no jar config supplied). */
-  jarLines: JarLine[];
-  /** Income basis feeding percent-mode jars — unknown until salary/override. */
-  jarIncomeBasis: { value: number | "unknown"; source: DataSource };
+  /**
+   * Snapshot partition of the current primary-account balance (Model A):
+   * explicit jar earmarks + a "Chưa phân bổ" residual, `Σ ≡ balance`. Status is
+   * "unknown" when the primary account is ambiguous (0 or 2+ current accounts).
+   */
+  jarPartition: JarPartitionResult;
 }
 
 export interface ComposeOptions {
@@ -131,11 +133,18 @@ export function computeFinancials(
     ? estimateEndOfMonth(raw.accounts, cashflow, recurring, obligations, now)
     : { value: "unknown", meta: { source: "estimated", freshness: cashflow.meta.freshness } };
 
-  const jarConfig: JarConfig = options.jarConfig ?? { version: 1, jars: [], incomeBasis: "auto" };
-  // Resolve income from the same (correction-applied) txns `recurring` was
-  // detected from — not `raw.transactions` — so salary provenance stays in sync.
-  const jarIncome = resolveIncomeBasis(jarConfig, { transactions: txns }, recurring);
-  const jarLines = evaluateJars(jarConfig, txns, period, now, jarIncome);
+  const jarConfig: JarConfig = options.jarConfig ?? { version: 2, jars: [] };
+  // Partition the CURRENT balance (Model A): earmarks resolve against the primary
+  // account, the per-jar "đã tiêu" overlay uses the selected + previous period.
+  const jarPartition = evaluateJarPartition(
+    jarConfig,
+    resolvePrimaryAccount(raw.accounts),
+    txns,
+    period,
+    prevPeriod,
+  );
+  // Dev-only defence-in-depth: `Σ earmark === balance`. No-op in production.
+  assertPartitionBalances(jarPartition);
 
   return {
     monthKey: month,
@@ -152,7 +161,6 @@ export function computeFinancials(
     networthPrevious: trend.previous,
     networthSeries: trend.series,
     networthSeriesMeta: trend.meta,
-    jarLines,
-    jarIncomeBasis: { value: jarIncome.value, source: jarIncome.source },
+    jarPartition,
   };
 }

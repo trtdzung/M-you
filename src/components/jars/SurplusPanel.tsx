@@ -1,22 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { PiggyBank, CheckCircle2 } from "lucide-react";
 import { Card, Money, SourceBadge } from "@/components/primitives";
 import { Empty } from "@/components/states";
 import { useFinancials } from "@/state/useFinancials";
-import { computeSurplus, simulateSurplusAllocation } from "@/domain/engine";
+import { simulateSurplusAllocation, surplusFromResidual } from "@/domain/engine";
 import { cn } from "@/lib/cn";
 
 /**
- * Level 3 surplus allocation — a read-only what-if. Shows the month's surplus
- * (deterministic engine math, badged "estimated") and lets the user simulate
- * distributing it into savings goals with live projections. NO money movement,
- * NO draft: this only visualises numbers.
+ * Level 3 surplus allocation — a read-only what-if. The surplus IS the balance
+ * partition's "Chưa phân bổ" residual, a stock (Model A, red-team #1): no expense
+ * is subtracted again. It lets the user simulate distributing that residual into
+ * savings goals with live projections. NO money movement, NO draft.
  *
- * Income unknown → surplus is UNKNOWN, never 0₫ (Security-F6): the panel nudges
- * the user to set income above instead of implying there is nothing to save.
+ * Unknown primary balance → surplus is UNKNOWN, never 0₫ (Security-F6): the panel
+ * nudges the user instead of implying there is nothing to save.
  */
 export function SurplusPanel() {
   const { financials, raw } = useFinancials();
@@ -30,9 +29,12 @@ export function SurplusPanel() {
     );
   }
 
-  const income = financials.jarIncomeBasis.value;
-  const expense = financials.cashflow.expense;
-  const surplus = computeSurplus(income, expense);
+  const partition = financials.jarPartition;
+  const residual =
+    partition.status === "ok"
+      ? (partition.lines.find((l) => l.isResidual)?.earmark ?? "unknown")
+      : "unknown";
+  const surplus = surplusFromResidual(residual);
   const goals = raw?.goals ?? [];
 
   const plan = simulateSurplusAllocation({ surplus, goals, split });
@@ -47,20 +49,16 @@ export function SurplusPanel() {
 
       {surplus === "unknown" ? (
         <p className="text-sm text-muted">
-          Chưa xác định thặng dư.{" "}
-          <Link href="#" className="font-medium text-primary underline">
-            Đặt thu nhập trước
-          </Link>{" "}
-          để mô phỏng phân bổ.
+          Số dư tài khoản chính chưa xác định nên chưa tính được phần chưa phân bổ.
         </p>
       ) : surplus === 0 ? (
         <p className="text-sm text-muted">
-          Chưa có thặng dư tháng này để phân bổ. Nếu chi đang vượt thu, xem lại các hũ chi tiêu phía trên.
+          Không còn phần chưa phân bổ để mô phỏng. Nếu đã chia vượt số dư, xem lại các hũ phía trên.
         </p>
       ) : (
         <>
           <div className="flex items-baseline justify-between">
-            <span className="text-sm text-muted">Thặng dư tháng</span>
+            <span className="text-sm text-muted">Phần chưa phân bổ</span>
             <Money amount={surplus} className="text-lg font-bold text-text" />
           </div>
 

@@ -15,7 +15,7 @@ import { BudgetList } from "@/components/budget/BudgetList";
 import { JarList } from "@/components/jars/JarList";
 import { useFinancials } from "@/state/useFinancials";
 import { cashflowTrend } from "@/domain/engine";
-import { currentMonthKey } from "@/lib/demo-clock";
+import { monthKeyLabel } from "@/lib/demo-clock";
 
 /**
  * Dòng tiền tab (Red Team C4 — the view component, mounted by `PfmTabHost`; the
@@ -93,8 +93,8 @@ export function CashflowView() {
                 </Link>
               </div>
               <JarList
-                lines={financials.jarLines}
-                stale={financials.monthKey !== currentMonthKey()}
+                partition={financials.jarPartition}
+                periodLabel={monthKeyLabel(financials.monthKey)}
               />
             </AccordionCard>
             <AccordionCard icon={SlidersHorizontal} label="Cố định & linh hoạt">

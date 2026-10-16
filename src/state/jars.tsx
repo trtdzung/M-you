@@ -13,12 +13,28 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Jar, JarAllocation, JarConfig } from "@/domain/models";
-import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
+import {
+  configFromTemplate,
+  DEFAULT_JAR_CONFIG,
+  JAR_TEMPLATES,
+  type JarTemplate,
+} from "@/domain/models/jar-defaults";
 import { useProviders } from "@/providers/context";
 
 /** Fresh, deep copy of the seed so callers never share a mutable reference. */
 function seed(): JarConfig {
   return JSON.parse(JSON.stringify(DEFAULT_JAR_CONFIG)) as JarConfig;
+}
+
+/**
+ * Migrate a loaded config to v2. Model A dropped anchor + income basis, so a
+ * stored v1 is structurally incompatible — the migration DISCARDS it and reseeds
+ * (KISS; this is prototype localStorage, not a ledger — the accepted data loss is
+ * documented in the plan, red-team #11). A v2 config is normalized (dedupe).
+ */
+function migrateJarConfig(stored: JarConfig | null): JarConfig {
+  if (!stored || stored.version !== 2) return seed();
+  return dedupeCategories(stored);
 }
 
 /** Remove `catIds` from every jar except `exceptId` (keeps categories unique). */
@@ -41,7 +57,7 @@ function uniqueJarId(jars: Jar[], base: string): string {
  * Enforce one-category-one-jar on an arbitrary config (first jar to claim a
  * category keeps it). The mutators already guarantee this, but a config coming
  * straight from storage — hand-edited, or written by a future migration — has
- * not been through them, and `evaluateJars` would double-count an overlap. So
+ * not been through them, and `evaluateJarPartition` would double-count an overlap. So
  * every loaded config is normalized here before it can reach the engine.
  */
 function dedupeCategories(config: JarConfig): JarConfig {
@@ -63,7 +79,8 @@ interface JarConfigContextValue {
   /** Move a category into `jarId` (removing it from any other), or out (null). */
   assignCategory: (categoryId: string, jarId: string | null) => void;
   setAllocation: (id: string, allocation: JarAllocation) => void;
-  setIncomeBasis: (basis: "auto" | number) => void;
+  /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
+  applyTemplate: (templateId: JarTemplate["id"]) => void;
   resetToSeed: () => void;
 }
 
@@ -91,7 +108,7 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
     providers
       .getJarConfig()
       .then((stored) => {
-        if (active) apply(dedupeCategories(stored ?? seed()));
+        if (active) apply(migrateJarConfig(stored));
       })
       .catch(() => {
         if (active) apply(seed());
@@ -145,7 +162,12 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
           ...c,
           jars: c.jars.map((j) => (j.id === id ? { ...j, allocation } : j)),
         })),
-      setIncomeBasis: (basis) => mutate((c) => ({ ...c, incomeBasis: basis })),
+      applyTemplate: (templateId) =>
+        mutate(() =>
+          dedupeCategories(
+            JSON.parse(JSON.stringify(configFromTemplate(JAR_TEMPLATES[templateId]))) as JarConfig,
+          ),
+        ),
       resetToSeed: () => mutate(() => seed()),
     }),
     [config, mutate],
