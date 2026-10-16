@@ -20,6 +20,9 @@ import { buildChart } from "./whatif-chart";
 import { recordAuditEvent, newRequestId } from "@/ai/audit/log";
 import { CONSENT_VERSION } from "@/lib/consent";
 import type { AssistantEvent } from "./events";
+import type { AiDraftAudit } from "@/ai/audit/types";
+import { isTransferDraftingEnabled } from "@/ai/config";
+import { isTransferConfirmation, runActionPipeline } from "./action-pipeline";
 
 /** Mutable per-request trace, finalized into an audit event. */
 interface RequestTrace {
@@ -27,6 +30,8 @@ interface RequestTrace {
   degraded: boolean;
   numericOk: boolean;
   safetyOk: boolean;
+  /** Present only for assisted-transfer requests (metadata only). */
+  draft?: AiDraftAudit;
 }
 
 export interface ChatMessage {
@@ -144,6 +149,9 @@ export async function* runAssistant(input: RunInput): AsyncGenerator<AssistantEv
   const lastUser = [...input.messages].reverse().find((m) => m.role === "user");
   const intent = classifyIntent(lastUser?.content ?? "");
   const trace: RequestTrace = { toolsUsed: [], degraded: false, numericOk: true, safetyOk: true };
+  // Enter the draft pipeline for a fresh transfer OR a follow-up confirmation.
+  const isAction = intent.kind === "action_transfer" || isTransferConfirmation(input.messages);
+  let auditIntent = intent.kind;
 
   try {
     const scope = ensureScopes(intent, ctx.scopes);
@@ -154,10 +162,18 @@ export async function* runAssistant(input: RunInput): AsyncGenerator<AssistantEv
       return;
     }
 
-    if (intent.kind === "action_transfer") {
-      yield { type: "refusal", reason: "action_not_supported" };
-      yield { type: "text", delta: ACTION_REFUSAL };
-      yield { type: "done" };
+    if (isAction) {
+      auditIntent = "action_transfer";
+      if (!isTransferDraftingEnabled()) {
+        // Flag off: preserve the original hard refusal (no draft, no tool call).
+        trace.draft = { riskFlags: [], thresholdHit: false, outcome: "refused" };
+        yield { type: "refusal", reason: "action_not_supported" };
+        yield { type: "text", delta: ACTION_REFUSAL };
+        yield { type: "done" };
+        return;
+      }
+      // Draft-only: prepares a reviewable TransferDraft, never executes/confirms.
+      yield* runActionPipeline({ messages: input.messages, ctx }, trace, requestId);
       return;
     }
 
@@ -184,11 +200,12 @@ export async function* runAssistant(input: RunInput): AsyncGenerator<AssistantEv
       requestId,
       consentVersion: CONSENT_VERSION,
       dataScope: ctx.scopes,
-      intent: intent.kind,
+      intent: auditIntent,
       toolsUsed: trace.toolsUsed,
       validation: { numericOk: trace.numericOk, safetyOk: trace.safetyOk },
       degraded: trace.degraded,
       createdAt: new Date().toISOString(),
+      ...(trace.draft ? { draft: trace.draft } : {}),
     });
   }
 }

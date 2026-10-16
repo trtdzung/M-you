@@ -12,14 +12,14 @@ const ALL_SCOPES: ConsentScope[] = ["transactions", "assets", "liabilities", "ai
 
 async function makeCtx(overrides: Partial<AiContext> = {}, personaId: PersonaId = "stable"): Promise<AiContext> {
   const p = getProviders(personaId);
-  const [transactions, accounts, assets, liabilities, budgets, snapshots, goals, products] =
+  const [transactions, accounts, assets, liabilities, budgets, snapshots, goals, products, beneficiaries] =
     await Promise.all([
       p.listTransactions(), p.listAccounts(), p.listAssets(), p.listLiabilities(),
-      p.getBudgets(), p.getMonthlySnapshots(), p.listGoals(), p.listMockProducts(),
+      p.getBudgets(), p.getMonthlySnapshots(), p.listGoals(), p.listMockProducts(), p.listBeneficiaries(),
     ]);
   const raw: RawData = { transactions, accounts, assets, liabilities, budgets, snapshots, goals, products };
   const monthKey = currentMonthKey();
-  return { personaId, monthKey, raw, financials: computeFinancials(raw, monthKey), scopes: ALL_SCOPES, ...overrides };
+  return { personaId, monthKey, raw, financials: computeFinancials(raw, monthKey), scopes: ALL_SCOPES, beneficiaries, ...overrides };
 }
 
 /** Mock client: each streamMessage call returns the next scripted turn. */
@@ -83,12 +83,26 @@ describe("runAssistant pipeline", () => {
     expect(events.some((e) => e.type === "chart")).toBe(true);
   });
 
-  it("refuses a transfer action (Phase 1 hard block)", async () => {
+  it("refuses a transfer action when drafting is disabled (flag off)", async () => {
+    const prev = process.env.ENABLE_TRANSFER_DRAFTING;
+    process.env.ENABLE_TRANSFER_DRAFTING = "0";
+    try {
+      const ctx = await makeCtx();
+      const events = await collect(runAssistant({ messages: ask("Chuyển 5 triệu cho Lan"), ctx, client: mockClient([[]]) }));
+      expect(events.some((e) => e.type === "refusal")).toBe(true);
+      const text = events.filter((e) => e.type === "text").map((e) => (e as { delta: string }).delta).join("");
+      expect(text).toContain("không hỗ trợ chuyển tiền");
+      expect(events.some((e) => e.type === "draft")).toBe(false);
+    } finally {
+      process.env.ENABLE_TRANSFER_DRAFTING = prev;
+    }
+  });
+
+  it("drafts (not refuses) a valid transfer with drafting ON by default", async () => {
     const ctx = await makeCtx();
     const events = await collect(runAssistant({ messages: ask("Chuyển 5 triệu cho Lan"), ctx, client: mockClient([[]]) }));
-    expect(events.some((e) => e.type === "refusal")).toBe(true);
-    const text = events.filter((e) => e.type === "text").map((e) => (e as { delta: string }).delta).join("");
-    expect(text).toContain("không hỗ trợ chuyển tiền");
+    expect(events.some((e) => e.type === "draft")).toBe(true);
+    expect(events.some((e) => e.type === "refusal")).toBe(false);
   });
 
   it("refuses when a required scope is missing", async () => {

@@ -9,6 +9,7 @@
 import type {
   Account,
   Asset,
+  Beneficiary,
   Budget,
   Goal,
   Liability,
@@ -41,6 +42,11 @@ export interface MarketDataProvider {
   listMockProducts(): Promise<MockProduct[]>;
 }
 
+export interface BeneficiaryDataProvider {
+  /** Saved payees the assistant may resolve a transfer recipient from (Level 3). */
+  listBeneficiaries(): Promise<Beneficiary[]>;
+}
+
 /**
  * The full provider bundle consumed by the app. Composes every data provider
  * plus budgets and goals, so screens receive a single `Providers` object.
@@ -50,7 +56,8 @@ export interface Providers
     TransactionDataProvider,
     AssetDataProvider,
     LiabilityDataProvider,
-    MarketDataProvider {
+    MarketDataProvider,
+    BeneficiaryDataProvider {
   getBudgets(): Promise<Budget[]>;
   listGoals(): Promise<Goal[]>;
 }

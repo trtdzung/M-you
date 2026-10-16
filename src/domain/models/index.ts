@@ -51,6 +51,12 @@ export interface Transaction {
   relatedTransactionId?: string;
   /** Both legs of an internal transfer share this id (for exclusion). */
   transferGroupId?: string;
+  /**
+   * For an external P2P transfer: the counterparty's real account number. Lets
+   * the assistant resolve a past payee from history WITHOUT fabricating a number
+   * (invariant #3). Absent for internal/merchant transactions.
+   */
+  counterpartyAccountNumber?: string;
 }
 
 export interface TransactionQuery {
@@ -168,6 +174,59 @@ export interface MockProduct {
   type: "savings" | "deposit" | "card" | "loan" | "fund";
   summary: string;
   indicativeRate?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Assisted transfer drafting (Level 3, EPIC-13) — draft-only, never executed
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a resolved recipient came from. NEVER a fabricated value: the assistant
+ * may only reference a saved beneficiary, a number the user explicitly typed, or
+ * a counterparty found in real transaction history (invariant #3).
+ */
+export type RecipientSource =
+  | "saved_beneficiary"
+  | "user_typed"
+  | "transaction_history";
+
+/** Risk signals attached to a draft; surfaced to the user, never auto-cleared. */
+export type TransferRiskFlag = "new_payee" | "over_threshold" | "urgency_language";
+
+/** A saved payee. Account numbers are real-shaped mock data (`source: "mock"`). */
+export interface Beneficiary {
+  id: string;
+  name: string;
+  accountNumber: string;
+  bankName: string;
+  source: DataSource;
+}
+
+/**
+ * An agent-prepared transfer draft (docs/ARCHITECTURE.md §TransferDraft). It is
+ * an intent to be reviewed — never an executed transaction. The agent NEVER
+ * populates OTP, credentials, or an execution token; `status` is always "draft".
+ * `recipientRef`/`recipientAccountMasked` always trace to a real existing record.
+ */
+export interface TransferDraft {
+  id: string;
+  status: "draft";
+  /** Reference to a saved beneficiary / history record; never a fabricated number. */
+  recipientRef: string;
+  recipientName: string;
+  /** Masked for display, e.g. "****7890" — derived from a real account number. */
+  recipientAccountMasked: string;
+  recipientSource: RecipientSource;
+  sourceAccountId: string;
+  amount: number;
+  currency: string;
+  memo: string | null;
+  riskFlags: TransferRiskFlag[];
+  thresholdHit: boolean;
+  requiresReconfirm: boolean;
+  createdBy: "agent";
+  createdAt: string;
+  requestId: string;
 }
 
 // ---------------------------------------------------------------------------

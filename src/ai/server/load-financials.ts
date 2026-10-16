@@ -10,6 +10,7 @@ import { getProviders, type PersonaId } from "@/providers";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { currentMonthKey } from "@/lib/demo-clock";
 import type { ConsentScope } from "@/lib/consent";
+import type { Beneficiary } from "@/domain/models";
 
 export interface AiContext {
   personaId: PersonaId;
@@ -18,6 +19,12 @@ export interface AiContext {
   financials: Financials;
   /** Scopes granted by the caller (client sends its consent record). */
   scopes: ConsentScope[];
+  /**
+   * Saved payees for transfer drafting (Level 3). Optional so read/analysis
+   * contexts that never touch drafting can omit it; the draft pipeline reads
+   * `?? []` and resolves recipients only from real records.
+   */
+  beneficiaries?: Beneficiary[];
 }
 
 /** Load raw provider data for a persona (server-side, via the interface). */
@@ -48,11 +55,13 @@ export async function buildAiContext(input: BuildContextInput): Promise<AiContex
   const monthKey = input.month || currentMonthKey();
   const raw = await loadRaw(input.personaId);
   const financials = computeFinancials(raw, monthKey);
+  const beneficiaries = await getProviders(input.personaId).listBeneficiaries();
   return {
     personaId: input.personaId,
     monthKey,
     raw,
     financials,
     scopes: input.scopes ?? [],
+    beneficiaries,
   };
 }

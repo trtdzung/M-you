@@ -12,6 +12,18 @@ export interface AiValidationResult {
   safetyOk: boolean;
 }
 
+/**
+ * Draft metadata for an assisted-transfer request (Level 3). METADATA ONLY:
+ * risk flags and whether the amount threshold was hit — never the recipient
+ * account number, amount detail, OTP, or credentials.
+ */
+export interface AiDraftAudit {
+  riskFlags: string[];
+  thresholdHit: boolean;
+  /** Outcome of the action turn (draft handed off, or stopped to ask/confirm). */
+  outcome: "draft" | "reconfirm" | "clarify" | "refused";
+}
+
 export interface AiAuditEvent {
   requestId: string;
   consentVersion: string;
@@ -22,4 +34,6 @@ export interface AiAuditEvent {
   validation: AiValidationResult;
   degraded: boolean;
   createdAt: string;
+  /** Present only for assisted-transfer (draft) requests. Metadata only. */
+  draft?: AiDraftAudit;
 }

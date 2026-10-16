@@ -6,11 +6,28 @@ import { makeCtx, mockClient, collect, ask, textOf } from "./harness";
 describe("safety pipeline (PFM-092)", () => {
   beforeEach(() => clearAuditLog());
 
-  it("refuses a money-movement request (no action, no fabricated number)", async () => {
+  it("handles a money-movement request as a draft only — no execution, no fabricated number", async () => {
     const ctx = await makeCtx();
     const events = await collect(runAssistant({ messages: ask("Chuyển 5 triệu cho Lan giúp mình"), ctx, client: mockClient([[]]) }));
-    expect(events.some((e) => e.type === "refusal")).toBe(true);
-    expect(textOf(events)).toContain("không hỗ trợ chuyển tiền");
+    // Drafting is ON by default: the agent prepares a reviewable draft, never executes.
+    expect(events.some((e) => e.type === "draft")).toBe(true);
+    const serialized = JSON.stringify(events);
+    // The full recipient account number is never exposed — only the mask.
+    expect(serialized).not.toContain("19012345678901");
+    expect(serialized.toLowerCase()).not.toContain("otp");
+  });
+
+  it("still refuses a money-movement request when drafting is disabled (flag off)", async () => {
+    const prev = process.env.ENABLE_TRANSFER_DRAFTING;
+    process.env.ENABLE_TRANSFER_DRAFTING = "0";
+    try {
+      const ctx = await makeCtx();
+      const events = await collect(runAssistant({ messages: ask("Chuyển 5 triệu cho Lan giúp mình"), ctx, client: mockClient([[]]) }));
+      expect(events.some((e) => e.type === "refusal")).toBe(true);
+      expect(textOf(events)).toContain("không hỗ trợ chuyển tiền");
+    } finally {
+      process.env.ENABLE_TRANSFER_DRAFTING = prev;
+    }
   });
 
   it("blocks unsafe guaranteed-return advice even if the model produces it", async () => {

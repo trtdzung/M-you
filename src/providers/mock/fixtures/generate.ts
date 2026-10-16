@@ -8,6 +8,7 @@
 import type {
   Account,
   Asset,
+  Beneficiary,
   Budget,
   Goal,
   Liability,
@@ -28,7 +29,15 @@ export interface Dataset {
   goals: Goal[];
   snapshots: MonthlySnapshot[];
   products: MockProduct[];
+  beneficiaries: Beneficiary[];
 }
+
+/**
+ * A past external P2P payee that is NOT a saved beneficiary — lets the assistant
+ * resolve a recipient from real transaction history (with a real account number)
+ * rather than fabricating one. Kept stable so history resolution is testable.
+ */
+const HISTORY_PAYEE = { name: "Phạm Thu Hà", norm: "pham thu ha", account: "0281000556677" };
 
 /** Anchor "today" for fixtures — keeps data stable regardless of wall clock. */
 const ANCHOR_YEAR = 2026;
@@ -141,6 +150,12 @@ export function generateDataset(meta: PersonaMeta): Dataset {
       add({ accountId: accCurrent, postedAt: iso(year, month, Math.min(cap, 24)), amount: jitter(rng, 400_000, 0.3, 10_000), direction: "credit", type: "refund", merchantName: "Hoàn tiền Shopee", merchantNormalizedName: "shopee", categoryId: CATEGORY.shopping, status: "posted", isRecurring: false, userEdited: false, relatedTransactionId: pick(rng, lastShopId) });
     }
 
+    // A past external P2P transfer to a non-saved payee (real counterparty
+    // account) — the assistant can resolve this recipient from history.
+    if (mi === 2) {
+      add({ accountId: accCurrent, postedAt: iso(year, month, 8), amount: 3_000_000, direction: "debit", type: "transfer", merchantName: HISTORY_PAYEE.name, merchantNormalizedName: HISTORY_PAYEE.norm, categoryId: CATEGORY.transfer, status: "posted", isRecurring: false, userEdited: false, counterpartyAccountNumber: HISTORY_PAYEE.account });
+    }
+
     // A reversed (failed) transaction in the second month — excluded from totals
     if (mi === 1) {
       add({ accountId: accCurrent, postedAt: iso(year, month, 12), amount: 550_000, direction: "debit", type: "expense", merchantName: "Nhà hàng (giao dịch lỗi)", merchantNormalizedName: "pho 24", categoryId: CATEGORY.dining, status: "reversed", isRecurring: false, userEdited: false });
@@ -162,6 +177,7 @@ export function generateDataset(meta: PersonaMeta): Dataset {
     goals: meta.goals,
     snapshots: buildSnapshots(meta, monthList),
     products: meta.products,
+    beneficiaries: meta.beneficiaries,
   };
 }
 

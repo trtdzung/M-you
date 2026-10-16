@@ -1,14 +1,22 @@
 /**
  * Tool registry. Tier A = whitelisted read-only analytics + deterministic
  * simulations. This is the ONLY set the LLM can call in the read/analysis
- * pipeline. Tier B (draft tools that prepare — never execute — a transfer) is
- * deliberately absent until the gated Level 3 phase.
+ * pipeline.
+ *
+ * Tier B (draft tools that PREPARE — never execute — a transfer) lives in
+ * `draft-tools.ts` and is DELIBERATELY absent from `toolSchemas()`: the LLM can
+ * never call it. The action pipeline invokes Tier B directly, server-side, with
+ * fields parsed in code — so a prompt-injected model cannot fill transfer fields
+ * or trigger a draft. `TIER_B_TOOL_NAMES` is re-exported only so tests can assert
+ * these names never leak into the LLM schema.
  */
 
 import type { LlmTool } from "@/ai/llm/types";
 import type { AiTool } from "./types";
 import { READ_TOOLS } from "./read-tools";
 import { SIM_TOOLS } from "./sim-tools";
+
+export { TIER_B_TOOL_NAMES } from "./draft-tools";
 
 export const TIER_A_TOOLS: AiTool[] = [...READ_TOOLS, ...SIM_TOOLS];
 

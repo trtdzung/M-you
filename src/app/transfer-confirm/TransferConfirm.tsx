@@ -1,0 +1,158 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Lock, ShieldCheck } from "lucide-react";
+import { Card, SourceBadge } from "@/components/primitives";
+import { formatVnd } from "@/lib/format";
+import { CURRENCY_VND, type DataSource } from "@/domain/models";
+
+/**
+ * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field,
+ * enters a simulated OTP THEY type, and explicitly confirms. "Executing" here
+ * only builds a local `source: "mock"` record; no facade/API is ever called and
+ * the assistant never reaches this code. Cancel returns control with no effect.
+ */
+
+interface MockExecutedTransfer {
+  recipientName: string;
+  recipientAccountMasked: string;
+  amount: number;
+  currency: string;
+  memo: string | null;
+  executedAt: string;
+  source: DataSource; // always "mock" — never presented as a real MSB transfer
+}
+
+export function TransferConfirm() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [name, setName] = useState(params.get("name") ?? "");
+  const [acct] = useState(params.get("acct") ?? "");
+  const [amount, setAmount] = useState<number>(Number(params.get("amount") ?? 0));
+  const [memo, setMemo] = useState(params.get("memo") ?? "");
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<MockExecutedTransfer | null>(null);
+  const sourceLabel = params.get("src") ?? "Tài khoản MSB";
+
+  function confirm() {
+    if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
+    if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
+    if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (mô phỏng, ≥ 4 chữ số).");
+    setError(null);
+    // Mock-only: no real money moves, no API call, no facade involvement.
+    setDone({
+      recipientName: name.trim(),
+      recipientAccountMasked: acct,
+      amount,
+      currency: CURRENCY_VND,
+      memo: memo.trim() || null,
+      executedAt: new Date().toISOString(),
+      source: "mock",
+    });
+  }
+
+  if (done) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Card className="flex flex-col items-center gap-2 text-center">
+          <CheckCircle2 size={40} className="text-positive" />
+          <p className="text-lg font-semibold text-text">Đã ghi nhận (mô phỏng)</p>
+          <p className="text-2xl font-bold tabular-nums text-primary">{formatVnd(done.amount)}</p>
+          <p className="text-sm text-muted">
+            {done.recipientName} · {done.recipientAccountMasked}
+          </p>
+          <SourceBadge source="mock" className="mt-1" />
+          <p className="mt-1 text-[11px] text-muted">
+            Đây là giao dịch giả lập trong bản demo, không có tiền thật được chuyển.
+          </p>
+        </Card>
+        <button
+          type="button"
+          onClick={() => router.push("/assistant")}
+          className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white"
+        >
+          Về trợ lý
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-muted">
+        <ArrowLeft size={16} /> Huỷ &amp; quay lại
+      </button>
+
+      <Card className="bg-primary-soft/40">
+        <p className="flex items-start gap-2 text-xs text-text">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
+          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận và nhập OTP — trợ lý không thực hiện bước này.
+        </p>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <Labeled label="Người nhận">
+          <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+        </Labeled>
+        <Labeled label="Số tài khoản">
+          <input value={acct} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
+        </Labeled>
+        <Labeled label="Số tiền (VND)">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            className={`${inputCls} tabular-nums`}
+          />
+        </Labeled>
+        <Labeled label="Nội dung">
+          <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} placeholder="Tuỳ chọn" />
+        </Labeled>
+        <Labeled label="Từ tài khoản">
+          <input value={sourceLabel} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
+        </Labeled>
+      </Card>
+
+      <Card className="flex flex-col gap-2">
+        <Labeled label="Mã OTP (mô phỏng)">
+          <div className="flex items-center gap-2">
+            <Lock size={15} className="text-muted" />
+            <input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              inputMode="numeric"
+              placeholder="Bạn tự nhập OTP"
+              className={`${inputCls} tabular-nums`}
+            />
+          </div>
+        </Labeled>
+        <p className="text-[11px] text-muted">Bản demo: OTP do bạn tự nhập, không gửi đi đâu.</p>
+      </Card>
+
+      {error && <p className="text-sm text-negative">{error}</p>}
+
+      <button
+        type="button"
+        onClick={confirm}
+        className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+      >
+        Xác nhận chuyển tiền (mô phỏng)
+      </button>
+    </div>
+  );
+}
+
+const inputCls =
+  "w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary";
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</span>
+      {children}
+    </label>
+  );
+}

@@ -13,14 +13,14 @@ export const ALL_SCOPES: ConsentScope[] = ["transactions", "assets", "liabilitie
 
 export async function makeCtx(overrides: Partial<AiContext> = {}, personaId: PersonaId = "stable"): Promise<AiContext> {
   const p = getProviders(personaId);
-  const [transactions, accounts, assets, liabilities, budgets, snapshots, goals, products] =
+  const [transactions, accounts, assets, liabilities, budgets, snapshots, goals, products, beneficiaries] =
     await Promise.all([
       p.listTransactions(), p.listAccounts(), p.listAssets(), p.listLiabilities(),
-      p.getBudgets(), p.getMonthlySnapshots(), p.listGoals(), p.listMockProducts(),
+      p.getBudgets(), p.getMonthlySnapshots(), p.listGoals(), p.listMockProducts(), p.listBeneficiaries(),
     ]);
   const raw: RawData = { transactions, accounts, assets, liabilities, budgets, snapshots, goals, products };
   const monthKey = currentMonthKey();
-  return { personaId, monthKey, raw, financials: computeFinancials(raw, monthKey), scopes: ALL_SCOPES, ...overrides };
+  return { personaId, monthKey, raw, financials: computeFinancials(raw, monthKey), scopes: ALL_SCOPES, beneficiaries, ...overrides };
 }
 
 export function mockClient(script: LlmStreamEvent[][]): LlmClient {

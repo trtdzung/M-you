@@ -41,6 +41,16 @@ function reduce(msg: UiMessage, ev: AssistantEvent): UiMessage {
       return { ...msg, degraded: true };
     case "refusal":
       return { ...msg, refusal: true };
+    case "clarify":
+      return { ...msg, text: msg.text + ev.question };
+    case "reconfirm":
+      return {
+        ...msg,
+        text: msg.text + ev.summary,
+        reconfirm: { reason: ev.reason, summary: ev.summary, riskFlags: ev.riskFlags },
+      };
+    case "draft":
+      return { ...msg, draft: ev.draft, text: msg.text + (ev.note ? ev.note : "") };
     case "error":
       return { ...msg, error: ev.message, status: "done" };
     case "done":

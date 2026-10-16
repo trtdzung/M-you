@@ -56,5 +56,8 @@ export function createMockProvider(dataset: Dataset): Providers {
     async listGoals() {
       return clone(dataset.goals);
     },
+    async listBeneficiaries() {
+      return clone(dataset.beneficiaries);
+    },
   };
 }
