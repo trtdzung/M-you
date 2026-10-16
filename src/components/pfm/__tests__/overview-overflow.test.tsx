@@ -58,35 +58,32 @@ function renderOverview() {
   );
 }
 
-describe("cockpit overflow guard", () => {
-  it("renders a scroll-safe wrapper with all four tiles", async () => {
+describe("overview overflow guard", () => {
+  it("renders a scroll-safe wrapper with the three thu-chi sections", async () => {
     renderOverview();
 
-    // Wait for async provider load to resolve into the populated cockpit.
+    // Wait for async provider load to resolve into the populated overview.
     await waitFor(() => expect(screen.getByTestId("cockpit-root")).toBeTruthy());
 
     const root = screen.getByTestId("cockpit-root");
     expect(root.className).toContain("min-h-full");
     expect(root.className).not.toContain("overflow-hidden");
 
-    // All four cockpit questions must be present (compact, no scroll).
-    for (const label of ["Dòng tiền tháng này", "Dự kiến cuối tháng", "Sắp phải trả", "Khả năng trang trải"]) {
+    // The overview is exactly the three income/expense sections — no wealth.
+    for (const label of ["Tổng quan thu chi", "Báo cáo thu chi", "Biến động thu chi"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
-    expect(screen.getByText("Tài sản ròng")).toBeTruthy();
-
-    // Folded P04: the Tài sản & Nợ summary is present and drills to the manager.
-    const summary = screen.getByLabelText("Mở Tài sản & Nợ");
-    expect(summary).toHaveAttribute("href", "/pfm/wealth");
+    expect(screen.getByLabelText("Tổng quan thu chi")).toBeTruthy();
 
     expect(root.scrollHeight).toBeGreaterThanOrEqual(root.clientHeight);
   });
 
   /**
-   * Worst-case content must still keep the overview itself compact enough to
-   * enter the page; long record labels remain behind the wealth drill-down.
+   * Wealth/net-worth content lives on its own tab: even with heavy liability
+   * fixtures loaded, the overview must not surface any of it (invariant: the
+   * overview is income/expense only).
    */
-  it("keeps the non-scrolling contract under a worst-case content fixture", async () => {
+  it("never leaks wealth content onto the income/expense overview", async () => {
     const LONG_VN_NAME =
       "Khoản vay mua nhà chung cư cao cấp khu đô thị phía Tây thành phố đợt hai"; // ~72 chars (< 80 cap)
     const provider = getProviders("stable");
@@ -112,12 +109,12 @@ describe("cockpit overflow guard", () => {
     const root = screen.getByTestId("cockpit-root");
     expect(root.className).toContain("min-h-full");
     expect(root.className).not.toContain("overflow-hidden");
-    for (const label of ["Dòng tiền tháng này", "Dự kiến cuối tháng", "Sắp phải trả", "Khả năng trang trải"]) {
+    for (const label of ["Tổng quan thu chi", "Báo cáo thu chi", "Biến động thu chi"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
-    // The Tài sản & Nợ summary stays a single drill row (no per-liability rows leak
-    // onto the cockpit), so the long labels never enter this viewport.
-    expect(screen.getByLabelText("Mở Tài sản & Nợ")).toHaveAttribute("href", "/pfm/wealth");
+    // No net-worth / wealth summary and no per-liability rows leak onto the overview.
+    expect(screen.queryByText("Tài sản ròng")).toBeNull();
+    expect(screen.queryByLabelText("Mở Tài sản & Nợ")).toBeNull();
     expect(screen.queryByText(new RegExp(LONG_VN_NAME))).toBeNull();
   });
 });

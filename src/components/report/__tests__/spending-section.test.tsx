@@ -4,9 +4,9 @@ import type { JarBudgetLine } from "@/domain/engine";
 import { SpendingSection } from "../SpendingSection";
 
 /**
- * The overview's spend-by-jar section: donut + month-over-month + trend + a link
- * into the detailed report. MoM shows a delta only when the prior period had
- * spend, otherwise an explicit "no prior period" note — never a fake 0% (RT #10).
+ * "Báo cáo thu chi" — the overview's spend-by-jar section: donut + month-over-month
+ * + a link into the detailed report. MoM shows a delta only when the prior period
+ * had spend, otherwise an explicit "no prior period" note — never a fake 0% (RT #10).
  */
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -22,17 +22,12 @@ const line = (over: Partial<JarBudgetLine>): JarBudgetLine => ({
   pct: 0.25, status: "ok", thresholdHit: false, source: "mock", freshness: null, ...over,
 });
 
-const trend = { points: [], meta: { source: "mock", freshness: null } } as unknown as Parameters<
-  typeof SpendingSection
->[0]["trend"];
-
 function renderSection(over: Partial<Parameters<typeof SpendingSection>[0]> = {}) {
   render(
     <SpendingSection
       lines={over.lines ?? [line({})]}
       expense={over.expense ?? 1_000_000}
       prevExpense={over.prevExpense ?? 800_000}
-      trend={trend}
       onOpenReport={over.onOpenReport ?? (() => {})}
     />,
   );
