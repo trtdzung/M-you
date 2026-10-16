@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { Send, Trash2, X } from "lucide-react";
+import { Mic, Square, Send, Trash2, X } from "lucide-react";
+import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
-import { Loading, ErrorState } from "@/components/states";
+import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
 import {
   getChatHistory,
@@ -54,7 +55,8 @@ export function MYourWidget() {
   const cif = persona.cif;
 
   const [open, setOpen] = useState(false);
-  const [historyStatus, setHistoryStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">("loading");
+  const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -63,15 +65,33 @@ export function MYourWidget() {
   const idRef = useRef(0);
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voicePrefix = useRef("");
+  const voice = useStreamingSpeech((text) => {
+    setInput([voicePrefix.current, text].filter(Boolean).join(" "));
+  });
+  const voiceBusy = voice.state !== "idle";
+  const cancelVoice = voice.cancel;
+
+  useEffect(() => {
+    cancelVoice();
+  }, [open, cif, cancelVoice]);
 
   const loadHistory = useCallback(() => {
     setHistoryStatus("loading");
+    setHistoryUnavailable(false);
     getChatHistory(cif)
       .then((res) => {
         setMessages(fromHistory(res.messages));
         setHistoryStatus("ready");
       })
-      .catch(() => setHistoryStatus("error"));
+      .catch(() => {
+        // History belongs to the Agent Backend, while speech capture talks to
+        // the STT service independently. Keep the composer available so a
+        // temporary agent outage does not prevent local STT verification.
+        setMessages([]);
+        setHistoryUnavailable(true);
+        setHistoryStatus("ready");
+      });
   }, [cif]);
 
   useEffect(() => {
@@ -88,7 +108,7 @@ export function MYourWidget() {
 
   async function send() {
     const text = input.trim();
-    if (!text || composerDisabled) return;
+    if (!text || composerDisabled || voiceBusy) return;
     const userId = `m${++idRef.current}`;
     const replyId = `m${++idRef.current}`;
     setMessages((prev) => [...prev, { id: userId, role: "user", text }]);
@@ -105,7 +125,7 @@ export function MYourWidget() {
   }
 
   async function handleDelete() {
-    if (deleting || locked) return;
+    if (deleting || locked || voiceBusy) return;
     setDeleting(true);
     try {
       await deleteChatHistory(cif);
@@ -164,7 +184,7 @@ export function MYourWidget() {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleting || locked}
+                disabled={deleting || locked || voiceBusy}
                 aria-label="Xóa hội thoại"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40"
               >
@@ -172,7 +192,7 @@ export function MYourWidget() {
               </button>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => { cancelVoice(); setOpen(false); }}
                 aria-label="Đóng"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
@@ -184,19 +204,17 @@ export function MYourWidget() {
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {historyStatus === "loading" && <Loading label="Đang tải hội thoại…" />}
 
-            {historyStatus === "error" && (
-              <ErrorState
-                description="Không tải được hội thoại với M-Your. Vui lòng thử lại."
-                action={
-                  <button
-                    type="button"
-                    onClick={loadHistory}
-                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-fg"
-                  >
-                    Thử lại
-                  </button>
-                }
-              />
+            {historyUnavailable && (
+              <div role="alert" className="mb-3 rounded-2xl bg-warning-soft px-3.5 py-3 text-sm text-text">
+                <p>Không tải được lịch sử M-Your. Bạn vẫn có thể thử nhập bằng giọng nói.</p>
+                <button
+                  type="button"
+                  onClick={loadHistory}
+                  className="mt-2 font-semibold text-primary"
+                >
+                  Thử tải lại lịch sử
+                </button>
+              </div>
             )}
 
             {historyStatus === "ready" && (
@@ -242,20 +260,38 @@ export function MYourWidget() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 rows={1}
-                disabled={composerDisabled}
+                disabled={composerDisabled || voiceBusy}
                 placeholder="Nhắn tin cho M-Your…"
                 className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface-muted px-3.5 py-2.5 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
               />
               <button
                 type="button"
+                onClick={() => {
+                  if (voiceBusy) voice.stop();
+                  else { voicePrefix.current = input.trim(); voice.start(); }
+                }}
+                disabled={composerDisabled || voice.state === "finishing"}
+                aria-label={voice.state === "connecting" ? "Hủy kết nối micro" : voiceBusy ? "Dừng ghi âm" : "Nhập bằng giọng nói"}
+                aria-pressed={voiceBusy}
+                className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40", voiceBusy ? "bg-negative-soft text-negative" : "bg-surface-muted text-primary")}
+              >
+                {voiceBusy ? <Square size={16} /> : <Mic size={18} />}
+              </button>
+              <button
+                type="button"
                 onClick={send}
-                disabled={composerDisabled || !input.trim()}
+                disabled={composerDisabled || voiceBusy || !input.trim()}
                 aria-label="Gửi"
                 className="brand-gradient flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
               >
                 <Send size={16} />
               </button>
             </div>
+            {(voiceBusy || voice.error) && (
+              <p role={voice.error ? "alert" : "status"} className={cn("mt-2 text-xs", voice.error ? "text-negative" : "text-muted")}>
+                {voice.error || (voice.state === "connecting" ? "Đang mở micro…" : voice.state === "recording" ? "Đang nghe… Ngừng nói để hoàn tất, hoặc bấm dừng." : "Đang hoàn tất bản chép lời…")}
+              </p>
+            )}
           </div>
         </div>
       )}

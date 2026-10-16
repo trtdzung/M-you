@@ -87,18 +87,20 @@ describe("MYourWidget", () => {
     expect(screen.getByText("Bạn đã chi 4.000.000đ.")).toBeInTheDocument();
   });
 
-  it("shows an error state with retry when history fails to load", async () => {
+  it("keeps the composer and voice input available when history fails to load", async () => {
     vi.spyOn(agentApi, "getChatHistory").mockRejectedValueOnce(new Error("boom"));
     renderWidget();
     open();
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeDisabled();
+    expect(screen.getByText("Không tải được lịch sử M-Your. Bạn vẫn có thể thử nhập bằng giọng nói.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Nhập bằng giọng nói" })).toBeEnabled();
 
     vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
-    fireEvent.click(screen.getByRole("button", { name: "Thử lại" }));
+    fireEvent.click(screen.getByRole("button", { name: "Thử tải lại lịch sử" }));
 
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
   it("sends a message via the real agent and shows the real reply", async () => {
