@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, RotateCcw, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { usePersona } from "@/providers/context";
 import { sendChatMessage, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
+import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 
@@ -51,19 +52,36 @@ export function VoiceFab() {
   const [reply, setReply] = useState<{ answer: string; ui: UiPayload } | null>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
 
+  const autoSendRef = useRef(false);
+  const voice = useStreamingSpeech((text, final) => {
+    setTranscript(text);
+    if (final && text.trim()) {
+      autoSendRef.current = true;
+    }
+  });
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+
+  useEffect(() => {
+    if (autoSendRef.current && transcript && !sending) {
+      autoSendRef.current = false;
+      handleSend();
+    }
+  }, [transcript, sending]);
+
   useEffect(() => {
     setContainer(document.getElementById("device-canvas") ?? document.body);
   }, []);
 
-  // Release detection MUST be window-level, not the button's own `onPointerUp`:
-  // once the section opens, this component stops rendering the button inline
-  // and instead renders a NEW instance inside the portal (see the
-  // `!sectionOpen` branch below) — the original element is gone, so its own
-  // pointerup would never fire. Covers every release event type, not just
-  // Pointer Events, since some mobile browsers suppress one but not another
-  // during a sustained touch-hold.
   useEffect(() => {
-    if (!listening) return;
+    if (!listening) {
+      voiceRef.current.stop();
+      return;
+    }
+    setTranscript("");
+    setReply(null);
+    voiceRef.current.start();
+    
     function stopListening() {
       setListening(false);
     }
@@ -74,15 +92,8 @@ export function VoiceFab() {
     };
   }, [listening]);
 
-  function openChat() {
-    const next = new URLSearchParams(params?.toString());
-    next.set("assistant", "1");
-    router.replace(`/pfm?${next.toString()}`, { scroll: false });
-  }
-
   function onPointerDown() {
     if (!sectionOpen) {
-      openChat();
       setSectionOpen(true);
     }
     setListening(true);
@@ -91,12 +102,14 @@ export function VoiceFab() {
   function closeSection() {
     setSectionOpen(false);
     setListening(false);
+    voiceRef.current.cancel();
   }
 
   function handleRefresh() {
     setTranscript("");
     setReply(null);
     setListening(false);
+    voiceRef.current.cancel();
   }
 
   async function handleSend() {
