@@ -27,11 +27,18 @@ export interface UseFinancialsResult {
   financials: Financials | null;
 }
 
-export function useFinancials(): UseFinancialsResult {
+/**
+ * @param monthOverride When set, financials are computed for this "YYYY-MM"
+ *   instead of the shared period selection. The Overview cockpit uses this to
+ *   stay pinned to the current month (Red Team C2), independent of any month
+ *   picked on the other tabs.
+ */
+export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const providers = useProviders();
   const { corrections } = useCorrections();
   const { config: jarConfig } = useJarConfig();
-  const { month } = usePeriod();
+  const { month: selectedMonth } = usePeriod();
+  const month = monthOverride ?? selectedMonth;
 
   const [raw, setRaw] = useState<RawData | null>(null);
   const [loading, setLoading] = useState(true);

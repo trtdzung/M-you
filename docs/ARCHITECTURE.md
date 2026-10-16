@@ -64,13 +64,13 @@ src/app/
   accounts/page.tsx         Tài khoản tab: account list
   accounts/[id]/page.tsx    Account detail: header + scoped transaction list
   transactions/page.tsx     All-transactions view (shared list component)
-  pfm/page.tsx              PFM hub: net worth + cashflow summary +
-                            obligations + entry cards
-  pfm/cashflow/page.tsx     Cash Flow detail (extracted CashflowView)
-  pfm/wealth/page.tsx       Wealth detail (extracted WealthView)
-  pfm/insights/page.tsx     Insights detail
-  cashflow/page.tsx         Redirect -> /pfm/cashflow (legacy route kept alive)
-  wealth/page.tsx           Redirect -> /pfm/wealth (legacy route kept alive)
+  pfm/page.tsx              Single PFM route: 4 client-side tabs (Overview /
+                            Cashflow / Wealth / Insights) via PfmTabHost
+  pfm/cashflow/page.tsx     Redirect -> /pfm?tab=cashflow (legacy deep link)
+  pfm/wealth/page.tsx       Redirect -> /pfm?tab=wealth (legacy deep link)
+  pfm/insights/page.tsx     Redirect -> /pfm?tab=insights (legacy deep link)
+  cashflow/page.tsx         Redirect -> /pfm?tab=cashflow (legacy route kept alive)
+  wealth/page.tsx           Redirect -> /pfm?tab=wealth (legacy route kept alive)
   settings/page.tsx         Consent scope + revoke, persona switcher, About
   assistant/                AI Assistant chat screen
   transfer-confirm/         Native MSB transfer confirmation (draft handoff)
@@ -82,8 +82,12 @@ Key shared components introduced by the refactor:
 - `src/components/shell/AssistantFab.tsx` — floating action button (Sparkles icon) rendered above the tab bar on every screen except `/assistant`, linking to `/assistant`.
 - `src/components/home/*` (`AccountSummaryCard`, `HomeQuickGrid`, `PromoCarousel`, `PromoCard`, `Dots`) — Home-specific presentation, not reused elsewhere.
 - `src/components/transactions/TransactionListSection.tsx` — shared transaction list, used by both `/transactions` (all accounts) and `/accounts/[id]` (scoped via an `accountId` filter prop).
-- `src/components/cashflow/CashflowView.tsx` and `src/components/wealth/WealthView.tsx` — cash flow and wealth detail views extracted out of the old top-level screens so `/pfm/cashflow` and `/pfm/wealth` render them directly; obligations, previously on Home, now live on the PFM hub (`src/app/pfm/page.tsx`) only.
-- `src/components/pfm/PfmHubNav.tsx` — entry cards from the PFM hub into Cash Flow / Wealth / Insights.
+- `src/components/pfm/PfmTabHost.tsx` + `src/components/pfm/PfmTabs.tsx` — the single-route `/pfm` tab host: client-side switching (no navigation, no refetch — `useFinancials` loads once), initial tab read from `?tab=` for deep links. The Overview panel is locked to one non-scrolling viewport (`overflow-hidden`); the other three panels scroll within their own region.
+- `src/components/pfm/OverviewTab.tsx` + `src/components/pfm/cockpit/*` (`HeroNetWorth`, `StatTile`, `InsightStrip`, `Sparkline`) — the no-scroll "4-Question Cockpit": hero net worth, 2×2 KPI grid (cashflow net, end-of-month estimate, next obligation, runway), top-1 insight strip, and a worst-case provenance footer. Always the current month (`currentMonthKey()`) — no `PeriodPicker` here, independent of the month selected on the other tabs.
+- `src/components/cashflow/CashflowView.tsx` and `src/components/wealth/WealthView.tsx` — cash flow and wealth tab panels rendered directly by `PfmTabHost`; obligations, previously on Home, now live only inside the Overview cockpit.
+- `src/components/charts/CashflowTrendChart.tsx` — multi-month income/expense/net chart backing the Cashflow tab, fed by `cashflowTrend()`.
+- `src/components/wealth/HealthPanel.tsx` — 2×2 financial-health panel (runway, surplus, essential-expense coverage, asset concentration) on the Wealth tab, fed by `financialHealth()`.
+- `src/components/insights/InsightFilters.tsx` — severity filter (info / attention / urgent) on the Insights tab.
 - `src/lib/format.ts` (`maskAccountNumber`) — masks an account number to its last 4 digits for display (e.g. `•••• 1991`); used by the Home account card and account list/detail headers. Presentation-only; does not touch the calculation engine or provider data.
 - `src/lib/transfer-draft-store.ts` — session-scoped (`sessionStorage`) hand-off of a `TransferDraft`'s display fields (name, masked account, amount, memo, source label) from the chat `DraftCard` to `/transfer-confirm`, keyed by draft id. The draft's PII/financial fields never travel in the URL query string — only the `draftId` does. No account number (only the masked form) is ever stored, and nothing in this module executes a transfer; it purely carries display state across the client-side navigation boundary, consistent with the `TransferDraft` model and pipeline in "Tier B — draft-only tools" below.
 
@@ -103,12 +107,15 @@ Key shared components introduced by the refactor:
 - Exclude internal transfers from cash-flow totals.
 - Separate fixed and discretionary spending.
 - Calculate period comparisons and end-of-period estimates.
+- Build a multi-month trend for charting (`cashflow-trend.ts`), flagging months with no underlying data so the UI renders a gap rather than a misleading 0.
+- Project end-of-month liquid cash and cash-runway months (`projection.ts`) — always `source: "estimated"`, and only computed for the current month; other months are `"unknown"`.
 - Evaluate user-defined spending jars against real spend (`jars.ts` — `evaluateJars`); config persists per persona and has a dedicated setup UI. See "Spending jars" below.
 
 ### Balance-sheet module
 
 - Aggregate assets and liabilities.
-- Calculate net worth and net-worth trend.
+- Calculate net worth and net-worth trend (`networth.ts` — `calculateNetWorth`, `networthTrend`), exposing the raw current/previous values plus a sparkline series and lowest-trust provenance.
+- Compute explainable financial-health indicators (`health.ts` — runway, surplus, essential-expense coverage, asset concentration), each `null` rather than defaulted when its inputs are missing.
 - Keep source and freshness metadata.
 - Distinguish verified, self-reported, and estimated values.
 
@@ -325,7 +332,7 @@ The AI facade is an application boundary, not a domain module. It cannot mutate 
 
 ### Calculation reuse (implemented)
 
-`computeFinancials` was extracted from the React data hook into `src/domain/engine/finance-compose.ts` so the server-side AI pipeline calls the **same deterministic engine** the UI renders from — the AI never becomes a second source of financial truth (invariant #1). Two new pure simulation engines back the what-if tools:
+`computeFinancials` was extracted from the React data hook into `src/domain/engine/finance-compose.ts` so the server-side AI pipeline calls the **same deterministic engine** the UI renders from — the AI never becomes a second source of financial truth (invariant #1). Its `Financials` return type also backs the PFM Overview cockpit (`src/components/pfm/OverviewTab.tsx`), with `endOfMonth` (`EndOfMonthEstimate`) and `runway` (`CashRunway`) computed only for the current month and `networthCurrent`/`networthPrevious`/`networthSeries`/`networthSeriesMeta` derived from `networthTrend()`. Two new pure simulation engines back the what-if tools:
 
 - `src/domain/engine/goals.ts` — `simulateGoal`
 - `src/domain/engine/debt.ts` — `simulateDebtRepayment`

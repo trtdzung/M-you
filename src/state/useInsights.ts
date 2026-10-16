@@ -73,9 +73,13 @@ export function useInsightState(): InsightState {
   };
 }
 
-/** Convenience: insights for the current period with interaction state applied. */
-export function useInsights() {
-  const { financials, loading, error } = useFinancials();
+/**
+ * Convenience: insights for the current period with interaction state applied.
+ * `monthOverride` pins the computation to a specific "YYYY-MM" (the Overview
+ * cockpit passes the current month — Red Team C2).
+ */
+export function useInsights(monthOverride?: string) {
+  const { financials, loading, error } = useFinancials(monthOverride);
   const state = useInsightState();
 
   const base = useMemo<Insight[]>(() => (financials ? runDetectors(financials) : []), [financials]);

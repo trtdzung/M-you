@@ -237,11 +237,11 @@ The prototype ships a **3-tab MSB banking layout**, matching the real MSB app ra
 |---|---|---|
 | **Trang chủ** (Home) | `/` | MSB-style home: hero header, primary account card, quick actions, promos/insights. Not a PFM dashboard. |
 | **Tài khoản** (Accounts) | `/accounts`, `/accounts/[id]`, `/transactions` | Account list → account detail (with per-account transactions) → all-transactions view. |
-| **PFM** | `/pfm`, `/pfm/cashflow`, `/pfm/wealth`, `/pfm/insights` | Hub with net worth + cash flow summary + upcoming obligations, plus entry cards into cash flow, wealth, and insights detail. |
+| **PFM** | `/pfm` (single route, client-side tabs via `?tab=`) | One screen with 4 tabs — **Tổng quan** (Overview cockpit), **Dòng tiền** (Cashflow), **Tài sản** (Wealth), **Gợi ý** (Insights) — switched client-side with no navigation or refetch. |
 
 A floating **Assistant FAB** (sparkle icon) sits above the tab bar on every screen and links to `/assistant`; it hides itself on the assistant screen. **Settings** (`/settings`) is not a tab — it holds consent scope + revoke, the demo persona switcher, and About, and is reachable in at most two taps (tap the account tier row on the account card, or navigate directly to `/settings`).
 
-Legacy routes `/cashflow` and `/wealth` still exist as thin redirects to `/pfm/cashflow` and `/pfm/wealth` respectively, so old links and bookmarks keep working.
+Legacy routes `/cashflow`, `/wealth`, `/pfm/cashflow`, `/pfm/wealth`, and `/pfm/insights` still exist as thin redirects to the matching `/pfm?tab=X` deep link, so old links and bookmarks keep working.
 
 ### Masked account number (implemented)
 
@@ -249,14 +249,16 @@ The primary account card on Home shows a display-safe, masked account number (e.
 
 ## Primary screens
 
-1. **Home (Trang chủ):** hero header, primary account card (masked number, hide/show balance, tier as marketing metadata only), quick-action grid, promo carousel with a top insight surfaced inline. Obligations are not shown here — they live on the PFM hub.
+1. **Home (Trang chủ):** hero header, primary account card (masked number, hide/show balance, tier as marketing metadata only), quick-action grid, promo carousel with a top insight surfaced inline. Obligations are not shown here — they live on the PFM Overview cockpit.
 2. **Tài khoản (Accounts):** account list → account detail with a scoped transaction list; a shared "all transactions" entry point.
-3. **PFM hub:** net worth, monthly cash flow summary, "Sắp phải trả" (upcoming obligations), and entry cards into Cash Flow, Wealth, and Insights.
-4. **Cash Flow (`/pfm/cashflow`):** income/expense chart, forecast, category trend, and monthly comparison.
-5. **Wealth (`/pfm/wealth`):** assets, liabilities, allocation, and balance-sheet trend.
-6. **Goals:** progress, required monthly contribution, and scenarios.
-7. **Settings:** consent scope view + revoke, demo persona switcher, About — reachable from the account card, not a tab.
-8. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off.
+3. **PFM (`/pfm`):** single route, 4 client-side tabs.
+   - **Tổng quan (Overview):** a no-scroll "4-Question Cockpit" — hero net worth (with delta badge and sparkle trend), a 2×2 KPI grid (Dòng tiền tháng, Cuối tháng estimate, Sắp phải trả, Sức khỏe/runway), the single top-severity insight, and a worst-case provenance footer (lowest-trust source + oldest freshness across every tile). Always the current month — there is no PeriodPicker on this tab, by design (the end-of-month projection is only valid when "now" is inside the displayed month).
+   - **Dòng tiền (Cashflow):** trend-primary view with a multi-month income/expense/net chart (gaps for months with no data, never a misleading 0đ bar), fixed-vs-discretionary breakdown, and category trend; keeps the shared PeriodPicker.
+   - **Tài sản (Wealth):** assets, liabilities, allocation, balance-sheet trend, and a 2×2 financial-health panel (runway, surplus, essential-expense coverage, asset concentration); keeps the shared PeriodPicker.
+   - **Gợi ý (Insights):** insight list with severity filters (info / attention / urgent).
+4. **Goals:** progress, required monthly contribution, and scenarios.
+5. **Settings:** consent scope view + revoke, demo persona switcher, About — reachable from the account card, not a tab.
+6. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off.
 
 ## AI product contract
 

@@ -38,6 +38,12 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     categorySpend: over.categorySpend ?? [],
     recurring: over.recurring ?? [],
     obligations: over.obligations ?? [],
+    endOfMonth: over.endOfMonth ?? { value: 0, meta: { source: "estimated", freshness: null } },
+    runway: over.runway ?? { months: null, meta: { source: "estimated", freshness: null } },
+    networthCurrent: over.networthCurrent ?? null,
+    networthPrevious: over.networthPrevious ?? null,
+    networthSeries: over.networthSeries ?? [],
+    networthSeriesMeta: over.networthSeriesMeta ?? { source: null, count: 0, freshness: null },
     jarLines: over.jarLines ?? [],
     jarIncomeBasis: over.jarIncomeBasis ?? { value: "unknown", source: "estimated" },
   };

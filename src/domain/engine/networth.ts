@@ -4,7 +4,7 @@
  * (never silently treated as 0). Coverage is reported in meta.
  */
 
-import type { Asset, DataSource, Liability } from "@/domain/models";
+import type { Asset, DataSource, Liability, MonthlySnapshot } from "@/domain/models";
 import { coverageOf, type AggregateMeta, type Period } from "./types";
 
 export interface NetWorthItem {
@@ -81,4 +81,81 @@ export function calculateNetWorth(
     hasUnknown: unknownFields.length > 0,
     meta,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Net-worth trend (delta + sparkline series) from monthly snapshots
+// ---------------------------------------------------------------------------
+
+/** Provenance for a snapshot-derived trend (Red Team H2). */
+export interface NetWorthTrendMeta {
+  /** Lowest-trust source across the snapshots feeding the delta/series. */
+  source: DataSource | null;
+  /** Number of snapshots used. */
+  count: number;
+  freshness: string | null;
+}
+
+export interface NetWorthTrend {
+  /** Latest snapshot net worth, or null if there are no snapshots. */
+  current: number | null;
+  /** Previous snapshot net worth, or null if fewer than 2 snapshots. */
+  previous: number | null;
+  /** Chronological net-worth values (oldest → newest) for the sparkline. */
+  series: number[];
+  meta: NetWorthTrendMeta;
+}
+
+/** Most-trusted → least-trusted; the trend reports the lowest present. */
+const TRUST_ORDER: DataSource[] = ["msb", "self_reported", "estimated", "mock"];
+
+function lowestTrust(sources: DataSource[]): DataSource | null {
+  let worst: DataSource | null = null;
+  let worstRank = -1;
+  for (const s of sources) {
+    const rank = TRUST_ORDER.indexOf(s);
+    if (rank > worstRank) {
+      worstRank = rank;
+      worst = s;
+    }
+  }
+  return worst;
+}
+
+/**
+ * Derive delta inputs + sparkline series from monthly snapshots. Red Team C3:
+ * exposes raw `current`/`previous` for the existing `DeltaBadge` — never a
+ * reinvented delta object. Snapshots are sorted by month first (order is not
+ * guaranteed); the last `maxPoints` feed the series and carry their own
+ * lowest-trust provenance (Red Team H2), separate from current-completeness.
+ */
+export function networthTrend(
+  snapshots: MonthlySnapshot[],
+  maxPoints = 6,
+): NetWorthTrend {
+  const sorted = [...snapshots].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+  const used = sorted.slice(-maxPoints);
+  const series = used.map((s) => s.netWorth);
+  const current = sorted.length > 0 ? sorted[sorted.length - 1].netWorth : null;
+  const previous = sorted.length > 1 ? sorted[sorted.length - 2].netWorth : null;
+
+  return {
+    current,
+    previous,
+    series,
+    meta: {
+      source: lowestTrust(used.map((s) => s.source)),
+      count: used.length,
+      // Snapshots carry month granularity only; expose as a full ISO timestamp
+      // (start of the latest snapshot month) to match the freshness contract
+      // used everywhere else (AggregateMeta/ProjectionMeta).
+      freshness: used.length > 0 ? monthKeyToIso(used[used.length - 1].month) : null,
+    },
+  };
+}
+
+/** "YYYY-MM" → ISO timestamp at the start of that UTC month. */
+function monthKeyToIso(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toISOString();
 }

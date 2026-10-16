@@ -70,6 +70,23 @@ describe("computeFinancials", () => {
     expect(empty.categorySpend).toEqual([]);
   });
 
+  it("[Red Team C2] computes a numeric end-of-month only for the current month", async () => {
+    const raw = await loadRaw("stable");
+    // DEMO_NOW is 2026-09 → the projection is valid.
+    const current = computeFinancials(raw, "2026-09");
+    expect(typeof current.endOfMonth.value).toBe("number");
+    expect(current.endOfMonth.meta.source).toBe("estimated");
+  });
+
+  it("[Red Team C2] returns end-of-month 'unknown' for a browsed past month", async () => {
+    const raw = await loadRaw("stable");
+    const past = computeFinancials(raw, "2026-08");
+    // A now-anchored projection over a different month is genuinely unknown,
+    // never a misleading number (invariant #6).
+    expect(past.endOfMonth.value).toBe("unknown");
+    expect(past.endOfMonth.meta.source).toBe("estimated");
+  });
+
   it("yields no jar lines when no jarConfig is supplied (default empty config)", async () => {
     const raw = await loadRaw("stable");
     const f = computeFinancials(raw, MONTH);
