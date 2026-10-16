@@ -54,7 +54,12 @@ export function QuickActions({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-[24px] bg-surface-tint p-5", className)}>
+    <div
+      className={cn(
+        "rounded-[24px] border border-white/40 bg-white/70 p-5 backdrop-blur-xl",
+        className,
+      )}
+    >
       <div className="grid grid-cols-3 gap-x-2 gap-y-5">
         {actions.map((a) => (
           <ActionCell key={a.label} action={a} layout="grid" />

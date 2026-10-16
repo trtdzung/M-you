@@ -2,19 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Wallet, PieChart, type LucideIcon } from "lucide-react";
+import { Home, Wallet, Settings, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type Tab = { href: string; label: string; icon: LucideIcon; match: string[] };
 
 /**
- * 3-tab MSB IA (quyết định #1): Trang chủ · Tài khoản · PFM. Cài đặt dời vào
- * sheet từ account card (không nằm trên bar). Giao dịch tổng hợp thuộc tab Tài khoản.
+ * 3-tab MSB IA khớp ref-ui-msb: Trang chủ · Tài khoản · Cài đặt. PFM truy cập
+ * từ tile PFM trên lưới quick-action Home. Giao dịch tổng hợp thuộc tab Tài khoản.
  */
 const TABS: Tab[] = [
   { href: "/", label: "Trang chủ", icon: Home, match: [] },
   { href: "/accounts", label: "Tài khoản", icon: Wallet, match: ["/accounts", "/transactions"] },
-  { href: "/pfm", label: "PFM", icon: PieChart, match: ["/pfm"] },
+  { href: "/settings", label: "Cài đặt", icon: Settings, match: ["/settings"] },
 ];
 
 function isActive(pathname: string, tab: Tab): boolean {
@@ -31,7 +31,7 @@ export function BottomNav() {
       aria-label="Điều hướng chính"
       className="shell-bottom-nav pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-shell-main-inset"
     >
-      <ul className="shadow-nav pointer-events-auto flex w-full items-stretch justify-between gap-1 rounded-full bg-surface px-2 py-2">
+      <ul className="shadow-nav pointer-events-auto flex w-full items-stretch justify-between gap-1 rounded-full border border-white/40 bg-white/70 px-2 py-2 backdrop-blur-xl">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
           const Icon = tab.icon;

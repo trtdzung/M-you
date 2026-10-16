@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Eye, EyeOff, Flower2 } from "lucide-react";
+import { ChevronRight, Eye, EyeOff } from "lucide-react";
 import { formatVnd } from "@/lib/format";
 
 /**
@@ -26,7 +26,7 @@ export function AccountSummaryCard({
 
   return (
     <section
-      className="shadow-card rounded-[24px] bg-surface p-2"
+      className="shadow-card rounded-[24px] border border-white/40 bg-white/70 p-2 backdrop-blur-xl"
       aria-label="Tài khoản chính"
       data-freshness={freshness ?? undefined}
     >
@@ -34,9 +34,13 @@ export function AccountSummaryCard({
         href="/settings"
         className="flex items-center gap-3 rounded-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-100 to-indigo-100 text-indigo-500">
-          <Flower2 size={22} strokeWidth={1.8} />
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/msb-avatar.png"
+          alt=""
+          aria-hidden="true"
+          className="h-11 w-11 shrink-0 rounded-full object-cover"
+        />
         <span className="flex-1 truncate text-lg font-bold tracking-wide text-primary">
           {tier}
         </span>

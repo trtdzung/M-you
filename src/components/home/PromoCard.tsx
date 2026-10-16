@@ -16,19 +16,34 @@ export function PromoCard({
   highlight,
   cta,
   variant = "offer",
+  image,
+  imageAlt,
 }: {
-  icon: LucideIcon;
-  title: string;
+  icon?: LucideIcon;
+  title?: string;
   body?: string;
   highlight?: string;
   cta?: string;
-  variant?: "offer" | "banner";
+  variant?: "offer" | "banner" | "image";
+  image?: string;
+  imageAlt?: string;
 }) {
+  if (variant === "image" && image) {
+    return (
+      <article className="shadow-card relative overflow-hidden rounded-[20px]">
+        {/* Hiển thị đúng tỉ lệ gốc của material — không object-cover/cắt xén. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image} alt={imageAlt ?? ""} className="block h-auto w-full" />
+        <SourceBadge source="mock" className="absolute right-3 top-3" />
+      </article>
+    );
+  }
+
   if (variant === "banner") {
     return (
       <article className="shadow-card relative flex h-full min-h-[104px] flex-col justify-center gap-1 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#FCE0CC] to-[#FBEFE3] p-5">
         <div className="flex items-center gap-2 text-text">
-          <Icon size={20} className="text-primary" />
+          {Icon && <Icon size={20} className="text-primary" />}
           <span className="text-sm font-bold">{title}</span>
         </div>
         {body && <p className="text-xs font-medium text-ink-soft">{body}</p>}
@@ -41,7 +56,7 @@ export function PromoCard({
     <article className="shadow-card flex h-full flex-col rounded-[20px] bg-surface p-5">
       <div className="flex items-center gap-2.5">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
-          <Icon size={18} />
+          {Icon && <Icon size={18} />}
         </span>
         <span className="flex-1 text-[15px] font-bold text-text">{title}</span>
         <ChevronRight size={20} className="text-muted" />

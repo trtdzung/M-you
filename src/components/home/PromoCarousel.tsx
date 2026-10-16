@@ -29,7 +29,7 @@ export function PromoCarousel({ items }: { items: ReactNode[] }) {
       <div
         ref={scrollerRef}
         onScroll={onScroll}
-        className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4"
+        className="no-scrollbar -mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto px-4"
         role="group"
         aria-label="Ưu đãi & gợi ý"
       >

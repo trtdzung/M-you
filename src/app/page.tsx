@@ -1,64 +1,41 @@
 "use client";
 
 import { useMemo } from "react";
-import { Gift, Wallet } from "lucide-react";
 import { HomeHeader } from "@/components/shell/HomeHeader";
-import { BrandWatermark } from "@/components/shell/BrandWatermark";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
-import { InsightCard } from "@/components/insights/InsightCard";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
 import { useFinancials } from "@/state/useFinancials";
-import { useInsightState } from "@/state/useInsights";
-import { runDetectors } from "@/insights/run";
-
-/** Hero gradient + header + watermark — luôn hiển thị (kể cả khi loading). */
-function Hero() {
-  return (
-    <div className="hero-gradient -mx-4 -mt-1 rounded-b-[32px] px-4 pb-28 pt-1">
-      <HomeHeader notifications={9} />
-      <div className="pointer-events-none flex justify-center pb-1 pt-10">
-        <BrandWatermark className="w-52 opacity-90" />
-      </div>
-    </div>
-  );
-}
 
 export default function HomePage() {
-  const { loading, error, financials, raw } = useFinancials();
-  const insightState = useInsightState();
+  const { loading, error, raw } = useFinancials();
 
   const primary = useMemo(
     () => raw?.accounts.find((a) => a.type === "current") ?? null,
     [raw],
   );
-  const topInsight = useMemo(
-    () => (financials ? insightState.visibleOf(runDetectors(financials))[0] ?? null : null),
-    [financials, insightState],
-  );
 
   return (
     <div>
-      <Hero />
+      {/* Header ngồi thẳng trên nền toàn màn "2/9" (không còn khối hero riêng).
+          Spacer để lộ chữ số "2/9" của ảnh nền trước khi tới các thẻ. */}
+      <HomeHeader notifications={9} />
+      <div aria-hidden className="h-72" />
 
       {loading && (
-        <div className="-mt-20 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <SkeletonCard className="h-32" />
           <SkeletonCard className="h-56" />
           <SkeletonCard className="h-28" />
         </div>
       )}
 
-      {error && (
-        <div className="-mt-16">
-          <ErrorState />
-        </div>
-      )}
+      {error && <ErrorState />}
 
       {!loading && !error && (
-        <div className="-mt-20 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           {primary ? (
             <AccountSummaryCard
               tier={primary.tier ?? "MSB"}
@@ -77,32 +54,22 @@ export default function HomePage() {
           <PromoCarousel
             items={[
               <PromoCard
-                key="offer"
-                icon={Gift}
-                title="Ưu đãi dành riêng"
-                body="Quý khách đã đủ điều kiện sử dụng dịch vụ ứng lương với hạn mức lên tới"
-                highlight="75% hạn mức lương"
-                cta="Tìm hiểu ngay"
+                key="savings"
+                variant="image"
+                image="/brand/banner-savings.jpg"
+                imageAlt="Cùng tài khoản MSB sinh lời không ngừng, lên tới 5,8%/năm"
               />,
-              ...(topInsight
-                ? [
-                    <InsightCard
-                      key={topInsight.id}
-                      insight={topInsight}
-                      actions={{
-                        dismiss: insightState.dismiss,
-                        snooze: insightState.snooze,
-                        markHelpful: insightState.markHelpful,
-                      }}
-                    />,
-                  ]
-                : []),
               <PromoCard
-                key="applepay"
-                icon={Wallet}
-                variant="banner"
-                title="MSB Pay · Một chạm để thanh toán"
-                body="Dễ dàng, an toàn và riêng tư."
+                key="business"
+                variant="image"
+                image="/brand/banner-business.jpg"
+                imageAlt="Từ hộ nhỏ hôm nay, vươn tầm doanh nghiệp ngày mai"
+              />,
+              <PromoCard
+                key="family"
+                variant="image"
+                image="/brand/banner-family.jpg"
+                imageAlt="Thẻ MSB Mastercard Family hoàn tiền tới 30%"
               />,
             ]}
           />

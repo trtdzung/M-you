@@ -63,8 +63,13 @@ export function TransferConfirm() {
 
   if (done) {
     return (
-      <div className="flex flex-col gap-4">
-        <Card className="flex flex-col items-center gap-2 text-center">
+      <div className="relative isolate flex flex-col gap-4">
+        {/* Nền "2/9" (Quốc khánh) rất nhạt — trang trí; số liệu vẫn trên card trắng. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-x-4 -top-1 -z-10 h-64 bg-[url('/brand/hero-2-9-wash.jpg')] bg-cover bg-center opacity-80 [mask-image:linear-gradient(to_bottom,black,transparent)]"
+        />
+        <Card className="mt-6 flex flex-col items-center gap-2 text-center">
           <CheckCircle2 size={40} className="text-positive" />
           <p className="text-lg font-semibold text-text">Đã ghi nhận (mô phỏng)</p>
           <p className="text-2xl font-bold tabular-nums text-primary">{formatVnd(done.amount)}</p>

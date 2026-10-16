@@ -6,7 +6,7 @@ import {
   ReceiptText,
   HandCoins,
   Award,
-  Sparkles,
+  PieChart,
   LayoutGrid,
 } from "lucide-react";
 import { QuickActions, type QuickAction } from "@/components/common/QuickActions";
@@ -16,9 +16,9 @@ const noop = () => {};
 
 /**
  * Khối quick-action Home MSB: lưới 3×2 (Chuyển tiền, Quét QR, Tiền gửi, Thẻ,
- * Thanh toán, Vay) + hàng chân Rewards · Trợ lý AI · Xem thêm. Chuyển tiền & Trợ
- * lý AI dẫn vào Trợ lý (draft/chat). "Xem thêm" → PFM hub. (Red Team #14: tile
- * Trợ lý AI bắt buộc.)
+ * Thanh toán, Vay) + hàng chân Rewards · PFM · Xem thêm. Chuyển tiền → màn chuyển
+ * tiền; PFM → hub PFM (lối vào PFM duy nhất từ Home). "Xem thêm" là placeholder
+ * demo chưa có màn.
  */
 const ACTIONS: QuickAction[] = [
   { label: "Chuyển tiền", icon: ArrowUpRight, href: "/transfer" },
@@ -31,8 +31,8 @@ const ACTIONS: QuickAction[] = [
 
 const FOOTER: QuickAction[] = [
   { label: "Rewards", icon: Award, onClick: noop },
-  { label: "Trợ lý AI", icon: Sparkles, href: "/assistant" },
-  { label: "Xem thêm", icon: LayoutGrid, href: "/pfm" },
+  { label: "PFM", icon: PieChart, href: "/pfm" },
+  { label: "Xem thêm", icon: LayoutGrid, onClick: noop },
 ];
 
 export function HomeQuickGrid() {

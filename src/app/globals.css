@@ -74,7 +74,9 @@ body {
 }
 
 body {
-  background-color: var(--color-background);
+  /* Nền do lớp phủ toàn màn "2/9" trong PhoneShell đảm nhận — body trong suốt để
+     ảnh nền hiện xuyên qua (thay cho blush đặc trước đây). */
+  background-color: transparent;
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

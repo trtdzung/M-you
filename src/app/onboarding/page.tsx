@@ -14,6 +14,12 @@ const VALUE_POINTS = [
 export default function OnboardingPage() {
   return (
     <div className="flex min-h-full flex-col">
+      {/* Hero "2/9" (Quốc khánh) — nền thật crop từ bộ nhận diện, logo trắng đè lên. */}
+      <div className="-mx-4 -mt-1 overflow-hidden rounded-b-[28px] bg-[#c81f0e] bg-[url('/brand/hero-2-9.jpg')] bg-cover bg-[position:50%_14%] px-4 pb-20 pt-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/msb-logo-white.png" alt="MSB" className="h-7 w-auto" />
+      </div>
+
       <div className="pt-6">
         <span className="inline-flex items-center rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
           MSB Financial Copilot
