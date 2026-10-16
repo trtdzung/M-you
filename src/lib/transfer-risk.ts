@@ -1,5 +1,7 @@
-import { TRANSFER_THRESHOLD_VND } from "@/ai/config";
 import type { TransferRiskFlag } from "@/domain/models";
+
+/** Amount at/above which a transfer is flagged over-threshold in the review UI. */
+export const TRANSFER_THRESHOLD_VND = 10_000_000;
 
 export function hitsThreshold(amount: number): boolean {
   return amount >= TRANSFER_THRESHOLD_VND;

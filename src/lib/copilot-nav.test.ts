@@ -25,10 +25,6 @@ describe("resolveIntentRoute — whitelisted mappings (BIDV 4-tab IA, plan 26091
   it("maps open-overview → Tổng quan tab", () => {
     expect(resolveIntentRoute("open-overview")).toBe("/pfm?tab=overview");
   });
-
-  it("maps open-assistant → dedicated chat", () => {
-    expect(resolveIntentRoute("open-assistant")).toBe("/assistant");
-  });
 });
 
 describe("resolveIntentRoute — retired dock params (red-team #12)", () => {

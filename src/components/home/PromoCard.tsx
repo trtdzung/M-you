@@ -6,8 +6,8 @@ import { cn } from "@/lib/cn";
 /**
  * Banner ưu đãi TĨNH `source: mock` (Red Team #1) — KHÔNG mang số gắn dữ liệu tài
  * chính người dùng. Hai kiểu: "offer" (icon + tiêu đề + chevron + body + highlight
- * + CTA) và "banner" (dải peach quảng bá). Card insight thật dùng `InsightCard`
- * riêng, KHÔNG dùng component này.
+ * + CTA) và "banner" (dải peach quảng bá). Chỉ dùng cho nội dung quảng bá tĩnh,
+ * KHÔNG hiển thị dữ liệu tài chính người dùng.
  */
 export function PromoCard({
   icon: Icon,

@@ -27,8 +27,7 @@ export type CopilotIntent =
   | "open-transactions" // full transaction feed (Tài khoản)
   | "open-report" // báo cáo tháng (nay trên Tổng quan)
   | "open-wealth" // Tài sản & Nợ manager
-  | "open-overview" // Tổng quan
-  | "open-assistant"; // dedicated copilot chat
+  | "open-overview"; // Tổng quan
 
 /**
  * Each intent resolves to one fixed route. No params, no interpolation. Remapped
@@ -43,7 +42,6 @@ const ROUTES: Record<CopilotIntent, string> = {
   "open-report": `${PFM_HUB}?tab=overview#${REPORT_ANCHOR}`,
   "open-wealth": `${PFM_HUB}/wealth`,
   "open-overview": `${PFM_HUB}?tab=overview`,
-  "open-assistant": "/assistant",
 };
 
 /** True only for intent ids present in the whitelist. */

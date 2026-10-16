@@ -31,7 +31,6 @@ export function TransferConfirm() {
   // Draft fields come from session storage keyed by id (Red Team #11) — never
   // from the URL. Only `draftId` is read from the query string.
   const draft = useMemo(() => getTransferDraft(params.get("draftId") ?? ""), [params]);
-  const doneDestination = params.get("returnTo") === "/" || params.get("from") === "transfer" ? "/" : "/assistant";
   const isValidDraft = Boolean(draft?.name.trim() && draft.accountMasked && Number.isFinite(draft.amount) && draft.amount > 0);
 
   const [name, setName] = useState(draft?.name ?? "");
@@ -80,10 +79,10 @@ export function TransferConfirm() {
         </Card>
         <button
           type="button"
-          onClick={() => router.push(doneDestination)}
+          onClick={() => router.push("/")}
           className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white"
         >
-          {doneDestination === "/" ? "Về trang chủ" : "Về trợ lý"}
+          Về trang chủ
         </button>
       </div>
     );
@@ -96,8 +95,8 @@ export function TransferConfirm() {
           <p className="text-sm font-semibold text-warning">Không tìm thấy bản nháp hợp lệ</p>
           <p className="mt-1 text-xs text-warning">Để bảo vệ thông tin người nhận, hãy tạo lại bản nháp từ luồng chuyển tiền.</p>
         </Card>
-        <button type="button" onClick={() => router.push(doneDestination === "/" ? "/transfer" : "/assistant")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
-          {doneDestination === "/" ? "Tạo lại bản nháp" : "Về trợ lý"}
+        <button type="button" onClick={() => router.push("/transfer")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
+          Tạo lại bản nháp
         </button>
       </div>
     );

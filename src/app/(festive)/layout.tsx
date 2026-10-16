@@ -1,6 +1,5 @@
 import { PhoneShell } from "@/components/shell/PhoneShell";
 import { BottomNav } from "@/components/shell/BottomNav";
-import { AssistantFab } from "@/components/shell/AssistantFab";
 
 /**
  * Festive shell: the full-screen 2/9 (Quốc khánh) photo background + bottom scrim.
@@ -23,8 +22,8 @@ function FestiveBg() {
 }
 
 /**
- * Chrome for every non-PFM route (Home / accounts / settings / assistant /
- * transfer / …): festive photo surface, 3-tab MSB `BottomNav`, floating AI FAB.
+ * Chrome for every non-PFM route (Home / accounts / settings / transfer / …):
+ * festive photo surface + 3-tab MSB `BottomNav`.
  */
 export default function FestiveLayout({
   children,
@@ -32,7 +31,7 @@ export default function FestiveLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PhoneShell background={<FestiveBg />} nav={<BottomNav />} fab={<AssistantFab />}>
+    <PhoneShell background={<FestiveBg />} nav={<BottomNav />}>
       {children}
     </PhoneShell>
   );

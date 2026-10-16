@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TRANSFER_THRESHOLD_VND } from "@/ai/config";
-import { assessTransferRisk, hitsThreshold } from "./transfer-risk";
+import { assessTransferRisk, hitsThreshold, TRANSFER_THRESHOLD_VND } from "./transfer-risk";
 
 describe("transfer risk", () => {
   it("includes the threshold boundary", () => {

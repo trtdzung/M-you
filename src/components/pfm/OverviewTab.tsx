@@ -145,7 +145,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
       />
 
       {topInsight ? (
-        <InsightStrip insight={topInsight} onTap={() => router.push("/assistant")} />
+        <InsightStrip insight={topInsight} onTap={() => router.push("/pfm?tab=overview")} />
       ) : (
         <div className="shadow-card rounded-[20px] bg-surface p-3 text-center text-xs text-muted">
           Chưa có gợi ý mới

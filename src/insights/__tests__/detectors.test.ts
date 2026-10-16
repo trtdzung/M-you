@@ -4,7 +4,6 @@ import { runDetectors } from "../run";
 import { spendingSpike } from "../detectors/spending-spike";
 import { incomeChange } from "../detectors/income-change";
 import { numbersIn, factValues } from "../narrate";
-import { answerPrompt } from "../assistant";
 import type { Insight } from "../types";
 import { makeCashflow, makeFinancials, makeJarBudgetLine, makeJarBudgetResult } from "./helpers";
 
@@ -70,18 +69,5 @@ describe("runDetectors", () => {
     );
     expect(insights.length).toBeGreaterThanOrEqual(2);
     expect(insights[0].severity).toBe("urgent");
-  });
-});
-
-describe("assistant answers", () => {
-  it("explains the month from engine numbers", () => {
-    const answer = answerPrompt("explain_month", makeFinancials({ cashflow: makeCashflow({ income: 25_000_000, expense: 18_000_000, net: 7_000_000 }) }));
-    expect(answer.lines.join(" ")).toContain("25.000.000");
-    expect(answer.sources.length).toBeGreaterThan(0);
-  });
-
-  it("names the top spending category", () => {
-    const answer = answerPrompt("top_category", makeFinancials({ categorySpend: [{ categoryId: "dining", label: "Ăn uống", amount: 3_000_000, share: 0.4 }] }));
-    expect(answer.lines[0]).toContain("Ăn uống");
   });
 });
