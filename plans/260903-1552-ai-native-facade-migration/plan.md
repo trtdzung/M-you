@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: completed
 type: implementation-plan
 title: AI-native facade migration (từ web report tĩnh → feature AI sống trong app)
 created: 2026-09-03
@@ -34,11 +34,15 @@ Brainstorm gồm 4 phase; Phase 1 (ưu tiên #1) tách thành 5 file chi tiết,
 | 03 | [phase-03-pipeline-validator-fallback.md](phase-03-pipeline-validator-fallback.md) | P1 | PFM-062, PFM-072/073, PFM-111 | ✅ done |
 | 04 | [phase-04-chat-streaming-ui.md](phase-04-chat-streaming-ui.md) | P1 | PFM-070, EPIC-08 | ✅ done |
 | 05 | [phase-05-proactive-audit-safety.md](phase-05-proactive-audit-safety.md) | P1 | PFM-060, PFM-091/092, PFM-111 | ✅ done |
-| 06 | [phase-06-ux-overhaul-banking.md](phase-06-ux-overhaul-banking.md) | P2 | PFM-006, EPIC-01 | outline (chờ screenshot MSB) |
-| 07 | [phase-07-polish-states-motion.md](phase-07-polish-states-motion.md) | P3 | PFM-112, PFM-090 | outline |
-| 08 | [phase-08-assisted-transfer-drafting.md](phase-08-assisted-transfer-drafting.md) | P4 | EPIC-13, PFM-093 | outline (Level 3 gate) |
+| 06 | [phase-06-ux-overhaul-banking.md](phase-06-ux-overhaul-banking.md) | P2 | PFM-006, EPIC-01 | ✅ done (reskin MSB) |
+| 07 | [phase-07-polish-states-motion.md](phase-07-polish-states-motion.md) | P3 | PFM-112, PFM-090 | ✅ done |
+| 08 | [phase-08-assisted-transfer-drafting.md](phase-08-assisted-transfer-drafting.md) | P4 | EPIC-13, PFM-093 | ✅ done (Level 3 gate) |
 
 > **Cập nhật 2026-09-03:** Phase 01–05 (ưu tiên #1 — AI facade thật) đã hoàn thành. 94 test xanh, `npm run build`/`lint` sạch, không rò key ở client bundle. Đã xử lý findings từ code review (year-in-period false flag, tolerance stacking, guard chống claim giao dịch đã hoàn tất, prompt rule chống injection từ tool-result). LLM provider giữ linh hoạt (interface trung lập, Anthropic mặc định, tự fallback offline khi thiếu key). Còn lại: 06 (chờ screenshot MSB), 07 (polish), 08 (Level 3 gate).
+>
+> **Cập nhật 2026-09-04:** Đã có 4 screenshot MSB thật (`ref-ui-msb/`) → Phase 06 unblocked & chi tiết hoá. Token chuẩn trích ở [reports/msb-design-tokens.md](reports/msb-design-tokens.md). Quyết định UI (user): **apply design language** (reskin màn PFM, không clone app mẹ 1:1) · **giữ 5 tab** restyle floating pill · font **Be Vietnam Pro**. Phase 07/08 tham chiếu token mới (08 áp cho màn confirm mock).
+>
+> **Cập nhật 2026-09-04 (2):** Phase 06–08 đã hoàn thành và xác minh (125 test xanh, lint 0/0, build 0 lỗi). Toàn bộ migration UI reskin MSB (06), polish/states/motion/provenance/a11y (07), và assisted transfer drafting Level 3 (08) đã ship trong prototype. Còn 1 quyết định sản phẩm mở ở Phase 08 (hiển thị số TK trên màn confirm mock) cần sign-off — không chặn done trạng thái phase. Toàn bộ 8 phase của plan đã done.
 
 ## Dependency order
 

@@ -42,7 +42,7 @@ Provider interfaces
   +-- Future investment provider
       |
       v
-AI Facade (implemented, Tier A only)
+AI Facade (implemented, Tier A + Tier B)
   +-- Provider-agnostic LLM client (Anthropic default, offline fallback)
   +-- Intent and scope check
   +-- Context builder (reuses the deterministic engine)
@@ -50,7 +50,7 @@ AI Facade (implemented, Tier A only)
   +-- LLM narrative generation (streamed)
   +-- Numeric grounding and safety validation
   +-- AI audit log
-  +-- [planned] Tier B draft tools (Level 3, EPIC-13)
+  +-- Tier B draft-only transfer tools (Level 3, EPIC-13) — flag-gated, LLM cannot call them directly
 ```
 
 ## Module responsibilities
@@ -230,6 +230,7 @@ TransactionDataProvider
 AssetDataProvider
 LiabilityDataProvider
 MarketDataProvider
+BeneficiaryDataProvider  # saved payees for Tier B recipient resolution (findRecipient)
 ```
 
 The mock provider supplies deterministic fixtures for the prototype. Production providers can later connect to MSB core banking, card, savings, or investment systems without changing calculation and presentation contracts.
@@ -250,7 +251,7 @@ Required rules:
 
 ## AI facade
 
-**Status:** the facade is implemented and live, not a stub. Tier A (read-only analytics + deterministic simulation) is wired to a real LLM with an offline fallback. Tier B (draft-only transfer tools) is designed below but **not yet built** — deferred to the Level 3 assisted-transfer-drafting phase (`EPIC-13`, `plans/project-backlog.md`). Until Tier B ships, any transfer-intent message is refused outright by the pipeline (no draft, no tool call).
+**Status:** the facade is implemented and live, not a stub. Tier A (read-only analytics + deterministic simulation) is wired to a real LLM with an offline fallback. Tier B (draft-only transfer tools, Level 3, `EPIC-13`, `plans/project-backlog.md`) is also implemented: the agent can prepare a `TransferDraft`, gated by the `ENABLE_TRANSFER_DRAFTING` feature flag (default ON in the prototype). The agent still never executes, confirms, or authenticates a transfer — that stays with the human in the native MSB confirm flow. When the flag is off, transfer-intent messages fall back to the original hard refusal (no draft, no tool call).
 
 The AI facade is an application boundary, not a domain module. It cannot mutate the ledger.
 
@@ -282,14 +283,14 @@ Six whitelisted tools, registered in `src/ai/tools/registry.ts` as the *only* to
 
 Each handler is pure: it reads from the deterministic engine, never computes inline, and attaches a Vietnamese `sources[]` string plus `period` used for the response's provenance chips.
 
-### Tier B — draft-only tools (designed, not yet implemented)
+### Tier B — draft-only tools (implemented, `src/ai/tools/draft-tools.ts`)
 
-The tools and data model below are the target design for Level 3 assisted transfer drafting; there is no code for them yet. `src/ai/tools/registry.ts` explicitly documents Tier A as "the ONLY set the LLM can call" and Tier B as "deliberately absent until the gated Level 3 phase."
+Level 3 assisted transfer drafting (`EPIC-13`). Tier B is **deliberately excluded** from `toolSchemas()` (`src/ai/tools/registry.ts`) — the LLM tool-use loop only ever sees Tier A. The action pipeline (`src/ai/pipeline/action-pipeline.ts`) calls Tier B directly, server-side, with fields parsed from the user's text in code (`src/ai/pipeline/action-parse.ts`), never by the model — so a prompt-injected model cannot fill transfer fields or trigger a draft on its own.
 
-- `findRecipient(query)` — planned: resolve a payee from saved beneficiaries or the user's transaction history; would return real, existing account references only, never a fabricated number.
-- `prepareTransferDraft(input)` — planned: would return a validated `TransferDraft` for the user to review; would **not** submit, confirm, or execute anything.
+- `findRecipient(query, ctx)` — resolves a payee from saved beneficiaries (`BeneficiaryDataProvider`) or the user's transaction history only; returns real, existing account references (masked for display) or an honest "not found"/"ambiguous" result. Never fabricates an account number.
+- `prepareTransferDraft(input, ctx)` — validates recipient/amount/source account and returns a `TransferDraft`. It does **not** submit, confirm, or execute anything; there is no execute/confirm/authenticate/OTP path anywhere in this module.
 
-When built, Tier B tools would produce a draft object plus a handoff descriptor for the native MSB confirmation screen, and would never call an execution/authentication API — that stays outside the facade, reachable only by the human. See the `TransferDraft` model above and the action-pipeline sketch below for the intended shape.
+Feature-gated by `isTransferDraftingEnabled()` (`src/ai/config.ts`, env `ENABLE_TRANSFER_DRAFTING`, default ON in the prototype). Turning it off restores the prior hard refusal; it can never grant execution capability. Tier B produces a draft object plus a handoff to the native MSB confirmation screen (`src/app/transfer-confirm/`), which the facade cannot invoke. See the `TransferDraft` model above and the action pipeline below.
 
 ### Request pipeline (implemented — `src/ai/pipeline/orchestrator.ts`, `runAssistant`)
 
@@ -324,25 +325,27 @@ Grounding and safety are enforced in code, not just by prompt:
 - `src/ai/proactive/openers.ts` — reuses the existing rule-based insight detectors to seed the chat with the single highest-severity insight; bounded (at most one opener), no new autonomy introduced.
 - `src/ai/audit/` — an audit event per request (`AiAuditEvent`: `requestId`, `consentVersion`, `dataScope`, `intent`, `toolsUsed`, `validation` flags, `degraded`). Metadata only — never the raw prompt, PII, account numbers, or credentials.
 
-### Action pipeline (assisted transfer drafting) — planned, not yet implemented
+### Action pipeline (assisted transfer drafting) — implemented (`src/ai/pipeline/action-pipeline.ts`)
 
 ```text
 User asks to send money
-  -> intent classification (action intent)
-  -> consent and data-scope check (action-tier consent)
+  -> intent classification (action_transfer intent, or a re-confirmation reply)
+  -> consent/scope check (same ensureScopes as Tier A; always requires "ai")
+  -> feature flag off? -> fixed hard refusal (no draft, no tool call)
+  -> parse fields deterministically from text (action-parse.ts) — never by the LLM
   -> resolve recipient via findRecipient (saved / typed / history; never fabricated)
   -> gather + validate required fields (recipient, amount, memo, source account)
-  -> risk checks: amount threshold + fraud heuristics (new payee + large + urgency)
-  -> if risky/over-threshold: in-chat re-confirmation before drafting
+  -> risk checks: amount threshold (10M VND) + fraud heuristic (new payee + large + urgency)
+  -> if risky/over-threshold: in-chat re-confirmation before drafting (stops the turn)
   -> prepareTransferDraft (Tier B) -> TransferDraft
   -> render editable draft + provenance in chat
-  -> handoff to native MSB confirm screen (prefilled, all fields editable)
-  -> HUMAN reviews every field -> confirms -> enters OTP/password
+  -> handoff to native MSB confirm screen (src/app/transfer-confirm/, prefilled, all fields editable)
+  -> HUMAN reviews every field -> confirms -> enters OTP/password (simulated, user-operated)
   -> MSB flow (outside the facade) executes
-  -> AI audit log records the draft (no credentials/OTP stored)
+  -> AI audit log records the draft (fields/risk flags/outcome only, no credentials/OTP)
 ```
 
-Today the orchestrator stops at the first line: any `action_transfer` intent is refused before any tool call. The agent's authority, once Tier B ships, will end at the `TransferDraft` — execution, confirmation, and authentication remain performed only by the human in the MSB flow, which the facade cannot invoke.
+The agent's authority ends at the `TransferDraft`: execution, confirmation, and authentication are performed only by the human in the MSB confirm flow, which the facade cannot invoke — this stays true whether or not the drafting flag is enabled. When `ENABLE_TRANSFER_DRAFTING` is off, the orchestrator (`src/ai/pipeline/orchestrator.ts`) stops at the first line and any `action_transfer` intent is refused before any tool call, matching the pre-EPIC-13 behaviour.
 
 ### AI response contract
 
@@ -353,7 +356,7 @@ Each answer includes, where relevant:
 - Assumptions (stated in the tool `sources[]` text, e.g. "dự phóng theo giả định đóng góp đều").
 - A safe refusal instead of a guess when data is missing (`required-data.ts`) or a numeric/safety check fails (`validator.ts`).
 
-The LLM cannot directly mutate financial records or call transaction execution/authentication APIs. Today it also cannot prepare a transfer draft — that capability does not exist yet. Once Tier B ships, action intents will return only a `TransferDraft` plus a handoff descriptor; the execute/confirm/OTP step will remain performed by the human in the native MSB flow, which the facade cannot invoke.
+The LLM cannot directly mutate financial records or call transaction execution/authentication APIs. It can, via the deterministic action pipeline (not via a tool call the model makes itself), cause an `action_transfer` intent to return a `TransferDraft` plus a handoff descriptor — but that is the limit of its authority: the execute/confirm/OTP step remains performed by the human in the native MSB flow, which the facade cannot invoke.
 
 ## Data flow: mock to production
 
@@ -382,9 +385,9 @@ MSB systems
 - Prompt/output audit without storing unnecessary sensitive content.
 - User-visible source and last-sync timestamp.
 - Explicit separation between verified MSB data and self-reported data.
-- No autonomous money movement today: the facade refuses every transfer-intent request outright (Tier B is not built). Once Tier B ships, the agent may prepare a transfer draft, but execution, confirmation, and OTP/authentication will remain performed only by the human in the native MSB flow; the facade will have no execution/authentication capability and will never handle credentials or OTP.
-- Recipient account numbers must never be fabricated by the agent once drafting ships; they will resolve only from saved beneficiaries, explicit user input, or existing transaction history.
-- Draft creation will be audited (fields, recipient source, risk flags, threshold hits) without storing credentials or OTP.
+- No autonomous money movement: the agent may prepare a transfer draft (Tier B, flag-gated by `ENABLE_TRANSFER_DRAFTING`), but execution, confirmation, and OTP/authentication remain performed only by the human in the native MSB confirm flow; the facade has no execution/authentication capability and never handles credentials or OTP. With the flag off, every transfer-intent request is refused outright.
+- Recipient account numbers are never fabricated by the agent; they resolve only from saved beneficiaries, explicit user input, or existing transaction history.
+- Draft creation is audited (fields, recipient source, risk flags, threshold hits) without storing credentials or OTP.
 - Production rollout requires security, privacy, compliance, and model-risk review.
 
 ## Observability
@@ -405,8 +408,8 @@ Track:
 - Fixture-based reconciliation tests for totals and net worth.
 - Contract tests for provider adapters.
 - Golden tests for AI numeric grounding (implemented — `src/ai/pipeline/__tests__/grounding.test.ts`, `validator.test.ts`, `safety.test.ts`, `orchestrator.test.ts`).
-- Safety tests for unsupported advice and action requests (implemented — transfer intents are asserted to be refused).
-- Draft-safety tests (planned, once Tier B ships): agent never executes/confirms, never fabricates a recipient account number, honours the amount threshold, and triggers the fraud checkpoint on new-payee + large + urgency.
+- Safety tests for unsupported advice and action requests (implemented — transfer intents are asserted to be refused when the drafting flag is off).
+- Draft-safety tests (implemented — `src/ai/tools/__tests__/draft-tools.test.ts`, `src/ai/pipeline/__tests__/action-pipeline.test.ts`, `action-parse.test.ts`, `draft-attack.test.ts`): agent never executes/confirms, never fabricates a recipient account number, honours the amount threshold, and triggers the fraud checkpoint on new-payee + large + urgency.
 - Accessibility tests for charts, colour, labels, and keyboard navigation.
 - End-to-end tests for onboarding, correction, goal creation, and simulation.
 
@@ -440,7 +443,7 @@ Track:
 |---|---|---|
 | Deployment shape | Modular monolith first | Lowest complexity for prototype, preserves boundaries |
 | Financial truth | Deterministic engine | Numeric correctness and auditability |
-| AI role | Non-committing facade, two tool tiers (read + draft); Tier A (read/simulate) implemented, Tier B (draft) planned for Level 3 | Explainability and safety; agent explains/simulates now, will draft (never execute) later |
+| AI role | Non-committing facade, two tool tiers (read + draft); both Tier A (read/simulate) and Tier B (draft, Level 3) implemented | Explainability and safety; agent explains/simulates and prepares transfer drafts, but never executes |
 | Data integration | Provider interfaces | Mock now, MSB systems later |
 | Agent topology | Single assistant with tools | Avoid premature multi-agent complexity |
 | Level rollout | Progressive gates | Build trust and data coverage before advice |

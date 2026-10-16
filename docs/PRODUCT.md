@@ -42,7 +42,7 @@ Typical needs:
 ## Product principles
 
 - **Visibility before advice:** complete and understandable data comes before recommendations.
-- **AI as copilot:** AI explains and simulates today, and will be able to *prepare* a transaction draft for review once assisted transfer drafting ships; it never becomes the financial ledger, and never executes, confirms, or authenticates a transaction. The human is always the one who presses send and enters the OTP.
+- **AI as copilot:** AI explains and simulates, and can *prepare* a transaction draft for review (assisted transfer drafting); it never becomes the financial ledger, and never executes, confirms, or authenticates a transaction. The human is always the one who presses send and enters the OTP.
 - **Progressive disclosure:** Level 1 is useful on its own; Level 2 and Level 3 unlock as data and user trust improve.
 - **Explain every number:** show source, freshness, assumptions, and whether a value is estimated.
 - **User correction improves the product:** category edits, asset updates, and feedback are explicit product actions.
@@ -54,7 +54,7 @@ Typical needs:
 |---|---|---|---|
 | 1. Money visibility | Understand daily money movement | Transactions, categories, cash flow, budgets, recurring payments, basic net worth | Summary, anomaly detection, explanations |
 | 2. Wealth picture | Understand assets, debts, and resilience | Assets, liabilities, goals, allocation, debt health, emergency fund | Analysis, projections, prioritization |
-| 3. Guided decisions & assisted actions | Choose a sensible next action and act on it safely | Surplus allocation, debt-vs-saving scenarios, goal planning, investment education, product discovery, assisted transfer drafting (planned) | Bounded recommendation, scenario explanation; prepare transfer draft for human review/confirm/OTP (planned, not yet built) |
+| 3. Guided decisions & assisted actions | Choose a sensible next action and act on it safely | Surplus allocation, debt-vs-saving scenarios, goal planning, investment education, product discovery, assisted transfer drafting | Bounded recommendation, scenario explanation; prepare transfer draft for human review/confirm/OTP |
 
 ## Level 1: Money visibility
 
@@ -159,11 +159,11 @@ Use several explainable indicators instead of one authoritative score:
 - Risk-profile questionnaire.
 - Education-oriented investment allocation examples.
 - Eligibility-aware product discovery using mock products.
-- **Assisted transfer drafting** (planned, see below): the agent will prepare a transfer draft; the human reviews, confirms, and authenticates. Not yet built — today transfer requests are refused.
+- **Assisted transfer drafting**: the agent prepares a transfer draft; the human reviews, confirms, and authenticates. Feature-gated by `ENABLE_TRANSFER_DRAFTING` (default on in the prototype); when off, transfer requests are refused as before.
 
-### Assisted transfer drafting (planned, not yet implemented)
+### Assisted transfer drafting (implemented, `EPIC-13`)
 
-The read/explain/simulate assistant described in the AI product contract above is implemented; this subsection is the target design for the next phase (`EPIC-13`) and is not yet built. Today the assistant refuses any transfer request and points the user to the native MSB transfer flow.
+The read/explain/simulate assistant described in the AI product contract above is implemented. This subsection describes assisted transfer drafting, also implemented. When the `ENABLE_TRANSFER_DRAFTING` flag is off, the assistant refuses any transfer request and points the user to the native MSB transfer flow, exactly as before this feature shipped.
 
 The agent can help the user *set up* a transfer, but stops strictly at the draft. It is a **write-intent, not a write**.
 
@@ -222,11 +222,11 @@ PFM entry
 3. **Cash Flow:** income/expense chart, forecast, category trend, and monthly comparison.
 4. **Wealth:** assets, liabilities, allocation, and balance-sheet trend.
 5. **Goals:** progress, required monthly contribution, and scenarios.
-6. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is planned, not yet built; transfer requests are refused today.
+6. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off.
 
 ## AI product contract
 
-**Status:** implemented and live for the read/explain/simulate capabilities below, grounded on a real LLM (Anthropic by default) with an offline fallback when no key is configured. Assisted transfer drafting is target design, not yet built (see "Assisted transfer drafting" under Level 3).
+**Status:** implemented and live for the read/explain/simulate capabilities below, grounded on a real LLM (Anthropic by default) with an offline fallback when no key is configured. Assisted transfer drafting is also implemented (see "Assisted transfer drafting" under Level 3), feature-gated by `ENABLE_TRANSFER_DRAFTING` (default on in the prototype).
 
 The assistant may (implemented):
 
@@ -241,10 +241,11 @@ The assistant may not, and today cannot (enforced in code, not just prompted):
 - Invent balances, transactions, rates, or market data — every displayed number must trace back to a tool result, or the answer is suppressed in favour of a safe "not sure" reply.
 - Override deterministic calculations.
 - Hide uncertainty or data freshness.
-- Prepare, execute, submit, confirm, or authenticate a financial action, or handle OTP/credentials — any transfer-intent request is refused outright, with no draft produced.
+- Execute, submit, confirm, or authenticate a financial action, or handle OTP/credentials, under any circumstance.
+- Invent or complete a recipient account number, or move money without explicit user confirmation and authentication in the native MSB flow.
 - Phrase a projection as a guaranteed outcome, or claim it already performed a transaction.
 
-Once assisted transfer drafting ships (Level 3, not yet built), the contract will extend to let the assistant *prepare* a transfer draft (prefill recipient, amount, memo, source account) for the user to review, confirm, and authenticate — never invent or complete a recipient account number, and never move money without explicit user confirmation and authentication in the native MSB flow.
+The assistant may (implemented, Level 3, assisted transfer drafting): *prepare* a transfer draft (prefill recipient, amount, memo, source account) for the user to review, confirm, and authenticate, feature-gated by `ENABLE_TRANSFER_DRAFTING`. When the flag is off, any transfer-intent request is refused outright, with no draft produced.
 
 ## Mock-data strategy
 
@@ -278,8 +279,8 @@ Mock records must carry `source: mock` and be replaceable through data-provider 
 - Insight feedback: helpful versus not helpful.
 - Correction resolution rate.
 - Stale-data disclosure rate.
-- Zero unauthorised action execution (currently trivially true: no action tools exist; every transfer intent is refused).
-- The following apply once assisted transfer drafting ships (planned, not yet built): zero transfers executed by the agent (100% of executions performed by the human with OTP), zero fabricated recipient account numbers in drafts, transfer-draft acceptance/edit/abandon rate.
+- Zero unauthorised action execution: the agent has no execute/confirm/authenticate capability, whether or not transfer drafting is enabled.
+- Zero transfers executed by the agent (100% of executions performed by the human with OTP), zero fabricated recipient account numbers in drafts, transfer-draft acceptance/edit/abandon rate.
 
 ## Main risks and mitigations
 
