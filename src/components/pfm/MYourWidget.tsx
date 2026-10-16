@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, Trash2, X } from "lucide-react";
-import { useBatchSpeech } from "@/lib/use-batch-speech";
+import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
@@ -31,6 +31,7 @@ interface ChatBubble {
 const GREETING = "Xin chào 👋 Mình là M-Your. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
 const DELETE_LOCK_MS = 30_000;
+const VOICE_WORD_REVEAL_MS = 70;
 
 function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
   return messages.map((m, i) => ({
@@ -43,6 +44,12 @@ function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
 
 function composeVoiceDraft(prefix: string, transcript: string) {
   return [prefix, transcript].filter(Boolean).join(" ");
+}
+
+function sharedWordPrefix(left: string[], right: string[]) {
+  let length = 0;
+  while (length < left.length && length < right.length && left[length] === right[length]) length += 1;
+  return length;
 }
 
 /**
@@ -78,13 +85,48 @@ export function MYourWidget() {
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voicePrefix = useRef("");
-  const acceptVoiceTranscript = useCallback((text: string) => {
-    setInput(composeVoiceDraft(voicePrefix.current, text));
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealedTranscriptRef = useRef("");
+
+  const clearVoiceReveal = useCallback(() => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = null;
   }, []);
 
-  const voice = useBatchSpeech(acceptVoiceTranscript);
+  const revealVoiceTranscript = useCallback((text: string, final: boolean) => {
+    clearVoiceReveal();
+    const target = text.trim();
+    if (final) {
+      revealedTranscriptRef.current = target;
+      setInput(composeVoiceDraft(voicePrefix.current, target));
+      return;
+    }
+
+    const visibleWords = revealedTranscriptRef.current.match(/\S+/g) ?? [];
+    const targetWords = target.match(/\S+/g) ?? [];
+    let position = sharedWordPrefix(visibleWords, targetWords);
+
+    // A revised hypothesis can change earlier words. Keep only its stable prefix
+    // before revealing the newer words, so the composer never appends stale text.
+    revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
+    setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
+
+    const revealNext = () => {
+      if (position >= targetWords.length) return;
+      position += 1;
+      revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
+      setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
+      if (position < targetWords.length) revealTimerRef.current = setTimeout(revealNext, VOICE_WORD_REVEAL_MS);
+    };
+    revealNext();
+  }, [clearVoiceReveal]);
+
+  const voice = useStreamingSpeech(revealVoiceTranscript);
   const voiceBusy = voice.state !== "idle";
-  const cancelVoice = voice.cancel;
+  const cancelVoice = useCallback(() => {
+    clearVoiceReveal();
+    voice.cancel();
+  }, [clearVoiceReveal, voice.cancel]);
 
   useEffect(() => {
     cancelVoice();
@@ -125,8 +167,9 @@ export function MYourWidget() {
   useEffect(() => {
     return () => {
       if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+      clearVoiceReveal();
     };
-  }, []);
+  }, [clearVoiceReveal]);
 
   const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
 
@@ -291,15 +334,16 @@ export function MYourWidget() {
               <button
                 type="button"
                 onClick={() => {
-                  if (voice.state === "connecting") voice.cancel();
-                  else if (voice.state === "recording") voice.stop();
+                  if (voiceBusy) voice.stop();
                   else {
+                    clearVoiceReveal();
                     voicePrefix.current = input.trim();
+                    revealedTranscriptRef.current = "";
                     voice.start();
                   }
                 }}
-                disabled={composerDisabled || voice.state === "processing"}
-                aria-label={voice.state === "connecting" ? "Hủy mở micro" : voice.state === "recording" ? "Dừng ghi âm" : "Nhập bằng giọng nói"}
+                disabled={composerDisabled || voice.state === "finishing"}
+                aria-label={voice.state === "connecting" ? "Hủy kết nối micro" : voiceBusy ? "Dừng ghi âm" : "Nhập bằng giọng nói"}
                 aria-pressed={voiceBusy}
                 className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40", voiceBusy ? "bg-negative-soft text-negative" : "bg-surface-muted text-primary")}
               >
@@ -315,21 +359,9 @@ export function MYourWidget() {
                 <Send size={16} />
               </button>
             </div>
-            {voice.state === "recording" && (
-              <div role="img" aria-label="Dạng sóng âm thanh đang thu" className="mt-2 flex h-7 items-center justify-center gap-0.5 rounded-xl bg-surface-muted px-3">
-                {voice.levels.map((level, index) => (
-                  <span
-                    key={index}
-                    aria-hidden="true"
-                    className="w-1 rounded-full bg-primary transition-[height] duration-100"
-                    style={{ height: `${Math.max(4, Math.round(level * 24))}px` }}
-                  />
-                ))}
-              </div>
-            )}
             {(voiceBusy || voice.error) && (
               <p role={voice.error ? "alert" : "status"} className={cn("mt-2 text-xs", voice.error ? "text-negative" : "text-muted")}>
-                {voice.error || (voice.state === "connecting" ? "Đang mở micro…" : voice.state === "recording" ? "Đang ghi âm… Bấm dừng khi nói xong (tối đa 30 giây)." : "Đang nhận dạng toàn bộ bản ghi âm…")}
+                {voice.error || (voice.state === "connecting" ? "Đang mở micro…" : voice.state === "recording" ? "Đang nghe… Ngừng nói để hoàn tất, hoặc bấm dừng." : "Đang hoàn tất bản chép lời…")}
               </p>
             )}
           </div>
