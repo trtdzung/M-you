@@ -4,13 +4,79 @@
  * TransactionQuery filtering server-side so callers get exactly what they ask.
  */
 
-import type { JarConfig, Transaction, TransactionQuery } from "@/domain/models";
-import type { Providers } from "../interfaces";
+import type { Asset, JarConfig, Liability, Transaction, TransactionQuery } from "@/domain/models";
+import {
+  ASSET_STORE_VERSION,
+  isUserRecordStore,
+  isValidAssetRecord,
+  isValidLiabilityRecord,
+  LIABILITY_STORE_VERSION,
+  type UserRecordStore,
+} from "@/domain/models/asset-liability-input";
+import {
+  GOAL_STORE_VERSION,
+  isValidGoalRecord,
+  type GoalRecord,
+} from "@/domain/models/goal-input";
+import {
+  personaLocalStorageResource,
+  type PersonaLocalStorageResource,
+} from "@/lib/persona-storage";
+import type { Providers, UserRecordsResult } from "../interfaces";
 import type { PersonaId } from "./personas";
 import type { Dataset } from "./fixtures/generate";
 
 /** Persona-scoped storage key so jar config never leaks across personas (H5). */
 const jarKey = (personaId: PersonaId) => `msb-pfm.jars.${personaId}`;
+
+/**
+ * A persona-scoped, versioned collection of user-authored records with a
+ * PER-RECORD guard (red-team #4). Built on the shared `personaLocalStorageResource`
+ * so persona keys + SSR/try-catch live in one place (DRY, red-team #6). Generic
+ * so Phase 05 (goals) reuses it verbatim; a corrupt element is dropped and its
+ * valid siblings are kept — a single bad record never wipes the store (#6).
+ */
+function userRecordStore<T extends { id: string }>(
+  namespace: string,
+  personaId: PersonaId,
+  version: number,
+  isValid: (value: unknown) => value is T,
+) {
+  const resource: PersonaLocalStorageResource<UserRecordStore<T>> = personaLocalStorageResource({
+    namespace,
+    personaId,
+    guard: isUserRecordStore as (v: unknown) => v is UserRecordStore<T>,
+    seed: () => ({ version, records: [] }),
+  });
+
+  /** Read the envelope, then keep only guard-valid elements + count the drops. */
+  function readValid(): { valid: T[]; dropped: number } {
+    const stored = resource.read();
+    const raw: unknown[] = stored?.records ?? [];
+    const valid = raw.filter(isValid);
+    return { valid, dropped: raw.length - valid.length };
+  }
+
+  function persist(records: T[]): void {
+    resource.save({ version, records });
+  }
+
+  return {
+    list(): UserRecordsResult<T> {
+      const { valid, dropped } = readValid();
+      return { records: clone(valid), dropped };
+    },
+    create(record: T): void {
+      persist([...readValid().valid, record]);
+    },
+    update(record: T): void {
+      persist(readValid().valid.map((r) => (r.id === record.id ? record : r)));
+    },
+    remove(id: string): void {
+      persist(readValid().valid.filter((r) => r.id !== id));
+    },
+  };
+}
 
 /**
  * Structural guard (M11). Any parse error or shape mismatch → treated as absent
@@ -67,6 +133,12 @@ function clone<T>(items: T[]): T[] {
 }
 
 export function createMockProvider(dataset: Dataset, personaId: PersonaId): Providers {
+  // Persistence-only user-record stores (client-local; a real MSB adapter maps
+  // these to CRUD endpoints without changing the contract — invariant #4).
+  const assetStore = userRecordStore<Asset>("assets", personaId, ASSET_STORE_VERSION, isValidAssetRecord);
+  const liabilityStore = userRecordStore<Liability>("liabilities", personaId, LIABILITY_STORE_VERSION, isValidLiabilityRecord);
+  const goalStore = userRecordStore<GoalRecord>("goals", personaId, GOAL_STORE_VERSION, isValidGoalRecord);
+
   return {
     async listAccounts() {
       return clone(dataset.accounts);
@@ -76,10 +148,34 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId): Prov
       return clone(rows).sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
     },
     async listAssets() {
-      return clone(dataset.assets);
+      return clone(dataset.assets); // SEED ONLY — user records never folded here (#3)
+    },
+    async getUserAssets() {
+      return assetStore.list();
+    },
+    async createAsset(record) {
+      assetStore.create(record);
+    },
+    async updateAsset(record) {
+      assetStore.update(record);
+    },
+    async deleteAsset(id) {
+      assetStore.remove(id);
     },
     async listLiabilities() {
-      return clone(dataset.liabilities);
+      return clone(dataset.liabilities); // SEED ONLY (#3)
+    },
+    async getUserLiabilities() {
+      return liabilityStore.list();
+    },
+    async createLiability(record) {
+      liabilityStore.create(record);
+    },
+    async updateLiability(record) {
+      liabilityStore.update(record);
+    },
+    async deleteLiability(id) {
+      liabilityStore.remove(id);
     },
     async getMonthlySnapshots() {
       return clone(dataset.snapshots);
@@ -91,7 +187,19 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId): Prov
       return clone(dataset.budgets);
     },
     async listGoals() {
-      return clone(dataset.goals);
+      return clone(dataset.goals); // SEED ONLY — user records never folded here (#3)
+    },
+    async getUserGoals() {
+      return goalStore.list();
+    },
+    async createGoal(record) {
+      goalStore.create(record);
+    },
+    async updateGoal(record) {
+      goalStore.update(record);
+    },
+    async deleteGoal(id) {
+      goalStore.remove(id);
     },
     async listBeneficiaries() {
       return clone(dataset.beneficiaries);

@@ -11,7 +11,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { useProviders } from "@/providers/context";
+import { useAssetLiabilities } from "./assets";
 import { useCorrections, applyCorrections } from "./corrections";
+import { useGoals } from "./goals";
 import { useJarConfig } from "./jars";
 import { usePeriod } from "./period";
 
@@ -37,6 +39,8 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const providers = useProviders();
   const { corrections } = useCorrections();
   const { config: jarConfig } = useJarConfig();
+  const { assets: userAssets, liabilities: userLiabilities } = useAssetLiabilities();
+  const { goals: userGoals } = useGoals();
   const { month: selectedMonth } = usePeriod();
   const month = monthOverride ?? selectedMonth;
 
@@ -78,9 +82,21 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
     [raw, corrections],
   );
 
+  // `userAssets`/`userLiabilities` are context state (single source of truth),
+  // not part of the one-time `raw` fetch — including them as deps here is what
+  // makes a create/edit/delete recompute net worth + debt health live (#2).
   const financials = useMemo<Financials | null>(
-    () => (raw ? computeFinancials(raw, month, { transactions, jarConfig }) : null),
-    [raw, transactions, month, jarConfig],
+    () =>
+      raw
+        ? computeFinancials(raw, month, {
+            transactions,
+            jarConfig,
+            userAssets,
+            userLiabilities,
+            userGoals,
+          })
+        : null,
+    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals],
   );
 
   return { loading, error, raw, transactions, financials };
