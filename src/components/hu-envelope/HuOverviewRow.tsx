@@ -5,6 +5,7 @@ import type { Financials } from "@/domain/engine/finance-compose";
 import { useJarConfig } from "@/state/jars";
 import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
+import type { PfmTabId } from "@/components/pfm/PfmTabs";
 import { PendingAllocationCard } from "./PendingAllocationCard";
 import { JarEnvelopeCard } from "./JarEnvelopeCard";
 import { AllocationSheet } from "./AllocationSheet";
@@ -15,8 +16,18 @@ import { AllocationSheet } from "./AllocationSheet";
  * funded − spent, "ĐANG DÙNG" when funded this period). Pure presentation of
  * `financials.jarEnvelope` (invariant #1); jar colours/icons come from the jar
  * config (presentation state). "Chia ngay →" opens the allocation sheet.
+ *
+ * Tapping a jar card jumps to the real jar view (the Ngân sách tab) via
+ * `onNavigate` — the overview cards are a summary, the management lives there.
  */
-export function HuOverviewRow({ financials }: { financials: Financials }) {
+export function HuOverviewRow({
+  financials,
+  onNavigate,
+}: {
+  financials: Financials;
+  /** Jump to another PFM tab (a tapped jar card opens Ngân sách). */
+  onNavigate?: (tab: PfmTabId) => void;
+}) {
   const { config } = useJarConfig();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { pending, jars } = financials.jarEnvelope;
@@ -54,6 +65,7 @@ export function HuOverviewRow({ financials }: { financials: Financials }) {
             remaining={line.remaining}
             inUse={line.inUse}
             Icon={iconOf(line.jarId)}
+            onOpen={onNavigate ? () => onNavigate("budget") : undefined}
           />
         ))}
       </div>

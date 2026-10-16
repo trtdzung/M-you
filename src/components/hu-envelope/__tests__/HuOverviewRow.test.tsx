@@ -63,10 +63,20 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("Chưa có số dư")).toBeInTheDocument();
   });
 
-  it("labels a negative remaining as 'đã vượt hũ' (overspent)", () => {
+  it("floors an overspent jar at 0 and shows 'đã vượt X' — never a negative balance", () => {
     const env = envelope({ jars: [line({ funded: 1_000_000, spent: 1_500_000, remaining: -500_000 })] });
     render(<HuOverviewRow financials={withEnvelope(env)} />);
-    expect(screen.getByText("đã vượt hũ")).toBeInTheDocument();
+    expect(screen.getByText("đã vượt 500K")).toBeInTheDocument();
+    // A hũ can't hold negative money: the balance floors at 0, no "-500K".
+    expect(screen.getByText("0 ₫")).toBeInTheDocument();
+    expect(screen.queryByText("-500K")).not.toBeInTheDocument();
+  });
+
+  it("opens the real jar view (Ngân sách) when a jar card is tapped", () => {
+    const onNavigate = vi.fn();
+    render(<HuOverviewRow financials={withEnvelope(envelope({}))} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByRole("button", { name: /Hũ Ăn uống & Đi chợ/ }));
+    expect(onNavigate).toHaveBeenCalledWith("budget");
   });
 
   it("hides the pending card once everything is allocated (known amount, 0 outstanding)", () => {

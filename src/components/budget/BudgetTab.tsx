@@ -106,10 +106,16 @@ export function BudgetTab() {
                 node={summary.totalLimit !== null ? <Money amount={summary.totalLimit} className="font-semibold text-text" /> : <span className="text-muted">—</span>}
               />
               <GaugeStat
-                label="Còn lại"
+                // A hũ holds money you put in — "còn lại" can't be negative. When
+                // spend exceeds the total limit, show the overspend as "Vượt X"
+                // (a positive figure) instead of a nonsensical negative balance.
+                label={summary.totalRemaining !== null && summary.totalRemaining < 0 ? "Vượt" : "Còn lại"}
                 node={
                   summary.totalRemaining !== null ? (
-                    <Money amount={summary.totalRemaining} className={cn("font-semibold", summary.totalRemaining < 0 ? "text-negative" : "text-text")} />
+                    <Money
+                      amount={Math.abs(summary.totalRemaining)}
+                      className={cn("font-semibold", summary.totalRemaining < 0 ? "text-negative" : "text-text")}
+                    />
                   ) : (
                     <span className="text-muted">—</span>
                   )

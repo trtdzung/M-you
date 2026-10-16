@@ -20,7 +20,7 @@ import { currentMonthKey } from "@/lib/demo-clock";
  * trend). Every number traces to the deterministic engine (invariant #1); missing
  * values render "—", never 0 (#6). Wealth/net-worth lives on its own tab.
  */
-export function OverviewTab({ onNavigate: _onNavigate }: { onNavigate: (tab: PfmTabId) => void }) {
+export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => void }) {
   // Always the current month, independent of any month picked on other tabs.
   const { loading, error, financials, transactions } = useInsights(currentMonthKey());
   const [reportOpen, setReportOpen] = useState(false);
@@ -75,7 +75,7 @@ export function OverviewTab({ onNavigate: _onNavigate }: { onNavigate: (tab: Pfm
     <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
       <CashflowOverviewCard cashflow={cashflow} prevCashflow={prevCashflow} />
 
-      <HuOverviewRow financials={financials} />
+      <HuOverviewRow financials={financials} onNavigate={onNavigate} />
 
       <SpendingSection expense={expenseSide} income={incomeSide} onOpenReport={() => setReportOpen(true)} />
 
