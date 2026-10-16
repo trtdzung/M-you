@@ -655,12 +655,13 @@ describe("useAutoFund — H1: 'Đổi nguồn' (changeSource) is atomic — the 
       fundedIds = r.createdIds;
     });
 
-    let swapped: string[] = [];
+    let swapped: ReturnType<typeof result.current.changeSource> | undefined;
     act(() => {
       // "tiny" only holds 100k, far short of the 500k shortfall.
       swapped = result.current.changeSource({ triggerTxnId: triggerId, targetJarId: "food", postedAt: "2026-09-05T10:00:00.000Z", oldIds: fundedIds, donorJarId: "tiny" });
     });
-    expect(swapped).toEqual(fundedIds); // unchanged — the original ids are returned
+    expect(swapped?.status).toBe("insufficient");
+    expect(swapped?.ids).toEqual(fundedIds); // unchanged — the original ids are returned
     const rebs = rebalancesFor(result.current.manualTxns, triggerId);
     expect(rebs).toHaveLength(1);
     expect(rebs[0].rebalance).toMatchObject({ fromJarId: "buf" }); // original donor intact

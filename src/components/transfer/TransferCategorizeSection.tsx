@@ -10,7 +10,7 @@ import { useManualTxns } from "@/state/manual-txns";
 import { useAutoFund } from "@/state/use-auto-fund";
 import { useTransferPurposeSuggestion } from "@/state/use-transfer-purpose-suggestion";
 import { typeForCategory } from "@/lib/category-txn-type";
-import { formatVnd } from "@/lib/format";
+import { fundOutcomeNote } from "./fund-outcome-note";
 import {
   CATEGORY,
   CATEGORY_BY_ID,
@@ -124,17 +124,12 @@ export function TransferCategorizeSection({
       if (result.status === "needs-goal") {
         // Only a protected `goal` jar can cover — prompt before raiding it (C5).
         setGoalPending({ categoryId, postedAt });
-      } else if (result.status === "funded") {
-        setGoalPending(null);
-        const total = result.donors.reduce((s, d) => s + d.take, 0);
-        setFundNote(`Đã bù ${formatVnd(total)} cho hũ ${result.targetLabel}.`);
-      } else if (result.status === "insufficient") {
-        // C5 durable state: the jar stays over-budget (remaining < 0) and re-surfaces
-        // as a "cần bù thủ công" banner on its card until resolved — never a silent loss.
-        setGoalPending(null);
-        setFundNote(`Hũ ${result.targetLabel} vượt hạn mức — cần bù thủ công.`);
       } else {
+        // funded / partial-insufficient (U5: covered part + residual) / covered.
+        // C5 durable state: an uncovered residual keeps the jar over-budget and
+        // re-surfaces as "cần bù thủ công" on its card — never a silent loss.
         setGoalPending(null);
+        setFundNote(fundOutcomeNote(result));
       }
     } finally {
       inFlight.current = false;

@@ -48,7 +48,11 @@ const h = vi.hoisted(() => {
     // separately). `assess` returns this verdict; `commit` returns these rebalance ids.
     assessment: { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: null, source: "mock" } as Record<string, unknown>,
     createdIds: [] as string[],
+    casaBalance: 100_000_000,
     commit: vi.fn(),
+    // Awaited leg writes (H14): resolves with `createdIds` unless a test rejects it.
+    commitPersisted: vi.fn(async (..._args: unknown[]): Promise<string[]> => []),
+    assess: vi.fn(),
     draft: null as Record<string, unknown> | null,
     used: {} as Record<string, boolean>,
     query: "draftId=d1",
@@ -57,7 +61,7 @@ const h = vi.hoisted(() => {
         { id: "acc1", type: "current" },
       ],
     ),
-    applyAccountDebit: vi.fn(async () => {}),
+    applyAccountDebit: vi.fn(async (_accountId: string, _amount: number, _record?: unknown) => {}),
     push: vi.fn(),
     add: vi.fn((input: { categoryId: string; type: string; amount: number; merchantName: string }) => {
       const id = `manual-test-${state.store.length + 1}`;
@@ -68,6 +72,10 @@ const h = vi.hoisted(() => {
       if (!state.store.some((t) => t.id === id)) return false;
       state.store = state.store.map((t) => (t.id === id ? { ...t, ...patch } : t));
       return true;
+    }),
+    // The primary txn is stored by the debit endpoint and only ADOPTED locally.
+    adopt: vi.fn((txn: MockTxn & { postedAt?: string }) => {
+      state.store = [{ ...txn, source: "self_reported" }, ...state.store];
     }),
   };
   return state;
@@ -95,24 +103,41 @@ vi.mock("@/state/useFinancials", () => ({
   useFinancials: () => ({ financials: h.financials, transactions: [], raw: { accounts: [] } }),
 }));
 
-vi.mock("@/state/manual-txns", () => ({
-  MANUAL_ACCOUNT_ID: "self-reported",
-  useManualTxns: () => ({ manualTxns: h.store, add: h.add, update: h.update, remove: () => {}, removeByTrigger: () => [] }),
-}));
+vi.mock("@/state/manual-txns", async () => {
+  const actual = await vi.importActual<typeof import("@/state/manual-txns")>("@/state/manual-txns");
+  return {
+    MANUAL_ACCOUNT_ID: "self-reported",
+    buildManualTxn: actual.buildManualTxn, // the real record builder
+    useManualTxns: () => ({
+      manualTxns: h.store,
+      add: h.add,
+      addPersisted: async (input: Parameters<typeof h.add>[0]) => h.add(input),
+      adopt: h.adopt,
+      update: h.update,
+      remove: () => {},
+      removeByTrigger: () => [],
+    }),
+  };
+});
 
 // The shared auto-fund unit is exercised against the engine elsewhere; here it is a
 // controllable stub so the confirm screen's OWN responsibilities (assess-then-commit
 // ordering, single primary txn, latch, error) are tested in isolation.
 vi.mock("@/state/use-auto-fund", () => ({
   useAutoFund: () => ({
-    assess: () => ({ assessment: h.assessment, snapshot: { spendables: [], casaBalance: 0, lines: [], month: "2026-09" } }),
+    assess: (p: unknown) => {
+      h.assess(p);
+      return { assessment: h.assessment, snapshot: { spendables: [], casaBalance: h.casaBalance, lines: [], month: "2026-09" } };
+    },
     commit: (...args: unknown[]) => {
       h.commit(...args);
       return h.createdIds;
     },
+    commitPersisted: h.commitPersisted,
     reconcile: () => null,
     undo: () => ({ status: "undone" }),
-    changeSource: () => [],
+    changeSource: () => ({ status: "nothing", ids: [], shortfall: 0 }),
+    swapOptions: () => ({ shortfall: 0, options: [] }),
     fundJar: () => ({ status: "covered", donors: [], goalDonors: [], shortfall: 0, createdIds: [], targetJarId: null, targetLabel: "", postedAt: "" }),
     removeByTrigger: () => [],
     jarConfig: h.jarConfig,
@@ -162,8 +187,16 @@ beforeEach(() => {
   h.listAccounts.mockImplementation(async () => [{ id: "acc1", type: "current" }]);
   h.applyAccountDebit.mockClear();
   h.add.mockClear();
+  h.adopt.mockClear();
   h.update.mockClear();
   h.commit.mockClear();
+  h.assess.mockClear();
+  h.casaBalance = 100_000_000;
+  h.commitPersisted.mockReset();
+  h.commitPersisted.mockImplementation(async (...args: unknown[]) => {
+    h.commit(...args);
+    return h.createdIds;
+  });
   h.assessment = { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: null, source: "mock" };
   h.createdIds = [];
   h.update.mockImplementation((id: string, patch: Partial<MockTxn>) => {
@@ -182,8 +215,8 @@ describe("TransferConfirm — always create + categorize", () => {
     // A jar source books the spend into its first category (drops derived remaining);
     // jar money lives in the CASA account → the account is debited too (legacy
     // fallback: no sourceAccountId, so the single current account is used).
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
+    expect(h.adopt).toHaveBeenCalledTimes(1);
     expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: AMOUNT });
 
     fireEvent.click(screen.getByRole("button", { name: "Ăn uống" }));
@@ -195,7 +228,7 @@ describe("TransferConfirm — always create + categorize", () => {
     // via the category→jar map): only the txn's category changes.
     fireEvent.click(within(dialog).getByRole("button", { name: "Nhu yếu phẩm" }));
     expect(h.store[0]).toMatchObject({ categoryId: "groceries", type: "expense" });
-    expect(h.add).toHaveBeenCalledTimes(1); // still one txn total
+    expect(h.adopt).toHaveBeenCalledTimes(1); // still one txn total
   });
 
   it("account-sourced: defaults to transfer, then re-category changes only the txn category (F#5)", async () => {
@@ -205,7 +238,7 @@ describe("TransferConfirm — always create + categorize", () => {
 
     // Account-sourced debits the real account (uses the draft's explicit
     // sourceAccountId — no current-account lookup needed) and books a transfer txn.
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
     expect(h.listAccounts).not.toHaveBeenCalled();
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
 
@@ -218,7 +251,7 @@ describe("TransferConfirm — always create + categorize", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mua sắm" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Không phân loại" }));
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("0-category jar records type:transfer (no phantom expense, F#1)", async () => {
@@ -236,21 +269,21 @@ describe("TransferConfirm — always create + categorize", () => {
     fireEvent.click(btn);
     fireEvent.click(btn);
     await screen.findByText("Chuyển tiền thành công");
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("reload after completion does not resubmit — shows completed state (F#2)", async () => {
     h.draft = jarDraft();
     const view = render(<TransferConfirm />);
     await completeTransfer();
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
 
     // Remount with the same draftId — draft consumed, marked used.
     view.unmount();
     render(<TransferConfirm />);
     expect(screen.getByText("Giao dịch đã hoàn tất")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Xác nhận chuyển tiền" })).not.toBeInTheDocument();
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("a provider failure surfaces an error and stays retryable (no permanent lock)", async () => {
@@ -261,12 +294,12 @@ describe("TransferConfirm — always create + categorize", () => {
 
     fireEvent.click(btn);
     await screen.findByText(/Không hoàn tất được giao dịch/);
-    expect(h.add).not.toHaveBeenCalled(); // async failed before any local write
+    expect(h.adopt).not.toHaveBeenCalled(); // async failed before any local write
 
     // Retry now succeeds — the latch was released.
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
     await screen.findByText("Chuyển tiền thành công");
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("shows an error and does not change category when update fails (F#8)", async () => {
@@ -299,7 +332,7 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
 
     await screen.findByText(/Số dư không đủ để hoàn tất giao dịch/);
     expect(h.applyAccountDebit).not.toHaveBeenCalled();
-    expect(h.add).not.toHaveBeenCalled();
+    expect(h.adopt).not.toHaveBeenCalled();
   });
 
   it("topup: books the FULL amount into the jar category, then commits the rebalance", async () => {
@@ -313,8 +346,8 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
     await completeTransfer();
 
     // Real spend keeps its real category at its FULL amount — NOT split per donor.
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
+    expect(h.adopt).toHaveBeenCalledTimes(1);
     expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: AMOUNT });
     // Coverage is delegated to the shared unit (one rebalance per donor), not booked here.
     expect(h.commit).toHaveBeenCalledTimes(1);
@@ -336,12 +369,94 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
     expect(await screen.findByText(/Cần rút từ hũ Mục tiêu/)).toBeInTheDocument();
     expect(h.applyAccountDebit).not.toHaveBeenCalled();
-    expect(h.add).not.toHaveBeenCalled();
+    expect(h.adopt).not.toHaveBeenCalled();
 
     // Explicit confirm proceeds: books the primary + commits the goal chain.
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận rút" }));
     await screen.findByText("Chuyển tiền thành công");
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
     expect(h.commit).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Edge fixes (plan 260919-1915): H14/U1 atomic debit + record, S10/U7 one clock,
+ * H11/U16 no empty donor list when the amount exceeds CASA.
+ */
+describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
+  it("H14/U1: a failed debit+record write shows an error — no success screen, no local txn, draft kept", async () => {
+    h.draft = jarDraft();
+    h.applyAccountDebit.mockRejectedValueOnce(new Error("manual-transactions 500"));
+    render(<TransferConfirm />);
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+
+    await screen.findByText(/Không hoàn tất được giao dịch/);
+    expect(screen.queryByText("Chuyển tiền thành công")).not.toBeInTheDocument();
+    expect(h.adopt).not.toHaveBeenCalled();
+    expect(h.store).toHaveLength(0);
+    expect(h.used.d1).toBeUndefined(); // draft NOT consumed — the user can retry
+    // The record travels WITH the debit (one server transaction), never separately.
+    const [, , record] = h.applyAccountDebit.mock.calls[0];
+    expect(record).toMatchObject({ amount: AMOUNT, direction: "debit", categoryId: "dining" });
+
+    // Retry of the SAME transfer reuses the record id (server-side replay guard).
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    await screen.findByText("Chuyển tiền thành công");
+    const retryRecord = h.applyAccountDebit.mock.calls[1][2] as { id: string };
+    expect(retryRecord.id).toBe((record as { id: string }).id);
+    expect(h.adopt).toHaveBeenCalledWith(expect.objectContaining({ id: retryRecord.id }));
+  });
+
+  it("H14/U1: a failed rebalance leg after the debit is surfaced on the receipt, never 'Đã bù'", async () => {
+    h.assessment = {
+      tier: "topup", shortfall: 200_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 200_000 }],
+    };
+    h.commitPersisted.mockRejectedValueOnce(new Error("leg 500"));
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+    await completeTransfer();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Chưa bù được 200\.000.*hũ Ăn uống.*cần bù thủ công/);
+    expect(screen.queryByText(/Đã bù/)).not.toBeInTheDocument();
+  });
+
+  it("S10/U7: assessment + posted date use the demo clock even when the real clock is in another month", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T03:00:00.000Z"));
+    try {
+      h.draft = jarDraft();
+      render(<TransferConfirm />);
+      await completeTransfer();
+      const assessedAt = h.assess.mock.calls.map((c) => (c[0] as { postedAt: string }).postedAt);
+      expect(assessedAt.length).toBeGreaterThan(0);
+      expect(assessedAt.every((d) => d.startsWith("2026-09-15"))).toBe(true);
+      const record = h.applyAccountDebit.mock.calls[0][2] as { postedAt: string };
+      expect(record.postedAt).toBe("2026-09-15T03:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("H11/U16: amount above CASA shows the plain 'Số dư không đủ' state — never an empty donor list", async () => {
+    h.casaBalance = 680_000;
+    h.assessment = { tier: "insufficient", shortfall: 820_000, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: "food", source: "mock" };
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+    fireEvent.change(screen.getByDisplayValue(String(AMOUNT)), { target: { value: "1500000" } });
+
+    expect(await screen.findByRole("alert", { name: "Số dư không đủ" })).toHaveTextContent(/680\.000/);
+    expect(screen.queryByRole("region", { name: "Dự kiến bù hũ" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/rót từ/)).not.toBeInTheDocument();
+  });
+
+  it("H11: a topup with donors still lists them (list only when there are donors)", async () => {
+    h.assessment = {
+      tier: "topup", shortfall: 300_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 300_000 }],
+    };
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+    const region = await screen.findByRole("region", { name: "Dự kiến bù hũ" });
+    expect(within(region).getByText("Hũ Mua sắm")).toBeInTheDocument();
   });
 });

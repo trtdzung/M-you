@@ -4,15 +4,20 @@
  * The ONE shared auto-fund unit (plan 260918-1120, Phases 04/05) — Case 1
  * (jar-sourced transfer confirm) and Case 2 (spend-first, categorize-later) both
  * call this so the funding + `dieu-chinh-hu` rebalance mechanic lives in one place
- * (DRY). It wraps the pure core (`auto-fund-core.ts`) with the manual-txns store:
+ * (DRY). It wraps the pure core (`auto-fund-core.ts`, `auto-fund-plan.ts`,
+ * `auto-fund-swap.ts`) with the manual-txns store:
  *
- *  - `assess`        pre-commit funding verdict on the trigger-date snapshot (C3/H6).
- *  - `commit`        write one rebalance txn per JAR donor (atomic + compensating).
- *  - `fundJar`       Case 2: fund a jar that just went over-budget from a label.
- *  - `reconcile`     H3/H5: unwind + re-evaluate a refunded / re-amounted / re-
- *                    categorized trigger txn (shrink/grow/remove — no blanket delete).
- *  - `undo`          C4: remove a fund AND re-validate the target (never rest negative).
- *  - `changeSource`  H1: atomically swap the donor (new legs first, then drop old).
+ *  - `assess` / `snapshotAt`  pre-commit verdict / snapshot on the trigger-date month.
+ *  - `commit` / `commitPersisted`  write one rebalance txn per donor (the latter
+ *                    AWAITS persistence and rolls back on failure — H14/U1).
+ *  - `fundJar`       Case 2: fund a jar that just went over-budget from a label,
+ *                    capped at the trigger's own contribution (U5); partial
+ *                    non-goal cover + residual when full cover is impossible.
+ *  - `reconcile`     H3/H5: unwind + re-evaluate a changed trigger txn.
+ *  - `reconcileLabels` S7/U4: batch-fund background auto-labels, each fund seeing
+ *                    the legs written before it (no double-funding in a batch).
+ *  - `undo`          C4: remove a fund AND re-validate (reports what it re-applied — U12).
+ *  - `swapOptions` / `changeSource`  H1 atomic donor swap; goal needs confirm (S3).
  *
  * Invariants: engine is sole truth (#1), rebalances are virtual/no OTP (#3),
  * excluded from thu/chi (#6), and carry `origin` provenance (#5).
@@ -20,30 +25,24 @@
 
 import { useCallback, useMemo } from "react";
 import type { Transaction } from "@/domain/models";
-import {
-  evaluateFunding,
-  type DonorProposal,
-  type FundingAssessment,
-} from "@/domain/engine";
+import { evaluateFunding, type DonorProposal, type FundingAssessment } from "@/domain/engine";
 import { DEMO_NOW } from "@/lib/demo-clock";
-import {
-  jarIdForCategory,
-  overspendOf,
-  rebalanceInputsFor,
-  snapshotForDate,
-  type AutoFundDeps,
-  type JarSnapshot,
-} from "@/lib/auto-fund-core";
+import { jarIdForCategory, rebalanceInputsFor, snapshotForDate, type AutoFundDeps, type JarSnapshot } from "@/lib/auto-fund-core";
+import type { RawData } from "@/domain/engine/finance-compose";
+import { planCover, triggerContribution, type SnapshotOpts } from "./auto-fund-plan";
+import { planSwap, swapOptionsFor, type SwapRequest, type SwapResult } from "./auto-fund-swap";
 import { useFinancials } from "./useFinancials";
 import { useJarConfig } from "./jars";
-import { useManualTxns } from "./manual-txns";
+import { buildManualTxn, useManualTxns } from "./manual-txns";
 
 export type FundStatus = "covered" | "funded" | "needs-goal" | "insufficient";
 
 export interface FundResult {
   status: FundStatus;
+  /** The donors actually written (`funded`/partial `insufficient`), or the proposal (`needs-goal`). */
   donors: DonorProposal[];
   goalDonors: DonorProposal[];
+  /** VND still uncovered for `insufficient` (after any partial cover); the gap otherwise. */
   shortfall: number;
   createdIds: string[];
   targetJarId: string | null;
@@ -60,48 +59,46 @@ export interface CommitInput {
   includeGoal?: boolean;
 }
 
-export function useAutoFund() {
-  const { transactions, raw } = useFinancials();
+export type UndoResult =
+  | { status: "undone" }
+  | { status: "reapplied"; donors: DonorProposal[]; createdIds: string[] }
+  | { status: "residual"; donors: DonorProposal[]; createdIds: string[]; shortfall: number };
+
+type Origin = "auto" | "manual";
+
+/** The donor chain a commit writes (goal donors only on explicit confirm). */
+function donorsOf(p: CommitInput): DonorProposal[] {
+  return p.includeGoal ? [...p.assessment.donors, ...p.assessment.goalDonors] : p.assessment.donors;
+}
+
+/** Hook body, fed an already-loaded txn view (so a provider that already calls
+ *  `useFinancials` — e.g. auto-categorize — doesn't start a second data fetch). */
+export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData | null }) {
+  const { transactions, raw } = fin;
   const { config: jarConfig } = useJarConfig();
-  const { add, remove, removeByTrigger } = useManualTxns();
+  const { add, remove, removeByTrigger, addPersisted } = useManualTxns();
 
   const deps: AutoFundDeps = useMemo(
     () => ({ transactions, accounts: raw?.accounts ?? [], jarConfig, now: DEMO_NOW }),
     [transactions, raw, jarConfig],
   );
 
+  const snapshotAt = useCallback((postedAt: string, opts?: SnapshotOpts): JarSnapshot => snapshotForDate(deps, postedAt, opts), [deps]);
+
   /** Pre-commit funding verdict (C3/H6): assess BEFORE any spend is booked. */
   const assess = useCallback(
     (p: { postedAt: string; sourceJarId: string | null; amount: number }) => {
-      const snapshot: JarSnapshot = snapshotForDate(deps, p.postedAt);
-      const assessment = evaluateFunding({
-        amount: p.amount,
-        sourceJarId: p.sourceJarId,
-        casaBalance: snapshot.casaBalance,
-        jars: snapshot.spendables,
-      });
+      const snapshot = snapshotForDate(deps, p.postedAt);
+      const assessment = evaluateFunding({ amount: p.amount, sourceJarId: p.sourceJarId, casaBalance: snapshot.casaBalance, jars: snapshot.spendables });
       return { assessment, snapshot };
     },
     [deps],
   );
 
-  /**
-   * Write one `dieu-chinh-hu` rebalance txn per JAR donor from an assessment.
-   * All legs go in one try; if `add` throws SYNCHRONOUSLY (e.g. a bad input), the
-   * compensating `remove` drops the legs already created so no jar is left
-   * half-funded. NOTE: `add` is optimistic — it commits local state and fires
-   * `apiCreate(...).catch(log)` in the background, so an async PERSISTENCE failure
-   * does NOT reach this catch. That case is not silently lost: a re-fetch drops the
-   * unpersisted leg and the C5 residual detector (`jarOverspendCovered`) re-flags the
-   * jar as "cần bù thủ công". True cross-leg write atomicity is out of scope for the
-   * prototype (SQLite dev, single user) — see plan 260918-1120 phase-04 H1/H2.
-   */
-  const commit = useCallback(
-    (p: CommitInput): string[] => {
-      const donors = p.includeGoal
-        ? [...p.assessment.donors, ...p.assessment.goalDonors]
-        : p.assessment.donors;
-      const inputs = rebalanceInputsFor(donors, p.targetJarId, p.triggerTxnId, p.postedAt, p.origin);
+  /** Write legs synchronously (optimistic); compensating remove on a synchronous throw. */
+  const writeLegs = useCallback(
+    (donors: DonorProposal[], targetJarId: string | null, triggerTxnId: string, postedAt: string, origin: Origin) => {
+      const inputs = rebalanceInputsFor(donors, targetJarId, triggerTxnId, postedAt, origin);
       const created: string[] = [];
       try {
         for (const input of inputs) created.push(add(input));
@@ -109,79 +106,78 @@ export function useAutoFund() {
         created.forEach(remove);
         throw err;
       }
-      return created;
+      const legs = inputs.map((input, i) => ({ ...buildManualTxn(input), id: created[i] }));
+      return { ids: created, legs };
     },
     [add, remove],
   );
 
-  /**
-   * Case 2 / reconcile core: fund a jar that is over-budget in the trigger-period
-   * snapshot. `requiresManualGoal` returns `needs-goal` (caller prompts, then
-   * re-calls with `includeGoal`); an uncoverable residual returns `insufficient`
-   * (the durable "cần bù thủ công" state, C5). Nothing is written on either.
-   */
-  const fundJar = useCallback(
-    (p: {
-      targetJarId: string;
-      triggerTxnId: string;
-      postedAt: string;
-      origin: "auto" | "manual";
-      includeGoal?: boolean;
-      excludeIds?: ReadonlySet<string>;
-      overrides?: Map<string, Partial<Transaction>>;
-    }): FundResult => {
-      const snapshot = snapshotForDate(deps, p.postedAt, { excludeIds: p.excludeIds, overrides: p.overrides });
-      const line = snapshot.lines.find((l) => l.huId === p.targetJarId);
-      const targetLabel = line?.label ?? "hũ";
-      const shortfall = overspendOf(snapshot.lines, p.targetJarId);
-      const base = { targetJarId: p.targetJarId, targetLabel, postedAt: p.postedAt, createdIds: [] as string[] };
-      if (shortfall <= 0) return { ...base, status: "covered", donors: [], goalDonors: [], shortfall: 0 };
-
-      const assessment = evaluateFunding({
-        amount: shortfall,
-        sourceJarId: p.targetJarId,
-        casaBalance: snapshot.casaBalance,
-        jars: snapshot.spendables,
-      });
-      if (assessment.requiresManualGoal && !p.includeGoal) {
-        return { ...base, status: "needs-goal", donors: assessment.donors, goalDonors: assessment.goalDonors, shortfall };
-      }
-      if (assessment.tier === "insufficient" && !assessment.requiresManualGoal) {
-        // True over-allocated residual (C1) — no donor, incl. goal, can close the gap.
-        // A `requiresManualGoal` insufficiency is NOT terminal here: line 141 already
-        // returned `needs-goal` unless the caller re-confirmed with `includeGoal`, in
-        // which case we fall through to commit the goal-jar raid.
-        return { ...base, status: "insufficient", donors: assessment.donors, goalDonors: assessment.goalDonors, shortfall };
-      }
-      const createdIds = commit({
-        assessment,
-        targetJarId: p.targetJarId,
-        triggerTxnId: p.triggerTxnId,
-        postedAt: p.postedAt,
-        origin: p.origin,
-        includeGoal: p.includeGoal,
-      });
-      const donors = p.includeGoal ? [...assessment.donors, ...assessment.goalDonors] : assessment.donors;
-      return { ...base, status: "funded", donors, goalDonors: assessment.goalDonors, shortfall, createdIds };
-    },
-    [deps, commit],
+  /** Write one `dieu-chinh-hu` rebalance txn per donor from an assessment (optimistic). */
+  const commit = useCallback(
+    (p: CommitInput): string[] => writeLegs(donorsOf(p), p.targetJarId, p.triggerTxnId, p.postedAt, p.origin).ids,
+    [writeLegs],
   );
 
   /**
-   * H3/H5: a trigger txn was refunded/reversed (`override` status), re-amounted, or
-   * re-categorized. Unwind its rebalance(s) THEN re-evaluate the effective spend and
-   * re-fund only the residual overspend (shrink/grow/remove — never a blanket delete).
-   * `categoryId` is the trigger's CURRENT category (routes to the target jar).
+   * Like `commit`, but AWAITS every leg's persistence (H14/U1). If any leg fails,
+   * the ones that did land are removed and the promise rejects — the caller must
+   * surface it, never report the cover as done.
    */
+  const commitPersisted = useCallback(
+    async (p: CommitInput): Promise<string[]> => {
+      const inputs = rebalanceInputsFor(donorsOf(p), p.targetJarId, p.triggerTxnId, p.postedAt, p.origin);
+      const settled = await Promise.allSettled(inputs.map((input) => addPersisted(input)));
+      const ok = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+      const failed = settled.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      if (failed) {
+        ok.forEach(remove);
+        throw failed.reason instanceof Error ? failed.reason : new Error("rebalance write failed");
+      }
+      return ok;
+    },
+    [addPersisted, remove],
+  );
+
+  /** Plan + write a cover for one trigger against `d` (lets a batch thread its own legs). */
+  const fundWith = useCallback(
+    (
+      d: AutoFundDeps,
+      p: { targetJarId: string; triggerTxnId: string; postedAt: string; origin: Origin; includeGoal?: boolean; partialOnNeedsGoal?: boolean } & SnapshotOpts,
+    ): { result: FundResult; legs: Transaction[] } => {
+      const opts = { excludeIds: p.excludeIds, overrides: p.overrides };
+      const snapshot = snapshotForDate(d, p.postedAt, opts);
+      const targetLabel = snapshot.lines.find((l) => l.huId === p.targetJarId)?.label ?? "hũ";
+      const cap = triggerContribution(d, p.triggerTxnId, p.targetJarId, opts);
+      const plan = planCover(snapshot, p.targetJarId, cap, { includeGoal: p.includeGoal, partialOnNeedsGoal: p.partialOnNeedsGoal });
+      const base = { targetJarId: p.targetJarId, targetLabel, postedAt: p.postedAt, goalDonors: plan.goalDonors };
+      if (plan.status === "covered") return { result: { ...base, status: "covered", donors: [], shortfall: 0, createdIds: [] }, legs: [] };
+      if (plan.status === "needs-goal") {
+        return { result: { ...base, status: "needs-goal", donors: plan.donors, shortfall: plan.shortfall, createdIds: [] }, legs: [] };
+      }
+      const origin: Origin = p.includeGoal ? "manual" : p.origin;
+      const { ids, legs } = writeLegs(plan.donors, p.targetJarId, p.triggerTxnId, p.postedAt, origin);
+      const shortfall = plan.status === "funded" ? plan.shortfall : plan.residual;
+      return { result: { ...base, status: plan.status, donors: plan.donors, shortfall, createdIds: ids }, legs };
+    },
+    [writeLegs],
+  );
+
+  /**
+   * Case 2 / reconcile core: fund a jar over-budget in the trigger-period snapshot,
+   * capped at the trigger's own contribution (U5). `needs-goal` writes nothing
+   * (caller prompts, re-calls with `includeGoal`); `insufficient` writes the best
+   * PARTIAL non-goal cover and reports the residual (C5 "cần bù thủ công").
+   */
+  const fundJar = useCallback(
+    (p: { targetJarId: string; triggerTxnId: string; postedAt: string; origin: Origin; includeGoal?: boolean } & SnapshotOpts): FundResult => {
+      return fundWith(deps, p).result;
+    },
+    [deps, fundWith],
+  );
+
+  /** H3/H5: unwind a changed trigger's legs, then re-fund against its CURRENT category. */
   const reconcile = useCallback(
-    (p: {
-      triggerTxnId: string;
-      categoryId: string;
-      postedAt: string;
-      origin?: "auto" | "manual";
-      includeGoal?: boolean;
-      override?: Partial<Transaction>;
-    }): FundResult | null => {
+    (p: { triggerTxnId: string; categoryId: string; postedAt: string; origin?: Origin; includeGoal?: boolean; override?: Partial<Transaction> }): FundResult | null => {
       const removed = removeByTrigger(p.triggerTxnId);
       const targetJarId = jarIdForCategory(jarConfig, p.categoryId);
       if (!targetJarId) return null; // transfer/rebalance category maps to no jar
@@ -199,61 +195,91 @@ export function useAutoFund() {
   );
 
   /**
-   * C4: undo the fund for a trigger, then re-validate the TARGET — if removing it
-   * re-exposes an overspend, re-apply the default non-goal chain rather than rest in
-   * a negative state. (The DONOR side can't go negative: returning money only lifts
-   * a donor's remaining.) An uncoverable residual is left as the durable state (C5).
+   * S7/U4: background labels just landed (not yet re-rendered). Fund each labelled
+   * txn's jar in date order; every fund sees the category `overrides` AND the legs
+   * already written earlier in this batch, so two labels in one jar never both
+   * claim the same overspend or the same donor money. Goal jars are never raided
+   * (no prompt in the background) — the non-goal part is covered, the rest stays a
+   * visible "cần bù thủ công" residual.
    */
-  const undo = useCallback(
-    (p: { triggerTxnId: string; targetJarId: string | null; postedAt: string }): { status: "undone" | "reapplied" | "residual" } => {
-      const removed = removeByTrigger(p.triggerTxnId);
-      if (!p.targetJarId) return { status: "undone" };
-      const snapshot = snapshotForDate(deps, p.postedAt, { excludeIds: new Set(removed) });
-      const shortfall = overspendOf(snapshot.lines, p.targetJarId);
-      if (shortfall <= 0) return { status: "undone" };
-      const assessment = evaluateFunding({
-        amount: shortfall,
-        sourceJarId: p.targetJarId,
-        casaBalance: snapshot.casaBalance,
-        jars: snapshot.spendables,
-      });
-      if (assessment.tier === "topup") {
-        commit({ assessment, targetJarId: p.targetJarId, triggerTxnId: p.triggerTxnId, postedAt: p.postedAt, origin: "auto" });
-        return { status: "reapplied" };
+  const reconcileLabels = useCallback(
+    (labels: { txnId: string; categoryId: string }[]): FundResult[] => {
+      const overrides = new Map<string, Partial<Transaction>>(labels.map((l) => [l.txnId, { categoryId: l.categoryId }]));
+      const byId = new Map(deps.transactions.map((t) => [t.id, t]));
+      // Unique, known (non-hidden) triggers, oldest first.
+      const ordered = [...new Map(labels.map((l) => [l.txnId, l])).values()]
+        .filter((l) => byId.has(l.txnId))
+        .sort((a, b) => (byId.get(a.txnId)!.postedAt < byId.get(b.txnId)!.postedAt ? -1 : 1));
+      let extra: Transaction[] = [];
+      const excludeIds = new Set<string>();
+      const results: FundResult[] = [];
+      for (const l of ordered) {
+        const targetJarId = jarIdForCategory(jarConfig, l.categoryId);
+        if (!targetJarId) continue;
+        removeByTrigger(l.txnId).forEach((id) => excludeIds.add(id));
+        const d = { ...deps, transactions: [...extra, ...deps.transactions] };
+        const postedAt = byId.get(l.txnId)!.postedAt;
+        const { result, legs } = fundWith(d, { targetJarId, triggerTxnId: l.txnId, postedAt, origin: "auto", partialOnNeedsGoal: true, excludeIds, overrides });
+        extra = [...legs, ...extra];
+        if (result.status !== "covered") results.push(result);
       }
-      return { status: "residual" }; // durable "cần bù thủ công" surfaces on the jar
+      return results;
     },
-    [deps, removeByTrigger, commit],
+    [deps, jarConfig, removeByTrigger, fundWith],
   );
 
   /**
-   * H1 atomic "Đổi nguồn": fund the residual overspend from a chosen donor jar,
-   * creating the NEW leg FIRST, then removing the OLD legs — so the jar is never
-   * unfunded mid-swap. Presented donors always fully cover, so it's a single leg.
+   * C4: undo the fund for a trigger, then re-validate the TARGET. A re-exposed
+   * overspend is re-covered from the non-goal chain (fully → `reapplied`, partly or
+   * not at all → `residual` with what's left) and the result says WHICH donors were
+   * used, so the UI can tell the user instead of silently dismissing (U12).
    */
-  const changeSource = useCallback(
-    (p: { triggerTxnId: string; targetJarId: string; postedAt: string; oldIds: string[]; donorJarId: string }): string[] => {
-      const snapshot = snapshotForDate(deps, p.postedAt, { excludeIds: new Set(p.oldIds) });
-      const shortfall = overspendOf(snapshot.lines, p.targetJarId);
-      const donor = snapshot.spendables.find((j) => j.id === p.donorJarId);
-      const available = donor?.spendable ?? 0;
-      if (shortfall <= 0 || available < shortfall) return p.oldIds; // nothing to swap / can't cover → keep old intact
-      const donors: DonorProposal[] = [{ jarId: p.donorJarId, label: `Hũ ${donor?.label ?? ""}`, take: shortfall }];
-      const created = commit({
-        assessment: { tier: "topup", shortfall, donors, goalDonors: [], requiresManualGoal: false, targetJarId: p.targetJarId, source: "mock" },
+  const undo = useCallback(
+    (p: { triggerTxnId: string; targetJarId: string | null; postedAt: string }): UndoResult => {
+      const removed = removeByTrigger(p.triggerTxnId);
+      if (!p.targetJarId) return { status: "undone" };
+      const { result: r } = fundWith(deps, {
         targetJarId: p.targetJarId,
         triggerTxnId: p.triggerTxnId,
         postedAt: p.postedAt,
-        origin: "manual",
+        origin: "auto",
+        partialOnNeedsGoal: true, // never re-raid a goal jar on undo
+        excludeIds: new Set(removed),
       });
-      p.oldIds.forEach(remove); // old dropped only AFTER the new leg exists (atomic)
-      return created;
+      if (r.status === "covered") return { status: "undone" };
+      if (r.status === "funded") return { status: "reapplied", donors: r.donors, createdIds: r.createdIds };
+      return { status: "residual", donors: r.donors, createdIds: r.createdIds, shortfall: r.shortfall };
     },
-    [deps, commit, remove],
+    [deps, removeByTrigger, fundWith],
+  );
+
+  /** H1/G31: the Đổi nguồn list, from the SAME trigger-month snapshot `changeSource` uses. */
+  const swapOptions = useCallback((p: SwapRequest) => swapOptionsFor(deps, p), [deps]);
+
+  /**
+   * H1 atomic "Đổi nguồn": create the NEW leg first, then drop the OLD ones. Refuses
+   * a `goal` donor unless `confirmGoal` (S3/G26) and any donor the engine wouldn't
+   * accept (G27) or that can't fully cover — the old legs stay intact on refusal.
+   */
+  const changeSource = useCallback(
+    (p: SwapRequest & { donorJarId: string; confirmGoal?: boolean }): SwapResult => {
+      const plan = planSwap(deps, p);
+      if (plan.status !== "ok" || !plan.donor) return { status: plan.status === "ok" ? "nothing" : plan.status, ids: p.oldIds, shortfall: plan.shortfall };
+      const { ids } = writeLegs([plan.donor], p.targetJarId, p.triggerTxnId, p.postedAt, "manual");
+      p.oldIds.forEach(remove); // old dropped only AFTER the new leg exists (atomic)
+      return { status: "swapped", ids, donor: plan.donor, shortfall: plan.shortfall };
+    },
+    [deps, writeLegs, remove],
   );
 
   return useMemo(
-    () => ({ assess, commit, fundJar, reconcile, undo, changeSource, removeByTrigger, jarConfig }),
-    [assess, commit, fundJar, reconcile, undo, changeSource, removeByTrigger, jarConfig],
+    () => ({ assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, undo, swapOptions, changeSource, removeByTrigger, jarConfig }),
+    [assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, undo, swapOptions, changeSource, removeByTrigger, jarConfig],
   );
+}
+
+/** The shared auto-fund unit over the app's merged txn view. */
+export function useAutoFund() {
+  const { transactions, raw } = useFinancials();
+  return useAutoFundWith({ transactions, raw });
 }

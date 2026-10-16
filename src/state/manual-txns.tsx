@@ -43,7 +43,7 @@ export interface ManualTxnInput {
   note?: string;
   /**
    * Inter-jar rebalance meta (Phase 03). Set ONLY when recording a rebalance txn
-   * (`categoryId: REBALANCE_CATEGORY`, `type: "transfer"`). `toTransaction` carries
+   * (`categoryId: REBALANCE_CATEGORY`, `type: "transfer"`). `buildManualTxn` carries
    * it onto the built Transaction so it survives the POST round-trip — WITHOUT this
    * passthrough the client would silently drop the meta before it ever reached the API.
    */
@@ -69,6 +69,19 @@ interface ManualTxnsContextValue {
    */
   update: (id: string, patch: ManualTxnPatch) => boolean;
   remove: (id: string) => void;
+  /**
+   * Record a self-reported txn and AWAIT its persistence (H14/U1): the local
+   * state updates optimistically, but a failed POST rolls the record back and
+   * rejects — so a caller (e.g. the transfer confirm's rebalance legs) can never
+   * report a write as done when the server never stored it.
+   */
+  addPersisted: (input: ManualTxnInput) => Promise<string>;
+  /**
+   * Add an ALREADY-PERSISTED txn to local state without re-posting it — used
+   * after `/api/accounts/debit` stored the transfer's primary txn atomically
+   * with the debit (the server is the one that wrote it).
+   */
+  adopt: (txn: Transaction) => void;
   /**
    * Remove every rebalance txn triggered by `triggerTxnId` (SC1: rebalances are
    * `dieu-chinh-hu`-tagged txns keyed by `rebalance.triggerTxnId`). Returns the
@@ -115,7 +128,7 @@ function newId(): string {
 }
 
 /** Build a full, valid Transaction from user input — self-reported, posted. */
-function toTransaction(input: ManualTxnInput): Transaction {
+export function buildManualTxn(input: ManualTxnInput): Transaction {
   return {
     id: newId(),
     accountId: MANUAL_ACCOUNT_ID,
@@ -253,12 +266,35 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
 
   const add = useCallback(
     (input: ManualTxnInput): string => {
-      const txn = toTransaction(input);
+      const txn = buildManualTxn(input);
       apply([txn, ...txnsRef.current]); // optimistic
       apiCreate(cif, txn).catch(logWriteError);
       return txn.id;
     },
     [cif, apply],
+  );
+
+  const addPersisted = useCallback(
+    async (input: ManualTxnInput): Promise<string> => {
+      const txn = buildManualTxn(input);
+      apply([txn, ...txnsRef.current]); // optimistic, rolled back on failure
+      try {
+        await apiCreate(cif, txn);
+      } catch (err) {
+        apply(txnsRef.current.filter((t) => t.id !== txn.id));
+        throw err;
+      }
+      return txn.id;
+    },
+    [cif, apply],
+  );
+
+  const adopt = useCallback(
+    (txn: Transaction) => {
+      if (txnsRef.current.some((t) => t.id === txn.id)) return; // idempotent
+      apply([{ ...txn, source: "self_reported" }, ...txnsRef.current]);
+    },
+    [apply],
   );
 
   const update = useCallback(
@@ -291,8 +327,8 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   );
 
   const value = useMemo(
-    () => ({ manualTxns, add, update, remove, removeByTrigger }),
-    [manualTxns, add, update, remove, removeByTrigger],
+    () => ({ manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger }),
+    [manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger],
   );
   return <ManualTxnsContext.Provider value={value}>{children}</ManualTxnsContext.Provider>;
 }

@@ -90,4 +90,16 @@ describe("JarTopupSuggestionSheet", () => {
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(onChooseAnother).not.toHaveBeenCalled();
   });
+
+  it("H17/U17: a pool source is not presented as a jar ('Tiền chưa phân bổ không đủ', no 'Hũ chưa đủ tiền')", () => {
+    renderSheet({
+      assessment: { ...assessment, targetJarId: null, shortfall: 100_000, donors: [{ jarId: "food", label: "Hũ Ăn uống", take: 100_000 }] },
+      targetLabel: "Chưa phân bổ",
+    });
+    expect(screen.getByText("Tiền chưa phân bổ không đủ")).toBeInTheDocument();
+    expect(screen.getByText(/Còn thiếu 100\.000.*lấy thêm từ hũ/)).toBeInTheDocument();
+    expect(screen.queryByText("Hũ chưa đủ tiền")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chưa phân bổ còn thiếu/)).not.toBeInTheDocument();
+    expect(screen.getByText("Hũ Ăn uống")).toBeInTheDocument();
+  });
 });

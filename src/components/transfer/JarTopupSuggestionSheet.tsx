@@ -41,16 +41,25 @@ export function JarTopupSuggestionSheet({
     setPending(true);
     fn();
   };
+  // H17/U17: a pool source ("Chưa phân bổ", `targetJarId: null`) is NOT a jar —
+  // the copy says the unallocated money is short and jars top it up (the
+  // `toJarId: "pool"` leg itself is by design, E16).
+  const poolSource = assessment.targetJarId === null;
+  const shortfall = formatVnd(assessment.shortfall);
 
   return (
     <Sheet
-      title="Hũ chưa đủ tiền"
-      description={`${targetLabel} còn thiếu ${formatVnd(assessment.shortfall)} cho giao dịch này.`}
+      title={poolSource ? "Tiền chưa phân bổ không đủ" : "Hũ chưa đủ tiền"}
+      description={
+        poolSource
+          ? `Còn thiếu ${shortfall} cho giao dịch này — lấy thêm từ hũ bên dưới.`
+          : `${targetLabel} còn thiếu ${shortfall} cho giao dịch này.`
+      }
       onClose={onClose}
     >
       <div className="flex flex-col gap-4">
         <div className="rounded-2xl border border-border bg-surface p-3">
-          <p className="mb-2 text-xs font-semibold text-muted">Đề xuất rót từ</p>
+          <p className="mb-2 text-xs font-semibold text-muted">{poolSource ? "Lấy thêm từ" : "Đề xuất rót từ"}</p>
           <ul className="flex flex-col divide-y divide-border">
             {assessment.donors.map((donor) => (
               <li key={donor.jarId} className="flex items-center justify-between py-2">

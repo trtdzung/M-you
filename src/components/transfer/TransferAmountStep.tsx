@@ -11,7 +11,7 @@ import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
 import { BankLogo } from "./BankLogo";
 import type { Account, Jar } from "@/domain/models";
-import type { UnallocatedPool } from "@/domain/engine";
+import type { UnallocatedPoolResult } from "@/domain/engine";
 import type { SelectedRecipient } from "./RecipientPicker";
 
 const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
@@ -55,7 +55,7 @@ export function TransferAmountStep({
   /** A jar with a set limit is selectable as a source (its derived `spendable = max(0, remaining)`); one with no limit (`remaining == null`) stays view-only. */
   jars?: (Jar & { remaining: number | null; spendable: number | null })[];
   /** The virtual "Chưa phân bổ" pool (null/omitted while jars are still loading — RT#14). */
-  pool?: UnallocatedPool | null;
+  pool?: UnallocatedPoolResult | null;
   source: TransferSource | null;
   amount: string;
   memo: string;
@@ -72,8 +72,11 @@ export function TransferAmountStep({
   const sourceJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
   const sourcePool = source?.kind === "pool";
   // Over-allocated → available is 0 (invariant #6: the true negative is not shown
-  // as a spendable balance; the pool row carries the "Vượt phân bổ" badge).
-  const poolAvailable = pool ? Math.max(0, pool.amount) : 0;
+  // as a spendable balance; the pool row carries the "Vượt phân bổ" badge). No
+  // CASA account → "unknown": shown as "Chưa rõ", never a fabricated 0.
+  const poolKnown = pool != null && pool.amount !== "unknown";
+  const poolAvailable = pool && pool.amount !== "unknown" ? Math.max(0, pool.amount) : 0;
+  const poolText = poolKnown ? formatVnd(poolAvailable) : "Chưa rõ";
   const recipientBank = findBankByName(recipient.bankName);
   const showRecipientBankName = Boolean(recipient.bankName) && recipient.bankName !== recipient.name;
 
@@ -127,7 +130,7 @@ export function TransferAmountStep({
               </p>
               {sourceAccount && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceAccount.balance)}</p>}
               {sourceJar && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceJar.spendable ?? 0)}</p>}
-              {sourcePool && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(poolAvailable)}</p>}
+              {sourcePool && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{poolText}</p>}
             </div>
             <ChevronDown size={16} className="shrink-0 text-muted" />
           </button>
@@ -199,11 +202,12 @@ export function TransferAmountStep({
           {pool && (
             <button
               type="button"
+              disabled={!poolKnown}
               onClick={() => {
                 onSourceChange({ kind: "pool" });
                 setSourceSheetOpen(false);
               }}
-              className="flex w-full items-center gap-3 border-b border-border px-1 py-3 text-left"
+              className="flex w-full items-center gap-3 border-b border-border px-1 py-3 text-left disabled:opacity-45"
             >
               <span
                 aria-hidden
@@ -213,7 +217,7 @@ export function TransferAmountStep({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold text-text">{POOL_SOURCE_LABEL}</p>
-                <p className="mt-0.5 text-base font-bold tabular-nums text-text">{formatVnd(poolAvailable)}</p>
+                <p className="mt-0.5 text-base font-bold tabular-nums text-text">{poolText}</p>
                 {/* Spendable-lens subtitle — distinguishes this pool (CASA − Σ còn-lại-các-hũ)
                     from the Tổng quan "Chờ phân bổ" budget-headroom card (CASA − Σ hạn mức). */}
                 <p className="mt-0.5 text-[11px] text-muted">số dư khả dụng ngoài hũ</p>

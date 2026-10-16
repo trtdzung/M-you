@@ -5,7 +5,8 @@ import { ChevronDown } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { Sheet } from "@/components/primitives";
 import { CategoryOptionGrid } from "@/components/transactions/CategoryPickerSheet";
-import { formatDate, formatVnd, formatVndCompact } from "@/lib/format";
+import { formatDate, formatVndCompact } from "@/lib/format";
+import { fundOutcomeNote } from "@/components/transfer/fund-outcome-note";
 import { useConfirmCategory, useCorrections } from "@/state/corrections";
 import { useAutoFund } from "@/state/use-auto-fund";
 import { typeForCategory } from "@/lib/category-txn-type";
@@ -64,14 +65,11 @@ export function UnlabeledSpendSheet({
       });
       if (!result) return;
       if (result.status === "needs-goal") setGoalPending({ txn, categoryId });
-      else if (result.status === "funded") {
+      else {
+        // funded / partial cover + residual (U5) / covered — one shared copy.
         setGoalPending(null);
-        const total = result.donors.reduce((s, d) => s + d.take, 0);
-        setFundNote(`Đã bù ${formatVnd(total)} cho hũ ${result.targetLabel}.`);
-      } else if (result.status === "insufficient") {
-        setGoalPending(null);
-        setFundNote(`Hũ ${result.targetLabel} vượt hạn mức — cần bù thủ công.`);
-      } else setGoalPending(null);
+        setFundNote(fundOutcomeNote(result));
+      }
     } finally {
       inFlight.current = false;
     }

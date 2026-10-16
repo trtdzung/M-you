@@ -1,0 +1,221 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import type { Account, JarConfig } from "@/domain/models";
+import { account, allRebalances, db, installFetchMock, net, rebalancesFor, spend, useHarness, wrapper } from "./auto-fund-harness";
+
+/**
+ * Cover-sizing edge fixes for `useAutoFund`, against the REAL hook + REAL
+ * ManualTxnsProvider (fetch-mocked):
+ *  - U5: a trigger funds at most its OWN contribution; impossible full cover →
+ *    partial non-goal cover + residual (never all-or-nothing).
+ *  - G22/U12: undo reports what it re-applied / what's left.
+ *  - S7/U4: `reconcileLabels` batches background labels without double-funding.
+ *  - H14/U1: `commitPersisted` rejects (and rolls back) when a leg isn't stored.
+ */
+
+const h = vi.hoisted(() => ({ jarConfig: { version: 3, jars: [] } as JarConfig, accounts: [] as Account[] }));
+
+vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config: h.jarConfig, loaded: true }) }));
+vi.mock("@/state/useFinancials", async () => {
+  const manual = await import("../manual-txns");
+  return {
+    useFinancials: () => ({ transactions: manual.useManualTxns().manualTxns, raw: { accounts: h.accounts } }),
+  };
+});
+
+const SEP = "2026-09-05T10:00:00.000Z";
+const food = { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], budgetLimit: 4_000_000, role: "spending" as const };
+const buf = (limit: number) => ({ id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: limit, role: "buffer" as const });
+const goal = { id: "goal", label: "Mục tiêu", categoryIds: ["goal-save"], budgetLimit: 5_000_000, role: "goal" as const };
+
+beforeEach(() => {
+  db.clear();
+  net.failPosts = false;
+  window.localStorage.clear();
+  installFetchMock();
+});
+
+describe("U5 — a trigger funds only its own contribution; partial cover when full cover is impossible", () => {
+  it("re-labelling within the same jar re-applies the trigger's cover despite OLDER uncovered debt", () => {
+    h.jarConfig = { version: 3, jars: [food, buf(1_200_000)] };
+    h.accounts = [account("cur", 1_200_000)]; // = buf → pool 0
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let trigger = "";
+    act(() => {
+      result.current.addTxn(spend(4_449_000, "dining", "2026-09-02T10:00:00.000Z")); // 449k older debt, never covered
+      trigger = result.current.addTxn(spend(1_200_000, "dining"));
+    });
+    let first: ReturnType<typeof result.current.fundJar> | undefined;
+    act(() => {
+      first = result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" });
+    });
+    expect(first?.status).toBe("funded"); // capped at 1.2M (not the whole 1.649M overspend)
+    expect(first?.donors).toEqual([{ jarId: "buf", label: "Hũ Dự phòng", take: 1_200_000 }]);
+
+    // Nhà ở → Tiện ích style re-label: same jar, different category.
+    let again: ReturnType<typeof result.current.reconcile> | undefined;
+    act(() => {
+      result.current.updateTxn(trigger, { categoryId: "groceries" });
+      again = result.current.reconcile({ triggerTxnId: trigger, categoryId: "groceries", postedAt: SEP, origin: "manual", override: { categoryId: "groceries" } });
+    });
+    expect(again?.status).toBe("funded");
+    const legs = rebalancesFor(result.current.manualTxns, trigger);
+    expect(legs).toHaveLength(1);
+    expect(legs[0]).toMatchObject({ amount: 1_200_000 });
+  });
+
+  it("commits a PARTIAL non-goal cover and reports the residual (status insufficient, ids created)", () => {
+    h.jarConfig = { version: 3, jars: [food, buf(1_000_000)] };
+    h.accounts = [account("cur", 1_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let trigger = "";
+    act(() => {
+      trigger = result.current.addTxn(spend(5_500_000, "dining")); // 1.5M over, only 1M reachable
+    });
+    let r: ReturnType<typeof result.current.fundJar> | undefined;
+    act(() => {
+      r = result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" });
+    });
+    expect(r?.status).toBe("insufficient");
+    expect(r?.shortfall).toBe(500_000); // the residual still uncovered
+    expect(r?.createdIds).toHaveLength(1);
+    expect(rebalancesFor(result.current.manualTxns, trigger)[0]).toMatchObject({ amount: 1_000_000 });
+  });
+
+  it("keeps the goal-confirm gate: a goal-only gap still returns needs-goal and writes nothing", () => {
+    h.jarConfig = { version: 3, jars: [food, goal] };
+    h.accounts = [account("cur", 5_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let trigger = "";
+    act(() => {
+      trigger = result.current.addTxn(spend(4_800_000, "dining"));
+    });
+    let r: ReturnType<typeof result.current.fundJar> | undefined;
+    act(() => {
+      r = result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" });
+    });
+    expect(r?.status).toBe("needs-goal");
+    expect(rebalancesFor(result.current.manualTxns, trigger)).toHaveLength(0);
+  });
+});
+
+describe("G22/U12 — undo says what it did", () => {
+  it("reapplied: returns the donors + new leg ids it re-applied", () => {
+    h.jarConfig = { version: 3, jars: [food, buf(6_000_000)] };
+    h.accounts = [account("cur", 6_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let trigger = "";
+    act(() => {
+      trigger = result.current.addTxn(spend(4_500_000, "dining"));
+    });
+    act(() => {
+      result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" });
+    });
+    let out: ReturnType<typeof result.current.undo> | undefined;
+    act(() => {
+      out = result.current.undo({ triggerTxnId: trigger, targetJarId: "food", postedAt: SEP });
+    });
+    expect(out).toMatchObject({ status: "reapplied", donors: [{ jarId: "buf", label: "Hũ Dự phòng", take: 500_000 }] });
+    expect(out?.status === "reapplied" && out.createdIds).toEqual(rebalancesFor(result.current.manualTxns, trigger).map((t) => t.id));
+  });
+
+  it("residual: returns the uncovered amount (goal jar never re-raided on undo)", () => {
+    h.jarConfig = { version: 3, jars: [food, goal] };
+    h.accounts = [account("cur", 5_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let trigger = "";
+    act(() => {
+      trigger = result.current.addTxn(spend(4_800_000, "dining"));
+    });
+    act(() => {
+      result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "manual", includeGoal: true });
+    });
+    let out: ReturnType<typeof result.current.undo> | undefined;
+    act(() => {
+      out = result.current.undo({ triggerTxnId: trigger, targetJarId: "food", postedAt: SEP });
+    });
+    expect(out).toMatchObject({ status: "residual", shortfall: 800_000, donors: [] });
+    expect(rebalancesFor(result.current.manualTxns, trigger)).toHaveLength(0);
+  });
+});
+
+describe("S7/U4 — reconcileLabels funds background labels once, never double-funding within a batch", () => {
+  it("two labels into one jar in the same tick: legs total the overspend exactly (2M), not 2M each", () => {
+    h.jarConfig = { version: 3, jars: [food, buf(6_000_000)] };
+    h.accounts = [account("cur", 6_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let a = "";
+    let b = "";
+    act(() => {
+      a = result.current.addTxn(spend(3_000_000, "unclassified", "2026-09-03T10:00:00.000Z"));
+      b = result.current.addTxn(spend(3_000_000, "unclassified", "2026-09-04T10:00:00.000Z"));
+    });
+    let results: ReturnType<typeof result.current.reconcileLabels> = [];
+    act(() => {
+      // Labels land as overrides (corrections not yet re-rendered).
+      results = result.current.reconcileLabels([{ txnId: b, categoryId: "dining" }, { txnId: a, categoryId: "dining" }]);
+    });
+    const legs = allRebalances(result.current.manualTxns);
+    expect(legs.reduce((s, t) => s + t.amount, 0)).toBe(2_000_000);
+    expect(legs).toHaveLength(1);
+    expect(legs[0].rebalance).toMatchObject({ triggerTxnId: a, fromJarId: "buf", toJarId: "food", origin: "auto" });
+    expect(results.map((r) => r.status)).toEqual(["funded"]);
+  });
+
+  it("never raids a goal jar in the background (no legs; residual stays visible)", () => {
+    h.jarConfig = { version: 3, jars: [food, goal] };
+    h.accounts = [account("cur", 5_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    let a = "";
+    act(() => {
+      a = result.current.addTxn(spend(4_800_000, "unclassified"));
+    });
+    let results: ReturnType<typeof result.current.reconcileLabels> = [];
+    act(() => {
+      results = result.current.reconcileLabels([{ txnId: a, categoryId: "dining" }]);
+    });
+    expect(allRebalances(result.current.manualTxns)).toHaveLength(0);
+    expect(results[0]).toMatchObject({ status: "insufficient", shortfall: 800_000, createdIds: [] });
+  });
+});
+
+describe("H14/U1 — commitPersisted awaits every leg", () => {
+  const assessment = {
+    tier: "topup" as const,
+    shortfall: 500_000,
+    donors: [{ jarId: "buf", label: "Hũ Dự phòng", take: 500_000 }],
+    goalDonors: [],
+    requiresManualGoal: false,
+    targetJarId: "food",
+    source: "mock" as const,
+  };
+
+  it("resolves with the stored leg ids on success", async () => {
+    h.jarConfig = { version: 3, jars: [food, buf(6_000_000)] };
+    h.accounts = [account("cur", 6_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    await waitFor(() => expect(result.current.manualTxns).toEqual([]));
+    let ids: string[] = [];
+    await act(async () => {
+      ids = await result.current.commitPersisted({ assessment, targetJarId: "food", triggerTxnId: "t1", postedAt: SEP, origin: "auto" });
+    });
+    expect(ids).toHaveLength(1);
+    expect(db.get("CIF_0001")?.map((t) => t.id)).toEqual(ids);
+  });
+
+  it("rejects and leaves no local leg when the server fails to store it", async () => {
+    h.jarConfig = { version: 3, jars: [food, buf(6_000_000)] };
+    h.accounts = [account("cur", 6_000_000)];
+    const { result } = renderHook(() => useHarness(), { wrapper });
+    await waitFor(() => expect(result.current.manualTxns).toEqual([]));
+    net.failPosts = true;
+    let error: unknown = null;
+    await act(async () => {
+      await result.current
+        .commitPersisted({ assessment, targetJarId: "food", triggerTxnId: "t1", postedAt: SEP, origin: "auto" })
+        .catch((e: unknown) => (error = e));
+    });
+    expect(error).toBeInstanceOf(Error);
+    expect(allRebalances(result.current.manualTxns)).toHaveLength(0);
+  });
+});
