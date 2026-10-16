@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
@@ -22,6 +22,15 @@ function renderWidget() {
 function open() {
   fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý M-Your" }));
 }
+
+beforeAll(() => {
+  // Recharts' ResponsiveContainer needs ResizeObserver (absent in jsdom).
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+});
 
 beforeEach(() => {
   vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
@@ -122,6 +131,85 @@ describe("MYourWidget", () => {
     expect(screen.getByRole("cell", { name: "Giải trí" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "5.000.000đ" })).toBeInTheDocument();
     expect(screen.getByText("2 hũ").tagName).toBe("STRONG");
+  });
+
+  it("renders a chart card below the reply when the agent returns a well-formed chart ui", async () => {
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
+      answer: "Tháng này bạn chi nhiều nhất cho Mua sắm.",
+      thread_id: "CIF_0001",
+      ui: {
+        type: "chart",
+        chart_type: "pie",
+        title: "Chi tiêu theo danh mục - Tháng 8/2026",
+        labels: ["Mua sắm", "Ăn uống"],
+        series: [{ name: "VND", data: [16280000, 10500000] }],
+      },
+    });
+    renderWidget();
+    open();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "So sánh chi tiêu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    expect(await screen.findByText("Tháng này bạn chi nhiều nhất cho Mua sắm.")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Chi tiêu theo danh mục - Tháng 8/2026" })).toBeInTheDocument();
+    // Pie slice labels must be visible without hovering — only the amount is hover-only (tooltip).
+    expect(screen.getByText("Mua sắm")).toBeInTheDocument();
+    expect(screen.getByText("Ăn uống")).toBeInTheDocument();
+    // Distinct hues, not the app's brand-harmonious (mostly warm/orange) jar palette —
+    // 6+ categories need to be tellable apart at a glance.
+    const legend = screen.getByRole("list", { name: "Chú giải Chi tiêu theo danh mục - Tháng 8/2026" });
+    const dots = within(legend)
+      .getAllByText(/Mua sắm|Ăn uống/)
+      .map((el) => el.previousElementSibling as HTMLElement);
+    expect(dots[0].style.background).not.toBe(dots[1].style.background);
+    expect(dots[1].style.background).toMatch(/rgb\(14, 116, 144\)|#0e7490/i);
+  });
+
+  it("renders a bar chart card without crashing for a 6-category series (Recharts' own axis, not a plain list)", async () => {
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
+      answer: "Chi tiêu theo danh mục tháng này.",
+      thread_id: "CIF_0001",
+      ui: {
+        type: "chart",
+        chart_type: "bar",
+        title: "Chi tiêu theo danh mục - Tháng 8/2026",
+        labels: ["Siêu thị", "Di chuyển", "Giải trí", "Ăn uống", "Mua sắm", "Hoá đơn"],
+        series: [{ name: "VND", data: [6990000, 650000, 320000, 990000, 590000, 6130000] }],
+      },
+    });
+    renderWidget();
+    open();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Chi tiêu theo danh mục" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    // jsdom can't faithfully reproduce Recharts' real getBBox-based tick-skip
+    // layout (ResponsiveContainer measures 0×0 there regardless), so this only
+    // asserts the card renders without throwing for a 6-category series — the
+    // actual "every label visible, none dropped" fix (`interval={0}` + angled
+    // labels on the bar chart's XAxis, see `AgentChartCard.tsx`) is verified
+    // against the real agent in a real browser, see `todo.md`.
+    expect(await screen.findByRole("img", { name: "Chi tiêu theo danh mục - Tháng 8/2026" })).toBeInTheDocument();
+  });
+
+  it("ignores an unsupported or malformed ui payload and shows only the text answer", async () => {
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
+      answer: "Đây là đề xuất trả nợ thẻ của bạn.",
+      thread_id: "CIF_0001",
+      ui: { type: "transfer_form", recipient: "MSB Visa", account_number: "card_001", amount: 1000000, note: "note" } as agentApi.UiPayload,
+    });
+    renderWidget();
+    open();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Trả nợ thẻ" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    expect(await screen.findByText("Đây là đề xuất trả nợ thẻ của bạn.")).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("shows an inline error on the reply bubble when sending fails", async () => {
