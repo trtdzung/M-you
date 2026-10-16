@@ -7,7 +7,7 @@
  * the calculation engine agree on the same string IDs. "Categories are data."
  */
 
-export type CategoryKind = "income" | "expense" | "transfer";
+export type CategoryKind = "expense" | "transfer";
 
 export interface CategoryDef {
   id: string;
@@ -18,8 +18,6 @@ export interface CategoryDef {
 }
 
 export const CATEGORIES: CategoryDef[] = [
-  { id: "salary", label: "Lương", kind: "income", fixed: false },
-  { id: "other_income", label: "Thu nhập khác", kind: "income", fixed: false },
   { id: "housing", label: "Nhà ở", kind: "expense", fixed: true },
   { id: "utilities", label: "Tiện ích", kind: "expense", fixed: true },
   { id: "subscriptions", label: "Đăng ký dịch vụ", kind: "expense", fixed: true },
@@ -68,8 +66,6 @@ export const FIXED_CATEGORY_IDS: ReadonlySet<string> = new Set(
 
 /** Convenience map of well-known IDs for the fixture generator. */
 export const CATEGORY = {
-  salary: "salary",
-  otherIncome: "other_income",
   housing: "housing",
   utilities: "utilities",
   subscriptions: "subscriptions",

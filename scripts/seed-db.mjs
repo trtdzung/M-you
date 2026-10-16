@@ -42,7 +42,67 @@ const SEED_JARS = [
   { id: "health", label: "Sức khỏe", categoryIds: ["health"], budgetLimit: 1_000_000 },
   { id: "savings", label: "Tiết kiệm", categoryIds: [], budgetLimit: undefined },
 ];
-const CIFS = ["CIF_0001", "CIF_0002", "CIF_0003"];
+
+// salaryBase per CIF, duplicated from src/providers/mock/personas.ts (same reason
+// as SEED_BENEFICIARIES: plain .mjs, no TS loader). scale = salaryBase / 25tr —
+// the SAME factor fixtures/generate.ts applies to the CASA balance (18tr × scale).
+// Scaling the seed by it keeps Σ budgetLimit tracking CASA per persona
+// (Σ/CASA ≈ 0.94, dư về "Chờ phân bổ") and fixes CIF_0002 over-allocation.
+const SALARY_BASE_BY_CIF = {
+  CIF_0001: 25_000_000,
+  CIF_0002: 22_000_000,
+  CIF_0003: 80_000_000,
+};
+const SALARY_REF = 25_000_000;
+const CIFS = Object.keys(SALARY_BASE_BY_CIF);
+
+// Per-persona account metadata, duplicated from src/providers/mock/personas.ts
+// + fixtures/generate.ts (same reason as above: plain .mjs, no TS loader). The
+// account rows must match `buildPersonaAccounts` EXACTLY so the DB and the
+// transaction fixtures never diverge — account id (`acc_<personaId>_<slot>`),
+// balances (18tr/45tr/-8tr/50tr × scale), numbers and masks all derive from
+// these seeds. `accounts-store.ts` seeds the same shape lazily; this script is
+// just the committed-DB path.
+const PERSONA_ACCOUNTS = {
+  CIF_0001: { personaId: "stable", seed: 1001, tier: "M-FIRST GOLD" },
+  CIF_0002: { personaId: "irregular", seed: 2002, tier: "M-FIRST" },
+  CIF_0003: { personaId: "wealthy", seed: 3003, tier: "M-FIRST PRIVATE" },
+};
+const ACCT_SYNCED_AT = "2026-09-15T00:00:00.000Z";
+
+// acctNumber(seed, salt) — mirrors fixtures/generate.ts.
+const acctNumber = (seed, salt) =>
+  String((seed * 1_000_003 + salt * 97) % 1_000_000_000_000).padStart(12, "0");
+// maskAccountNumber — mirrors src/lib/format.ts (`•••• last4`).
+const maskAccount = (number) => {
+  const digits = String(number ?? "").replace(/\D/g, "");
+  return digits ? `•••• ${digits.slice(-4)}` : "••••";
+};
+
+/** The three MSB accounts for a persona (current, savings, credit_card). */
+function buildAccountRows(cif) {
+  const { personaId, seed, tier } = PERSONA_ACCOUNTS[cif];
+  const scale = SALARY_BASE_BY_CIF[cif] / SALARY_REF;
+  const row = (slot, salt, type, balance, availableBalance, accTier) => ({
+    cif,
+    id: `acc_${personaId}_${slot}`,
+    type,
+    institution: "MSB",
+    currency: "VND",
+    balance: Math.round(balance),
+    availableBalance: Math.round(availableBalance),
+    lastSyncedAt: ACCT_SYNCED_AT,
+    source: "msb",
+    tier: accTier,
+    maskedNumber: maskAccount(acctNumber(seed, salt)),
+    accountNumber: acctNumber(seed, salt),
+  });
+  return [
+    row("current", 1, "current", 18_000_000 * scale, 18_000_000 * scale, tier),
+    row("savings", 2, "savings", 45_000_000 * scale, 45_000_000 * scale, null),
+    row("credit", 3, "credit_card", -8_000_000 * scale, 50_000_000 * scale, null),
+  ];
+}
 
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
@@ -67,14 +127,18 @@ const insertJar = db.prepare(
 );
 const insertAllJars = db.transaction(() => {
   for (const cif of CIFS) {
+    const scale = SALARY_BASE_BY_CIF[cif] / SALARY_REF;
     SEED_JARS.forEach((jar, index) => {
+      // Scale each jar's single number by the persona's factor; an unset limit
+      // (savings) stays NULL — never coerced to 0 (invariant #6).
+      const scaledLimit = jar.budgetLimit === undefined ? null : Math.round(jar.budgetLimit * scale);
       insertJar.run({
         id: jar.id,
         cif,
         label: jar.label,
         categoryIds: JSON.stringify(jar.categoryIds),
-        budgetLimit: jar.budgetLimit ?? null,
-        actualAmount: jar.budgetLimit ?? null, // backfilled at seed time too
+        budgetLimit: scaledLimit,
+        actualAmount: scaledLimit, // backfilled at seed time too
         sortOrder: index,
       });
     });
@@ -82,6 +146,22 @@ const insertAllJars = db.transaction(() => {
 });
 insertAllJars();
 console.log(`Seeded ${SEED_JARS.length} jars × ${CIFS.length} personas into ${DB_PATH}`);
+
+db.exec("DELETE FROM accounts");
+const insertAccount = db.prepare(
+  `INSERT INTO accounts
+     (cif, id, type, institution, currency, balance, available_balance, last_synced_at, source, tier, masked_number, account_number, sort_order)
+   VALUES (@cif, @id, @type, @institution, @currency, @balance, @availableBalance, @lastSyncedAt, @source, @tier, @maskedNumber, @accountNumber, @sortOrder)`,
+);
+const insertAllAccounts = db.transaction(() => {
+  for (const cif of CIFS) {
+    buildAccountRows(cif).forEach((account, index) => {
+      insertAccount.run({ ...account, sortOrder: index });
+    });
+  }
+});
+insertAllAccounts();
+console.log(`Seeded 3 accounts × ${CIFS.length} personas into ${DB_PATH}`);
 
 // WAL mode buffers writes in a separate -wal file; checkpoint before closing
 // so the committed .sqlite3 file itself reflects this run's data.

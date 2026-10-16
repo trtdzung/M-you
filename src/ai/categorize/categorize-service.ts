@@ -52,7 +52,6 @@ export interface CategorizeOutcome {
 function kindMatchesType(categoryId: string, txnType: Transaction["type"]): boolean {
   const kind = CATEGORY_BY_ID[categoryId]?.kind;
   if (txnType === "expense") return kind === "expense";
-  if (txnType === "income") return kind === "income";
   return false; // transfer / card_payment / fee / refund are never AI-labelled
 }
 

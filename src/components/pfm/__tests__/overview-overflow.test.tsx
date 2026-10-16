@@ -6,7 +6,6 @@ import { GoalProvider } from "@/state/goals";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { JarConfigProvider } from "@/state/jars";
-import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
 import { getProviders } from "@/providers";
@@ -45,7 +44,6 @@ function renderOverview() {
       <CorrectionsProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
-          <JarAllocationsProvider>
             <AssetLiabilityProvider>
               <GoalProvider>
                 <PeriodProvider>
@@ -53,7 +51,6 @@ function renderOverview() {
                 </PeriodProvider>
               </GoalProvider>
             </AssetLiabilityProvider>
-          </JarAllocationsProvider>
         </JarConfigProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>
@@ -72,11 +69,12 @@ describe("overview overflow guard", () => {
     expect(root.className).toContain("min-h-full");
     expect(root.className).not.toContain("overflow-hidden");
 
-    // The overview is exactly the three income/expense sections — no wealth.
-    for (const label of ["Tổng quan thu chi", "Báo cáo thu chi", "Biến động thu chi"]) {
+    // The overview is exactly the three spending sections — no wealth. Income
+    // was removed from the product.
+    for (const label of ["Tổng quan chi tiêu", "Báo cáo chi tiêu", "Biến động chi tiêu"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
-    expect(screen.getByLabelText("Tổng quan thu chi")).toBeTruthy();
+    expect(screen.getByLabelText("Tổng quan chi tiêu")).toBeTruthy();
 
     expect(root.scrollHeight).toBeGreaterThanOrEqual(root.clientHeight);
   });
@@ -112,7 +110,7 @@ describe("overview overflow guard", () => {
     const root = screen.getByTestId("cockpit-root");
     expect(root.className).toContain("min-h-full");
     expect(root.className).not.toContain("overflow-hidden");
-    for (const label of ["Tổng quan thu chi", "Báo cáo thu chi", "Biến động thu chi"]) {
+    for (const label of ["Tổng quan chi tiêu", "Báo cáo chi tiêu", "Biến động chi tiêu"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
     // No net-worth / wealth summary and no per-liability rows leak onto the overview.

@@ -8,7 +8,6 @@ import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
-import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { useFinancials } from "@/state/useFinancials";
 import { PfmTxnList } from "../PfmTxnList";
@@ -58,7 +57,6 @@ function renderList() {
         <CategoryMemoryProvider>
           <ManualTxnsProvider>
             <JarConfigProvider>
-              <JarAllocationsProvider>
                 <AssetLiabilityProvider>
                   <GoalProvider>
                     <PeriodProvider>
@@ -69,7 +67,6 @@ function renderList() {
                     </PeriodProvider>
                   </GoalProvider>
                 </AssetLiabilityProvider>
-              </JarAllocationsProvider>
             </JarConfigProvider>
           </ManualTxnsProvider>
         </CategoryMemoryProvider>

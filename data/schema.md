@@ -28,6 +28,33 @@ the Agent backend's `user_id` convention).
 Unique on `(cif, bank_name, account_number)` — saving an already-known
 account again updates its `name` instead of creating a duplicate row.
 
+## `accounts`
+
+One row per bank account, scoped by `cif`. The CASA source of truth — a
+confirmed transfer debits `balance` + `available_balance` here (via
+`/api/accounts/debit`), so the money leaves for real and persists (mock
+core-banking). Seeded per persona from the same formula as the transaction
+fixtures (`buildPersonaAccounts` in `fixtures/generate.ts`), and lazily
+re-seeded by `accounts-store.ts` if a persona has no rows yet.
+
+| column | type | notes |
+|---|---|---|
+| `id` | TEXT PK¹ | `acc_<personaId>_<current\|savings\|credit>` — matches the `accountId` on the transaction fixtures |
+| `cif` | TEXT PK¹ | owner |
+| `type` | TEXT | `current` / `savings` / `credit_card` |
+| `institution` | TEXT | e.g. "MSB" |
+| `currency` | TEXT | e.g. "VND" |
+| `balance` | REAL | ledger balance; a transfer decrements it |
+| `available_balance` | REAL | spendable balance (CASA pool sums this over `current`); a transfer decrements it |
+| `last_synced_at` | TEXT | ISO timestamp |
+| `source` | TEXT | provenance (invariant #5); seed accounts are `msb` |
+| `tier` | TEXT? | membership tier on the primary account (display-only), NULL otherwise |
+| `masked_number` | TEXT | `•••• 1234` |
+| `account_number` | TEXT | full |
+| `sort_order` | INTEGER | display order (current account first) |
+
+¹ Composite primary key `(cif, id)`.
+
 ## `jars`
 
 See `data/jars/schema.md` — documented in its own file/folder rather than

@@ -10,14 +10,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
-import { applyAccountAdjustments } from "@/lib/account-adjustments";
 import { useProviders } from "@/providers/context";
 import { useAssetLiabilities } from "./assets";
 import { useCorrections, applyCorrections, isHidden } from "./corrections";
 import { useManualTxns } from "./manual-txns";
 import { useGoals } from "./goals";
 import { useJarConfig } from "./jars";
-import { useJarAllocations } from "./jar-allocations";
 import { usePeriod } from "./period";
 
 /** Re-exported so existing screens keep importing these from the hook. */
@@ -51,7 +49,6 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const { corrections } = useCorrections();
   const { manualTxns } = useManualTxns();
   const { config: jarConfig } = useJarConfig();
-  const { allocations } = useJarAllocations();
   const { assets: userAssets, liabilities: userLiabilities } = useAssetLiabilities();
   const { goals: userGoals } = useGoals();
   const { month: selectedMonth } = usePeriod();
@@ -74,11 +71,12 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
       providers.getMonthlySnapshots(),
       providers.listGoals(),
       providers.listMockProducts(),
-      providers.getAccountAdjustments(),
     ])
-      .then(([transactions, accounts, assets, liabilities, budgets, snapshots, goals, products, adjustments]) => {
+      .then(([transactions, accounts, assets, liabilities, budgets, snapshots, goals, products]) => {
         if (!active) return;
-        setRaw({ transactions, accounts: applyAccountAdjustments(accounts, adjustments), assets, liabilities, budgets, snapshots, goals, products });
+        // Balances are DB-backed and already reflect confirmed-transfer debits
+        // (no client-side overlay to apply anymore).
+        setRaw({ transactions, accounts, assets, liabilities, budgets, snapshots, goals, products });
         setLoading(false);
       })
       .catch(() => {
@@ -113,13 +111,12 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
         ? computeFinancials(raw, month, {
             transactions,
             jarConfig,
-            allocations,
             userAssets,
             userLiabilities,
             userGoals,
           })
         : null,
-    [raw, transactions, month, jarConfig, allocations, userAssets, userLiabilities, userGoals],
+    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals],
   );
 
   return { loading, error, raw, transactions, allTransactions, financials };

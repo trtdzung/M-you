@@ -12,12 +12,41 @@
  * the HTTP/DB transport is faked.
  */
 
-import { backfillActualAmount, dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
-import type { Jar, JarAllocation, JarConfig } from "@/domain/models";
+import { backfillActualAmount, dedupeCategories, healOrphanCategories, resyncActualOnRaise, stripCategories, uniqueJarId } from "@/domain/jar-rules";
+import { fitsCasaCap } from "@/domain/engine";
+import type { Amount } from "@/domain/engine/types";
+import type { Account, Jar, JarConfig } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
+import { PERSONA_LIST } from "@/providers/mock/personas";
+import { buildPersonaAccounts } from "@/providers/mock/fixtures/generate";
+
+/**
+ * In-memory accounts per persona, mirroring the server's `accounts-store.ts`
+ * (which is `server-only`). Seeded from the same canonical builder as the
+ * fixtures/DB; a debit lowers `balance` + `availableBalance` so tests exercise
+ * the real "money leaves the account" behavior over the fetch boundary.
+ */
+let accountsStore: Record<string, Account[]> = {};
+
+function accountsFor(cif: string): Account[] {
+  const persona = PERSONA_LIST.find((p) => p.cif === cif);
+  if (!persona) return [];
+  if (!accountsStore[cif]) accountsStore[cif] = buildPersonaAccounts(persona);
+  return accountsStore[cif];
+}
+
+/**
+ * CASA pool for `cif`, mirroring the server's `casa-pool.ts` (server-only, can't
+ * be imported here): live Σ `availableBalance` of the `current` accounts.
+ */
+function casaFor(cif: string | null): Amount {
+  if (!cif) return "unknown";
+  const current = accountsFor(cif).filter((a) => a.type === "current");
+  if (current.length === 0) return "unknown";
+  return current.reduce((s, a) => s + a.availableBalance, 0);
+}
 
 let store: JarConfig = freshConfig();
-let allocationsStore: JarAllocation[] = [];
 let originalFetch: typeof globalThis.fetch | undefined;
 
 function freshConfig(): JarConfig {
@@ -55,6 +84,7 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
   const parsed = new URL(url, "http://localhost");
   const method = (init?.method ?? "GET").toUpperCase();
   const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
+  const cif = parsed.searchParams.get("cif") ?? (typeof body?.cif === "string" ? body.cif : null);
   const idMatch = parsed.pathname.match(/^\/api\/jars\/([^/]+)(\/categories)?$/);
 
   if (!idMatch) {
@@ -69,6 +99,28 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
     }
     if (method === "PUT") {
       return jsonResponse(commit({ version: 3, jars: (body?.jars as Jar[]) ?? [] }));
+    }
+    if (method === "PATCH") {
+      // Batch "Chia ngay": apply each patch (undefined-clears via null), resync
+      // actualAmount on raise, enforce Σ budgetLimit ≤ CASA (422), one write.
+      const patches = (body?.patches ?? {}) as Record<string, Record<string, unknown>>;
+      const byId = new Map(store.jars.map((j) => [j.id, j]));
+      const merged = new Map<string, Jar>();
+      for (const [jarId, patch] of Object.entries(patches)) {
+        const prev = byId.get(jarId);
+        if (!prev) return jsonResponse({ error: `jar ${jarId} not found` }, 404);
+        const next: Record<string, unknown> = { ...prev };
+        for (const [key, value] of Object.entries(patch)) {
+          if (key === "categoryIds") continue;
+          if (value === null) delete next[key];
+          else next[key] = value;
+        }
+        merged.set(jarId, resyncActualOnRaise(prev, next as unknown as Jar));
+      }
+      const nextJars = store.jars.map((j) => merged.get(j.id) ?? j);
+      const cap = fitsCasaCap(nextJars, casaFor(cif), {});
+      if (!cap.ok) return jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
+      return jsonResponse(commit({ version: 3, jars: nextJars }));
     }
     return jsonResponse({ error: "unhandled" }, 500);
   }
@@ -98,9 +150,13 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
         if (value === null) delete next[key];
         else next[key] = value;
       }
-      return next as unknown as Jar;
+      return resyncActualOnRaise(target, next as unknown as Jar); // H3
     });
     if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds as string[], id);
+    if (typeof patch.budgetLimit === "number") {
+      const cap = fitsCasaCap(jars, casaFor(cif), {});
+      if (!cap.ok) return jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
+    }
     return jsonResponse(commit({ version: 3, jars }));
   }
   if (method === "DELETE") {
@@ -110,29 +166,36 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
 }
 
 /**
- * `/api/jar-allocations` stub (see `src/state/jar-allocations.tsx`). GET returns
- * the in-memory ledger; POST appends the batch and returns the full list —
- * mirroring the real route, minus the DB transport.
+ * `/api/accounts` + `/api/accounts/debit`, mirroring the real route handlers
+ * over the fetch boundary: GET lists the persona's accounts, POST /debit lowers
+ * `balance` + `availableBalance` (floored at 0) on the target row. This is the
+ * test-side stand-in for the `server-only` `accounts-store.ts` DB.
  */
-async function handleAllocationsRequest(init?: RequestInit): Promise<Response> {
+async function handleAccountsRequest(url: string, init?: RequestInit): Promise<Response> {
+  const parsed = new URL(url, "http://localhost");
   const method = (init?.method ?? "GET").toUpperCase();
-  if (method === "GET") return jsonResponse(allocationsStore);
-  if (method === "POST") {
-    const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
-    const rows = (body?.allocations ?? []) as { txnId: string; jarId: string; amount: number }[];
-    const now = new Date().toISOString();
-    allocationsStore = [
-      ...allocationsStore,
-      ...rows.map((r, i) => ({
-        id: `alloc-${allocationsStore.length + i}`,
-        txnId: r.txnId,
-        jarId: r.jarId,
-        amount: r.amount,
-        source: "self_reported" as const,
-        createdAt: now,
-      })),
-    ];
-    return jsonResponse(allocationsStore, 201);
+  const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
+
+  if (parsed.pathname === "/api/accounts/debit") {
+    if (method !== "POST") return jsonResponse({ error: "unhandled" }, 500);
+    const cif = typeof body?.cif === "string" ? body.cif : null;
+    const accountId = typeof body?.accountId === "string" ? body.accountId : null;
+    const amount = typeof body?.amount === "number" ? body.amount : null;
+    if (!cif || !accountId || amount === null || amount < 0) {
+      return jsonResponse({ error: "cif, accountId and amount ≥ 0 required" }, 422);
+    }
+    const accounts = accountsFor(cif);
+    const target = accounts.find((a) => a.id === accountId);
+    if (!target) return jsonResponse({ error: `account ${accountId} not found` }, 404);
+    target.balance = Math.max(0, target.balance - amount);
+    target.availableBalance = Math.max(0, target.availableBalance - amount);
+    return jsonResponse(target);
+  }
+
+  const cif = parsed.searchParams.get("cif");
+  if (method === "GET") {
+    if (!cif) return jsonResponse({ error: "cif required" }, 422);
+    return jsonResponse(accountsFor(cif));
   }
   return jsonResponse({ error: "unhandled" }, 500);
 }
@@ -143,14 +206,14 @@ export function installMockJarsApi(): void {
   originalFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
-    if (url.startsWith("/api/jar-allocations")) return handleAllocationsRequest(init);
     if (url.startsWith("/api/jars")) return handleJarsRequest(url, init);
+    if (url.startsWith("/api/accounts")) return handleAccountsRequest(url, init);
     return originalFetch!(input as RequestInfo, init);
   }) as typeof fetch;
 }
 
-/** Reset the in-memory jar set + allocation ledger — call in `beforeEach`. */
+/** Reset the in-memory jar set + accounts — call in `beforeEach`. */
 export function resetMockJarsApi(): void {
   store = freshConfig();
-  allocationsStore = [];
+  accountsStore = {};
 }

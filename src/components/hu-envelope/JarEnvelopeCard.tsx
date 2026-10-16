@@ -3,11 +3,10 @@ import { formatVndCompact } from "@/lib/format";
 
 /**
  * One jar's envelope card for the Tổng quan row: the jar's accent colour with
- * white text, an "ĐANG DÙNG" badge when the jar has spending this period, and
- * "còn lại trong hũ" = `remaining` (hạn mức/nạp − đã tiêu, from the engine). A
- * jar with no limit and no allocation shows "Chưa có số dư" — never a fabricated
- * 0₫ (invariant #6). All numbers come from `Financials.jarEnvelope`; this card
- * never computes.
+ * white text and "còn lại trong hũ" = `remaining` (hạn mức/nạp − đã tiêu, from
+ * the engine). A jar with no limit and no allocation shows "Chưa có số dư" —
+ * never a fabricated 0₫ (invariant #6). All numbers come from
+ * `Financials.jarEnvelope`; this card never computes.
  *
  * A hũ is a money container: you cannot spend it below empty, so the balance is
  * floored at 0 here — an overspend is shown as a separate "đã vượt X" note, never
@@ -18,7 +17,6 @@ export function JarEnvelopeCard({
   label,
   accent,
   remaining,
-  inUse,
   Icon,
   onOpen,
 }: {
@@ -26,7 +24,6 @@ export function JarEnvelopeCard({
   accent: string;
   /** "còn lại trong hũ"; `null` = chưa đặt hạn mức & chưa nạp. Floored at 0 for display; the raw value may be negative (overspent). */
   remaining: number | null;
-  inUse: boolean;
   Icon: LucideIcon;
   /** Open the real jar view (Ngân sách tab). Card is a button when provided. */
   onOpen?: () => void;
@@ -44,11 +41,6 @@ export function JarEnvelopeCard({
       </div>
 
       <div className="flex flex-col gap-1">
-        {inUse && (
-          <span className="inline-flex w-fit items-center rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-            Đang dùng
-          </span>
-        )}
         <div>
           <div className="text-[18px] font-bold leading-tight">
             {balance === null ? "Chưa có số dư" : formatVndCompact(balance)}

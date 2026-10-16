@@ -5,6 +5,10 @@
 
 # next.js
 /.next/
+
+# playwright / test artifacts
+/test-results/
+/.playwright-mcp/
 /out/
 
 # production

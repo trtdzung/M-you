@@ -13,9 +13,9 @@ import { UNCLASSIFIED } from "@/domain/models";
  *
  * Rationale (documented choice, per task instructions): a full provider-stack
  * render would need to stub `fetch` selectively by URL while letting
- * `JarConfigProvider` / `JarAllocationsProvider`'s own same-origin calls (which
- * ALSO fail against jsdom's fake network with no server) resolve the way those
- * providers gracefully degrade internally. That exact plumbing is already
+ * `JarConfigProvider`'s own same-origin calls (which ALSO fail against jsdom's
+ * fake network with no server) resolve the way those providers gracefully
+ * degrade internally. That exact plumbing is already
  * rendered end to end by `src/components/transactions/__tests__/
  * auto-categorize-accept.test.tsx` (existing, untouched), which asserts the
  * heuristic badge/copy after the same offline-fetch fallback fires. Re-deriving

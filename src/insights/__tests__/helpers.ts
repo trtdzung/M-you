@@ -20,9 +20,7 @@ const META = {
 export function makeCashflow(over: Partial<CashflowResult> = {}): CashflowResult {
   const byCategory = over.byCategory ?? [];
   return {
-    income: over.income ?? 0,
     expense: over.expense ?? byCategory.reduce((s, c) => s + c.amount, 0),
-    net: over.net ?? (over.income ?? 0) - (over.expense ?? 0),
     byCategory,
     fixed: over.fixed ?? 0,
     discretionary: over.discretionary ?? 0,
@@ -51,9 +49,9 @@ const EMPTY_JAR_BUDGET: JarBudgetResult = {
   meta: META,
 };
 
-/** An empty envelope result — no income data to allocate, no funded jars. */
+/** An empty envelope result — no CASA account, no funded jars. */
 const EMPTY_JAR_ENVELOPE: JarEnvelopeResult = {
-  pending: { amount: "unknown", unallocatedCount: 0, unallocatedTxnIds: [], perTxn: [], meta: META },
+  pending: { amount: "unknown", pool: "unknown", allocated: 0, meta: META },
   jars: [],
   meta: META,
 };
@@ -99,8 +97,6 @@ const NULL_INDICATOR: HealthIndicator = {
 
 const EMPTY_HEALTH: FinancialHealth = {
   runwayMonths: NULL_INDICATOR,
-  surplus: NULL_INDICATOR,
-  essentialCoverage: NULL_INDICATOR,
   concentration: NULL_INDICATOR,
 };
 

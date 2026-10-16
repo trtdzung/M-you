@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backfillActualAmount, healOrphanCategories, stripCategories } from "@/domain/jar-rules";
-import { KHAC_JAR_ID } from "@/domain/engine/category-jars";
+import { backfillActualAmount, healOrphanCategories, resyncActualOnRaise, stripCategories } from "@/domain/jar-rules";
+import { fitsCasaCap } from "@/domain/engine";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
-import { reassignJar } from "@/lib/jar-allocations-store";
+import { casaPoolForCif } from "@/lib/casa-pool";
 
 /**
  * One jar of one persona. `cif` travels in the QUERY STRING on every `:id`
@@ -26,12 +26,24 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!patch) return NextResponse.json({ error: "patch is invalid" }, { status: 422 });
 
   const current = readJarConfig(cif);
-  if (!current.jars.some((j) => j.id === id)) {
+  const prev = current.jars.find((j) => j.id === id);
+  if (!prev) {
     return NextResponse.json({ error: `jar ${id} not found` }, { status: 404 });
   }
 
-  let jars = current.jars.map((j) => (j.id === id ? { ...j, ...patch } : j));
+  // H3: a budgetLimit raise on an undrawn jar pulls actualAmount up with it.
+  let jars = current.jars.map((j) => (j.id === id ? resyncActualOnRaise(prev, { ...prev, ...patch }) : j));
   if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds, id);
+
+  // Cap only when this patch SETS a numeric budgetLimit (the only way to raise Σ);
+  // clearing a limit or editing label/color/category can never exceed CASA, and
+  // must stay editable even if a legacy config is already over.
+  if (typeof patch.budgetLimit === "number") {
+    const cap = fitsCasaCap(jars, casaPoolForCif(cif) ?? "unknown", {});
+    if (!cap.ok) {
+      return NextResponse.json({ error: "over CASA cap", overBy: cap.overBy ?? null }, { status: 422 });
+    }
+  }
   return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars })));
 }
 
@@ -50,9 +62,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
 
   const remaining = { version: 3 as const, jars: current.jars.filter((j) => j.id !== id) };
   const next = target.categoryIds.length > 0 ? healOrphanCategories(remaining) : remaining;
-  // Keep the ledger tidy: repoint this jar's allocations at "Khác" (the engine
-  // would fold an unknown jarId there anyway — this just avoids dead ids). The
-  // stored `actualAmount` is deliberately untouched (envelope funded is derived).
-  if (id !== KHAC_JAR_ID) reassignJar(cif, id, KHAC_JAR_ID);
+  // The jar's categories heal into "Khác" above; there is no allocation ledger to
+  // repoint any more (single-number model — budgetLimit lives on the jar itself).
   return NextResponse.json(writeJarConfig(cif, backfillActualAmount(next)));
 }

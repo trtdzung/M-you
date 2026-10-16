@@ -113,19 +113,28 @@ export function TransferConfirm() {
     try {
       // Mock-only: no real money moves, no API call, no facade involvement.
       // Every transfer now records exactly ONE self-reported txn (like the ＋
-      // manual entry). Jar-sourced: default category = jar's first category and
-      // debit both the jar (Thực tế) and its underlying current account, so
-      // "Ngân sách" (from real txn history, see `evaluateJarBudget`) matches
-      // "Thực tế". Account-sourced: default category = "Chuyển khoản"
-      // (type:transfer, excluded from spend), no jar/account debit (old behavior).
-      // Do the fail-prone async work (account lookup/debit) BEFORE any local
+      // manual entry) AND debits the real source account, so the balance shown
+      // everywhere (transfer picker, Tổng quan, net worth) actually drops — the
+      // money leaves the account for real (envelope-label model: hũ are labels
+      // on the CASA account). Jar-sourced ADDITIONALLY draws down the jar's real
+      // balance (`actualAmount`) and defaults the category to the jar's first
+      // category so "Ngân sách" (from txn history, `evaluateJarBudget`) tracks
+      // "Thực tế". Account-sourced defaults to "Chuyển khoản" (type:transfer,
+      // excluded from spend so it doesn't inflate expense — invariant #6).
+      //
+      // Do the fail-prone async work (account lookup + debit) BEFORE any local
       // ledger write, so a provider failure leaves nothing partially applied and
       // the retry (after the catch releases the latch) can't double-debit.
+      let accountToDebit = draft?.sourceAccountId ?? null;
+      if (!accountToDebit) {
+        // Legacy draft without an explicit source account → the single current account.
+        const accounts = await providers.listAccounts();
+        accountToDebit = accounts.find((a) => a.type === "current")?.id ?? null;
+      }
+      if (accountToDebit) await providers.applyAccountDebit(accountToDebit, amount);
+
       let defaultCategoryId: string;
       if (draft?.sourceJarId) {
-        const accounts = await providers.listAccounts();
-        const currentAccount = accounts.find((a) => a.type === "current");
-        if (currentAccount) await providers.applyAccountDebit(currentAccount.id, amount);
         spendFromJar(draft.sourceJarId, amount);
         const sourceJar = jarConfig.jars.find((j) => j.id === draft.sourceJarId);
         defaultCategoryId = sourceJar?.categoryIds[0] ?? CATEGORY.transfer; // 0-category jar → transfer

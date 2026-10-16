@@ -6,7 +6,6 @@ import { Home, QrCode } from "lucide-react";
 import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
-import { applyAccountAdjustments } from "@/lib/account-adjustments";
 import { putTransferDraft } from "@/lib/transfer-draft-store";
 import { assessTransferRisk } from "@/lib/transfer-risk";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
@@ -66,13 +65,11 @@ export function TransferCompose() {
       providers.listBeneficiaries(),
       providers.listTransactions(),
       providers.listAccounts(),
-      providers.getAccountAdjustments(),
     ])
-      .then(([nextBeneficiaries, nextTransactions, nextAccounts, adjustments]) => {
+      .then(([nextBeneficiaries, nextTransactions, nextAccounts]) => {
         if (!active) return;
-        const eligibleAccounts = applyAccountAdjustments(nextAccounts, adjustments).filter(
-          (account) => account.type === "current",
-        );
+        // Balances are DB-backed and already reflect prior transfer debits.
+        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current");
         setBeneficiaries(nextBeneficiaries);
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
@@ -95,10 +92,13 @@ export function TransferCompose() {
   const numericAmount = Number(amount);
   const selectedAccount = source?.kind === "account" ? accounts.find((account) => account.id === source.id) : undefined;
   const selectedJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
+  // Can't send more than the source holds — an over-source transfer would drive
+  // the displayed balance negative ("không fit thực tế"). Jar → its real balance
+  // (actualAmount); account → its (adjustment-applied) balance.
   const sourceValid =
     source?.kind === "jar"
       ? Boolean(selectedJar && selectedJar.actualAmount !== undefined && numericAmount <= selectedJar.actualAmount)
-      : Boolean(selectedAccount);
+      : Boolean(selectedAccount && numericAmount <= selectedAccount.balance);
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
   const canContinue = Boolean(recipient && Number.isFinite(numericAmount) && numericAmount > 0 && sourceValid);
 
@@ -116,6 +116,10 @@ export function TransferCompose() {
       sourceLabel: selectedJar
         ? `Hũ ${selectedJar.label}`
         : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
+      // Jar money physically sits in the CASA account, so a jar source debits the
+      // (single, current-only `accounts`) CASA account too; an account source
+      // debits the account the user picked.
+      sourceAccountId: selectedAccount?.id ?? accounts[0]?.id,
       sourceJarId: selectedJar?.id,
       recipientSource: recipient.source,
       riskFlags,

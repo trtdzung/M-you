@@ -3,19 +3,16 @@ import { formatVndCompact } from "@/lib/format";
 import type { Amount } from "@/domain/engine";
 
 /**
- * "Chờ phân bổ" card: the period income not yet split into jars + the exact
- * count of income transactions "chưa vào hũ", and a "Chia ngay →" CTA that opens
- * the allocation sheet. The amount comes from `Financials.jarEnvelope.pending`
- * (engine-derived); an "unknown" amount (no income data) renders "—", never 0₫
- * (invariant #6).
+ * "Chờ phân bổ" card: the CASA balance not yet earmarked into jars, and a
+ * "Chia ngay →" CTA that opens the allocation sheet. The amount comes from
+ * `Financials.jarEnvelope.pending` (engine-derived: pool − Σ đã phân bổ); an
+ * "unknown" amount (no CASA account) renders "—", never 0₫ (invariant #6).
  */
 export function PendingAllocationCard({
   amount,
-  count,
   onAllocate,
 }: {
   amount: Amount;
-  count: number;
   onAllocate: () => void;
 }) {
   const known = amount !== "unknown";
@@ -25,7 +22,7 @@ export function PendingAllocationCard({
         <div className="text-[13px] font-semibold text-text">Chờ phân bổ</div>
         <div className="mt-1 text-[18px] font-bold text-text">{known ? formatVndCompact(amount) : "—"}</div>
         <div className="text-[11px] text-muted">
-          {known ? `${count} GD chưa vào hũ` : "chưa có dữ liệu thu"}
+          {known ? "số dư chưa vào hũ" : "chưa có số dư tài khoản"}
         </div>
       </div>
 

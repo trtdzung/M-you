@@ -13,8 +13,8 @@ import { AllocationSheet } from "./AllocationSheet";
 /**
  * Tổng quan "hũ (phong bì)" row: a horizontally-scrolling strip of a "Chờ phân
  * bổ" card + one envelope card per jar ("còn lại trong hũ" = engine-derived
- * funded − spent, "ĐANG DÙNG" when funded this period). Pure presentation of
- * `financials.jarEnvelope` (invariant #1); jar colours/icons come from the jar
+ * earmark − spent, where earmark = phân bổ CASA hoặc hạn mức). Pure presentation
+ * of `financials.jarEnvelope` (invariant #1); jar colours/icons come from the jar
  * config (presentation state). "Chia ngay →" opens the allocation sheet.
  *
  * Tapping a jar card jumps to the real jar view (the Ngân sách tab) via
@@ -42,7 +42,7 @@ export function HuOverviewRow({
   };
   const iconOf = (jarId: string) => jarIcon(config.jars.find((j) => j.id === jarId)?.icon);
 
-  const showPending = pending.amount === "unknown" || pending.unallocatedCount > 0;
+  const showPending = pending.amount === "unknown" || pending.amount > 0;
 
   return (
     <section aria-label="Hũ chi tiêu" className="flex flex-col gap-2">
@@ -51,11 +51,7 @@ export function HuOverviewRow({
       </div>
       <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
         {showPending && (
-          <PendingAllocationCard
-            amount={pending.amount}
-            count={pending.unallocatedCount}
-            onAllocate={() => setSheetOpen(true)}
-          />
+          <PendingAllocationCard amount={pending.amount} onAllocate={() => setSheetOpen(true)} />
         )}
         {jars.map((line) => (
           <JarEnvelopeCard
@@ -63,7 +59,6 @@ export function HuOverviewRow({
             label={line.label}
             accent={accentOf(line.jarId)}
             remaining={line.remaining}
-            inUse={line.inUse}
             Icon={iconOf(line.jarId)}
             onOpen={onNavigate ? () => onNavigate("budget") : undefined}
           />

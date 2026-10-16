@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, Freshness, SectionHeader, SegmentedControl } from "@/components/primitives";
 import { CashflowLineChart } from "@/components/charts/CashflowLineChart";
 import type { cashflowTrend, CashflowTrendPoint } from "@/domain/engine";
-import { EXPENSE_COLOR, INCOME_COLOR } from "@/lib/cashflow-colors";
+import { EXPENSE_COLOR } from "@/lib/cashflow-colors";
 
 /** "12/2024 – 05/2025", collapsing the first year when both ends share it. */
 function rangeLabel(points: CashflowTrendPoint[]): string {
@@ -16,9 +16,10 @@ function rangeLabel(points: CashflowTrendPoint[]): string {
 }
 
 /**
- * "Biến động thu chi" — the 6-month income/expense trend as two lines, with a
- * toggle between the recent and the previous 6-month window. Data is the engine's
+ * "Biến động chi tiêu" — the 6-month spending trend as a line, with a toggle
+ * between the recent and the previous 6-month window. Data is the engine's
  * `cashflowTrend` over 12 months (invariant #1), split into two windows here.
+ * Income was removed — spending only.
  */
 export function CashflowTrendCard({ trend }: { trend: ReturnType<typeof cashflowTrend> }) {
   const points = trend.points;
@@ -28,9 +29,9 @@ export function CashflowTrendCard({ trend }: { trend: ReturnType<typeof cashflow
   const shown = window === "older" && older.length > 0 ? older : recent;
 
   return (
-    <section aria-label="Biến động thu chi">
+    <section aria-label="Biến động chi tiêu">
       <SectionHeader
-        title="Biến động thu chi"
+        title="Biến động chi tiêu"
         action={<Freshness at={trend.meta.freshness} className="text-[11px]" />}
       />
       <Card padding="snug" className="flex flex-col gap-4">
@@ -50,7 +51,6 @@ export function CashflowTrendCard({ trend }: { trend: ReturnType<typeof cashflow
 
         <div className="flex items-center justify-center gap-6 text-xs text-muted">
           <LegendItem color={EXPENSE_COLOR} label="Chi tiêu" />
-          <LegendItem color={INCOME_COLOR} label="Thu nhập" />
         </div>
       </Card>
     </section>

@@ -29,7 +29,7 @@ export interface ManualTxnInput {
   categoryId: string;
   merchantName: string;
   postedAt: string;
-  /** Explicit transaction type; defaults to income/expense inferred from `direction`. */
+  /** Explicit transaction type; defaults to expense/refund inferred from `direction` (income was removed). */
   type?: Transaction["type"];
   /** Optional free-text memo ("Nội dung"); kept as a purpose-suggestion signal. */
   note?: string;
@@ -94,7 +94,7 @@ function toTransaction(input: ManualTxnInput): Transaction {
     amount: Math.abs(input.amount),
     currency: "VND",
     direction: input.direction,
-    type: input.type ?? (input.direction === "credit" ? "income" : "expense"),
+    type: input.type ?? (input.direction === "credit" ? "refund" : "expense"),
     merchantName: input.merchantName,
     merchantNormalizedName: input.merchantName.toLowerCase(),
     categoryId: input.categoryId,

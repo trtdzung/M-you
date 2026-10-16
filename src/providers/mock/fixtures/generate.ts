@@ -1,8 +1,9 @@
 /**
  * Deterministic transaction + snapshot generator. Given a persona it produces
- * ~6 months of realistic VN transactions (salary, recurring bills, discretionary
- * spend, internal transfers, a refund, a reversal, pending items) plus accounts
- * and net-worth snapshots. Seeded — same persona always yields the same data.
+ * ~6 months of realistic VN transactions (recurring bills, discretionary spend,
+ * internal transfers, a refund, a reversal, pending items) plus accounts and
+ * net-worth snapshots. Income was removed — the ledger is spending-only. Seeded —
+ * same persona always yields the same data.
  */
 
 import type {
@@ -114,11 +115,8 @@ export function generateDataset(meta: PersonaMeta): Dataset {
 
   const monthList = months();
   monthList.forEach(({ year, month, cap }, mi) => {
-    // Primary income (salary / freelance)
-    add({ accountId: accCurrent, postedAt: iso(year, month, 5), amount: jitter(rng, p.salaryBase, p.salaryVariance, 100_000), direction: "credit", type: "income", merchantName: "MSB Payroll", merchantNormalizedName: "payroll", categoryId: CATEGORY.salary, status: "posted", isRecurring: true, userEdited: false });
-    if (chance(rng, p.extraIncomeChance)) {
-      add({ accountId: accCurrent, postedAt: iso(year, month, randInt(rng, 12, 22)), amount: jitter(rng, p.salaryBase * 0.3, 0.5, 100_000), direction: "credit", type: "income", merchantName: "Thu nhập thêm", merchantNormalizedName: "side income", categoryId: CATEGORY.otherIncome, status: "posted", isRecurring: false, userEdited: false });
-    }
+    // Income was removed from the product — the ledger tracks spending only. The
+    // CASA account balance (funded elsewhere) is the envelope/net-worth source.
 
     // Recurring fixed bills
     add({ accountId: accCurrent, postedAt: iso(year, month, 3), amount: jitter(rng, p.housingBase, 0.02, 100_000), direction: "debit", type: "expense", merchantName: "Chủ nhà / Vay nhà", merchantNormalizedName: "housing", categoryId: CATEGORY.housing, status: "posted", isRecurring: true, userEdited: false });
@@ -142,7 +140,7 @@ export function generateDataset(meta: PersonaMeta): Dataset {
     for (const [cat, count, base] of bursts) {
       for (let i = 0; i < count; i++) {
         // Discretionary spend may ship un-enriched (UNCLASSIFIED) — the AI
-        // backfill target. Recurring bills + income stay labelled.
+        // backfill target. Recurring bills stay labelled.
         const id = spend(year, month, randInt(rng, 1, cap), cat, base, "posted", true);
         if (cat === CATEGORY.shopping) lastShopId.push(id);
       }
@@ -182,7 +180,7 @@ export function generateDataset(meta: PersonaMeta): Dataset {
   });
 
   return {
-    accounts: buildAccounts(meta, accCurrent, accSavings, accCredit),
+    accounts: buildPersonaAccounts(meta),
     transactions: txns,
     assets: meta.assets,
     liabilities: meta.liabilities,
@@ -200,6 +198,16 @@ export function generateDataset(meta: PersonaMeta): Dataset {
 function acctNumber(seed: number, salt: number): string {
   const base = String((seed * 1_000_003 + salt * 97) % 1_000_000_000_000).padStart(12, "0");
   return base;
+}
+
+/**
+ * The three MSB accounts for a persona, ids (`acc_<id>_current`, …) matching the
+ * `accountId` on this persona's transaction fixtures. The canonical account
+ * definition — the SQLite `accounts` table seeds from here (`accounts-store.ts`
+ * + `seed-db.mjs`), so balances/numbers never diverge between fixtures and DB.
+ */
+export function buildPersonaAccounts(meta: PersonaMeta): Account[] {
+  return buildAccounts(meta, `acc_${meta.id}_current`, `acc_${meta.id}_savings`, `acc_${meta.id}_credit`);
 }
 
 function buildAccounts(meta: PersonaMeta, current: string, savings: string, credit: string): Account[] {

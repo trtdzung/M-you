@@ -17,7 +17,6 @@ import type { Financials } from "@/state/useFinancials";
 import type { Insight } from "@/insights/types";
 import type { CopilotIntent } from "@/lib/copilot-nav";
 import { runDetectors } from "@/insights/run";
-import { formatVnd } from "@/lib/format";
 import { advisoryFor, type BriefBand } from "./advisory-copy";
 
 /** A deep-link "nên làm gì" CTA — resolved via `resolveIntentRoute` in the UI. */
@@ -71,7 +70,6 @@ function magnitude(insight: Insight): number {
   };
   switch (insight.type) {
     case "spending_spike":
-    case "income_change":
       return get("Chênh lệch");
     case "jar_pressure":
       return get("Vượt");
@@ -111,12 +109,13 @@ function dedupeActions(actions: BriefAction[]): BriefAction[] {
 
 /**
  * A grounded fallback CTA so a data-rich but detector-quiet month still meets the
- * "≥1 actionable" gate — derived from the month's own net cash flow, never filler.
+ * "≥1 actionable" gate — derived from the month's own envelope state, never filler.
  */
 function fallbackAction(f: Financials): BriefAction {
-  return f.cashflow.net > 0
-    ? { label: "Phân bổ khoản dư vào các hũ", intentId: "open-hu" }
-    : { label: "Xem lại chi tiêu để cân đối dòng tiền", intentId: "open-hu" };
+  const pending = f.jarEnvelope.pending.amount;
+  return pending !== "unknown" && pending > 0
+    ? { label: "Phân bổ số dư vào các hũ", intentId: "open-hu" }
+    : { label: "Xem lại chi tiêu trong kỳ", intentId: "open-hu" };
 }
 
 /** Compose the deterministic monthly brief. Identical inputs → identical output. */
@@ -141,22 +140,7 @@ export function composeMonthlyBrief(f: Financials): MonthlyBrief {
   const risks: BriefFinding[] = [];
   const highlights: BriefHighlight[] = [];
 
-  if (f.cashflow.net > 0) {
-    positives.push({
-      title: "Dòng tiền dương",
-      detail: `Tháng này bạn thu nhiều hơn chi ${formatVnd(f.cashflow.net)}.`,
-      source,
-      freshness,
-    });
-  }
-
   for (const insight of runDetectors(f)) {
-    // Income increase is good news — a positive, not an action-needing highlight.
-    if (insight.type === "income_change" && insight.severity === "info") {
-      positives.push({ title: insight.title, detail: insight.explanation, source, freshness });
-      continue;
-    }
-
     const band = bandOf(insight);
     const copy = advisoryFor(insight.type, band);
     if (!copy) continue; // no template for this type → not a templated highlight

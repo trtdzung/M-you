@@ -96,3 +96,21 @@ export function backfillActualAmount(config: JarConfig): JarConfig {
     ),
   };
 }
+
+/**
+ * H3 (single-number model): when a jar's `budgetLimit` is RAISED and the jar has
+ * not been drawn from yet (`actualAmount === old budgetLimit`), pull `actualAmount`
+ * up to the new limit so the transfer-source balance keeps up with the single
+ * number. LOWERING the limit never touches `actualAmount` (that would vaporise
+ * real wallet money); a jar already drawn down (`actualAmount !== old limit`) is
+ * also left alone (never fabricates wallet money). This is the ONLY place outside
+ * the transfer flow allowed to move `actualAmount` (see plan Out of scope).
+ */
+export function resyncActualOnRaise(prev: Jar, next: Jar): Jar {
+  const prevLimit = prev.budgetLimit;
+  const nextLimit = next.budgetLimit;
+  if (nextLimit !== undefined && prevLimit !== undefined && nextLimit > prevLimit && prev.actualAmount === prevLimit) {
+    return { ...next, actualAmount: nextLimit };
+  }
+  return next;
+}

@@ -30,11 +30,11 @@ describe("categorize — validation", () => {
     expect(out.assignments).toHaveLength(0);
   });
 
-  it("drops a semantically wrong suggestion (income category for an expense txn) — Red Team #4", async () => {
+  it("drops a semantically wrong suggestion (transfer category for an expense txn) — Red Team #4", async () => {
     const out = await categorize({
       txns: [un({ id: "a", type: "expense", merchantNormalizedName: "zzz" })],
       memory: {},
-      classify: fixed([{ txnId: "a", categoryId: "salary", confidence: 0.99 }]),
+      classify: fixed([{ txnId: "a", categoryId: "transfer", confidence: 0.99 }]),
       classifyOrigin: "ai",
     });
     expect(out.assignments).toHaveLength(0);

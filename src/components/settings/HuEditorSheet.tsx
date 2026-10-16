@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Trash2, Check } from "lucide-react";
 import { CATEGORY_BY_ID } from "@/domain/models";
-import { isDuplicateLabel } from "@/domain/engine";
+import { isDuplicateLabel, fitsCasaCap } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
+import { useCasaPool } from "@/state/use-casa-pool";
 import { Sheet } from "@/components/primitives";
 import { validateJarInput } from "@/domain/engine/jar-input";
 import { categoryColor, JAR_COLOR_OPTIONS, jarAccent } from "@/lib/category-colors";
@@ -20,6 +21,7 @@ import { JAR_ICON_KEYS, jarIcon } from "./jar-visuals";
  */
 export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () => void }) {
   const { config, updateJar, assignCategory, removeJar } = useJarConfig();
+  const casaPool = useCasaPool();
   const jar = config.jars.find((j) => j.id === jarId);
   const [limitDraft, setLimitDraft] = useState(jar?.budgetLimit != null ? String(jar.budgetLimit) : "");
   const [limitError, setLimitError] = useState<string | null>(null);
@@ -42,8 +44,19 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
       setLimitError(res.error);
       return;
     }
+    const nextLimit = Math.round(res.value);
+    // Cap: Σ (các hũ khác) + hạn mức mới ≤ CASA. Server re-checks (422) — đây là UX.
+    const cap = fitsCasaCap(config.jars, casaPool, { [jarId]: nextLimit });
+    if (!cap.ok) {
+      setLimitError(
+        casaPool === "unknown"
+          ? "Chưa có số dư tài khoản để đặt hạn mức."
+          : `Vượt số dư ${formatVnd(cap.overBy ?? 0)}. Giảm hạn mức lại.`,
+      );
+      return;
+    }
     setLimitError(null);
-    updateJar(jarId, { budgetLimit: Math.round(res.value) });
+    updateJar(jarId, { budgetLimit: nextLimit });
   }
 
   return (

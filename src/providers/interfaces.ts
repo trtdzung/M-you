@@ -13,7 +13,6 @@ import type {
   Budget,
   Goal,
   Jar,
-  JarAllocation,
   JarConfig,
   Liability,
   MockProduct,
@@ -117,6 +116,13 @@ export interface Providers
   createJar(jar: Jar): Promise<JarConfig>;
   /** Patch an existing jar's fields. Returns the full updated config. */
   updateJar(id: string, patch: Partial<Omit<Jar, "id">>): Promise<JarConfig>;
+  /**
+   * Patch several jars ATOMICALLY in one transaction — used by "Chia ngay" to set
+   * every jar's `budgetLimit` in a single write (no `Promise.all` race). The
+   * server enforces `fitsCasaCap` on the resulting set and rejects (422) if Σ
+   * budgetLimit would exceed CASA. Returns the full updated config.
+   */
+  updateJars(patches: Record<string, Partial<Omit<Jar, "id">>>): Promise<JarConfig>;
   /** Remove a jar (its categories move to "Khác"). Returns the full updated config. */
   removeJar(id: string): Promise<JarConfig>;
   /** Move `categoryId` into `jarId`, removing it from every other jar first. Returns the full updated config. */
@@ -124,24 +130,12 @@ export interface Providers
   /** Replace the whole jar set (template apply / reset to default). Returns the full updated config. */
   replaceJars(jars: Jar[]): Promise<JarConfig>;
   /**
-   * Read the persona's envelope allocations ("phân bổ thu nhập vào hũ"), oldest
-   * first. Backed by `data/pfm.sqlite3` via `/api/jar-allocations` (invariant
-   * #4). The engine derives "chờ phân bổ" and funded "còn lại trong hũ" from
-   * these — no money movement is implied (invariant #3).
+   * Debit a confirmed transfer's amount from an account, mutating its real
+   * balance in the store (SQLite `accounts` table — CASA is DB-backed now, not a
+   * fixture + localStorage overlay). Reached only from the human-confirmed
+   * Chuyển tiền flow (invariant #3); the resulting balance flows back through
+   * `listAccounts()`. Idempotency/replay is guarded by the caller (the draft is
+   * consumed on confirm), not here.
    */
-  getJarAllocations(): Promise<JarAllocation[]>;
-  /**
-   * Append a batch of allocations (one "Chia ngay" submit). Returns the full
-   * updated list. Bookkeeping only — never a transfer/execute/OTP.
-   */
-  allocateIncome(allocations: { txnId: string; jarId: string; amount: number }[]): Promise<JarAllocation[]>;
-  /**
-   * Cumulative amount already debited from each account via a jar-sourced
-   * transfer (Chuyển tiền Phần 1) — a mock ledger overlay on top of the
-   * engine-computed `Account.balance`, which itself is never mutated
-   * (invariant #1). Keyed by account id.
-   */
-  getAccountAdjustments(): Promise<Record<string, number>>;
-  /** Record an additional debit against an account (adds to, never replaces, any existing adjustment). */
   applyAccountDebit(accountId: string, amount: number): Promise<void>;
 }

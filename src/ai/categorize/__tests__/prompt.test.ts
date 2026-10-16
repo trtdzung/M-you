@@ -3,9 +3,8 @@ import { CATEGORIZE_SYSTEM_PROMPT, buildUserPrompt, parseCategorizeResults } fro
 import type { ClassifyInput } from "../types";
 
 describe("CATEGORIZE_SYSTEM_PROMPT", () => {
-  it("lists income/expense category ids and instructs JSON-only output", () => {
+  it("lists expense category ids and instructs JSON-only output", () => {
     expect(CATEGORIZE_SYSTEM_PROMPT).toContain("dining");
-    expect(CATEGORIZE_SYSTEM_PROMPT).toContain("salary");
     expect(CATEGORIZE_SYSTEM_PROMPT).toMatch(/JSON ONLY/);
   });
 

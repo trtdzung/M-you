@@ -27,10 +27,6 @@ export interface HealthIndicator {
 export interface FinancialHealth {
   /** Months of liquid cash at the current burn rate. */
   runwayMonths: HealthIndicator;
-  /** Monthly cash surplus (cashflow.net). */
-  surplus: HealthIndicator;
-  /** Share of income spent on essentials (fixed / income), [0,1]. */
-  essentialCoverage: HealthIndicator;
   /** Largest single asset's share of total assets, [0,1]. */
   concentration: HealthIndicator;
 }
@@ -39,8 +35,6 @@ export interface FinancialHealth {
 export const HEALTH_BANDS = {
   /** Runway in months: ≥6 healthy, ≥3 caution, else risk. */
   runwayMonths: { good: 6, warn: 3 },
-  /** Essential coverage share: ≤0.5 healthy, ≤0.7 caution, else strained. */
-  essentialCoverage: { good: 0.5, warn: 0.7 },
   /** Asset concentration share: ≤0.4 diversified, ≤0.6 caution, else concentrated. */
   concentration: { good: 0.4, warn: 0.6 },
 } as const;
@@ -74,25 +68,6 @@ export function financialHealth(
     hasUnknown: false,
   };
 
-  // Surplus — cashflow.net (always present); positive is good.
-  const surplus: HealthIndicator = {
-    value: cashflow.net,
-    band: cashflow.net >= 0 ? "good" : "bad",
-    source: "estimated",
-    freshness: cashflow.meta.freshness,
-    hasUnknown: false,
-  };
-
-  // Essential coverage — fixed / income; null when income is 0.
-  const ec = cashflow.income > 0 ? cashflow.fixed / cashflow.income : null;
-  const essentialCoverage: HealthIndicator = {
-    value: ec,
-    band: ec === null ? null : bandLowerBetter(ec, HEALTH_BANDS.essentialCoverage),
-    source: "estimated",
-    freshness: cashflow.meta.freshness,
-    hasUnknown: false,
-  };
-
   // Concentration — largest single asset / assetsTotal; null when no assets.
   const assetAmounts = networth.breakdown.filter((b) => b.kind === "asset").map((b) => b.amount);
   const largest = assetAmounts.reduce((m, v) => Math.max(m, v), 0);
@@ -107,5 +82,5 @@ export function financialHealth(
     hasUnknown: networth.hasUnknown,
   };
 
-  return { runwayMonths, surplus, essentialCoverage, concentration };
+  return { runwayMonths, concentration };
 }

@@ -1,22 +1,22 @@
 import { formatVndCompact } from "@/lib/format";
 
 /**
- * One jar's row inside the "Chia ngay" sheet: colour dot + label + current
- * funded balance, and a VND input for how much of the pending pool to put here.
- * Presentation + a controlled input only — the number logic (FIFO split) lives
- * in the pure `buildAllocationRows` engine helper, not here.
+ * One jar's row inside the "Chia ngay" sheet: colour dot + label + its CURRENT
+ * hạn mức, and a VND input for the jar's NEW total limit (prefilled with the
+ * current one — this is a "số tổng mới" editor, not a top-up). Presentation + a
+ * controlled input only; the cap/guardrail logic lives in `AllocationSheet`.
  */
 export function AllocationJarRow({
   label,
   accent,
-  funded,
+  currentLimit,
   value,
   onChange,
 }: {
   label: string;
   accent: string;
-  /** Current "còn lại trong hũ"; `null` = chưa nạp. */
-  funded: number | null;
+  /** The jar's current hạn mức (`budgetLimit`); `null` = chưa đặt. */
+  currentLimit: number | null;
   value: number;
   onChange: (next: number) => void;
 }) {
@@ -26,7 +26,7 @@ export function AllocationJarRow({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-text">{label}</div>
         <div className="text-[11px] text-muted">
-          {funded === null ? "chưa có số dư" : `còn ${formatVndCompact(funded)}`}
+          {currentLimit === null ? "chưa đặt hạn mức" : `hạn mức hiện tại ${formatVndCompact(currentLimit)}`}
         </div>
       </div>
       <input
@@ -40,7 +40,7 @@ export function AllocationJarRow({
           onChange(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
         }}
         placeholder="0"
-        aria-label={`Số tiền chia vào hũ ${label}`}
+        aria-label={`Hạn mức mới cho hũ ${label}`}
         className="h-11 w-28 rounded-xl border border-border bg-surface px-3 text-right text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       />
     </div>

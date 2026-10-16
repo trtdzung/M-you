@@ -12,7 +12,6 @@ import { CategoryMemoryProvider } from "@/state/category-memory";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
-import { JarAllocationsProvider } from "@/state/jar-allocations";
 import { PeriodProvider } from "@/state/period";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ConsentGate } from "@/components/consent/ConsentGate";
@@ -26,17 +25,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           <CategoryMemoryProvider>
             <ManualTxnsProvider>
               <JarConfigProvider>
-                <JarAllocationsProvider>
-                  <AssetLiabilityProvider>
-                    <GoalProvider>
-                      <PeriodProvider>
-                        <ConsentGate>
-                          <AutoCategorizeProvider>{children}</AutoCategorizeProvider>
-                        </ConsentGate>
-                      </PeriodProvider>
-                    </GoalProvider>
-                  </AssetLiabilityProvider>
-                </JarAllocationsProvider>
+                <AssetLiabilityProvider>
+                  <GoalProvider>
+                    <PeriodProvider>
+                      <ConsentGate>
+                        <AutoCategorizeProvider>{children}</AutoCategorizeProvider>
+                      </ConsentGate>
+                    </PeriodProvider>
+                  </GoalProvider>
+                </AssetLiabilityProvider>
               </JarConfigProvider>
             </ManualTxnsProvider>
           </CategoryMemoryProvider>

@@ -34,21 +34,30 @@ CREATE TABLE IF NOT EXISTS jars (
 
 CREATE INDEX IF NOT EXISTS idx_jars_cif ON jars (cif);
 
--- Envelope allocations ("phân bổ thu nhập vào hũ"), per persona (`cif`). Each row
--- records that part of an income transaction (`txn_id`) was allocated into a jar
--- (`jar_id`) for `amount` VND. Keyed to a concrete transaction so "N GD chưa vào
--- hũ" is an exact ledger count, not a proxy. Append-only bookkeeping of money the
--- user already received — never a money movement (invariant #3). The funded
--- balance the Overview widget shows is DERIVED from these rows by the engine, not
--- stored in `jars.actual_amount` (which remains the Chuyển-tiền spendable balance).
-CREATE TABLE IF NOT EXISTS jar_allocations (
-  id TEXT PRIMARY KEY,
+-- Bank accounts per persona (`cif`) — the CASA source of truth. Previously pure
+-- in-memory fixtures + a localStorage debit overlay; now a real table so a
+-- transfer debits the balance server-side and it persists (mock core-banking).
+-- `balance`/`available_balance` are mutated directly by a confirmed transfer
+-- (see /api/accounts/debit). `sort_order` fixes display order (current first).
+CREATE TABLE IF NOT EXISTS accounts (
   cif TEXT NOT NULL,
-  txn_id TEXT NOT NULL,
-  jar_id TEXT NOT NULL,
-  amount REAL NOT NULL,             -- VND allocated (> 0)
+  id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('current', 'savings', 'credit_card')),
+  institution TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  balance REAL NOT NULL,
+  available_balance REAL NOT NULL,
+  last_synced_at TEXT NOT NULL,
   source TEXT NOT NULL CHECK (source IN ('msb', 'self_reported', 'estimated', 'mock')),
-  created_at TEXT NOT NULL
+  tier TEXT,                       -- NULL for accounts with no membership tier
+  masked_number TEXT NOT NULL,
+  account_number TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (cif, id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_jar_allocations_cif ON jar_allocations (cif);
+CREATE INDEX IF NOT EXISTS idx_accounts_cif ON accounts (cif);
+
+-- NOTE: the legacy `jar_allocations` table was retired with the single-number
+-- ("một con số") jar model — a jar's `budget_limit` IS its allocation now, so
+-- there is no separate earmark ledger. `db.ts` drops the old table on connect.

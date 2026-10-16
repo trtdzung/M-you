@@ -1,13 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { ArrowDownRight, ArrowUpRight, ChevronRight, FileText } from "lucide-react";
-import { Card, SectionHeader, SegmentedControl } from "@/components/primitives";
+import { Card, SectionHeader } from "@/components/primitives";
 import { REPORT_ANCHOR } from "@/lib/copilot-nav";
 import { cn } from "@/lib/cn";
 import { SpendingDonut, type JarDonutDatum } from "./SpendingDonut";
-
-type Direction = "expense" | "income";
 
 export interface DonutSide {
   data: JarDonutDatum[];
@@ -16,48 +13,31 @@ export interface DonutSide {
 }
 
 /**
- * "Báo cáo thu chi" — a donut of the month's spend (or income) grouped by
- * category, with a Chi tiêu / Thu nhập toggle, a month-over-month badge in the
- * center, on-slice percentages, a legend, and a link to the detailed report. All
- * figures come from the deterministic engine (invariant #1). Section carries
+ * "Báo cáo chi tiêu" — a donut of the month's spend grouped by category, with a
+ * month-over-month badge in the center, on-slice percentages, a legend, and a
+ * link to the detailed report. All figures come from the deterministic engine
+ * (invariant #1). Income was removed — spending only. Section carries
  * `id={REPORT_ANCHOR}` so copilot `open-report` anchors here (H1).
  */
 export function SpendingSection({
   expense,
-  income,
   onOpenReport,
 }: {
   expense: DonutSide;
-  income: DonutSide;
   onOpenReport: () => void;
 }) {
-  const [direction, setDirection] = useState<Direction>("expense");
-  const side = direction === "expense" ? expense : income;
-
   return (
     <section id={REPORT_ANCHOR} className="scroll-mt-4">
-      <SectionHeader title="Báo cáo thu chi" />
+      <SectionHeader title="Báo cáo chi tiêu" />
       <Card className="flex flex-col gap-4">
-        <SegmentedControl
-          ariaLabel="Loại báo cáo"
-          value={direction}
-          onChange={setDirection}
-          options={[
-            { value: "expense", label: "Chi tiêu" },
-            { value: "income", label: "Thu nhập" },
-          ]}
-        />
-
         <SpendingDonut
-          data={side.data}
+          data={expense.data}
           height={220}
           legend
           showPercentLabels
-          centerLabel={direction === "expense" ? "Đã tiêu" : "Đã nhận"}
-          emptyLabel={direction === "expense" ? "Chưa có chi tiêu kỳ này." : "Chưa có thu nhập kỳ này."}
-          centerBadge={
-            <MomBadge current={side.total} prev={side.prevTotal} goodWhenDown={direction === "expense"} />
-          }
+          centerLabel="Đã tiêu"
+          emptyLabel="Chưa có chi tiêu kỳ này."
+          centerBadge={<MomBadge current={expense.total} prev={expense.prevTotal} goodWhenDown />}
         />
 
         <button

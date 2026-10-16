@@ -8,17 +8,17 @@ import { CashflowOverviewCard } from "@/components/cashflow/CashflowOverviewCard
 import { CashflowTrendCard } from "@/components/cashflow/CashflowTrendCard";
 import { HuOverviewRow } from "@/components/hu-envelope/HuOverviewRow";
 import type { JarDonutDatum } from "@/components/report/SpendingDonut";
-import { cashflowTrend, incomeByCategory, monthPeriodFromKey } from "@/domain/engine";
+import { cashflowTrend } from "@/domain/engine";
 import type { PfmTabId } from "./PfmTabs";
 import { useInsights } from "@/state/useInsights";
 import { currentMonthKey } from "@/lib/demo-clock";
 
 /**
- * Tổng quan — the current-month income/expense picture in three sections:
- * "Tổng quan thu chi" (two-bar income vs expense), "Báo cáo thu chi" (donut with
- * Chi tiêu/Thu nhập toggle + detailed report), and "Biến động thu chi" (two-line
- * trend). Every number traces to the deterministic engine (invariant #1); missing
- * values render "—", never 0 (#6). Wealth/net-worth lives on its own tab.
+ * Tổng quan — the current-month spending picture in three sections: "Tổng quan
+ * chi tiêu" (Chi tiêu bar), "Báo cáo chi tiêu" (donut + detailed report), and
+ * "Biến động chi tiêu" (spend trend). Every number traces to the deterministic
+ * engine (invariant #1); missing values render "—", never 0 (#6). Income was
+ * removed — spending only. Wealth/net-worth lives on its own tab.
  */
 export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => void }) {
   // Always the current month, independent of any month picked on other tabs.
@@ -28,17 +28,6 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
   const monthKey = financials?.monthKey ?? currentMonthKey();
   // 12 months so the trend card can toggle two 6-month windows.
   const trend = useMemo(() => cashflowTrend(transactions, monthKey, 12), [transactions, monthKey]);
-
-  const incomeData: JarDonutDatum[] = useMemo(
-    () =>
-      incomeByCategory(transactions, monthPeriodFromKey(monthKey)).map((c) => ({
-        id: c.categoryId,
-        label: c.label,
-        amount: c.amount,
-        colorKey: c.categoryId,
-      })),
-    [transactions, monthKey],
-  );
 
   if (loading) {
     return (
@@ -65,11 +54,6 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
     total: cashflow.expense,
     prevTotal: prevCashflow.expense,
   };
-  const incomeSide: DonutSide = {
-    data: incomeData,
-    total: cashflow.income,
-    prevTotal: prevCashflow.income,
-  };
 
   return (
     <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
@@ -77,7 +61,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
 
       <HuOverviewRow financials={financials} onNavigate={onNavigate} />
 
-      <SpendingSection expense={expenseSide} income={incomeSide} onOpenReport={() => setReportOpen(true)} />
+      <SpendingSection expense={expenseSide} onOpenReport={() => setReportOpen(true)} />
 
       <CashflowTrendCard trend={trend} />
 
