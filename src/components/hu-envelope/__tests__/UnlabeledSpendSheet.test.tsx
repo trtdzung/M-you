@@ -10,6 +10,14 @@ vi.mock("@/state/corrections", () => ({
   useCorrections: () => ({ unsaved }),
 }));
 
+// Auto-fund is covered by its own Phase 04/05 suites; stub it to a no-op "covered"
+// so labelling a spend here exercises only the confirm-category path under test.
+vi.mock("@/state/use-auto-fund", () => ({
+  useAutoFund: () => ({
+    reconcile: () => ({ status: "covered", donors: [], targetLabel: "hũ" }),
+  }),
+}));
+
 import { UnlabeledSpendSheet } from "../UnlabeledSpendSheet";
 
 function txn(over: Partial<Transaction> = {}): Transaction {

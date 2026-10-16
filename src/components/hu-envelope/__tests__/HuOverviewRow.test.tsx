@@ -22,6 +22,11 @@ vi.mock("@/state/corrections", () => ({
   useConfirmCategory: () => vi.fn(),
   useCorrections: () => ({ unsaved: false }),
 }));
+// The labeling sheet also consults auto-fund on label; stub to a no-op "covered"
+// so this row test needs no PersonaProvider/financials wiring.
+vi.mock("@/state/use-auto-fund", () => ({
+  useAutoFund: () => ({ reconcile: () => ({ status: "covered", donors: [], targetLabel: "hũ" }) }),
+}));
 
 import { HuOverviewRow } from "../HuOverviewRow";
 

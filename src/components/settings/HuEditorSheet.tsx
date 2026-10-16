@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Trash2, Check } from "lucide-react";
-import { CATEGORY_BY_ID } from "@/domain/models";
+import { CATEGORY_BY_ID, type JarRole } from "@/domain/models";
 import { isDuplicateLabel, fitsCasaCap } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
 import { useCasaPool } from "@/state/use-casa-pool";
@@ -19,6 +19,18 @@ import { JAR_ICON_KEYS, jarIcon } from "./jar-visuals";
  * exactly-one), và xoá hũ (danh mục dời sang "Khác"). Mọi thay đổi ghi qua
  * `updateJar`/`assignCategory`/`removeJar` — state là nguồn sự thật.
  */
+/**
+ * Donor-waterfall roles (plan 260918-1120): the order auto-fund drains jars when
+ * another is short — `buffer` → `spending` → `essential`, with `goal` PROTECTED
+ * (never auto-raided; a goal-only shortfall needs explicit confirm). VN labels.
+ */
+const ROLE_OPTIONS: { value: JarRole; label: string; hint: string }[] = [
+  { value: "buffer", label: "Dự phòng", hint: "Ưu tiên rót khi hũ khác thiếu" },
+  { value: "spending", label: "Tùy ý", hint: "Chi tiêu linh hoạt" },
+  { value: "essential", label: "Thiết yếu", hint: "Chỉ rót khi bất đắc dĩ" },
+  { value: "goal", label: "Mục tiêu", hint: "Được bảo vệ — cần xác nhận mới rút" },
+];
+
 export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () => void }) {
   const { config, updateJar, assignCategory, removeJar } = useJarConfig();
   const casaPool = useCasaPool();
@@ -91,6 +103,29 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
             {limitError ?? (limitDraft.trim() === "" ? "Để trống = chưa đặt hạn mức" : formatVnd(Number(limitDraft.replace(/[^\d]/g, ""))))}
           </span>
         </label>
+
+        <Field label="Vai trò khi bù hũ">
+          <div className="grid grid-cols-2 gap-2">
+            {ROLE_OPTIONS.map((opt) => {
+              const active = (jar.role ?? "spending") === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => updateJar(jarId, { role: opt.value })}
+                  className={cn(
+                    "flex flex-col gap-0.5 rounded-row border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    active ? "border-primary bg-primary/10" : "border-border bg-surface",
+                  )}
+                >
+                  <span className="text-sm font-medium text-text">{opt.label}</span>
+                  <span className="text-[11px] text-muted">{opt.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
 
         <Field label="Màu">
           <div className="flex flex-wrap gap-2">

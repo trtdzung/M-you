@@ -123,6 +123,7 @@ export function TransferCompose() {
         id: line.huId,
         label: line.label,
         categoryIds: line.categoryIds,
+        role: line.role,
         spendable: jarSpendable(line.remaining),
       })),
     [financials],
@@ -182,8 +183,8 @@ export function TransferCompose() {
   const [topupOpen, setTopupOpen] = useState(false);
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
 
-  /** Write the draft (with optional planned reallocation / overspend) and navigate to confirm. */
-  function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation" | "overspend"> = {}) {
+  /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
+  function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation"> = {}) {
     if (!recipient) return;
     const id = `form_${Date.now()}`;
     putTransferDraft({
@@ -206,6 +207,7 @@ export function TransferCompose() {
       // pool self-shrinks).
       sourceAccountId: selectedAccount?.id ?? accounts[0]?.id,
       sourceJarId: selectedJar?.id,
+      sourceKind: source?.kind,
       recipientSource: recipient.source,
       riskFlags,
       categoryId: agentCategoryId,
@@ -279,10 +281,6 @@ export function TransferCompose() {
               writeDraftAndGo({
                 plannedReallocation: { donors: assessment.donors, targetJarId: assessment.targetJarId },
               });
-            }}
-            onOverspend={() => {
-              setTopupOpen(false);
-              writeDraftAndGo({ overspend: true });
             }}
             onChooseAnother={() => setTopupOpen(false)}
           />

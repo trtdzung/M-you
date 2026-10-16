@@ -11,9 +11,10 @@ import type { FundingAssessment } from "@/domain/engine";
  * comes straight from the engine's `FundingAssessment` (invariant #1) — this
  * component only presents them and records the user's choice. It NEVER moves
  * money: "Đồng ý rót" attaches a PLANNED reallocation to the draft (applied
- * atomically at confirm, RT#1); "Bỏ qua, vượt hũ" flags an overspend. Relabeling
- * jars is an internal action; the outward payment still runs the MSB confirm
- * flow.
+ * atomically at confirm, RT#1). Relabeling jars is an internal action; the
+ * outward payment still runs the MSB confirm flow. There is NO "vượt hũ" escape
+ * hatch — a jar can never be left over-budget-unfunded (plan 260918-1120): the
+ * only choices are to fund it (Đồng ý rót) or pick another source.
  *
  * Copy is static (deterministic) for the MVP — Phase 03 may swap in an
  * AI-narrated line WITHOUT changing any figure.
@@ -22,7 +23,6 @@ export function JarTopupSuggestionSheet({
   assessment,
   targetLabel,
   onAccept,
-  onOverspend,
   onChooseAnother,
   onClose,
 }: {
@@ -30,7 +30,6 @@ export function JarTopupSuggestionSheet({
   /** The jar (or pool) the shortfall funds, e.g. "Hũ Thiết yếu". */
   targetLabel: string;
   onAccept: () => void;
-  onOverspend: () => void;
   onChooseAnother: () => void;
   onClose: () => void;
 }) {
@@ -78,14 +77,6 @@ export function JarTopupSuggestionSheet({
             className="w-full rounded-full border border-border bg-surface px-4 py-3 text-sm font-semibold text-text disabled:opacity-60"
           >
             Chọn nguồn khác
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={guard(onOverspend)}
-            className="w-full rounded-full px-4 py-2 text-sm font-medium text-muted disabled:opacity-60"
-          >
-            Bỏ qua, vượt hũ
           </button>
         </div>
 

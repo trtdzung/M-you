@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronRight, Tag } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { CategoryOptionGrid } from "@/components/transactions/CategoryPickerSheet";
 import { TransferPurposeSuggestionBanner } from "./TransferPurposeSuggestionBanner";
 import { useJarConfig } from "@/state/jars";
 import { useManualTxns } from "@/state/manual-txns";
+import { useAutoFund } from "@/state/use-auto-fund";
 import { useTransferPurposeSuggestion } from "@/state/use-transfer-purpose-suggestion";
 import { typeForCategory } from "@/lib/category-txn-type";
+import { formatVnd } from "@/lib/format";
 import {
   CATEGORY,
   CATEGORY_BY_ID,
@@ -48,9 +50,15 @@ export function TransferCategorizeSection({
 }) {
   const { config: jarConfig } = useJarConfig();
   const { manualTxns, update: updateManualTxn } = useManualTxns();
+  const autoFund = useAutoFund();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [purposeOpen, setPurposeOpen] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
+  // Auto-fund feedback for Case 2 (categorize-later routes the spend into a jar).
+  const [fundNote, setFundNote] = useState<string | null>(null);
+  const [goalPending, setGoalPending] = useState<{ categoryId: string; postedAt: string } | null>(null);
+  // RT-fix (H1): a commit-latch so a double-tap can't create two rebalances for one label.
+  const inFlight = useRef(false);
 
   // Read the CURRENT record from the store — never recompute an independent
   // default (avoids drift with the real txn, Red Team F#7).
@@ -81,19 +89,56 @@ export function TransferCategorizeSection({
    * Set category (+ optional purpose). The category change alone re-routes this
    * txn's spend between jars (derived model, invariant #1) — no jar bookkeeping.
    */
-  function applyCategory(categoryId: string, purposeId?: string) {
-    const nextType = typeForCategory(categoryId);
-    // Always send transferPurpose so a plain category pick (purposeId omitted)
-    // CLEARS a previously-accepted purpose — otherwise stale metadata lingers,
-    // the label stays wrong, and the txn never looks unclassified again.
-    const ok = updateManualTxn(txnId, { categoryId, type: nextType, transferPurpose: purposeId });
-    if (!ok) {
-      setPickError("Không cập nhật được phân loại. Vui lòng thử lại.");
-      return;
+  function applyCategory(categoryId: string, purposeId?: string, goalOk = false) {
+    if (inFlight.current) return; // H1 latch — one label, one rebalance
+    inFlight.current = true;
+    try {
+      const nextType = typeForCategory(categoryId);
+      // Always send transferPurpose so a plain category pick (purposeId omitted)
+      // CLEARS a previously-accepted purpose — otherwise stale metadata lingers,
+      // the label stays wrong, and the txn never looks unclassified again.
+      const ok = updateManualTxn(txnId, { categoryId, type: nextType, transferPurpose: purposeId });
+      if (!ok) {
+        setPickError("Không cập nhật được phân loại. Vui lòng thử lại.");
+        return;
+      }
+      setPickError(null);
+      setPickerOpen(false);
+      setPurposeOpen(false);
+      setFundNote(null);
+
+      // Case 2 (tiêu trước, phân loại sau): the new category may route this spend
+      // into a jar that's now over-budget. Unwind any prior rebalance (H5) and
+      // re-fund the residual overspend from the waterfall on the TRIGGER period
+      // (H4 — derive the snapshot from the txn's own date, not the viewed month).
+      const postedAt = currentTxn?.postedAt ?? new Date().toISOString();
+      const result = autoFund.reconcile({
+        triggerTxnId: txnId,
+        categoryId,
+        postedAt,
+        origin: "manual",
+        includeGoal: goalOk,
+        override: { categoryId, type: nextType },
+      });
+      if (!result) return;
+      if (result.status === "needs-goal") {
+        // Only a protected `goal` jar can cover — prompt before raiding it (C5).
+        setGoalPending({ categoryId, postedAt });
+      } else if (result.status === "funded") {
+        setGoalPending(null);
+        const total = result.donors.reduce((s, d) => s + d.take, 0);
+        setFundNote(`Đã bù ${formatVnd(total)} cho hũ ${result.targetLabel}.`);
+      } else if (result.status === "insufficient") {
+        // C5 durable state: the jar stays over-budget (remaining < 0) and re-surfaces
+        // as a "cần bù thủ công" banner on its card until resolved — never a silent loss.
+        setGoalPending(null);
+        setFundNote(`Hũ ${result.targetLabel} vượt hạn mức — cần bù thủ công.`);
+      } else {
+        setGoalPending(null);
+      }
+    } finally {
+      inFlight.current = false;
     }
-    setPickError(null);
-    setPickerOpen(false);
-    setPurposeOpen(false);
   }
 
   function handlePick(categoryId: string) {
@@ -147,6 +192,34 @@ export function TransferCategorizeSection({
           <ChevronRight size={16} className="shrink-0 text-muted" aria-hidden />
         </button>
         {pickError && <p className="text-xs text-negative">{pickError}</p>}
+        {fundNote && <p className="text-xs text-muted">{fundNote}</p>}
+
+        {goalPending && (
+          <div className="rounded-row border border-warning/40 bg-warning-soft/50 p-2.5" role="alertdialog">
+            <p className="text-xs font-semibold text-warning">Cần rút từ hũ Mục tiêu để bù</p>
+            <div className="mt-1.5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => applyCategory(goalPending.categoryId, undefined, true)}
+                className="flex-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Xác nhận rút
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Decline = durable "cần bù thủ công" state (C5): the jar stays
+                  // over-budget and re-surfaces on its card until resolved.
+                  setGoalPending(null);
+                  setFundNote("Chưa bù — hũ đang vượt hạn mức, cần bù thủ công.");
+                }}
+                className="flex-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text"
+              >
+                Để sau
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {pickerOpen && (

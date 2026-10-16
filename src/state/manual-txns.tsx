@@ -41,9 +41,22 @@ export interface ManualTxnInput {
   type?: Transaction["type"];
   /** Optional free-text memo ("Nội dung"); kept as a purpose-suggestion signal. */
   note?: string;
+  /**
+   * Inter-jar rebalance meta (Phase 03). Set ONLY when recording a rebalance txn
+   * (`categoryId: REBALANCE_CATEGORY`, `type: "transfer"`). `toTransaction` carries
+   * it onto the built Transaction so it survives the POST round-trip — WITHOUT this
+   * passthrough the client would silently drop the meta before it ever reached the API.
+   */
+  rebalance?: Transaction["rebalance"];
 }
 
-type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note">>;
+/**
+ * `status` is on the whitelist (RT-fix H3): a refund/reversal of a trigger txn
+ * (or a partial refund that lowers its effective spend) is recorded by patching
+ * `status`, which the auto-fund reconciler reacts to — shrinking/growing/removing
+ * the linked `dieu-chinh-hu` rebalance rather than blanket-deleting it.
+ */
+type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note" | "rebalance" | "status" | "amount">>;
 
 interface ManualTxnsContextValue {
   manualTxns: Transaction[];
@@ -56,6 +69,14 @@ interface ManualTxnsContextValue {
    */
   update: (id: string, patch: ManualTxnPatch) => boolean;
   remove: (id: string) => void;
+  /**
+   * Remove every rebalance txn triggered by `triggerTxnId` (SC1: rebalances are
+   * `dieu-chinh-hu`-tagged txns keyed by `rebalance.triggerTxnId`). Returns the
+   * removed ids. The single unwind point for undo (C4), re-categorize/re-amount
+   * (H5) and refund reconciliation (H3) — so a changed trigger never stacks two
+   * rebalances.
+   */
+  removeByTrigger: (triggerTxnId: string) => string[];
 }
 
 const ManualTxnsContext = createContext<ManualTxnsContextValue | null>(null);
@@ -111,6 +132,7 @@ function toTransaction(input: ManualTxnInput): Transaction {
     isRecurring: false,
     userEdited: true,
     ...(input.note ? { note: input.note } : {}),
+    ...(input.rebalance ? { rebalance: input.rebalance } : {}),
   };
 }
 
@@ -140,6 +162,12 @@ async function apiPatch(cif: string, id: string, patch: ManualTxnPatch): Promise
   if ("type" in patch) wire.type = patch.type ?? null;
   if ("transferPurpose" in patch) wire.transferPurpose = patch.transferPurpose ?? null;
   if ("note" in patch) wire.note = patch.note ?? null;
+  // Rebalance meta is an object; `null` over the wire ⇒ CLEAR (Phase 05 unwind).
+  if ("rebalance" in patch) wire.rebalance = patch.rebalance ?? null;
+  // `status`/`amount` are non-clearable — only sent when a concrete value is set
+  // (refund/reversal or amount edit of a trigger txn, H3/H5).
+  if (patch.status !== undefined) wire.status = patch.status;
+  if (patch.amount !== undefined) wire.amount = patch.amount;
   const res = await fetch(API_PATH, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -251,7 +279,21 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
     [cif, apply],
   );
 
-  const value = useMemo(() => ({ manualTxns, add, update, remove }), [manualTxns, add, update, remove]);
+  const removeByTrigger = useCallback(
+    (triggerTxnId: string): string[] => {
+      const victims = txnsRef.current.filter((t) => t.rebalance?.triggerTxnId === triggerTxnId);
+      if (victims.length === 0) return [];
+      apply(txnsRef.current.filter((t) => t.rebalance?.triggerTxnId !== triggerTxnId)); // optimistic
+      victims.forEach((t) => apiRemove(cif, t.id).catch(logWriteError));
+      return victims.map((t) => t.id);
+    },
+    [cif, apply],
+  );
+
+  const value = useMemo(
+    () => ({ manualTxns, add, update, remove, removeByTrigger }),
+    [manualTxns, add, update, remove, removeByTrigger],
+  );
   return <ManualTxnsContext.Provider value={value}>{children}</ManualTxnsContext.Provider>;
 }
 

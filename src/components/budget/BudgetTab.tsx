@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { useFinancials } from "@/state/useFinancials";
 import { BudgetGauge } from "./BudgetGauge";
 import { HuBudgetCard } from "./HuBudgetCard";
+import { makeJarLabelResolver } from "./JarRebalanceLines";
 
 /**
  * Ngân sách tab (BIDV wallet model): a total gauge (đã tiêu vs tổng hạn mức) + a
@@ -43,6 +44,11 @@ export function BudgetTab() {
   const setLines = lines.filter((l) => l.limitState === "set");
   const unsetLines = lines.filter((l) => l.limitState === "unset");
   const pctLabel = summary.pctUsed !== null ? `${Math.round(summary.pctUsed * 100)}%` : "Chưa đặt";
+  // The period's inter-jar rebalance txns — rendered as read-only "cho/nhận"
+  // pseudo-lines on each jar card (Phase 02). Same engine-excluded txns already
+  // folded into every jar's `remaining`; `?? []` guards partial-`Financials` fixtures.
+  const rebalances = financials.jarRebalances ?? [];
+  const labelOf = makeJarLabelResolver(lines);
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,7 +133,7 @@ export function BudgetTab() {
           {setLines.length > 0 ? (
             <div className="flex flex-col gap-3">
               {setLines.map((line) => (
-                <HuBudgetCard key={line.huId} line={line} onEdit={openEditor} />
+                <HuBudgetCard key={line.huId} line={line} onEdit={openEditor} rebalances={rebalances} labelOf={labelOf} />
               ))}
             </div>
           ) : (
@@ -139,7 +145,7 @@ export function BudgetTab() {
               <SectionHeader title="Chưa đặt hạn mức" />
               <div className="flex flex-col gap-3">
                 {unsetLines.map((line) => (
-                  <HuBudgetCard key={line.huId} line={line} onEdit={openEditor} />
+                  <HuBudgetCard key={line.huId} line={line} onEdit={openEditor} rebalances={rebalances} labelOf={labelOf} />
                 ))}
               </div>
             </>
