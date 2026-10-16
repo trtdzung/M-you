@@ -13,7 +13,6 @@ export function PersonaSwitcher({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <p className="text-xs font-medium text-muted">Hồ sơ demo (dữ liệu giả lập)</p>
       <div className="flex flex-col gap-2">
         {personas.map((p) => {
           const active = p.id === personaId;
