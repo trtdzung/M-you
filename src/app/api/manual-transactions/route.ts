@@ -5,6 +5,7 @@ import {
   upsertManualTxn,
   patchManualTxn,
   deleteManualTxn,
+  countRebalanceLegsForJar,
   type ManualTxnPatch,
 } from "@/lib/manual-txns-store";
 
@@ -16,8 +17,12 @@ import {
  * forces `source: "self_reported"` so a row can never look bank-verified (#5).
  *
  *   GET    ?cif=            → Transaction[] (newest first)
- *   POST   {cif, txn}       → persist one client-built Transaction (201)
- *   PATCH  {cif, id, patch} → merge whitelisted fields (200) / 404 if absent
+ *   GET    ?cif=&jarId=     → {jarId, rebalanceLegCount} — legs whose rebalance
+ *                              from/to is that jar (warn before deleting the jar)
+ *   POST   {cif, txn}       → persist one client-built Transaction (201); a
+ *                              present `rebalance` must be well-formed (else 422)
+ *   PATCH  {cif, id, patch} → merge whitelisted fields (200) / 404 if absent;
+ *                              a malformed `rebalance` patch → 422
  *   DELETE ?cif=&id=        → remove one (204)
  */
 
@@ -28,16 +33,23 @@ function isTxn(v: unknown): v is Transaction {
   return typeof t.id === "string" && typeof t.postedAt === "string" && typeof t.amount === "number";
 }
 
-/** Shape-guard for the rebalance meta so a malformed object never lands in the store. */
+const isNonEmptyString = (v: unknown): v is string => typeof v === "string" && v !== "";
+
+/** Shape-guard for the rebalance meta so a malformed object never lands in the store (F15). */
 function isRebalanceMeta(v: unknown): v is NonNullable<Transaction["rebalance"]> {
   if (!v || typeof v !== "object") return false;
   const m = v as Record<string, unknown>;
   return (
-    typeof m.fromJarId === "string" &&
-    typeof m.toJarId === "string" &&
-    typeof m.triggerTxnId === "string" &&
+    isNonEmptyString(m.fromJarId) &&
+    isNonEmptyString(m.toJarId) &&
+    isNonEmptyString(m.triggerTxnId) &&
     (m.origin === "auto" || m.origin === "manual")
   );
+}
+
+/** A leg must move a positive, finite amount alongside well-formed meta. */
+function isValidRebalanceTxn(txn: Transaction): boolean {
+  return isRebalanceMeta(txn.rebalance) && Number.isFinite(txn.amount) && txn.amount > 0;
 }
 
 /** The four valid txn statuses — a refund/reversal PATCH must land in this set (H3). */
@@ -70,6 +82,8 @@ function sanitizePatch(raw: Record<string, unknown>): ManualTxnPatch {
 export async function GET(req: NextRequest) {
   const cif = req.nextUrl.searchParams.get("cif");
   if (!cif) return NextResponse.json({ error: "cif is required" }, { status: 422 });
+  const jarId = req.nextUrl.searchParams.get("jarId");
+  if (jarId) return NextResponse.json({ jarId, rebalanceLegCount: countRebalanceLegsForJar(cif, jarId) });
   return NextResponse.json(readManualTxns(cif));
 }
 
@@ -83,6 +97,9 @@ export async function POST(req: NextRequest) {
   const { cif, txn } = body;
   if (typeof cif !== "string" || !cif) return NextResponse.json({ error: "cif is required" }, { status: 422 });
   if (!isTxn(txn)) return NextResponse.json({ error: "txn is invalid" }, { status: 422 });
+  if (txn.rebalance !== undefined && !isValidRebalanceTxn(txn)) {
+    return NextResponse.json({ error: "rebalance is invalid" }, { status: 422 });
+  }
   upsertManualTxn(cif, txn);
   return NextResponse.json({ ok: true }, { status: 201 });
 }
@@ -98,6 +115,10 @@ export async function PATCH(req: NextRequest) {
   if (typeof cif !== "string" || !cif) return NextResponse.json({ error: "cif is required" }, { status: 422 });
   if (typeof id !== "string" || !id) return NextResponse.json({ error: "id is required" }, { status: 422 });
   if (!patch || typeof patch !== "object") return NextResponse.json({ error: "patch is required" }, { status: 422 });
+  const rawRebalance = (patch as Record<string, unknown>).rebalance;
+  if (rawRebalance !== undefined && rawRebalance !== null && !isRebalanceMeta(rawRebalance)) {
+    return NextResponse.json({ error: "rebalance is invalid" }, { status: 422 });
+  }
   const updated = patchManualTxn(cif, id, sanitizePatch(patch as Record<string, unknown>));
   if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(updated);

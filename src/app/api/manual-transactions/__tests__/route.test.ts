@@ -140,14 +140,42 @@ describe("/api/manual-transactions", () => {
     await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance } });
     let rows = (await (await list()).json()) as Transaction[];
     expect(rows[0].rebalance).toEqual(rebalance);
-    // A malformed rebalance patch is dropped, not written (shape guard).
-    await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance: { fromJarId: 1 } } });
+    // A malformed rebalance patch is REJECTED (F15) — 422, nothing written.
+    expect((await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance: { fromJarId: 1 } } })).status).toBe(422);
+    const partial = { fromJarId: "food", toJarId: "", triggerTxnId: "t2", origin: "manual" };
+    expect((await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance: partial } })).status).toBe(422);
     rows = (await (await list()).json()) as Transaction[];
     expect(rows[0].rebalance).toEqual(rebalance); // unchanged
     // null clears it (Phase 05 unwind).
     await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance: null } });
     rows = (await (await list()).json()) as Transaction[];
     expect(rows[0].rebalance).toBeUndefined();
+  });
+
+  it.each([
+    ["missing toJarId/triggerTxnId/origin", { fromJarId: "food" }],
+    ["bogus origin", { fromJarId: "food", toJarId: "savings", triggerTxnId: "t", origin: "bogus-origin" }],
+    ["empty fromJarId", { fromJarId: "", toJarId: "savings", triggerTxnId: "t", origin: "auto" }],
+    ["null meta", null],
+  ])("422s a POST with malformed rebalance meta: %s (F15)", async (_label, rebalance) => {
+    const res = await post({ cif: CIF, txn: { ...txn({ id: "bad", categoryId: "dieu-chinh-hu" }), rebalance } });
+    expect(res.status).toBe(422);
+    expect(((await (await list()).json()) as Transaction[]).length).toBe(0);
+  });
+
+  it.each([0, -5])("422s a rebalance leg whose amount is %d (F15)", async (amount) => {
+    const rebalance = { fromJarId: "food", toJarId: "savings", triggerTxnId: "t", origin: "auto" as const };
+    expect((await post({ cif: CIF, txn: txn({ id: "bad", amount, rebalance }) })).status).toBe(422);
+  });
+
+  it("counts the rebalance legs referencing a jar (?jarId=) for the pre-delete warning", async () => {
+    const leg = (from: string, to: string) => ({ fromJarId: from, toJarId: to, triggerTxnId: "t", origin: "auto" as const });
+    await post({ cif: CIF, txn: txn({ id: "l1", rebalance: leg("savings", "food") }) });
+    await post({ cif: CIF, txn: txn({ id: "l2", rebalance: leg("pool", "savings") }) });
+    await post({ cif: CIF, txn: txn({ id: "l3", rebalance: leg("pool", "food") }) });
+    await post({ cif: "CIF_OTHER", txn: txn({ id: "l4", rebalance: leg("savings", "food") }) });
+    const res = await GET(new NextRequest(`http://localhost/api/manual-transactions?cif=${CIF}&jarId=savings`));
+    expect(await res.json()).toEqual({ jarId: "savings", rebalanceLegCount: 2 });
   });
 
   it("deletes a txn (204) and it disappears from the list", async () => {

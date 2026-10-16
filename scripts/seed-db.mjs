@@ -34,13 +34,16 @@ const SEED_BENEFICIARIES = [
 // The "Cá nhân" 6-jar template (src/domain/models/jar-defaults.ts) — duplicated
 // here rather than imported, same reasoning as SEED_BENEFICIARIES above (this
 // is a plain .mjs script, no TS loader configured).
+// `role` mirrors the template's donor-waterfall role (U11) — the column must be
+// seeded, or every seeded jar reads back role-less (engine default `spending`)
+// and the "Tiết kiệm" buffer / "Thiết yếu" essential ordering is lost.
 const SEED_JARS = [
-  { id: "essentials", label: "Thiết yếu", categoryIds: ["housing", "utilities", "insurance", "subscriptions"], budgetLimit: 8_000_000 },
-  { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], budgetLimit: 4_000_000 },
-  { id: "transport", label: "Di chuyển", categoryIds: ["transport"], budgetLimit: 1_500_000 },
-  { id: "lifestyle", label: "Hưởng thụ", categoryIds: ["entertainment", "shopping"], budgetLimit: 2_500_000 },
-  { id: "health", label: "Sức khỏe", categoryIds: ["health"], budgetLimit: 1_000_000 },
-  { id: "savings", label: "Tiết kiệm", categoryIds: [], budgetLimit: undefined },
+  { id: "essentials", label: "Thiết yếu", categoryIds: ["housing", "utilities", "insurance", "subscriptions"], role: "essential", budgetLimit: 8_000_000 },
+  { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], role: "spending", budgetLimit: 4_000_000 },
+  { id: "transport", label: "Di chuyển", categoryIds: ["transport"], role: "spending", budgetLimit: 1_500_000 },
+  { id: "lifestyle", label: "Hưởng thụ", categoryIds: ["entertainment", "shopping"], role: "spending", budgetLimit: 2_500_000 },
+  { id: "health", label: "Sức khỏe", categoryIds: ["health"], role: "spending", budgetLimit: 1_000_000 },
+  { id: "savings", label: "Tiết kiệm", categoryIds: [], role: "buffer", budgetLimit: undefined },
 ];
 
 // salaryBase per CIF, duplicated from src/providers/mock/personas.ts (same reason
@@ -122,13 +125,23 @@ insertAll(SEED_BENEFICIARIES);
 
 console.log(`Seeded ${SEED_BENEFICIARIES.length} beneficiaries into ${DB_PATH}`);
 
-db.exec("DELETE FROM jars");
+// Older DB files predate `jars.role` (CREATE TABLE IF NOT EXISTS won't add it) —
+// same idempotent migration as src/lib/db.ts, so the INSERT below never fails.
+try {
+  db.exec("ALTER TABLE jars ADD COLUMN role TEXT");
+} catch {
+  // column already exists
+}
+// Only the seeded personas' jars are replaced (K08) — any other cif's jars
+// (synthetic test personas, user-created data) survive a reseed.
+const deleteJarsOfCif = db.prepare("DELETE FROM jars WHERE cif = ?");
 const insertJar = db.prepare(
-  `INSERT INTO jars (id, cif, label, category_ids, budget_limit, color, icon, sort_order)
-   VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, NULL, NULL, @sortOrder)`,
+  `INSERT INTO jars (id, cif, label, category_ids, budget_limit, role, color, icon, sort_order)
+   VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @role, NULL, NULL, @sortOrder)`,
 );
 const insertAllJars = db.transaction(() => {
   for (const cif of CIFS) {
+    deleteJarsOfCif.run(cif);
     const scale = SALARY_BASE_BY_CIF[cif] / SALARY_REF;
     SEED_JARS.forEach((jar, index) => {
       // Scale each jar's single number by the persona's factor; an unset limit
@@ -143,6 +156,7 @@ const insertAllJars = db.transaction(() => {
         label: jar.label,
         categoryIds: JSON.stringify(jar.categoryIds),
         budgetLimit: scaledLimit,
+        role: jar.role,
         sortOrder: index,
       });
     });
@@ -166,6 +180,16 @@ const insertAllAccounts = db.transaction(() => {
 });
 insertAllAccounts();
 console.log(`Seeded 3 accounts × ${CIFS.length} personas into ${DB_PATH}`);
+
+// Transaction history comes from the TypeScript generator (fixtures/generate.ts),
+// which this plain .mjs script can't import. Clearing the table is enough: the
+// server's `transactions-store.ts` re-seeds each persona from that generator on
+// its first read, so history always matches the freshly seeded accounts.
+// Labels key on those transaction ids, so they reset together. The category
+// taxonomy (`categories`) is left alone — it is seeded lazily from code.
+db.exec("DELETE FROM transactions");
+db.exec("DELETE FROM transaction_corrections");
+console.log(`Cleared transactions + labels (re-seeded per persona on first read) in ${DB_PATH}`);
 
 // WAL mode buffers writes in a separate -wal file; checkpoint before closing
 // so the committed .sqlite3 file itself reflects this run's data.

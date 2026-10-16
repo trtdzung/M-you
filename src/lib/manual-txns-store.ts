@@ -102,6 +102,28 @@ export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): 
   return run();
 }
 
+/** WHERE clause matching a rebalance leg whose donor OR target is `@jarId`. */
+const LEG_OF_JAR = `cif = @cif AND (
+  json_extract(payload, '$.rebalance.fromJarId') = @jarId OR
+  json_extract(payload, '$.rebalance.toJarId') = @jarId)`;
+
+/** How many rebalance legs of `cif` reference `jarId` (from or to) — the UI's pre-delete warning. */
+export function countRebalanceLegsForJar(cif: string, jarId: string): number {
+  const row = getDb()
+    .prepare(`SELECT COUNT(*) AS n FROM manual_transactions WHERE ${LEG_OF_JAR}`)
+    .get({ cif, jarId }) as { n: number };
+  return row.n;
+}
+
+/**
+ * Delete every rebalance leg of `cif` referencing `jarId` (S8): a leg pointing at
+ * a jar that no longer exists would move money "from nowhere". Returns the number
+ * removed. Callers wrap it in the same transaction as the jar delete.
+ */
+export function deleteRebalanceLegsForJar(cif: string, jarId: string): number {
+  return getDb().prepare(`DELETE FROM manual_transactions WHERE ${LEG_OF_JAR}`).run({ cif, jarId }).changes;
+}
+
 /** Delete one self-reported txn (no-op if absent). */
 export function deleteManualTxn(cif: string, id: string): void {
   getDb().prepare("DELETE FROM manual_transactions WHERE cif = ? AND id = ?").run(cif, id);

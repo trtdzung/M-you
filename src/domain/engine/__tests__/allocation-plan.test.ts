@@ -47,3 +47,36 @@ describe("fitsCasaCap", () => {
     expect(fitsCasaCap([jar("food", 5_000_000)], 5_000_000, { food: Number.NaN })).toEqual({ ok: true });
   });
 });
+
+describe("fitsCasaCap — only an INCREASE of Σ can be rejected (S5)", () => {
+  const OVER = [jar("a", 40_000_000), jar("b", 30_000_000)]; // Σ 70tr
+
+  it("lowering a limit on an already-over-cap config passes even if still over (A34)", () => {
+    expect(fitsCasaCap(OVER, 57_600_000, { a: 35_000_000 })).toEqual({ ok: true });
+  });
+
+  it("re-saving the same value passes when CASA dropped below Σ (C08)", () => {
+    expect(fitsCasaCap(OVER, 52_600_000, { a: 40_000_000 })).toEqual({ ok: true });
+  });
+
+  it("limit 0 on a 0-jar passes when CASA is negative (C03)", () => {
+    expect(fitsCasaCap([jar("khac", 0)], -1_000_000, { khac: 0 })).toEqual({ ok: true });
+  });
+
+  it("raising while over cap is still rejected with the full overBy", () => {
+    expect(fitsCasaCap(OVER, 57_600_000, { a: 40_000_001 })).toEqual({ ok: false, overBy: 12_400_001 });
+  });
+
+  it("explicit baseline: no-op write passes, an increase past CASA fails", () => {
+    expect(fitsCasaCap(OVER, 10_000_000, {}, OVER)).toEqual({ ok: true });
+    const raised = [jar("a", 40_000_000), jar("b", 31_000_000)];
+    expect(fitsCasaCap(raised, 57_600_000, {}, OVER)).toEqual({ ok: false, overBy: 13_400_000 });
+    expect(fitsCasaCap(raised, 71_000_000, {}, OVER)).toEqual({ ok: true });
+  });
+
+  it("unknown CASA blocks increases only", () => {
+    expect(fitsCasaCap(OVER, "unknown", { a: 1 })).toEqual({ ok: true });
+    expect(fitsCasaCap(OVER, "unknown", { a: 40_000_001 })).toEqual({ ok: false });
+    expect(fitsCasaCap([jar("x")], "unknown", {}, [jar("x")])).toEqual({ ok: true });
+  });
+});

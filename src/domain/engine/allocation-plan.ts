@@ -19,15 +19,8 @@ export interface CasaCapResult {
   overBy?: number;
 }
 
-/**
- * Cap kiểm: tổng `budgetLimit` các hũ (sau khi áp `drafts`) có ≤ CASA pool không.
- * `drafts` là các hạn mức MỚI theo jarId — áp theo trạng thái SAU-KHI-áp toàn bộ
- * (không từng hũ rời rạc). Hũ chưa đặt `budgetLimit` (vd. hũ tiết kiệm) không tính
- * vào Σ. `casaPool === "unknown"` → chặn (`ok: false`, invariant #6: không có mẫu
- * số để validate). Thuần, deterministic; enforce ở cả client (UX) lẫn server.
- */
-export function fitsCasaCap(jars: Jar[], casaPool: Amount, drafts: Record<string, number> = {}): CasaCapResult {
-  if (casaPool === UNKNOWN) return { ok: false };
+/** Σ of the finite `budgetLimit`s (after `drafts`); unset/non-finite values count 0. */
+function sumLimits(jars: Jar[], drafts: Record<string, number> = {}): number {
   let sum = 0;
   for (const jar of jars) {
     const override = drafts[jar.id];
@@ -35,5 +28,37 @@ export function fitsCasaCap(jars: Jar[], casaPool: Amount, drafts: Record<string
     if (value === undefined || value === null || !Number.isFinite(value)) continue;
     sum += value;
   }
-  return sum <= casaPool ? { ok: true } : { ok: false, overBy: sum - casaPool };
+  return sum;
+}
+
+/**
+ * Cap kiểm: tổng `budgetLimit` các hũ (sau khi áp `drafts`) có ≤ CASA pool không.
+ * `drafts` là các hạn mức MỚI theo jarId — áp theo trạng thái SAU-KHI-áp toàn bộ
+ * (không từng hũ rời rạc). Hũ chưa đặt `budgetLimit` (vd. hũ tiết kiệm) không tính
+ * vào Σ. Thuần, deterministic; enforce ở cả client (UX) lẫn server.
+ *
+ * Chỉ chặn khi lần ghi LÀM TĂNG Σ VÀ Σ mới > CASA (S5): hạ / xoá / lưu lại y hệt
+ * luôn qua — kể cả khi config đang vượt trần hoặc CASA âm (sau một lần chuyển tiền).
+ * Mốc so sánh (Σ trước):
+ *  - `baseline` nếu truyền (server: config đang lưu; `jars` là config SAU khi áp);
+ *  - nếu không, và có `drafts` → chính `jars` (chưa áp drafts) — preview client;
+ *  - nếu không có cả hai → kiểm tuyệt đối (Σ `jars` ≤ CASA), như trước.
+ * `casaPool === "unknown"` → chặn mọi lần TĂNG (`ok: false`, invariant #6: không có
+ * mẫu số để validate); lần ghi không tăng vẫn qua.
+ */
+export function fitsCasaCap(
+  jars: Jar[],
+  casaPool: Amount,
+  drafts: Record<string, number> = {},
+  baseline?: Jar[],
+): CasaCapResult {
+  const next = sumLimits(jars, drafts);
+  const prev = baseline
+    ? sumLimits(baseline)
+    : Object.keys(drafts).length > 0
+      ? sumLimits(jars)
+      : undefined;
+  if (prev !== undefined && next <= prev) return { ok: true };
+  if (casaPool === UNKNOWN) return { ok: false };
+  return next <= casaPool ? { ok: true } : { ok: false, overBy: next - casaPool };
 }

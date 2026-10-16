@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
-import { fitsCasaCap } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { readJarConfig, sanitizeJar, sanitizeJarPatch, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
-import { casaPoolForCif } from "@/lib/casa-pool";
+import { capViolation, categoryViolation, reservedIdViolation } from "./jar-write-guards";
 
 /**
  * Spending jars ("hũ") for one persona (`cif`), backed by `data/pfm.sqlite3`
@@ -33,7 +32,9 @@ export async function GET(req: NextRequest) {
 /**
  * POST /api/jars — create one jar (body `{cif, jar}`). The id is made unique
  * against the existing set and the new jar's categories are taken away from
- * whichever jar held them (one-category-one-jar).
+ * whichever jar held them (one-category-one-jar). 422 on a sentinel id (`pool`,
+ * `unclassified`, `dieu-chinh-hu`, `khac`), a non-expense category, a
+ * non-integer/negative `budgetLimit`, or a create that raises Σ past CASA.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest) {
   if (!cif || typeof cif !== "string") return missingCif();
   const jar = sanitizeJar(body?.jar);
   if (!jar) return NextResponse.json({ error: "jar is invalid" }, { status: 422 });
+  const rejected = reservedIdViolation([jar.id], true) ?? categoryViolation(jar.categoryIds);
+  if (rejected) return rejected;
 
   const current = readJarConfig(cif);
   const created = { ...jar, id: uniqueJarId(current.jars, jar.id) };
@@ -48,6 +51,8 @@ export async function POST(req: NextRequest) {
     version: 3,
     jars: [...stripCategories(current.jars, created.categoryIds), created],
   };
+  const overCap = capViolation(cif, next.jars, current.jars);
+  if (overCap) return overCap;
   return NextResponse.json(writeJarConfig(cif, next), { status: 201 });
 }
 
@@ -55,7 +60,9 @@ export async function POST(req: NextRequest) {
  * PUT /api/jars — REPLACE the persona's whole jar set (body `{cif, jars}`),
  * used by "áp mẫu" and "khôi phục mặc định". An arbitrary incoming set has not
  * been through the mutators, so it is deduped and healed (no category claimed
- * twice, none orphaned) before it is stored.
+ * twice, none orphaned) before it is stored. 422 on `pool`/`unclassified`/
+ * `dieu-chinh-hu` ids (`khac` round-trips — it is the system heal jar), a
+ * non-expense category, or a replace that raises Σ budgetLimit past CASA.
  */
 export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -66,16 +73,22 @@ export async function PUT(req: NextRequest) {
   if (new Set(jars.map((j) => j.id)).size !== jars.length) {
     return NextResponse.json({ error: "duplicate jar id" }, { status: 422 });
   }
+  const rejected =
+    reservedIdViolation(jars.map((j) => j.id), false) ?? categoryViolation(jars.flatMap((j) => j.categoryIds));
+  if (rejected) return rejected;
 
   const next = healOrphanCategories(dedupeCategories({ version: 3, jars }));
+  const overCap = capViolation(cif, next.jars, readJarConfig(cif).jars);
+  if (overCap) return overCap;
   return NextResponse.json(writeJarConfig(cif, next));
 }
 
 /**
  * PATCH /api/jars?cif= — apply several jar patches ATOMICALLY (body `{cif,
  * patches: {jarId: patch}}`), used by "Chia ngay" to set every jar's
- * `budgetLimit` in one transaction. Server enforces the cap: if Σ budgetLimit of
- * the resulting set would exceed CASA it rejects 422 (client check is only UX).
+ * `budgetLimit` in one transaction. Server enforces the cap: if the batch RAISES
+ * Σ budgetLimit past CASA it rejects 422 (client check is only UX); a no-op or
+ * lowering batch always passes, even on an already-over-cap config.
  * `categoryIds` are NOT honoured here — category moves go through the per-jar
  * route so the one-category-one-jar invariant stays in one place.
  */
@@ -103,15 +116,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   const nextJars = current.jars.map((j) => merged.get(j.id) ?? j);
-  const casaPool = casaPoolForCif(cif) ?? "unknown";
-
-  const cap = fitsCasaCap(nextJars, casaPool, {});
-  if (!cap.ok) {
-    return NextResponse.json(
-      { error: "over CASA cap", overBy: cap.overBy ?? null },
-      { status: 422 },
-    );
-  }
+  const overCap = capViolation(cif, nextJars, current.jars);
+  if (overCap) return overCap;
 
   return NextResponse.json(writeJarConfig(cif, { version: 3, jars: nextJars }));
 }
