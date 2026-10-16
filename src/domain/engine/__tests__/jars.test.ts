@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JarConfig } from "@/domain/models";
-import { evaluateJars, resolveIncomeBasis, type IncomeBasis } from "../jars";
+import { evaluateJars, resolveIncomeBasis, validateJarInput, type IncomeBasis } from "../jars";
 import type { RecurringSeries } from "../recurring";
 import { monthPeriod } from "../types";
 import { txn } from "./helpers";
@@ -212,5 +212,36 @@ describe("resolveIncomeBasis (salary → manual → unknown)", () => {
     expect(basis.value).toBe("unknown");
     expect(basis.source).toBe("estimated");
     expect(basis.freshness).toBeNull();
+  });
+});
+
+describe("validateJarInput (M8 — never NaN/negative/huge into the engine)", () => {
+  it("accepts a valid percent and a valid amount", () => {
+    expect(validateJarInput("65", "percent")).toEqual({ ok: true, value: 65, error: null });
+    expect(validateJarInput("1500000", "amount")).toEqual({ ok: true, value: 1_500_000, error: null });
+    expect(validateJarInput("0", "percent")).toEqual({ ok: true, value: 0, error: null });
+  });
+
+  it("rejects blank and non-numeric input", () => {
+    expect(validateJarInput("", "percent").ok).toBe(false);
+    expect(validateJarInput("   ", "amount").ok).toBe(false);
+    expect(validateJarInput("abc", "percent").ok).toBe(false);
+  });
+
+  it("rejects non-finite and negative values", () => {
+    expect(validateJarInput("Infinity", "amount").ok).toBe(false);
+    expect(validateJarInput("NaN", "amount").ok).toBe(false);
+    expect(validateJarInput("-5", "percent").ok).toBe(false);
+  });
+
+  it("rejects a percent over 100 but accepts the same value as an amount", () => {
+    expect(validateJarInput("150", "percent").ok).toBe(false);
+    expect(validateJarInput("150", "amount")).toEqual({ ok: true, value: 150, error: null });
+  });
+
+  it("never returns a NaN value on rejection", () => {
+    const res = validateJarInput("not-a-number", "amount");
+    expect(res.value).toBeNull();
+    expect(Number.isNaN(res.value as unknown as number)).toBe(false);
   });
 });

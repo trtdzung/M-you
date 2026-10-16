@@ -10,6 +10,10 @@ import { CategoryBars } from "@/components/charts/CategoryBars";
 import { FixedVsDiscretionary } from "@/components/cashflow/FixedVsDiscretionary";
 import { BudgetList } from "@/components/budget/BudgetList";
 import { useFinancials } from "@/state/useFinancials";
+import Link from "next/link";
+import { PiggyBank } from "lucide-react";
+import { JarList } from "@/components/jars/JarList";
+import { currentMonthKey } from "@/lib/demo-clock";
 
 /**
  * Nội dung màn Dòng tiền (di dời vào PFM hub). Bao gồm ngân sách tháng (BudgetList
@@ -65,6 +69,18 @@ export function CashflowView() {
               )}
             </Card>
           </section>
+
+          <AccordionCard icon={PiggyBank} label="Hũ chi tiêu">
+            <div className="mb-3 flex items-center justify-end">
+              <Link href="/pfm/jars" className="text-xs font-medium text-primary underline">
+                Thiết lập
+              </Link>
+            </div>
+            <JarList
+              lines={financials.jarLines}
+              stale={financials.monthKey !== currentMonthKey()}
+            />
+          </AccordionCard>
 
           <section>
             <SectionHeader title="Thu nhập & chi tiêu" />

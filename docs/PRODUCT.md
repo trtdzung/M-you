@@ -79,6 +79,16 @@ Typical needs:
 - End-of-month cash estimate.
 - Month-over-month comparison.
 
+### Hũ chi tiêu (spending jars) — implemented
+
+A jar-based budgeting layer that sits alongside the existing per-category Budget, not instead of it — two altitudes on the same spend: category limits (Budget) and jar buckets (Hũ chi tiêu). Fully deterministic, no AI in the calculation path.
+
+- **2-layer model.** Named jars group one or more expense categories; each expense category belongs to at most one jar. Spend not assigned to any jar is never dropped — it rolls up into an implicit, neutral **"Chưa phân hũ"** (unassigned) bucket.
+- **Allocation per jar** is either a percentage of monthly income (default) or a fixed VND cap (override).
+- **Income basis** resolves in priority order: detected recurring salary → manual override → unknown. An unknown income basis **never** shows a false-healthy green jar — percent-mode jars show a neutral "chưa xác định thu nhập" state instead, so a jar is never falsely reported as "ok".
+- **Level 1:** jar pressure is tracked in a "Hũ chi tiêu" section on the Cashflow tab, plus a dedicated **jar-pressure insight** (e.g. "Hũ Giải trí đã dùng 82%, còn 12 ngày"), which only fires against the current month and skips jars with an unresolved income basis. Setup (create/edit/delete jars, assign categories, edit allocations, see a live total-allocation meter) lives on its own route, `/pfm/jars`, reachable from the Cashflow tab — kept off the main PFM tab bar so it stays at four tabs.
+- **Level 3:** a deterministic "phân bổ thặng dư" (surplus allocation) what-if lets the user simulate distributing the month's surplus across savings goals. It is a **read-only simulation** — no money movement, no transfer draft, no goal mutation. If income is unknown, surplus is reported as **"unknown", never 0₫**.
+
 ### Basic net worth
 
 ```text

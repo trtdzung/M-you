@@ -28,6 +28,15 @@ function stripCategories(jars: Jar[], catIds: string[], exceptId?: string): Jar[
   );
 }
 
+/** A jar id not already taken (suffixes `-2`, `-3`… on collision). */
+function uniqueJarId(jars: Jar[], base: string): string {
+  const taken = new Set(jars.map((j) => j.id));
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
 /**
  * Enforce one-category-one-jar on an arbitrary config (first jar to claim a
  * category keeps it). The mutators already guarantee this, but a config coming
@@ -108,7 +117,10 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
     () => ({
       config,
       addJar: (jar) =>
-        mutate((c) => ({ ...c, jars: [...stripCategories(c.jars, jar.categoryIds), jar] })),
+        mutate((c) => {
+          const next = { ...jar, id: uniqueJarId(c.jars, jar.id) };
+          return { ...c, jars: [...stripCategories(c.jars, next.categoryIds), next] };
+        }),
       updateJar: (id, patch) =>
         mutate((c) => {
           let jars = c.jars.map((j) => (j.id === id ? { ...j, ...patch } : j));

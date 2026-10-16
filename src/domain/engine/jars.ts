@@ -22,6 +22,32 @@ import type { Period } from "./types";
 
 export type JarStatus = PressureStatus | "unknown";
 
+/** Result of validating one raw allocation-input string (M8). */
+export interface JarInputResult {
+  ok: boolean;
+  /** Parsed value when `ok`; null when rejected — never `NaN` into the engine. */
+  value: number | null;
+  /** Vietnamese error message when rejected; null when accepted. */
+  error: string | null;
+}
+
+/**
+ * Validate a raw allocation input before it can reach the engine (Red Team M8).
+ * Blank / non-numeric / non-finite is rejected; a percent must sit in [0,100];
+ * a VND amount must be finite and non-negative. This is the ONLY gate between
+ * the free-text setup field and `JarAllocation.value`, so it must never let a
+ * `NaN`, an `Infinity`, or a negative slip through.
+ */
+export function validateJarInput(raw: string, mode: "percent" | "amount"): JarInputResult {
+  const trimmed = raw.trim();
+  if (trimmed === "") return { ok: false, value: null, error: "Nhập giá trị" };
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return { ok: false, value: null, error: "Giá trị không hợp lệ" };
+  if (n < 0) return { ok: false, value: null, error: "Không được âm" };
+  if (mode === "percent" && n > 100) return { ok: false, value: null, error: "Tối đa 100%" };
+  return { ok: true, value: n, error: null };
+}
+
 /** Resolved income basis for percent-mode jars, with its own provenance. */
 export interface IncomeBasis {
   value: number | "unknown";

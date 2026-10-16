@@ -13,4 +13,5 @@ export * from "./networth";
 export * from "./recurring";
 export * from "./obligations";
 export * from "./goals";
+export * from "./surplus";
 export * from "./debt";

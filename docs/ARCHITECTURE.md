@@ -103,7 +103,7 @@ Key shared components introduced by the refactor:
 - Exclude internal transfers from cash-flow totals.
 - Separate fixed and discretionary spending.
 - Calculate period comparisons and end-of-period estimates.
-- Evaluate user-defined spending jars against real spend (`jars.ts` — `evaluateJars`); the config now persists per persona (Phase 02), no UI yet. See "Spending jars" below.
+- Evaluate user-defined spending jars against real spend (`jars.ts` — `evaluateJars`); config persists per persona and has a dedicated setup UI. See "Spending jars" below.
 
 ### Balance-sheet module
 
@@ -112,7 +112,7 @@ Key shared components introduced by the refactor:
 - Keep source and freshness metadata.
 - Distinguish verified, self-reported, and estimated values.
 
-### Spending jars (engine + persistence, Phase 02 of 6 — no UI yet)
+### Spending jars (Hũ chi tiêu) — implemented, `plans/260908-1311-spending-jars` (all 6 phases shipped)
 
 `evaluateJars(config, txns, period, now, income)` (`src/domain/engine/jars.ts`) groups real expense categories into user-defined "jars" and compares their net spend against an allocation (`% of income` or a fixed VND cap). `resolveIncomeBasis` picks the income used by percent-mode jars, in priority order: detected recurring salary → manual `JarConfig.incomeBasis` override number → `"unknown"`.
 
@@ -122,8 +122,11 @@ Key shared components introduced by the refactor:
 - Spend not covered by any configured jar surfaces as a single `"Chưa phân hũ"` (unassigned) line rather than being dropped.
 - `NEAR_THRESHOLD`, `statusOf`, and `daysLeftIn` were extracted into a shared `src/domain/engine/pressure.ts` so budgets and jars share one ok/near/over classification (DRY) instead of duplicating the rule.
 - `JarConfig`/`Jar`/`JarAllocation` (`src/domain/models`) are **user state**, not provider `RawData` — threaded into the engine via `ComposeOptions.jarConfig` (`finance-compose.ts`). `Financials` gained `jarLines: JarLine[]` and `jarIncomeBasis`.
-- **Persistence (Phase 02):** `Providers.getJarConfig()` / `saveJarConfig()` (`src/providers/interfaces.ts`) are the first *write* methods on `Providers` — every other provider method is read-only. The mock adapter (`src/providers/mock/mock-provider.ts`) backs them with **persona-scoped `localStorage`** (key `msb-pfm.jars.<personaId>`) plus a structural schema guard (`isValidJarConfig`: `version === 1` + shape checks); a missing, corrupt, or wrong-shape record reads back as `null` so the caller reseeds from `DEFAULT_JAR_CONFIG` (`src/domain/models/jar-defaults.ts` — spend-only, all 10 expense categories, percents summing to 100). A real adapter maps these two methods to the MSB preferences API (invariant #4) without changing the interface.
-- **`JarConfigProvider` context (`src/state/jars.tsx`):** loads the config through the provider seam on mount and on persona switch (reseeding per persona so configs never leak across personas), normalizes overlapping categories on load (`dedupeCategories`), enforces one-category-one-jar on every mutation, and persists each mutation back through `saveJarConfig`. `useFinancials` threads the live `config` into `computeFinancials` via `ComposeOptions.jarConfig`. No jars UI consumes this context yet — that's Phase 03/04 of `plans/260908-1311-spending-jars`.
+- **Persistence:** `Providers.getJarConfig()` / `saveJarConfig()` (`src/providers/interfaces.ts`) are the first *write* methods on `Providers` — every other provider method is read-only. The mock adapter (`src/providers/mock/mock-provider.ts`) backs them with **persona-scoped `localStorage`** (key `msb-pfm.jars.<personaId>`) plus a structural schema guard (`isValidJarConfig`: `version === 1` + shape checks); a missing, corrupt, or wrong-shape record reads back as `null` so the caller reseeds from `DEFAULT_JAR_CONFIG` (`src/domain/models/jar-defaults.ts` — spend-only, all 10 expense categories, percents summing to 100). A real adapter maps these two methods to the MSB preferences API (invariant #4) without changing the interface.
+- **`JarConfigProvider` context (`src/state/jars.tsx`):** loads the config through the provider seam on mount and on persona switch (reseeding per persona so configs never leak across personas), normalizes overlapping categories on load (`dedupeCategories`), enforces one-category-one-jar on every mutation, and persists each mutation back through `saveJarConfig`. `useFinancials` threads the live `config` into `computeFinancials` via `ComposeOptions.jarConfig`.
+- **UI (`src/components/jars/`):** `JarCard`/`JarList` render jar pressure inside a "Hũ chi tiêu" section on `CashflowView.tsx` (Cashflow tab); `JarSetup` (with `JarEditor`, `CategoryAssigner`, `IncomeBasisControl`, `AllocationMeter`) is the CRUD + allocation editor at the dedicated route `src/app/pfm/jars/page.tsx` — kept off the main `/pfm` tab bar (still 4 tabs), reachable from Cashflow. `src/components/budget/PressureRow.tsx` is the shared ok/near/over row used by both budgets and jars.
+- **Insight:** `src/insights/detectors/jar-pressure.ts` surfaces the single most-pressured jar (over first, then near); it returns `null` off the current month (avoids a false "còn 0 ngày" alarm on a closed period) and skips the unassigned bucket and any jar with an unresolved income basis.
+- **Level 3 surplus allocation (`src/domain/engine/surplus.ts`):** `computeSurplus(income, expense)` = `income === "unknown" ? "unknown" : max(0, income − expense)`, using the same resolved `jarIncomeBasis` the jars use. `simulateSurplusAllocation({ surplus, goals, split })` is a pure, read-only what-if that distributes the surplus across goals per a UI-supplied split, capping each target at the goal's remaining headroom and the surplus left — it never mutates a goal, moves money, or produces a transfer draft. Unknown income yields `surplus: "unknown"`, never `0`. Rendered by `SurplusPanel` (`src/components/jars/SurplusPanel.tsx`) inside `JarSetup`.
 
 ### Asset and liability module
 

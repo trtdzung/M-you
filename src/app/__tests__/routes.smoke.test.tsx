@@ -77,6 +77,11 @@ describe("route smoke — all screens mount", () => {
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
+  it("PFM jars setup (/pfm/jars)", async () => {
+    const { default: Page } = await import("../pfm/jars/page");
+    expect(() => renderScreen(<Page />)).not.toThrow();
+  });
+
   it("PFM cashflow (/pfm/cashflow)", async () => {
     const { default: Page } = await import("../pfm/cashflow/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
