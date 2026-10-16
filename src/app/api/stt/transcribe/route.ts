@@ -46,7 +46,12 @@ export async function POST(req: NextRequest) {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = response.status === 401 || response.status === 403
+      const upstreamCode = typeof payload?.error?.code === "string" ? payload.error.code : "";
+      const error = upstreamCode === "provider_authentication_failed"
+        ? "Vbee từ chối API token hoặc App ID. Vui lòng kiểm tra cấu hình STT runtime."
+        : upstreamCode === "provider_error"
+          ? "Vbee không xử lý được bản ghi âm. Vui lòng kiểm tra token, App ID và log STT runtime."
+        : response.status === 401 || response.status === 403
         ? "Cấu hình xác thực STT không hợp lệ."
         : response.status === 413
           ? "Bản ghi âm quá dài. Hãy thử lại với câu ngắn hơn."
