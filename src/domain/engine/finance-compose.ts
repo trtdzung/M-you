@@ -28,6 +28,7 @@ import {
   estimateEndOfMonth,
   evaluateBudget,
   evaluateJarPartition,
+  financialHealth,
   monthPeriodFromKey,
   networthTrend,
   resolvePrimaryAccount,
@@ -38,6 +39,7 @@ import {
   type CashRunway,
   type CategorySpend,
   type EndOfMonthEstimate,
+  type FinancialHealth,
   type JarPartitionResult,
   type NetWorthResult,
   type NetWorthTrendMeta,
@@ -87,6 +89,19 @@ export interface Financials {
    * "unknown" when the primary account is ambiguous (0 or 2+ current accounts).
    */
   jarPartition: JarPartitionResult;
+  /**
+   * Financial-health indicators (runway, surplus, essential coverage, asset
+   * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
+   * (DRY) — no screen recomputes health locally. Missing inputs stay `null`.
+   */
+  health: FinancialHealth;
+  /**
+   * Seed (provider) goals + user-authored goals — the single merged goal view
+   * (Phase 05). Kế hoạch (goal list, surplus what-if) reads THIS so a create/
+   * edit/delete recomputes live and nothing is double-counted (the provider's
+   * `listGoals()` stays seed-only, red-team #2/#3).
+   */
+  goals: Goal[];
 }
 
 export interface ComposeOptions {
@@ -103,6 +118,22 @@ export interface ComposeOptions {
    * compose stays pure and testable (config is user state, not provider data).
    */
   jarConfig?: JarConfig;
+  /**
+   * User-authored assets/liabilities (Phase 03), threaded like `jarConfig` — they
+   * are context state merged with the seed here, NOT folded into the provider's
+   * `listAssets()`/`listLiabilities()` (which stay seed-only). This is the single
+   * source of truth for user records; keeping them separate avoids double-counting
+   * net worth (red-team #3) and lets a mutation recompute live (red-team #2).
+   */
+  userAssets?: Asset[];
+  userLiabilities?: Liability[];
+  /**
+   * User-authored goals (Phase 05), threaded like `userAssets` — context state
+   * merged with the seed goals here, NOT folded into the provider's `listGoals()`
+   * (which stays seed-only). Single source of truth; a mutation recomputes live
+   * (red-team #2) with no double-count (red-team #3).
+   */
+  userGoals?: Goal[];
 }
 
 /**
@@ -116,11 +147,15 @@ export function computeFinancials(
 ): Financials {
   const now = options.now ?? DEMO_NOW;
   const txns = options.transactions ?? raw.transactions;
+  // Seed (provider) records + user-authored records — the single merged view the
+  // engine sees. The provider reads stay seed-only, so nothing is double-counted.
+  const assets = [...raw.assets, ...(options.userAssets ?? [])];
+  const liabilities = [...raw.liabilities, ...(options.userLiabilities ?? [])];
   const period = monthPeriodFromKey(month);
   const prevPeriod = monthPeriodFromKey(prevMonthKey(month));
   const recurring = detectRecurring(txns);
   const cashflow = aggregateCashflow(txns, period);
-  const obligations = upcomingObligations(recurring, raw.liabilities, { now, horizonDays: 30 });
+  const obligations = upcomingObligations(recurring, liabilities, { now, horizonDays: 30 });
   const trend = networthTrend(raw.snapshots);
 
   // The end-of-month projection is only meaningful when the displayed month IS
@@ -146,11 +181,16 @@ export function computeFinancials(
   // Dev-only defence-in-depth: `Σ earmark === balance`. No-op in production.
   assertPartitionBalances(jarPartition);
 
+  // Net worth is composed once and reused for `health` (DRY) so the concentration
+  // indicator sees the exact same breakdown as the headline. Uses the merged
+  // seed + user records (user assets/liabilities are context state, red-team #3).
+  const networth = calculateNetWorth(assets, liabilities);
+
   return {
     monthKey: month,
     cashflow,
     prevCashflow: aggregateCashflow(txns, prevPeriod),
-    networth: calculateNetWorth(raw.assets, raw.liabilities),
+    networth,
     budgetLines: evaluateBudget(raw.budgets, txns, period, now),
     categorySpend: spendingByCategory(txns, period),
     recurring,
@@ -162,5 +202,7 @@ export function computeFinancials(
     networthSeries: trend.series,
     networthSeriesMeta: trend.meta,
     jarPartition,
+    health: financialHealth(cashflow, raw.accounts, networth),
+    goals: [...raw.goals, ...(options.userGoals ?? [])],
   };
 }
