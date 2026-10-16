@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
+import { putVoiceAssistantDraft } from "@/lib/voice-assistant-handoff";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -23,6 +24,7 @@ vi.mock("@/lib/batch-speech", () => ({
 }));
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   voice.cancel.mockClear();
   voice.stop.mockClear();
   vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
@@ -37,6 +39,15 @@ async function openWidget() {
 }
 
 describe("M-Your batch voice composer", () => {
+  it("consumes the center-mic transcript as an editable draft without sending it", async () => {
+    putVoiceAssistantDraft("Tôi đã chi bao nhiêu tháng này?");
+    await openWidget();
+
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toHaveValue("Tôi đã chi bao nhiêu tháng này?");
+    expect(window.sessionStorage.getItem("msb-pfm.voice-assistant-draft")).toBeNull();
+    expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
+  });
+
   it("shows waveform while recording, then inserts only final text for review before Send", async () => {
     await openWidget();
     const input = screen.getByPlaceholderText("Nhắn tin cho M-Your…");
