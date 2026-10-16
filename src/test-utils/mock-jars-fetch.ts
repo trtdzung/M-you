@@ -15,10 +15,11 @@
 import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import { fitsCasaCap } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
-import type { Account, Jar, JarConfig } from "@/domain/models";
+import type { Account, Jar, JarConfig, Transaction } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 import { PERSONA_LIST } from "@/providers/mock/personas";
-import { buildPersonaAccounts } from "@/providers/mock/fixtures/generate";
+import { buildPersonaAccounts, generateDataset } from "@/providers/mock/fixtures/generate";
+import { handleCorrectionsRequest, resetMockCorrections } from "./mock-corrections-fetch";
 
 /**
  * In-memory accounts per persona, mirroring the server's `accounts-store.ts`
@@ -74,6 +75,16 @@ function commit(next: JarConfig): JarConfig {
   return store;
 }
 
+/**
+ * The server's cap rule (every write door): 422 only when the write RAISES
+ * Σ budgetLimit (vs the stored config) AND the new Σ exceeds CASA — lowering,
+ * clearing or re-saving always passes, even on an already-over-cap config.
+ */
+function overCap(nextJars: Jar[], cif: string | null): Response | null {
+  const cap = fitsCasaCap(nextJars, casaFor(cif), {}, store.jars);
+  return cap.ok ? null : jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
+}
+
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();
@@ -92,17 +103,16 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
     if (method === "POST") {
       const jar = body?.jar as Jar;
       const created: Jar = { ...jar, id: uniqueJarId(store.jars, jar.id) };
-      return jsonResponse(
-        commit({ version: 3, jars: [...stripCategories(store.jars, created.categoryIds), created] }),
-        201,
-      );
+      const nextJars = [...stripCategories(store.jars, created.categoryIds), created];
+      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }), 201);
     }
     if (method === "PUT") {
-      return jsonResponse(commit({ version: 3, jars: (body?.jars as Jar[]) ?? [] }));
+      const nextJars = (body?.jars as Jar[]) ?? [];
+      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }));
     }
     if (method === "PATCH") {
-      // Batch "Chia ngay": apply each patch (undefined-clears via null), enforce
-      // Σ budgetLimit ≤ CASA (422), one write.
+      // Batch "Chia ngay": apply each patch (undefined-clears via null), reject
+      // (422) only a write that RAISES Σ budgetLimit above CASA, one write.
       const patches = (body?.patches ?? {}) as Record<string, Record<string, unknown>>;
       const byId = new Map(store.jars.map((j) => [j.id, j]));
       const merged = new Map<string, Jar>();
@@ -118,9 +128,7 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
         merged.set(jarId, next as unknown as Jar);
       }
       const nextJars = store.jars.map((j) => merged.get(j.id) ?? j);
-      const cap = fitsCasaCap(nextJars, casaFor(cif), {});
-      if (!cap.ok) return jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
-      return jsonResponse(commit({ version: 3, jars: nextJars }));
+      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }));
     }
     return jsonResponse({ error: "unhandled" }, 500);
   }
@@ -153,16 +161,35 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
       return next as unknown as Jar;
     });
     if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds as string[], id);
-    if (typeof patch.budgetLimit === "number") {
-      const cap = fitsCasaCap(jars, casaFor(cif), {});
-      if (!cap.ok) return jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
-    }
-    return jsonResponse(commit({ version: 3, jars }));
+    return overCap(jars, cif) ?? jsonResponse(commit({ version: 3, jars }));
   }
   if (method === "DELETE") {
     return jsonResponse(commit({ version: 3, jars: store.jars.filter((j) => j.id !== id) }));
   }
   return jsonResponse({ error: "unhandled" }, 500);
+}
+
+/**
+ * `GET /api/transactions`, mirroring the `server-only` `transactions-store.ts`:
+ * the persona's generated history (read-only, memoized — the generator is
+ * deterministic), bounded by inclusive `from`/`to`, newest first.
+ */
+const txnCache: Record<string, Transaction[]> = {};
+
+function handleTransactionsRequest(url: string, init?: RequestInit): Response {
+  const parsed = new URL(url, "http://localhost");
+  if ((init?.method ?? "GET").toUpperCase() !== "GET") return jsonResponse({ error: "unhandled" }, 500);
+  const cif = parsed.searchParams.get("cif");
+  if (!cif) return jsonResponse({ error: "cif is required" }, 422);
+  const persona = PERSONA_LIST.find((p) => p.cif === cif);
+  if (!persona) return jsonResponse([]);
+  txnCache[cif] ??= generateDataset(persona).transactions;
+  const from = parsed.searchParams.get("from");
+  const to = parsed.searchParams.get("to");
+  const rows = txnCache[cif]
+    .filter((t) => (!from || t.postedAt >= from) && (!to || t.postedAt <= to))
+    .sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
+  return jsonResponse(rows);
 }
 
 /**
@@ -208,12 +235,16 @@ export function installMockJarsApi(): void {
     const url = requestUrl(input);
     if (url.startsWith("/api/jars")) return handleJarsRequest(url, init);
     if (url.startsWith("/api/accounts")) return handleAccountsRequest(url, init);
+    if (url.startsWith("/api/transactions")) return Promise.resolve(handleTransactionsRequest(url, init));
+    const labels = handleCorrectionsRequest(url, init);
+    if (labels) return Promise.resolve(labels);
     return originalFetch!(input as RequestInfo, init);
   }) as typeof fetch;
 }
 
-/** Reset the in-memory jar set + accounts — call in `beforeEach`. */
+/** Reset the in-memory jar set, accounts and labels — call in `beforeEach`. */
 export function resetMockJarsApi(): void {
   store = freshConfig();
   accountsStore = {};
+  resetMockCorrections();
 }

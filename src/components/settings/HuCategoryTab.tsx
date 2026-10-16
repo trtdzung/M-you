@@ -11,15 +11,17 @@ import { cn } from "@/lib/cn";
 import { jarIcon } from "./jar-visuals";
 import { HuEditorSheet } from "./HuEditorSheet";
 import { CategoryManager } from "./CategoryManager";
+import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
  * Cài đặt → "Hũ & danh mục": danh sách hũ (icon/màu, tên, số danh mục, hạn mức
  * hoặc "chưa đặt"), thêm hũ, mở trình sửa; + lối vào Quản lý danh mục. Deep-link
  * `?hu=<id>` (từ nút "Đặt hạn mức" ở tab Ngân sách) tự mở đúng hũ. Cảnh báo ⚠ khi
- * hai hũ trùng tên (dedupe — chỉ cảnh báo, không tự gộp).
+ * hai hũ trùng tên (dedupe — chỉ cảnh báo, không tự gộp). Có trạng thái đang
+ * tải / lỗi tải (+ "Thử lại") — lỗi tải KHÔNG hiển thị như "chưa có hũ" (U10).
  */
 export function HuCategoryTab() {
-  const { config, addJar } = useJarConfig();
+  const { config, addJar, loaded, error, retry } = useJarConfig();
   const router = useRouter();
   const params = useSearchParams();
   const huParam = params?.get("hu");
@@ -43,12 +45,39 @@ export function HuCategoryTab() {
     // Minor-2: a new jar gets an EXPLICIT donor-waterfall role at creation
     // ("Tùy ý"/spending), never a silent engine fallback — the user refines it in
     // the editor's "Vai trò khi bù hũ" selector.
-    addJar({ id, label: "Hũ mới", categoryIds: [], role: "spending" });
     setEditing(id);
+    void addJar({ id, label: "Hũ mới", categoryIds: [], role: "spending" }).then((ok) => {
+      if (!ok) setEditing((cur) => (cur === id ? null : cur)); // reason shows in the notice
+    });
   }
+
+  if (error) {
+    return (
+      <div role="alert" className="flex flex-col items-center gap-3 rounded-row bg-surface p-5 text-center">
+        <p className="text-sm text-negative">{error}</p>
+        <button
+          type="button"
+          onClick={retry}
+          className="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
+  }
+  if (!loaded) {
+    return (
+      <p role="status" className="p-5 text-center text-sm text-muted">
+        Đang tải danh sách hũ…
+      </p>
+    );
+  }
+
+  const editorOpen = openJar != null && config.jars.some((j) => j.id === openJar);
 
   return (
     <div className="flex flex-col gap-5">
+      {!editorOpen && !managing && <JarMutationErrorNotice />}
       <SectionHeader
         title="Hũ & danh mục"
         action={

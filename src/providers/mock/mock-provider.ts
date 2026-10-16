@@ -23,6 +23,7 @@ import {
   type PersonaLocalStorageResource,
 } from "@/lib/persona-storage";
 import type { Providers, UserRecordsResult } from "../interfaces";
+import { jarApiError } from "../jar-api-error";
 import type { PersonaId } from "./personas";
 import type { Dataset } from "./fixtures/generate";
 
@@ -113,8 +114,19 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       return res.json();
     },
     async listTransactions(query?: TransactionQuery) {
-      const rows = query ? dataset.transactions.filter((t) => matches(t, query)) : dataset.transactions;
-      return clone(rows).sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
+      // Transaction history is DB-backed now (SQLite `transactions`, seeded from
+      // the same generator as the fixtures). The period bound is pushed to the
+      // server; the remaining filters apply here. A failed load THROWS rather than
+      // returning [] — an empty history would read as "no spending", a silent 0
+      // (invariant #6); callers surface their error state instead.
+      const params = new URLSearchParams({ cif });
+      if (query?.from) params.set("from", query.from);
+      if (query?.to) params.set("to", query.to);
+      const res = await fetch(`/api/transactions?${params.toString()}`);
+      if (!res.ok) throw new Error(`listTransactions failed: ${res.status}`);
+      const txns = (await res.json()) as Transaction[];
+      const rows = query ? txns.filter((t) => matches(t, query)) : txns;
+      return rows.sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
     },
     async listAssets() {
       return clone(dataset.assets); // SEED ONLY — user records never folded here (#3)
@@ -185,8 +197,10 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       return res.json();
     },
     async getJarConfig() {
+      // A failed load THROWS (U10): an empty `jars: []` would read as "no jars
+      // yet" and the UI would offer "Thêm hũ" instead of an error + retry.
       const res = await fetch(`/api/jars?cif=${encodeURIComponent(cif)}`);
-      if (!res.ok) return { version: 3, jars: [] };
+      if (!res.ok) throw await jarApiError("getJarConfig", res);
       return res.json();
     },
     async createJar(jar) {
@@ -195,7 +209,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cif, jar }),
       });
-      if (!res.ok) throw new Error(`createJar failed: ${res.status}`);
+      if (!res.ok) throw await jarApiError("createJar", res);
       return res.json();
     },
     async updateJar(id, patch) {
@@ -212,7 +226,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patch: wirePatch }),
       });
-      if (!res.ok) throw new Error(`updateJar failed: ${res.status}`);
+      if (!res.ok) throw await jarApiError("updateJar", res);
       return res.json();
     },
     async updateJars(patches) {
@@ -230,14 +244,14 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cif, patches: wirePatches }),
       });
-      if (!res.ok) throw new Error(`updateJars failed: ${res.status}`);
+      if (!res.ok) throw await jarApiError("updateJars", res);
       return res.json();
     },
     async removeJar(id) {
       const res = await fetch(`/api/jars/${encodeURIComponent(id)}?cif=${encodeURIComponent(cif)}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error(`removeJar failed: ${res.status}`);
+      if (!res.ok) throw await jarApiError("removeJar", res);
       return res.json();
     },
     async assignCategory(categoryId, jarId) {
@@ -246,7 +260,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId }),
       });
-      if (!res.ok) throw new Error(`assignCategory failed: ${res.status}`);
+      if (!res.ok) throw await jarApiError("assignCategory", res);
       return res.json();
     },
     async replaceJars(jars) {
@@ -255,14 +269,14 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cif, jars }),
       });
-      if (!res.ok) throw new Error(`replaceJars failed: ${res.status}`);
+      if (!res.ok) throw await jarApiError("replaceJars", res);
       return res.json();
     },
-    async applyAccountDebit(accountId, amount) {
+    async applyAccountDebit(accountId, amount, record) {
       const res = await fetch("/api/accounts/debit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cif, accountId, amount }),
+        body: JSON.stringify({ cif, accountId, amount, ...(record ? { txn: record } : {}) }),
       });
       if (!res.ok) throw new Error(`applyAccountDebit failed: ${res.status}`);
     },

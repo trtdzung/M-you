@@ -1,23 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { CATEGORY_BY_ID, type JarRole } from "@/domain/models";
-import { isDuplicateLabel, fitsCasaCap } from "@/domain/engine";
+import { isDuplicateLabel } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
-import { useCasaPool } from "@/state/use-casa-pool";
 import { Sheet } from "@/components/primitives";
-import { validateJarInput } from "@/domain/engine/jar-input";
 import { categoryColor, JAR_COLOR_OPTIONS, jarAccent } from "@/lib/category-colors";
-import { formatVnd } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { JAR_ICON_KEYS, jarIcon } from "./jar-visuals";
+import { HuLimitField } from "./HuLimitField";
+import { HuDeleteSection } from "./HuDeleteSection";
+import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
- * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức/tháng (để trống = chưa đặt,
- * KHÔNG ép 0 — invariant #6), màu, icon, danh mục trong hũ (chuyển sang hũ khác —
- * exactly-one), và xoá hũ (danh mục dời sang "Khác"). Mọi thay đổi ghi qua
- * `updateJar`/`assignCategory`/`removeJar` — state là nguồn sự thật.
+ * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức/tháng (`HuLimitField`), vai
+ * trò, màu, icon, danh mục trong hũ (chuyển sang hũ khác — exactly-one), và xoá
+ * hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig` — state (theo phản
+ * hồi server) là nguồn sự thật; lần ghi bị từ chối hiện ở `JarMutationErrorNotice`.
  */
 /**
  * Donor-waterfall roles (plan 260918-1120): the order auto-fund drains jars when
@@ -32,55 +31,30 @@ const ROLE_OPTIONS: { value: JarRole; label: string; hint: string }[] = [
 ];
 
 export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () => void }) {
-  const { config, updateJar, assignCategory, removeJar } = useJarConfig();
-  const casaPool = useCasaPool();
+  const { config, updateJar, assignCategory } = useJarConfig();
   const jar = config.jars.find((j) => j.id === jarId);
-  const [limitDraft, setLimitDraft] = useState(jar?.budgetLimit != null ? String(jar.budgetLimit) : "");
-  const [limitError, setLimitError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!jar) return null;
 
   const otherJars = config.jars.filter((j) => j.id !== jarId);
   const dup = isDuplicateLabel(jar.label, config.jars, jarId);
 
-  function commitLimit() {
-    const raw = limitDraft.trim();
-    if (raw === "") {
-      updateJar(jarId, { budgetLimit: undefined }); // chưa đặt (unknown, not 0)
-      setLimitError(null);
-      return;
-    }
-    const res = validateJarInput(raw);
-    if (!res.ok || res.value === null) {
-      setLimitError(res.error);
-      return;
-    }
-    const nextLimit = Math.round(res.value);
-    // Cap: Σ (các hũ khác) + hạn mức mới ≤ CASA. Server re-checks (422) — đây là UX.
-    const cap = fitsCasaCap(config.jars, casaPool, { [jarId]: nextLimit });
-    if (!cap.ok) {
-      setLimitError(
-        casaPool === "unknown"
-          ? "Chưa có số dư tài khoản để đặt hạn mức."
-          : `Vượt số dư ${formatVnd(cap.overBy ?? 0)}. Giảm hạn mức lại.`,
-      );
-      return;
-    }
-    setLimitError(null);
-    updateJar(jarId, { budgetLimit: nextLimit });
-  }
-
   return (
     <Sheet title="Sửa hũ" description={jar.label} onClose={onClose}>
       <div className="flex flex-col gap-5">
+        <JarMutationErrorNotice />
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">Tên hũ</span>
           <input
             defaultValue={jar.label}
             onBlur={(e) => {
-              const v = e.target.value.trim();
-              if (v && v !== jar.label) updateJar(jarId, { label: v });
+              const el = e.currentTarget;
+              const v = el.value.trim();
+              if (!v || v === jar.label) return;
+              // A refused rename snaps the field back to the stored name (U20).
+              void updateJar(jarId, { label: v }).then((ok) => {
+                if (!ok) el.value = jar.label;
+              });
             }}
             aria-label="Tên hũ"
             className="min-h-11 rounded-row border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
@@ -88,21 +62,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
           {dup && <span className="text-xs text-warning">⚠ Trùng tên với hũ khác</span>}
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-text">Hạn mức/tháng</span>
-          <input
-            inputMode="numeric"
-            value={limitDraft}
-            onChange={(e) => setLimitDraft(e.target.value)}
-            onBlur={commitLimit}
-            placeholder="Chưa đặt"
-            aria-label="Hạn mức mỗi tháng"
-            className="min-h-11 rounded-row border border-border bg-surface px-3 text-right text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-          />
-          <span className={cn("text-right text-xs", limitError ? "text-negative" : "text-muted")}>
-            {limitError ?? (limitDraft.trim() === "" ? "Để trống = chưa đặt hạn mức" : formatVnd(Number(limitDraft.replace(/[^\d]/g, ""))))}
-          </span>
-        </label>
+        <HuLimitField jar={jar} jars={config.jars} />
 
         <Field label="Vai trò khi bù hũ">
           <div className="grid grid-cols-2 gap-2">
@@ -197,35 +157,7 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
           )}
         </Field>
 
-        {confirmDelete ? (
-          <div className="flex flex-col gap-2 rounded-row border border-negative/40 bg-negative-soft/40 p-3">
-            <p className="text-sm text-text">Xoá hũ này? Danh mục trong hũ sẽ chuyển sang “Khác”.</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { removeJar(jarId); onClose(); }}
-                className="min-h-10 flex-1 rounded-full bg-negative px-3 text-sm font-semibold text-primary-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              >
-                Xoá hũ
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className="min-h-10 flex-1 rounded-full border border-border px-3 text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              >
-                Huỷ
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-full border border-negative/40 px-3 text-sm font-semibold text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-          >
-            <Trash2 size={15} aria-hidden /> Xoá hũ
-          </button>
-        )}
+        <HuDeleteSection jar={jar} jars={config.jars} onDeleted={onClose} />
       </div>
     </Sheet>
   );
