@@ -9,10 +9,11 @@ import { cn } from "@/lib/cn";
 const INPUT = "w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text";
 
 /**
- * Edit one jar: label, allocation mode (percent / fixed VND — override KEPT per
- * the user-locked decision), and its value. The value field is validated through
- * `validateJarInput` (M8) and an invalid entry is BLOCKED from committing, so a
- * NaN/negative can never reach the engine. Delete removes the jar.
+ * Edit one jar: label, allocation mode (% of the current balance / fixed VND),
+ * and its value. The value field is validated through `validateJarInput` (M8)
+ * and an invalid entry is BLOCKED from committing, so a NaN/negative can never
+ * reach the engine. The live meter reconciles the total against the balance and
+ * warns on over-allocation. Delete removes the jar.
  */
 export function JarEditor({
   jar,

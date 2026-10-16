@@ -5,9 +5,8 @@ import { cn } from "@/lib/cn";
 
 export const PFM_TABS = [
   { id: "overview", label: "Tổng quan" },
+  { id: "hu", label: "Hũ" },
   { id: "cashflow", label: "Dòng tiền" },
-  { id: "wealth", label: "Tài sản" },
-  { id: "insights", label: "Gợi ý" },
 ] as const;
 
 export type PfmTabId = (typeof PFM_TABS)[number]["id"];
@@ -60,7 +59,7 @@ export function PfmTabs({
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              "min-h-[38px] flex-1 rounded-full px-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+              "flex-1 rounded-full px-2 py-2 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 min-h-[44px]",
               selected ? "bg-surface text-primary-strong shadow-card" : "text-muted hover:text-text",
             )}
           >

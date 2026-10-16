@@ -1,33 +1,49 @@
 import { describe, expect, it } from "vitest";
-import { CATEGORIES, CATEGORY_BY_ID } from "@/domain/models";
-import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
+import { CATEGORY_BY_ID } from "@/domain/models";
+import {
+  configFromTemplate,
+  DEFAULT_JAR_CONFIG,
+  JAR_TEMPLATES,
+  JAR_TEMPLATE_LIST,
+} from "@/domain/models/jar-defaults";
 
-describe("DEFAULT_JAR_CONFIG seed", () => {
-  it("is a version-1, auto-income template", () => {
-    expect(DEFAULT_JAR_CONFIG.version).toBe(1);
-    expect(DEFAULT_JAR_CONFIG.incomeBasis).toBe("auto");
+const percentSum = (jars: { allocation: { mode: string; value: number } }[]) =>
+  jars.reduce((s, j) => s + (j.allocation.mode === "percent" ? j.allocation.value : 0), 0);
+
+describe("jar templates (Model A / v2)", () => {
+  it("ships exactly three templates: Cá nhân (6), Gia đình (4), Kinh doanh (3)", () => {
+    expect(JAR_TEMPLATE_LIST.map((t) => t.id)).toEqual(["caNhan", "giaDinh", "kinhDoanh"]);
+    expect(JAR_TEMPLATES.caNhan.jars).toHaveLength(6);
+    expect(JAR_TEMPLATES.giaDinh.jars).toHaveLength(4);
+    expect(JAR_TEMPLATES.kinhDoanh.jars).toHaveLength(3);
   });
 
-  it("percent allocations sum to 100", () => {
-    const sum = DEFAULT_JAR_CONFIG.jars.reduce(
-      (s, j) => s + (j.allocation.mode === "percent" ? j.allocation.value : 0),
-      0,
-    );
-    expect(sum).toBe(100);
+  it("every template's percents sum ≤ 100 (never starts over-allocated)", () => {
+    for (const t of JAR_TEMPLATE_LIST) {
+      expect(percentSum(t.jars)).toBeLessThanOrEqual(100);
+    }
   });
 
-  it("is spend-only — every mapped category is an expense category (AD1)", () => {
-    for (const jar of DEFAULT_JAR_CONFIG.jars) {
-      for (const id of jar.categoryIds) {
-        expect(CATEGORY_BY_ID[id]?.kind).toBe("expense");
+  it("no category appears in two jars within a template (one-category-one-jar)", () => {
+    for (const t of JAR_TEMPLATE_LIST) {
+      const mapped = t.jars.flatMap((j) => j.categoryIds);
+      expect(new Set(mapped).size).toBe(mapped.length);
+    }
+  });
+
+  it("maps only real expense categories", () => {
+    for (const t of JAR_TEMPLATE_LIST) {
+      for (const jar of t.jars) {
+        for (const id of jar.categoryIds) {
+          expect(CATEGORY_BY_ID[id]?.kind).toBe("expense");
+        }
       }
     }
   });
 
-  it("covers all expense categories exactly once (no duplicates, no gaps — AD6)", () => {
-    const mapped = DEFAULT_JAR_CONFIG.jars.flatMap((j) => j.categoryIds);
-    const expenseIds = CATEGORIES.filter((c) => c.kind === "expense").map((c) => c.id);
-    expect(new Set(mapped).size).toBe(mapped.length); // a category is in ≤ 1 jar
-    expect([...mapped].sort()).toEqual([...expenseIds].sort()); // and every one is covered
+  it("DEFAULT_JAR_CONFIG is v2 Cá nhân, with no legacy fields", () => {
+    expect(DEFAULT_JAR_CONFIG.version).toBe(2);
+    expect(DEFAULT_JAR_CONFIG).toEqual(configFromTemplate(JAR_TEMPLATES.caNhan));
+    expect("incomeBasis" in DEFAULT_JAR_CONFIG).toBe(false);
   });
 });

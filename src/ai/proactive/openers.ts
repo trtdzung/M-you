@@ -14,6 +14,23 @@ export interface AssistantOpener {
   sources: string[];
 }
 
+/**
+ * DEFERRED (3-tab reformat): these seeds were surfaced by the retired Trợ lý tab
+ * (PFM-070). Their only consumer, `SuggestedPrompts.tsx`, is unmounted — the live
+ * `/assistant` empty-state uses `Composer`'s starters instead (red-team #4). Kept
+ * for reference alongside that component; re-wire or delete both in a cleanup
+ * pass (tracked in plans/project-backlog.md). NOT proactive autonomy (the single
+ * proactive opener stays bounded to `buildOpener`); each still aligns with a real
+ * `classifyIntent` capability.
+ */
+export const SUGGESTED_PROMPTS: readonly string[] = [
+  "Tháng này tiền của tôi đi đâu?",
+  "Danh mục nào tôi chi nhiều nhất?",
+  "Bao giờ tôi đạt được mục tiêu tiết kiệm?",
+  "Giá trị ròng của tôi hiện tại là bao nhiêu?",
+  "Sắp tới tôi có khoản nào đến hạn?",
+];
+
 /** Turn one insight into an opener bubble (grounded by the detector's facts). */
 export function openerFromInsight(insight: Insight): AssistantOpener {
   return {

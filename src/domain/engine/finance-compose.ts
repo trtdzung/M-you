@@ -11,7 +11,6 @@ import type {
   Account,
   Asset,
   Budget,
-  DataSource,
   Goal,
   JarConfig,
   Liability,
@@ -21,16 +20,18 @@ import type {
 } from "@/domain/models";
 import {
   aggregateCashflow,
+  assertPartitionBalances,
   calculateNetWorth,
   cashRunwayMonths,
   dateToMonthKey,
   detectRecurring,
   estimateEndOfMonth,
   evaluateBudget,
-  evaluateJars,
+  evaluateJarPartition,
+  financialHealth,
   monthPeriodFromKey,
   networthTrend,
-  resolveIncomeBasis,
+  resolvePrimaryAccount,
   spendingByCategory,
   upcomingObligations,
   type BudgetLine,
@@ -38,7 +39,8 @@ import {
   type CashRunway,
   type CategorySpend,
   type EndOfMonthEstimate,
-  type JarLine,
+  type FinancialHealth,
+  type JarPartitionResult,
   type NetWorthResult,
   type NetWorthTrendMeta,
   type Obligation,
@@ -81,10 +83,25 @@ export interface Financials {
   networthSeries: number[];
   /** Lowest-trust provenance over the exact snapshots feeding the series (H2). */
   networthSeriesMeta: NetWorthTrendMeta;
-  /** Spending-jar lines (empty when no jar config supplied). */
-  jarLines: JarLine[];
-  /** Income basis feeding percent-mode jars — unknown until salary/override. */
-  jarIncomeBasis: { value: number | "unknown"; source: DataSource };
+  /**
+   * Snapshot partition of the current primary-account balance (Model A):
+   * explicit jar earmarks + a "Chưa phân bổ" residual, `Σ ≡ balance`. Status is
+   * "unknown" when the primary account is ambiguous (0 or 2+ current accounts).
+   */
+  jarPartition: JarPartitionResult;
+  /**
+   * Financial-health indicators (runway, surplus, essential coverage, asset
+   * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
+   * (DRY) — no screen recomputes health locally. Missing inputs stay `null`.
+   */
+  health: FinancialHealth;
+  /**
+   * Seed (provider) goals + user-authored goals — the single merged goal view
+   * (Phase 05). Kế hoạch (goal list, surplus what-if) reads THIS so a create/
+   * edit/delete recomputes live and nothing is double-counted (the provider's
+   * `listGoals()` stays seed-only, red-team #2/#3).
+   */
+  goals: Goal[];
 }
 
 export interface ComposeOptions {
@@ -101,6 +118,22 @@ export interface ComposeOptions {
    * compose stays pure and testable (config is user state, not provider data).
    */
   jarConfig?: JarConfig;
+  /**
+   * User-authored assets/liabilities (Phase 03), threaded like `jarConfig` — they
+   * are context state merged with the seed here, NOT folded into the provider's
+   * `listAssets()`/`listLiabilities()` (which stay seed-only). This is the single
+   * source of truth for user records; keeping them separate avoids double-counting
+   * net worth (red-team #3) and lets a mutation recompute live (red-team #2).
+   */
+  userAssets?: Asset[];
+  userLiabilities?: Liability[];
+  /**
+   * User-authored goals (Phase 05), threaded like `userAssets` — context state
+   * merged with the seed goals here, NOT folded into the provider's `listGoals()`
+   * (which stays seed-only). Single source of truth; a mutation recomputes live
+   * (red-team #2) with no double-count (red-team #3).
+   */
+  userGoals?: Goal[];
 }
 
 /**
@@ -114,11 +147,15 @@ export function computeFinancials(
 ): Financials {
   const now = options.now ?? DEMO_NOW;
   const txns = options.transactions ?? raw.transactions;
+  // Seed (provider) records + user-authored records — the single merged view the
+  // engine sees. The provider reads stay seed-only, so nothing is double-counted.
+  const assets = [...raw.assets, ...(options.userAssets ?? [])];
+  const liabilities = [...raw.liabilities, ...(options.userLiabilities ?? [])];
   const period = monthPeriodFromKey(month);
   const prevPeriod = monthPeriodFromKey(prevMonthKey(month));
   const recurring = detectRecurring(txns);
   const cashflow = aggregateCashflow(txns, period);
-  const obligations = upcomingObligations(recurring, raw.liabilities, { now, horizonDays: 30 });
+  const obligations = upcomingObligations(recurring, liabilities, { now, horizonDays: 30 });
   const trend = networthTrend(raw.snapshots);
 
   // The end-of-month projection is only meaningful when the displayed month IS
@@ -131,17 +168,29 @@ export function computeFinancials(
     ? estimateEndOfMonth(raw.accounts, cashflow, recurring, obligations, now)
     : { value: "unknown", meta: { source: "estimated", freshness: cashflow.meta.freshness } };
 
-  const jarConfig: JarConfig = options.jarConfig ?? { version: 1, jars: [], incomeBasis: "auto" };
-  // Resolve income from the same (correction-applied) txns `recurring` was
-  // detected from — not `raw.transactions` — so salary provenance stays in sync.
-  const jarIncome = resolveIncomeBasis(jarConfig, { transactions: txns }, recurring);
-  const jarLines = evaluateJars(jarConfig, txns, period, now, jarIncome);
+  const jarConfig: JarConfig = options.jarConfig ?? { version: 2, jars: [] };
+  // Partition the CURRENT balance (Model A): earmarks resolve against the primary
+  // account, the per-jar "đã tiêu" overlay uses the selected + previous period.
+  const jarPartition = evaluateJarPartition(
+    jarConfig,
+    resolvePrimaryAccount(raw.accounts),
+    txns,
+    period,
+    prevPeriod,
+  );
+  // Dev-only defence-in-depth: `Σ earmark === balance`. No-op in production.
+  assertPartitionBalances(jarPartition);
+
+  // Net worth is composed once and reused for `health` (DRY) so the concentration
+  // indicator sees the exact same breakdown as the headline. Uses the merged
+  // seed + user records (user assets/liabilities are context state, red-team #3).
+  const networth = calculateNetWorth(assets, liabilities);
 
   return {
     monthKey: month,
     cashflow,
     prevCashflow: aggregateCashflow(txns, prevPeriod),
-    networth: calculateNetWorth(raw.assets, raw.liabilities),
+    networth,
     budgetLines: evaluateBudget(raw.budgets, txns, period, now),
     categorySpend: spendingByCategory(txns, period),
     recurring,
@@ -152,7 +201,8 @@ export function computeFinancials(
     networthPrevious: trend.previous,
     networthSeries: trend.series,
     networthSeriesMeta: trend.meta,
-    jarLines,
-    jarIncomeBasis: { value: jarIncome.value, source: jarIncome.source },
+    jarPartition,
+    health: financialHealth(cashflow, raw.accounts, networth),
+    goals: [...raw.goals, ...(options.userGoals ?? [])],
   };
 }

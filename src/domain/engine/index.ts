@@ -6,6 +6,7 @@
 export * from "./types";
 export * from "./cashflow";
 export * from "./category";
+export * from "./category-jars";
 export * from "./pressure";
 export * from "./budget";
 export * from "./jars";

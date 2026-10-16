@@ -1,3 +1,7 @@
+// DEFERRED: the Cố định/Linh hoạt split was dropped when the Giao dịch dock was
+// retired in the 3-tab reformat (red-team #2). Engine fields (`cashflow.fixed`/
+// `.discretionary`) are kept; this view is re-mountable later. See
+// plans/260909-2254-pfm-3tab-reformat/ and plans/project-backlog.md.
 import { Money } from "@/components/primitives";
 
 /** Split of expense into fixed (recurring) vs discretionary. */

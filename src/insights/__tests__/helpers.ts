@@ -1,6 +1,12 @@
 /** Build Financials fixtures for insight tests. */
 
-import type { CashflowResult, NetWorthResult } from "@/domain/engine";
+import type {
+  CashflowResult,
+  FinancialHealth,
+  HealthIndicator,
+  JarPartitionResult,
+  NetWorthResult,
+} from "@/domain/engine";
 import type { Financials } from "@/state/useFinancials";
 
 const META = {
@@ -28,6 +34,30 @@ const NETWORTH: NetWorthResult = {
   meta: { ...META, period: { from: "", to: "", label: "Hiện tại" } },
 };
 
+const EMPTY_PARTITION: JarPartitionResult = {
+  status: "ok",
+  primaryBalance: 0,
+  lines: [],
+  total: 0,
+  meta: { source: "mock", freshness: null },
+};
+
+/** All-null health indicator — the safe default when a fixture omits inputs. */
+const NULL_INDICATOR: HealthIndicator = {
+  value: null,
+  band: null,
+  source: "estimated",
+  freshness: null,
+  hasUnknown: false,
+};
+
+const EMPTY_HEALTH: FinancialHealth = {
+  runwayMonths: NULL_INDICATOR,
+  surplus: NULL_INDICATOR,
+  essentialCoverage: NULL_INDICATOR,
+  concentration: NULL_INDICATOR,
+};
+
 export function makeFinancials(over: Partial<Financials> = {}): Financials {
   return {
     monthKey: over.monthKey ?? "2026-06",
@@ -44,7 +74,8 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     networthPrevious: over.networthPrevious ?? null,
     networthSeries: over.networthSeries ?? [],
     networthSeriesMeta: over.networthSeriesMeta ?? { source: null, count: 0, freshness: null },
-    jarLines: over.jarLines ?? [],
-    jarIncomeBasis: over.jarIncomeBasis ?? { value: "unknown", source: "estimated" },
+    jarPartition: over.jarPartition ?? EMPTY_PARTITION,
+    health: over.health ?? EMPTY_HEALTH,
+    goals: over.goals ?? [],
   };
 }

@@ -1,3 +1,6 @@
+// DEFERRED: unmounted in the 3-tab reformat — the financial-health UI is off the
+// tab bar; engine (`financialHealth`) + tests kept, UI re-enabled later. See
+// plans/260909-2254-pfm-3tab-reformat/ and plans/project-backlog.md.
 import type { FinancialHealth, HealthIndicator } from "@/domain/engine";
 import { SourceBadge } from "@/components/primitives";
 import { StatTile } from "@/components/pfm/cockpit/StatTile";

@@ -4,16 +4,27 @@
  * surplus into savings goals. Read-only simulation — it never moves money, never
  * prepares a draft, and never mutates a goal.
  *
- * Surplus formula (Red Team M12 — concretely defined, not "TBD"):
- *   surplus = income === "unknown" ? "unknown" : max(0, income − expense)
- * where `income` is the SAME resolved monthly basis the jars use
- * (`jarIncomeBasis`) and `expense` is posted, transfer-excluded spend. An unknown
- * income yields an UNKNOWN surplus, never 0 (Security-F6, invariant #6).
+ * Surplus source (Model A — red-team #1 Crit): the "Chưa phân bổ" RESIDUAL from
+ * the balance partition is already a stock — the balance left after every jar
+ * earmark — so the surplus IS that residual, floored at 0. It must NOT subtract
+ * the month's expense again (the residual is not income; expense never fed it):
+ * doing so double-counts. An unknown balance yields an UNKNOWN surplus, never 0
+ * (Security-F6, invariant #6). This stays a read-only what-if — no money moves.
  */
 
 import type { DataSource, Goal } from "@/domain/models";
 
 export type SurplusValue = number | "unknown";
+
+/**
+ * Surplus = the balance residual, as a STOCK. Unknown balance → unknown surplus;
+ * a negative residual (over-allocated) floors to 0. No expense subtraction here —
+ * the residual is already net of every earmark (red-team #1).
+ */
+export function surplusFromResidual(residual: number | "unknown"): SurplusValue {
+  if (residual === "unknown") return "unknown";
+  return Math.max(0, residual);
+}
 
 export interface SurplusTarget {
   goalId: string;
@@ -37,12 +48,6 @@ export interface SurplusPlan {
   remaining: SurplusValue;
   targets: SurplusTarget[];
   meta: { source: DataSource };
-}
-
-/** Monthly surplus. Income unknown → surplus unknown, NEVER 0 (Security-F6). */
-export function computeSurplus(income: SurplusValue, expense: number): SurplusValue {
-  if (income === "unknown") return "unknown";
-  return Math.max(0, income - expense);
 }
 
 export interface SurplusSimInput {

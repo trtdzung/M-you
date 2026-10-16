@@ -81,13 +81,18 @@ Typical needs:
 
 ### Hũ chi tiêu (spending jars) — implemented
 
-A jar-based budgeting layer that sits alongside the existing per-category Budget, not instead of it — two altitudes on the same spend: category limits (Budget) and jar buckets (Hũ chi tiêu). Fully deterministic, no AI in the calculation path.
+Hũ is **the single budgeting concept in the product** — there is no separate "Ngân sách" feature surfaced beside it (the earlier per-category Budget still exists in code but is dormant, not shown to the user). A jar earmarks a **share of the current primary-account balance** — a display-only snapshot partition, not a monthly spending envelope. Fully deterministic, no AI in the calculation path.
 
-- **2-layer model.** Named jars group one or more expense categories; each expense category belongs to at most one jar. Spend not assigned to any jar is never dropped — it rolls up into an implicit, neutral **"Chưa phân hũ"** (unassigned) bucket.
-- **Allocation per jar** is either a percentage of monthly income (default) or a fixed VND cap (override).
-- **Income basis** resolves in priority order: detected recurring salary → manual override → unknown. An unknown income basis **never** shows a false-healthy green jar — percent-mode jars show a neutral "chưa xác định thu nhập" state instead, so a jar is never falsely reported as "ok".
-- **Level 1:** jar pressure is tracked in a "Hũ chi tiêu" section on the Cashflow tab, plus a dedicated **jar-pressure insight** (e.g. "Hũ Giải trí đã dùng 82%, còn 12 ngày"), which only fires against the current month and skips jars with an unresolved income basis. Setup (create/edit/delete jars, assign categories, edit allocations, see a live total-allocation meter) lives on its own route, `/pfm/jars`, reachable from the Cashflow tab — kept off the main PFM tab bar so it stays at four tabs.
-- **Level 3:** a deterministic "phân bổ thặng dư" (surplus allocation) what-if lets the user simulate distributing the month's surplus across savings goals. It is a **read-only simulation** — no money movement, no transfer draft, no goal mutation. If income is unknown, surplus is reported as **"unknown", never 0₫**.
+- **Snapshot partition, not an envelope.** Each jar carries a `percent` (share of the primary account's current balance) or a fixed `amount` (VND). There is no income basis, no monthly anchor, no clock, no sub-account, and no jar balance — a jar never holds or moves money; it only labels a slice of the one real balance.
+- **Exact by construction.** `Σ(every jar earmark) + "Chưa phân bổ" ≡ số dư tài khoản chính`, always. "Chưa phân bổ" is the residual (`số dư − Σ earmarks`) and absorbs the whole-VND rounding remainder, so the identity holds exactly rather than approximately.
+- **Primary account.** The partition is drawn against the single `type: "current"` account. With zero or two-or-more current accounts, the balance to partition is genuinely **unknown** — the UI shows an explicit unknown state, never a fabricated split and never a silent 0.
+- **Two numbers per jar.** Each jar shows **chia** (its earmark, fixed) and **đã tiêu kỳ này** (an informational overlay: net expense over the jar's categories for the selected month, plus a month-over-month delta). The overlay follows the same spend rules as cash flow (internal transfers excluded, refunds reversed, reversed dropped, pending kept separate) and never changes the earmark or the Σ≡balance identity.
+- **Chia doubles as the monthly budget line.** `đã tiêu > chia` is a non-blocking "Vượt ngân sách" warning — this is the product's only budgeting signal. Over-allocation (`Σ chia > số dư`, i.e. a negative residual) is also a non-blocking warning, never a hard error.
+- **Level 1:** jars render on the top-level **Hũ** tab (promoted out of the old Dòng tiền sub-hub), plus a jar-budget insight that flags an over-allocated residual or the most-breached jar; it only fires against the current month. Setup — pick one of three templates (Cá nhân: 6 hũ, default; Gia đình: 4 hũ; Kinh doanh: 3 hũ, each summing to ≤100% so applying one never starts over-allocated), then create/edit/delete jars, assign categories, and edit earmarks with a live balance-reconciliation meter — opens as an "Điều chỉnh hũ" modal from the Hũ tab (the old dedicated `/pfm/jars` route now redirects there). Applying a template replaces the current jar set (with a confirm step).
+- **Trust line:** "Hũ chỉ để bạn nhìn tiền rõ hơn — tiền vẫn nằm nguyên trong tài khoản của bạn."
+- **Level 3:** the deterministic "phân bổ thặng dư" (surplus allocation) what-if sources its number from the **"Chưa phân bổ" residual** (a stock, floored at 0), not `income − expense`. It is a **read-only simulation** — no money movement, no transfer draft, no goal mutation. An unknown primary balance yields **"unknown" surplus, never 0₫**. The surplus what-if UI (`SurplusPanel`) is currently unmounted along with the rest of the Kế hoạch tab (see "Information architecture" below); the engine call remains intact.
+
+This is Model A (snapshot partition), which **supersedes** the earlier monthly spending-envelope design (allocation as % of income, "used" = period spend vs allocation, income-basis resolution) explored in `plans/260908-1311-spending-jars` — that design was not shipped.
 
 ### Basic net worth
 
@@ -102,7 +107,7 @@ Level 1 includes MSB-held cash and known liabilities. External assets are deferr
 Examples:
 
 - “Chi tiêu ăn uống tăng 24% so với tháng trước.”
-- “Bạn còn 12 ngày nhưng đã dùng 82% ngân sách giải trí.”
+- “Hũ Giải trí đã tiêu vượt phần chia tháng này.”
 - “Khoản thanh toán thẻ lớn nhất sẽ đến sau 5 ngày.”
 - “Có một khoản chi lặp lại mới xuất hiện trong 3 tháng gần đây.”
 
@@ -124,6 +129,8 @@ Support MSB-held and manually declared assets:
 
 Each external or manual asset has `lastUpdatedAt`, `source`, `isEstimated`, and an optional note. The UI must not present a manually entered value as a bank-verified balance.
 
+**Manual manager (implemented, `/pfm/wealth`):** users add, edit, and delete self-reported assets/liabilities directly; every user record carries `source: "self_reported"` and a per-row freshness/provenance chip, and a blank valuation renders as unknown, never `0₫`. Seed (mock) records stay read-only and shown separately.
+
 ### Liabilities
 
 - Credit card balance.
@@ -132,7 +139,7 @@ Each external or manual asset has `lastUpdatedAt`, `source`, `isEstimated`, and 
 - Instalment plan.
 - Other manually declared debt.
 
-Show principal, interest rate when known, minimum payment, due date, and remaining term. Missing fields are shown as unknown rather than guessed.
+Show principal, interest rate when known, minimum payment, due date, and remaining term. Missing fields are shown as unknown rather than guessed. Manual create/edit/delete is implemented in the same `/pfm/wealth` manager as Assets above.
 
 ### Goals
 
@@ -147,7 +154,9 @@ Initial goal templates:
 
 Each goal has target amount, target date, current amount, monthly contribution, priority, and funding source.
 
-### Financial health indicators
+**Manual manager (engine + components implemented; UI currently unmounted):** users create, edit, and delete goals (name, target amount, target date, optional monthly contribution); each goal supports a direct-tap what-if projection (live contribution slider) that returns the identical result as the chat assistant's `simulateGoal` tool. This lived on the **Kế hoạch** tab, which was removed from the `/pfm` tab bar in the 3-tab reformat (`plans/260909-2254-pfm-3tab-reformat/`) — the CRUD logic, `GoalProvider`, and `simulateGoal` parity test are all intact and unaffected; only the tab mount point is gone (`// DEFERRED:` banner on `PlanTab`), pending re-mounting.
+
+### Financial health indicators — engine implemented; Kế hoạch tab UI deferred
 
 Use several explainable indicators instead of one authoritative score:
 
@@ -157,6 +166,8 @@ Use several explainable indicators instead of one authoritative score:
 - Debt-to-income ratio.
 - Emergency-fund progress.
 - Concentration of assets and liabilities.
+
+Each indicator is `null` (rendered as `—`) rather than defaulted to zero when its inputs are missing. The `HealthPanel` UI lived on the Kế hoạch tab, removed from the `/pfm` tab bar in the 3-tab reformat (`plans/260909-2254-pfm-3tab-reformat/`); `Financials.health` composition is unaffected and unchanged.
 
 ## Level 3: Guided decisions
 
@@ -231,17 +242,25 @@ PFM entry
 
 ## Information architecture (implemented)
 
-The prototype ships a **3-tab MSB banking layout**, matching the real MSB app rather than a generic 5-tab PFM layout. The IA refactor is complete:
+The prototype ships a **3-tab MSB banking layout**, matching the real MSB app rather than a generic 5-tab PFM layout. Inside the PFM tab, the IA was first organized around MSB's four product-thesis questions across 4 tabs (`plans/260909-1519-pfm-benchmark-ia-redesign/`), then reformatted to a **3-tab spine** (`plans/260909-2254-pfm-3tab-reformat/`):
 
 | Tab | Route(s) | Purpose |
 |---|---|---|
 | **Trang chủ** (Home) | `/` | MSB-style home: hero header, primary account card, quick actions, promos/insights. Not a PFM dashboard. |
 | **Tài khoản** (Accounts) | `/accounts`, `/accounts/[id]`, `/transactions` | Account list → account detail (with per-account transactions) → all-transactions view. |
-| **PFM** | `/pfm` (single route, client-side tabs via `?tab=`) | One screen with 4 tabs — **Tổng quan** (Overview cockpit), **Dòng tiền** (Cashflow), **Tài sản** (Wealth), **Gợi ý** (Insights) — switched client-side with no navigation or refetch. |
+| **PFM** | `/pfm` (single route, client-side tabs via `?tab=`) | One screen with 3 tabs — **Tổng quan** ("Bao nhiêu tiền?"), **Hũ** (balance-lens jar partition), **Dòng tiền** (category-chart view of "Tiền đi đâu?") — switched client-side with no navigation or refetch. |
 
-A floating **Assistant FAB** (sparkle icon) sits above the tab bar on every screen and links to `/assistant`; it hides itself on the assistant screen. **Settings** (`/settings`) is not a tab — it holds consent scope + revoke, the demo persona switcher, and About, and is reachable in at most two taps (tap the account tier row on the account card, or navigate directly to `/settings`).
+**Hũ** was promoted from a Dòng tiền dock to a top-level tab: the jar list/reconciliation meter with its own `PeriodPicker`, plus an "Điều chỉnh hũ" modal for setup/templates/editing.
 
-Legacy routes `/cashflow`, `/wealth`, `/pfm/cashflow`, `/pfm/wealth`, and `/pfm/insights` still exist as thin redirects to the matching `/pfm?tab=X` deep link, so old links and bookmarks keep working.
+**Dòng tiền** is now a **pure category-chart view** (the former 3-dock sub-hub — Giao dịch / Hũ / Báo cáo — is retired): a donut + category bar list filtered by jar chips, a relocated 6-month cashflow trend chart, and a "Xem báo cáo tháng" CTA that opens the advisory brief in a sheet. Tapping a category row drills to `/transactions?category=<id>`; the transaction feed itself lives at `/transactions`, not inside `/pfm`.
+
+**Tài sản & Nợ** is not a tab — it is a manual asset/liability manager at `/pfm/wealth`, drilled into from a `NetWorthSummary` tile on Tổng quan (one tap) or the `open-wealth` copilot intent.
+
+**Kế hoạch** and **Trợ lý** were removed from the `/pfm` tab bar in the 3-tab reformat. This is a **UI-unmount only**: the deterministic engine behind them (goal CRUD/composition, `simulateGoal`, `financialHealth`, `simulateSurplusAllocation`), the AI facade, and every related test remain intact — only the tab mount points (`PlanTab`, `AssistantTab`) were dropped from `PfmTabHost`, and both components now carry a `// DEFERRED:` banner documenting the intent to re-mount them later (see `plans/project-backlog.md` for the deferred inventory).
+
+A floating **Assistant FAB** (sparkle icon) sits above the tab bar on every screen and links to `/assistant`; it hides itself on the assistant screen. The assistant chat's empty state (no messages yet) surfaces the rule-based insights feed (`InsightsView`) inline — this is now the feed's home, replacing the retired Trợ lý tab. The FAB, suggested prompts, and every advisory "nên làm gì" CTA all route through the same deterministic whitelist (`resolveIntentRoute`, `src/lib/copilot-nav.ts`) as tappable links — never an auto-navigation. **Settings** (`/settings`) is not a tab — it holds consent scope + revoke, the demo persona switcher, and About, and is reachable in at most two taps (tap the account tier row on the account card, or navigate directly to `/settings`).
+
+Legacy routes `/cashflow`, `/wealth`, `/pfm/cashflow`, `/pfm/jars`, and `/pfm/insights` still exist as thin redirects (`/wealth` → `/pfm?tab=overview`, `/pfm/jars` → `/pfm?tab=hu`, `/pfm/insights` → `/assistant`), and a stale `?tab=wealth`, `?tab=plan`, `?tab=assistant`, or `?tab=insights` query falls back to `overview`; a stale `?tab=cashflow&dock=hu` deep link normalizes to `?tab=hu`. So old links and bookmarks keep working. `/pfm/wealth` is no longer a redirect — it is the real Tài sản & Nợ manager.
 
 ### Masked account number (implemented)
 
@@ -251,14 +270,20 @@ The primary account card on Home shows a display-safe, masked account number (e.
 
 1. **Home (Trang chủ):** hero header, primary account card (masked number, hide/show balance, tier as marketing metadata only), quick-action grid, promo carousel with a top insight surfaced inline. Obligations are not shown here — they live on the PFM Overview cockpit.
 2. **Tài khoản (Accounts):** account list → account detail with a scoped transaction list; a shared "all transactions" entry point.
-3. **PFM (`/pfm`):** single route, 4 client-side tabs.
-   - **Tổng quan (Overview):** a no-scroll "4-Question Cockpit" — hero net worth (with delta badge and sparkle trend), a 2×2 KPI grid (Dòng tiền tháng, Cuối tháng estimate, Sắp phải trả, Sức khỏe/runway), the single top-severity insight, and a worst-case provenance footer (lowest-trust source + oldest freshness across every tile). Always the current month — there is no PeriodPicker on this tab, by design (the end-of-month projection is only valid when "now" is inside the displayed month).
-   - **Dòng tiền (Cashflow):** trend-primary view with a multi-month income/expense/net chart (gaps for months with no data, never a misleading 0đ bar), fixed-vs-discretionary breakdown, and category trend; keeps the shared PeriodPicker.
-   - **Tài sản (Wealth):** assets, liabilities, allocation, balance-sheet trend, and a 2×2 financial-health panel (runway, surplus, essential-expense coverage, asset concentration); keeps the shared PeriodPicker.
-   - **Gợi ý (Insights):** insight list with severity filters (info / attention / urgent).
-4. **Goals:** progress, required monthly contribution, and scenarios.
+3. **PFM (`/pfm`):** single route, 3 client-side tabs (`plans/260909-2254-pfm-3tab-reformat/`).
+   - **Tổng quan:** a no-scroll "4-Question Cockpit" — hero net worth (with delta badge and sparkle trend), a 2×2 KPI grid (Dòng tiền tháng, Cuối tháng estimate, Sắp phải trả, Sức khỏe/runway), the single top-severity insight, a `NetWorthSummary` drill tile (one tap → `/pfm/wealth`), and a worst-case provenance footer (lowest-trust source + oldest freshness across every tile). Always the current month — there is no PeriodPicker on this tab, by design (the end-of-month projection is only valid when "now" is inside the displayed month).
+   - **Hũ:** the jar partition — see "Hũ chi tiêu" below — with its own `PeriodPicker` driving the "đã tiêu kỳ này" overlay, and an "Điều chỉnh hũ" modal for setup/templates/editing.
+   - **Dòng tiền:** a pure category-chart view — `PeriodPicker`, jar filter chips, a donut + category bar list (each row a `DeltaBadge` vs. last month, tap-through to `/transactions?category=<id>`), a relocated 6-month cashflow trend chart, and a "Xem báo cáo tháng" CTA that opens the monthly advisory brief (see below) in a bottom sheet. The transaction feed itself lives at `/transactions`, not on this tab.
+   - **Kế hoạch and Trợ lý tabs (removed from the tab bar):** Mục tiêu CRUD + per-goal what-if, the surplus what-if panel, and the 2×2 financial-health panel (formerly Kế hoạch), and the copilot entry + suggested prompts + insights feed (formerly Trợ lý) are no longer mounted anywhere in `/pfm`. The underlying engine, providers, and tests are untouched; the components (`PlanTab`, `AssistantTab`) carry `// DEFERRED:` banners. The insights feed now surfaces inside the `/assistant` chat's empty state instead.
+4. **Tài sản & Nợ (`/pfm/wealth`):** a manual manager — add/edit/delete self-reported assets and liabilities, net-worth strip, read-only seed section, provenance + freshness per row. Drilled into from Tổng quan or the `open-wealth` copilot intent; not a tab.
 5. **Settings:** consent scope view + revoke, demo persona switcher, About — reachable from the account card, not a tab.
 6. **AI Assistant:** free-text streaming chat grounded on live financial data — explain-this-month, spending/obligations/net-worth questions, goal and debt what-if simulations, source-chip provenance per answer. Assisted transfer drafting (draft → review → hand off to MSB confirm + OTP) is implemented, feature-gated by `ENABLE_TRANSFER_DRAFTING`; transfer requests fall back to a plain refusal when the flag is off.
+
+### Báo cáo tư vấn (monthly advisory brief) — implemented, deterministic
+
+A rule-based monthly brief, opened from a "Xem báo cáo tháng" CTA on the Dòng tiền tab (a bottom sheet, `ReportBriefSheet`; the former dedicated Báo cáo dock is retired along with the rest of the sub-hub): positives, risks, and behavioral highlights drawn from the existing insight detectors and cashflow facts, each with evidence, a magnitude band, and templated "nghĩa là gì" (what it means) / "nên làm gì" (what to do) Vietnamese copy. Every "nên làm gì" is a tappable deep-link CTA through the same whitelisted `resolveIntentRoute` used by the copilot FAB. Insufficient-data months show an honest empty state instead of a fabricated brief; data-rich but otherwise quiet months still surface at least one grounded action.
+
+**This brief is fully deterministic/templated — there is no LLM in this pipeline.** LLM narration of the brief was scoped for this redesign but deliberately deferred (prompt-injection, timeout, and pipeline-shape risk were judged not worth taking before the new IA is validated with users); see `EPIC-07`/`PFM-062` in `plans/project-backlog.md`.
 
 ## AI product contract
 

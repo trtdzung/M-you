@@ -29,7 +29,7 @@ export function TxnFilters({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+      <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 focus-within:ring-2 focus-within:ring-primary/50">
         <Search size={16} className="text-muted" />
         <input
           type="search"
@@ -45,7 +45,7 @@ export function TxnFilters({
           value={value.status}
           onChange={(e) => onChange({ ...value, status: e.target.value as TxnFilterState["status"] })}
           aria-label="Lọc theo trạng thái"
-          className="flex-1 rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text outline-none"
+          className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           {STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -55,7 +55,7 @@ export function TxnFilters({
           value={value.categoryId}
           onChange={(e) => onChange({ ...value, categoryId: e.target.value })}
           aria-label="Lọc theo danh mục"
-          className="flex-1 rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text outline-none"
+          className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <option value="all">Mọi danh mục</option>
           {CATEGORIES.map((c) => (

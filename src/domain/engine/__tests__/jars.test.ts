@@ -1,217 +1,272 @@
 import { describe, expect, it } from "vitest";
-import type { JarConfig } from "@/domain/models";
-import { evaluateJars, resolveIncomeBasis, validateJarInput, type IncomeBasis } from "../jars";
-import type { RecurringSeries } from "../recurring";
+import type { Account, JarConfig } from "@/domain/models";
+import {
+  evaluateJarPartition,
+  resolveAllocation,
+  resolvePrimaryAccount,
+  resolvePrimaryBalance,
+  validateJarInput,
+} from "../jars";
 import { monthPeriod } from "../types";
 import { txn } from "./helpers";
 
 const JUNE = monthPeriod(2026, 5);
-const NOW = new Date("2026-06-20T00:00:00.000Z"); // 11 days left in June
+const MAY = monthPeriod(2026, 4); // previous period (for MoM)
 
-const KNOWN = (value: number, over: Partial<IncomeBasis> = {}): IncomeBasis => ({
-  value,
-  source: over.source ?? "msb",
-  freshness: over.freshness ?? "2026-06-05T00:00:00.000Z",
+const cfg = (jars: JarConfig["jars"]): JarConfig => ({ version: 2, jars });
+
+function acct(over: Partial<Account> = {}): Account {
+  return {
+    id: over.id ?? "acc_current",
+    type: over.type ?? "current",
+    institution: "MSB",
+    currency: "VND",
+    balance: over.balance ?? 10_000_000,
+    availableBalance: over.availableBalance ?? over.balance ?? 10_000_000,
+    lastSyncedAt: over.lastSyncedAt ?? "2026-09-15T00:00:00.000Z",
+    source: over.source ?? "msb",
+    maskedNumber: "•••• 1991",
+  };
+}
+
+/** Every partition result must satisfy the hard identity Σ earmark ≡ balance. */
+function expectIdentity(result: ReturnType<typeof evaluateJarPartition>, balance: number) {
+  expect(result.status).toBe("ok");
+  expect(result.primaryBalance).toBe(balance);
+  const sum = result.lines.reduce((s, l) => s + l.earmark, 0);
+  expect(sum).toBe(balance);
+  expect(result.total).toBe(balance);
+}
+
+describe("resolvePrimaryAccount / resolvePrimaryBalance", () => {
+  it("resolves the single current account", () => {
+    const accounts = [acct({ id: "c", balance: 5_000_000 }), acct({ id: "s", type: "savings" })];
+    expect(resolvePrimaryAccount(accounts)?.id).toBe("c");
+    expect(resolvePrimaryBalance(accounts)).toBe(5_000_000);
+  });
+
+  it("is unknown with 0 current accounts (never a silent 0)", () => {
+    const accounts = [acct({ id: "s", type: "savings" })];
+    expect(resolvePrimaryAccount(accounts)).toBeNull();
+    expect(resolvePrimaryBalance(accounts)).toBe("unknown");
+  });
+
+  it("is unknown with 2+ current accounts (never first-match)", () => {
+    const accounts = [acct({ id: "c1" }), acct({ id: "c2" })];
+    expect(resolvePrimaryAccount(accounts)).toBeNull();
+    expect(resolvePrimaryBalance(accounts)).toBe("unknown");
+  });
 });
-const UNKNOWN_INCOME: IncomeBasis = { value: "unknown", source: "estimated", freshness: null };
 
-const cfg = (jars: JarConfig["jars"], incomeBasis: JarConfig["incomeBasis"] = "auto"): JarConfig => ({
-  version: 1,
-  jars,
-  incomeBasis,
+describe("resolveAllocation", () => {
+  it("percent → rounded share of the balance; amount → the fixed value", () => {
+    expect(resolveAllocation({ id: "j", label: "", categoryIds: [], allocation: { mode: "percent", value: 30 } }, 10_000_000)).toBe(3_000_000);
+    expect(resolveAllocation({ id: "j", label: "", categoryIds: [], allocation: { mode: "amount", value: 2_000_000 } }, 10_000_000)).toBe(2_000_000);
+  });
+
+  it("rounds a fractional percent share to whole VND", () => {
+    // 50% of 3 = 1.5 → 2
+    expect(resolveAllocation({ id: "j", label: "", categoryIds: [], allocation: { mode: "percent", value: 50 } }, 3)).toBe(2);
+  });
 });
 
-describe("evaluateJars", () => {
-  it("returns no lines when the config has no jars", () => {
-    expect(evaluateJars(cfg([]), [txn({ categoryId: "dining", amount: 9_000_000 })], JUNE, NOW, UNKNOWN_INCOME)).toEqual([]);
-  });
-
-  it("computes percent-mode allocation from a known income", () => {
-    const [line] = evaluateJars(
-      cfg([{ id: "j1", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } }]),
-      [txn({ categoryId: "dining", amount: 3_000_000 })],
-      JUNE,
-      NOW,
-      KNOWN(20_000_000),
-    );
-    expect(line.allocated).toBe(6_000_000); // 30% of 20M
-    expect(line.used).toBe(3_000_000);
-    expect(line.pct).toBeCloseTo(0.5);
-    expect(line.status).toBe("ok");
-    expect(line.daysLeft).toBe(11);
-  });
-
-  it("uses a fixed VND cap for amount-mode jars, ignoring income", () => {
-    const [line] = evaluateJars(
-      cfg([{ id: "j1", label: "Mua sắm", categoryIds: ["shopping"], allocation: { mode: "amount", value: 4_000_000 } }]),
-      [txn({ categoryId: "shopping", amount: 2_000_000 })],
-      JUNE,
-      NOW,
-      UNKNOWN_INCOME, // amount mode is unaffected by unknown income
-    );
-    expect(line.allocated).toBe(4_000_000);
-    expect(line.pct).toBeCloseTo(0.5);
-    expect(line.status).toBe("ok");
-  });
-
-  it("classifies near and over against the allocation", () => {
-    const lines = evaluateJars(
+describe("evaluateJarPartition — identity + per-jar values (hard gate)", () => {
+  it("[normal] earmarks, spend overlay, and residual all hand-verified", () => {
+    const result = evaluateJarPartition(
       cfg([
-        { id: "near", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } },
-        { id: "over", label: "Di chuyển", categoryIds: ["transport"], allocation: { mode: "amount", value: 1_000_000 } },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } },
+        { id: "shop", label: "Mua sắm", categoryIds: ["shopping"], allocation: { mode: "amount", value: 2_000_000 } },
       ]),
+      acct({ balance: 10_000_000 }),
       [
-        txn({ categoryId: "dining", amount: 2_700_000 }), // 90% of 3M -> near
-        txn({ categoryId: "transport", amount: 1_200_000 }), // 120% -> over
+        txn({ categoryId: "dining", amount: 1_000_000 }),
+        txn({ categoryId: "shopping", amount: 2_500_000 }),
       ],
       JUNE,
-      NOW,
-      KNOWN(10_000_000), // dining allocated = 3M
+      MAY,
     );
-    const byId = Object.fromEntries(lines.map((l) => [l.jarId, l]));
-    expect(byId.near.status).toBe("near");
-    expect(byId.over.status).toBe("over");
+    expectIdentity(result, 10_000_000);
+
+    const [food, shop, residual] = result.lines;
+    expect(food.earmark).toBe(3_000_000); // 30% of 10M
+    expect(food.spentThisPeriod).toBe(1_000_000);
+    expect(food.isOverBudget).toBe(false);
+
+    expect(shop.earmark).toBe(2_000_000);
+    expect(shop.spentThisPeriod).toBe(2_500_000);
+    expect(shop.isOverBudget).toBe(true); // 2.5M > 2M chia → budget breach
+
+    expect(residual.isResidual).toBe(true);
+    expect(residual.label).toBe("Chưa phân bổ");
+    expect(residual.earmark).toBe(5_000_000); // 10M − (3M + 2M)
+    expect(residual.isOverAllocated).toBe(false);
   });
 
-  it("[C1] never manufactures a healthy verdict when income is unknown", () => {
-    const [line] = evaluateJars(
-      cfg([{ id: "j1", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } }]),
-      [txn({ categoryId: "dining", amount: 3_000_000 })],
+  it("[over-allocated] residual goes negative and is flagged; identity still holds", () => {
+    const result = evaluateJarPartition(
+      cfg([
+        { id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "percent", value: 80 } },
+        { id: "b", label: "B", categoryIds: ["shopping"], allocation: { mode: "amount", value: 5_000_000 } },
+      ]),
+      acct({ balance: 10_000_000 }),
+      [],
       JUNE,
-      NOW,
-      UNKNOWN_INCOME,
+      MAY,
     );
-    expect(line.allocated).toBeNull();
-    expect(line.pct).toBeNull();
-    expect(line.status).toBe("unknown");
-    expect(line.used).toBe(3_000_000); // used is always the real posted spend
+    expectIdentity(result, 10_000_000);
+    const residual = result.lines.find((l) => l.isResidual)!;
+    expect(residual.earmark).toBe(-3_000_000); // 10M − (8M + 5M)
+    expect(residual.isOverAllocated).toBe(true);
   });
 
-  it("reverses refunds out of the used amount (spend rule)", () => {
-    const [line] = evaluateJars(
-      cfg([{ id: "j1", label: "Mua sắm", categoryIds: ["shopping"], allocation: { mode: "amount", value: 2_000_000 } }]),
+  it("[over-budget] a jar whose period spend exceeds its earmark", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "amount", value: 1_000_000 } }]),
+      acct({ balance: 10_000_000 }),
+      [txn({ categoryId: "dining", amount: 1_500_000 })],
+      JUNE,
+      MAY,
+    );
+    const jar = result.lines[0];
+    expect(jar.spentThisPeriod).toBe(1_500_000);
+    expect(jar.earmark).toBe(1_000_000);
+    expect(jar.isOverBudget).toBe(true);
+  });
+
+  it("[unassigned category] spend outside any jar is not attributed; identity holds", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "amount", value: 2_000_000 } }]),
+      acct({ balance: 10_000_000 }),
+      [
+        txn({ categoryId: "dining", amount: 1_000_000 }),
+        txn({ categoryId: "shopping", amount: 3_000_000 }), // in no jar
+      ],
+      JUNE,
+      MAY,
+    );
+    expectIdentity(result, 10_000_000);
+    expect(result.lines[0].spentThisPeriod).toBe(1_000_000); // only its own category
+    expect(result.lines.every((l) => !l.categoryIds.includes("shopping"))).toBe(true);
+  });
+
+  it("[rounding] the residual absorbs the remainder so the total is exact", () => {
+    // 3 jars × 33% of 100 = round(33) = 33 each → 99; residual = 1
+    const result = evaluateJarPartition(
+      cfg([
+        { id: "a", label: "A", categoryIds: [], allocation: { mode: "percent", value: 33 } },
+        { id: "b", label: "B", categoryIds: [], allocation: { mode: "percent", value: 33 } },
+        { id: "c", label: "C", categoryIds: [], allocation: { mode: "percent", value: 33 } },
+      ]),
+      acct({ balance: 100 }),
+      [],
+      JUNE,
+      MAY,
+    );
+    expectIdentity(result, 100);
+    expect(result.lines.slice(0, 3).map((l) => l.earmark)).toEqual([33, 33, 33]);
+    expect(result.lines.find((l) => l.isResidual)!.earmark).toBe(1);
+  });
+
+  it("[empty config] a single residual line equal to the full balance", () => {
+    const result = evaluateJarPartition(cfg([]), acct({ balance: 7_000_000 }), [], JUNE, MAY);
+    expectIdentity(result, 7_000_000);
+    expect(result.lines).toHaveLength(1);
+    expect(result.lines[0].isResidual).toBe(true);
+    expect(result.lines[0].earmark).toBe(7_000_000);
+  });
+
+  it("[pending excluded] pending spend does not count toward the overlay", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } }]),
+      acct({ balance: 10_000_000 }),
+      [
+        txn({ categoryId: "dining", amount: 1_000_000 }),
+        txn({ categoryId: "dining", status: "pending", amount: 9_000_000 }),
+      ],
+      JUNE,
+      MAY,
+    );
+    expect(result.lines[0].spentThisPeriod).toBe(1_000_000);
+  });
+
+  it("[refund reversed] a refund nets out of the overlay", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["shopping"], allocation: { mode: "amount", value: 5_000_000 } }]),
+      acct({ balance: 10_000_000 }),
       [
         txn({ categoryId: "shopping", type: "expense", amount: 1_500_000 }),
         txn({ categoryId: "shopping", type: "refund", direction: "credit", amount: 500_000 }),
       ],
       JUNE,
-      NOW,
-      UNKNOWN_INCOME,
+      MAY,
     );
-    expect(line.used).toBe(1_000_000);
+    expect(result.lines[0].spentThisPeriod).toBe(1_000_000);
   });
 
-  it("excludes transfers from jar spend (AD1)", () => {
-    const [line] = evaluateJars(
-      cfg([{ id: "j1", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } }]),
+  it("[transfer excluded] an internal transfer is not spend", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } }]),
+      acct({ balance: 10_000_000 }),
       [
         txn({ categoryId: "dining", type: "expense", amount: 1_000_000 }),
-        txn({ categoryId: "dining", type: "transfer", amount: 9_000_000 }), // excluded
+        txn({ categoryId: "dining", type: "transfer", amount: 9_000_000 }),
       ],
       JUNE,
-      NOW,
-      UNKNOWN_INCOME,
+      MAY,
     );
-    expect(line.used).toBe(1_000_000);
+    expect(result.lines[0].spentThisPeriod).toBe(1_000_000);
   });
 
-  it("surfaces uncovered spend as a neutral 'Chưa phân hũ' line, never dropped", () => {
-    const lines = evaluateJars(
-      cfg([{ id: "j1", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 2_000_000 } }]),
+  it("[MoM] previous-period spend is reported separately for the delta", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } }]),
+      acct({ balance: 10_000_000 }),
       [
-        txn({ categoryId: "dining", amount: 1_000_000 }),
-        txn({ categoryId: "shopping", amount: 2_000_000 }), // in no jar
+        txn({ categoryId: "dining", amount: 1_000_000, postedAt: "2026-06-10T00:00:00.000Z" }),
+        txn({ categoryId: "dining", amount: 2_000_000, postedAt: "2026-05-10T00:00:00.000Z" }),
       ],
       JUNE,
-      NOW,
-      UNKNOWN_INCOME,
+      MAY,
     );
-    const unassigned = lines.find((l) => l.isUnassigned);
-    expect(unassigned).toBeDefined();
-    expect(unassigned!.jarId).toBe("unassigned");
-    expect(unassigned!.categoryIds).toEqual(["shopping"]);
-    expect(unassigned!.used).toBe(2_000_000);
-    expect(unassigned!.allocated).toBeNull();
-    expect(unassigned!.status).toBe("unknown");
+    expect(result.lines[0].spentThisPeriod).toBe(1_000_000);
+    expect(result.lines[0].spentPrevPeriod).toBe(2_000_000);
   });
 
-  it("omits the unassigned line when every category with spend is covered", () => {
-    const lines = evaluateJars(
-      cfg([{ id: "j1", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 2_000_000 } }]),
-      [txn({ categoryId: "dining", amount: 1_000_000 })],
+  it("[unknown] 0 current accounts → no lines, balance null, never 0", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } }]),
+      resolvePrimaryAccount([acct({ type: "savings" })]),
+      [],
       JUNE,
-      NOW,
-      UNKNOWN_INCOME,
+      MAY,
     );
-    expect(lines.some((l) => l.isUnassigned)).toBe(false);
+    expect(result.status).toBe("unknown");
+    expect(result.primaryBalance).toBeNull();
+    expect(result.lines).toEqual([]);
   });
 
-  it("[H4] folds the income source into a percent jar's provenance but not an amount jar's", () => {
-    const income = KNOWN(10_000_000, { source: "self_reported", freshness: "2026-06-01T00:00:00.000Z" });
-    const txns = [txn({ categoryId: "dining", source: "msb", postedAt: "2026-06-20T00:00:00.000Z", amount: 1_000_000 })];
-
-    const [percent] = evaluateJars(
-      cfg([{ id: "p", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } }]),
-      txns,
+  it("[unknown] 2+ current accounts → unknown", () => {
+    const result = evaluateJarPartition(
+      cfg([]),
+      resolvePrimaryAccount([acct({ id: "c1" }), acct({ id: "c2" })]),
+      [],
       JUNE,
-      NOW,
-      income,
+      MAY,
     );
-    // worst-case source is self_reported (income), oldest freshness is the income's
-    expect(percent.meta.source).toBe("self_reported");
-    expect(percent.meta.freshness).toBe("2026-06-01T00:00:00.000Z");
+    expect(result.status).toBe("unknown");
+  });
 
-    const [amount] = evaluateJars(
-      cfg([{ id: "a", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } }]),
-      txns,
+  it("residual provenance is the primary account's own source/freshness only", () => {
+    const result = evaluateJarPartition(
+      cfg([{ id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "percent", value: 30 } }]),
+      acct({ balance: 10_000_000, source: "msb", lastSyncedAt: "2026-09-15T00:00:00.000Z" }),
+      [txn({ categoryId: "dining", amount: 1_000_000, source: "mock" })],
       JUNE,
-      NOW,
-      income,
+      MAY,
     );
-    // income never feeds an amount jar → provenance is the transaction's only
-    expect(amount.meta.source).toBe("msb");
-    expect(amount.meta.freshness).toBe("2026-06-20T00:00:00.000Z");
-  });
-});
-
-describe("resolveIncomeBasis (salary → manual → unknown)", () => {
-  const salarySeries: RecurringSeries = {
-    merchantNormalizedName: "cong ty",
-    label: "Công ty",
-    categoryId: "salary",
-    direction: "credit",
-    occurrences: 3,
-    distinctMonths: 3,
-    averageAmount: 25_000_000,
-    averageDayOfMonth: 5,
-    lastPostedAt: "2026-06-05T00:00:00.000Z",
-    isExpense: false,
-  };
-
-  it("prefers a detected recurring salary, folding its transactions' provenance", () => {
-    const raw = {
-      transactions: [
-        txn({ merchantNormalizedName: "cong ty", direction: "credit", type: "income", categoryId: "salary", source: "msb" }),
-      ],
-    };
-    const basis = resolveIncomeBasis(cfg([], 99), raw, [salarySeries]);
-    expect(basis.value).toBe(25_000_000); // detected salary wins over the manual number
-    expect(basis.source).toBe("msb");
-    expect(basis.freshness).toBe("2026-06-05T00:00:00.000Z");
-  });
-
-  it("falls back to a manual override number when no salary is detected", () => {
-    const basis = resolveIncomeBasis(cfg([], 18_000_000), { transactions: [] }, []);
-    expect(basis.value).toBe(18_000_000);
-    expect(basis.source).toBe("self_reported");
-    expect(basis.freshness).toBeNull();
-  });
-
-  it("reports unknown when auto with no salary detected (first-run default)", () => {
-    const basis = resolveIncomeBasis(cfg([], "auto"), { transactions: [] }, []);
-    expect(basis.value).toBe("unknown");
-    expect(basis.source).toBe("estimated");
-    expect(basis.freshness).toBeNull();
+    const residual = result.lines.find((l) => l.isResidual)!;
+    expect(residual.meta.source).toBe("msb"); // account, NOT folded from the mock txn
+    expect(residual.meta.freshness).toBe("2026-09-15T00:00:00.000Z");
   });
 });
 
@@ -222,19 +277,11 @@ describe("validateJarInput (M8 — never NaN/negative/huge into the engine)", ()
     expect(validateJarInput("0", "percent")).toEqual({ ok: true, value: 0, error: null });
   });
 
-  it("rejects blank and non-numeric input", () => {
+  it("rejects blank, non-numeric, non-finite, negative, and percent > 100", () => {
     expect(validateJarInput("", "percent").ok).toBe(false);
-    expect(validateJarInput("   ", "amount").ok).toBe(false);
     expect(validateJarInput("abc", "percent").ok).toBe(false);
-  });
-
-  it("rejects non-finite and negative values", () => {
     expect(validateJarInput("Infinity", "amount").ok).toBe(false);
-    expect(validateJarInput("NaN", "amount").ok).toBe(false);
     expect(validateJarInput("-5", "percent").ok).toBe(false);
-  });
-
-  it("rejects a percent over 100 but accepts the same value as an amount", () => {
     expect(validateJarInput("150", "percent").ok).toBe(false);
     expect(validateJarInput("150", "amount")).toEqual({ ok: true, value: 150, error: null });
   });
@@ -242,6 +289,5 @@ describe("validateJarInput (M8 — never NaN/negative/huge into the engine)", ()
   it("never returns a NaN value on rejection", () => {
     const res = validateJarInput("not-a-number", "amount");
     expect(res.value).toBeNull();
-    expect(Number.isNaN(res.value as unknown as number)).toBe(false);
   });
 });

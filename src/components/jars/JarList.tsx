@@ -1,13 +1,16 @@
 import Link from "next/link";
-import type { JarLine } from "@/domain/engine";
-import { Empty } from "@/components/states";
+import type { JarPartitionResult } from "@/domain/engine";
+import { Empty, InsufficientData } from "@/components/states";
+import { AllocationMeter } from "./AllocationMeter";
 import { JarCard } from "./JarCard";
 
 /**
- * Renders the jar lines from the engine. Colour comes from position, not user
- * config (M9) — the "Chưa phân hũ" bucket is skipped in the palette so real jars
- * keep stable colours regardless of whether an unassigned bucket exists. Empty
- * config (user deleted every jar) offers a link to the setup route.
+ * Read-only view of the balance partition (Model A): a composition meter, then a
+ * card per explicit jar. Colour comes from position, not user config. The
+ * partition reflects the CURRENT balance in real time — only the per-jar "đã
+ * tiêu" overlay follows the selected month (`periodLabel`), which the note makes
+ * explicit (red-team #8). Unknown primary balance → an insufficient-data state,
+ * never fabricated lines. Empty config → a setup CTA.
  */
 const PALETTE = [
   "bg-primary",
@@ -18,33 +21,54 @@ const PALETTE = [
   "bg-positive",
 ];
 
-export function JarList({ lines, stale }: { lines: JarLine[]; stale: boolean }) {
-  if (lines.length === 0) {
+export function JarList({
+  partition,
+  periodLabel,
+}: {
+  partition: JarPartitionResult;
+  periodLabel?: string;
+}) {
+  if (partition.status !== "ok") {
     return (
-      <Empty
-        title="Chưa có hũ chi tiêu"
-        description="Tạo hũ để nhóm các hạng mục và theo dõi phân bổ."
-        action={
-          <Link href="/pfm/jars" className="text-sm font-medium text-primary underline">
-            Thiết lập hũ
-          </Link>
-        }
-      />
+      <InsufficientData description="Không xác định được tài khoản chính (cần đúng một tài khoản thanh toán) nên chưa thể chia hũ." />
     );
   }
 
-  let paletteIndex = 0;
+  const explicit = partition.lines.filter((l) => !l.isResidual);
+
+  if (explicit.length === 0) {
+    return (
+      <div className="flex flex-col gap-3">
+        <AllocationMeter partition={partition} />
+        <Empty
+          title="Chưa có hũ chi tiêu"
+          description="Tạo hũ để chia số dư và theo dõi chi tiêu theo hạng mục."
+          action={
+            <Link href="/pfm?tab=hu&setup=1" className="text-sm font-medium text-primary underline">
+              Thiết lập hũ
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
+
   return (
-    <ul className="flex flex-col gap-2.5">
-      {lines.map((line) => (
-        <li key={line.jarId}>
-          <JarCard
-            line={line}
-            accent={line.isUnassigned ? "" : PALETTE[paletteIndex++ % PALETTE.length]}
-            stale={stale}
-          />
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-3">
+      <AllocationMeter partition={partition} />
+      <p className="text-xs text-muted">
+        Phần chia theo số dư hiện tại{periodLabel ? ` · “đã tiêu” tính trong ${periodLabel}` : ""}.
+      </p>
+      <ul className="flex flex-col gap-2.5">
+        {explicit.map((line, i) => (
+          <li key={line.jarId}>
+            <JarCard line={line} accent={PALETTE[i % PALETTE.length]} periodLabel={periodLabel} />
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-muted">
+        Hũ chỉ để bạn nhìn tiền rõ hơn — tiền vẫn nằm nguyên trong tài khoản của bạn.
+      </p>
+    </div>
   );
 }

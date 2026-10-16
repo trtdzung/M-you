@@ -1,26 +1,29 @@
 /**
- * Spending-jar evaluation. A jar groups real expense categories and compares
- * their net spend against an allocation (a % of income, or a fixed VND cap).
+ * Jar evaluation — Model A, a display-only SNAPSHOT PARTITION of the current
+ * primary-account balance. A jar earmarks a share of that balance; the sum of
+ * every jar earmark plus a "Chưa phân bổ" residual is identical to the balance,
+ * by construction. Jars never move money, never hold a balance, and never depend
+ * on income or a clock (the superseded spending-envelope model did all three).
  *
  * Invariants honoured here:
- *  - Spend math is exactly `netExpenseByCategory` (transfers excluded, refunds
- *    reversed, reversed dropped, pending separate) — jars wrap spend only (AD1).
- *  - An unknown income basis NEVER manufactures a healthy verdict: percent jars
- *    report `allocated: null`, `pct: null`, `status: "unknown"`; `used` is always
- *    the real posted spend (Red Team C1, invariant #6).
- *  - Provenance is folded worst-case across the feeding transactions (and, for
- *    percent jars, the income basis) — invariant #5.
+ *  - Hard identity: `Σ(explicit earmark + residual) ≡ primaryBalance` exactly —
+ *    the residual absorbs the whole-VND rounding remainder (invariant #1).
+ *  - No money movement: an earmark is a lens over the balance, not a transfer (#3).
+ *  - Unknown stays unknown: 0 or 2+ current accounts → `status:"unknown"`, no
+ *    lines fabricated, never a silent 0 balance (#6).
+ *  - Provenance per line (#5): an explicit line folds worst-case over its feeding
+ *    spend transactions; the residual carries the primary account's own source /
+ *    freshness ONLY (it has no feeding transactions — red-team #9).
+ *  - The per-period "đã tiêu kỳ này" is an INFORMATIONAL overlay computed with the
+ *    same spend rules as cash-flow (transfers excluded, refunds reversed, reversed
+ *    dropped, pending separate); it never alters the earmark or the identity.
  */
 
-import type { DataSource, JarConfig, Transaction } from "@/domain/models";
+import type { Account, DataSource, Jar, JarConfig, Transaction } from "@/domain/models";
 import { CATEGORY_BY_ID } from "@/domain/models";
 import { lowestTrustSource, oldestFreshness } from "@/lib/provenance";
 import { netExpenseByCategory } from "./cashflow";
-import { daysLeftIn, statusOf, type PressureStatus } from "./pressure";
-import type { RecurringSeries } from "./recurring";
 import type { Period } from "./types";
-
-export type JarStatus = PressureStatus | "unknown";
 
 /** Result of validating one raw allocation-input string (M8). */
 export interface JarInputResult {
@@ -48,29 +51,37 @@ export function validateJarInput(raw: string, mode: "percent" | "amount"): JarIn
   return { ok: true, value: n, error: null };
 }
 
-/** Resolved income basis for percent-mode jars, with its own provenance. */
-export interface IncomeBasis {
-  value: number | "unknown";
-  source: DataSource;
-  freshness: string | null;
-}
-
-export interface JarLine {
+/** One partition line — an explicit jar, or the residual "Chưa phân bổ" line. */
+export interface JarPartitionLine {
   jarId: string;
   label: string;
   categoryIds: string[];
-  /** null when percent-mode + income unknown (C1). */
-  allocated: number | null;
-  /** Σ max(0, netExpenseByCategory[cat]) — always the real posted spend. */
-  used: number;
-  /** null when `allocated` is null or non-positive (C1). */
-  pct: number | null;
-  daysLeft: number;
-  /** "unknown" when the allocation could not be resolved (C1). */
-  status: JarStatus;
-  perCategory: { categoryId: string; label: string; used: number }[];
+  /** Share of the CURRENT balance earmarked here, rounded to whole VND. */
+  earmark: number;
+  /** Net expense over this jar's categories for the selected period (overlay). */
+  spentThisPeriod: number;
+  /** Same, for the previous period — feeds the MoM delta. */
+  spentPrevPeriod: number;
+  /** `spentThisPeriod > earmark` — a budget breach (warning, never a block). */
+  isOverBudget: boolean;
+  perCategory: { categoryId: string; label: string; spent: number }[];
   meta: { source: DataSource; freshness: string | null };
-  isUnassigned?: boolean;
+  /** The single residual line ("Chưa phân bổ"). */
+  isResidual?: boolean;
+  /** Residual `earmark < 0` — the user over-allocated (Σ chia > số dư). */
+  isOverAllocated?: boolean;
+}
+
+/** Full partition of the current balance. `total` is exactly `primaryBalance`. */
+export interface JarPartitionResult {
+  status: "ok" | "unknown";
+  /** The resolved current balance; null when unknown (0 or 2+ current accounts). */
+  primaryBalance: number | null;
+  /** Explicit jar lines followed by the residual line; empty when unknown. */
+  lines: JarPartitionLine[];
+  /** Σ of every line's earmark — equals `primaryBalance` exactly when known. */
+  total: number;
+  meta: { source: DataSource; freshness: string | null };
 }
 
 const EXPENSE_LIKE: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee", "refund"]);
@@ -82,11 +93,10 @@ function inPeriod(txn: Transaction, period: Period): boolean {
 const labelOf = (categoryId: string) => CATEGORY_BY_ID[categoryId]?.label ?? categoryId;
 
 /** Worst-case source + oldest freshness over the posted spend feeding `catIds`. */
-function foldProvenance(
+function foldSpendProvenance(
   txns: Transaction[],
   period: Period,
   catIds: Set<string>,
-  extra: IncomeBasis | null,
 ): { source: DataSource; freshness: string | null } {
   const sources: (DataSource | null)[] = [];
   const freshness: (string | null)[] = [];
@@ -96,10 +106,6 @@ function foldProvenance(
     sources.push(t.source);
     freshness.push(t.postedAt);
   }
-  if (extra) {
-    sources.push(extra.source);
-    freshness.push(extra.freshness);
-  }
   return {
     source: lowestTrustSource(sources) ?? "mock",
     freshness: oldestFreshness(freshness),
@@ -107,124 +113,124 @@ function foldProvenance(
 }
 
 /**
- * Resolve the income basis for percent-mode jars. Priority (H7 — trailing-3-mo
- * tier cut): detected recurring salary → manual override → unknown. A manual
- * number is `self_reported`; unknown is the default first-run state.
- *
- * `data.transactions` MUST be the same array `recurring` was detected from
- * (correction-applied, not raw) so the salary series and the provenance rows
- * folded here can never diverge.
+ * The primary account = the single `type:"current"` account. Exactly one → that
+ * account; 0 or 2+ → null (the balance is genuinely ambiguous, never a silent
+ * first-match and never 0 — invariant #6, red-team #7/#10).
  */
-export function resolveIncomeBasis(
-  config: JarConfig,
-  data: { transactions: Transaction[] },
-  recurring: RecurringSeries[],
-): IncomeBasis {
-  const salary = recurring.find((s) => s.direction === "credit" && s.categoryId === "salary");
-  if (salary) {
-    const rows = data.transactions.filter(
-      (t) =>
-        t.status === "posted" &&
-        t.direction === "credit" &&
-        t.merchantNormalizedName === salary.merchantNormalizedName,
-    );
-    return {
-      value: salary.averageAmount,
-      source: lowestTrustSource(rows.map((t) => t.source)) ?? "mock",
-      freshness: salary.lastPostedAt,
-    };
-  }
-  if (typeof config.incomeBasis === "number") {
-    return { value: config.incomeBasis, source: "self_reported", freshness: null };
-  }
-  return { value: "unknown", source: "estimated", freshness: null };
+export function resolvePrimaryAccount(accounts: Account[]): Account | null {
+  const currents = accounts.filter((a) => a.type === "current");
+  return currents.length === 1 ? currents[0] : null;
 }
 
-function buildJarLine(
-  jar: JarConfig["jars"][number],
-  byCat: Map<string, number>,
+/** Convenience: the resolved balance, or "unknown" when the account is ambiguous. */
+export function resolvePrimaryBalance(accounts: Account[]): number | "unknown" {
+  const primary = resolvePrimaryAccount(accounts);
+  return primary ? primary.balance : "unknown";
+}
+
+/** Earmark for a jar: percent → `round(balance*value/100)`; amount → `round(value)`. */
+export function resolveAllocation(jar: Jar, primaryBalance: number): number {
+  return jar.allocation.mode === "percent"
+    ? Math.round((primaryBalance * jar.allocation.value) / 100)
+    : Math.round(jar.allocation.value);
+}
+
+function spentOver(byCat: Map<string, number>, categoryIds: string[]): number {
+  return categoryIds.reduce((s, id) => s + Math.max(0, byCat.get(id) ?? 0), 0);
+}
+
+/**
+ * Evaluate the balance partition. Every explicit jar earmarks a share of the
+ * current balance; the residual "Chưa phân bổ" line takes whatever is left
+ * (`balance − Σ earmarks`), so the total is exactly the balance by construction
+ * — the residual also absorbs the whole-VND rounding remainder. An unknown
+ * primary balance yields a `status:"unknown"` result with no lines (never 0).
+ */
+export function evaluateJarPartition(
+  config: JarConfig,
+  primary: Account | null,
   txns: Transaction[],
   period: Period,
-  daysLeft: number,
-  income: IncomeBasis,
-): JarLine {
-  const perCategory = jar.categoryIds.map((categoryId) => ({
-    categoryId,
-    label: labelOf(categoryId),
-    used: Math.max(0, byCat.get(categoryId) ?? 0),
-  }));
-  const used = perCategory.reduce((s, c) => s + c.used, 0);
+  prevPeriod: Period,
+): JarPartitionResult {
+  if (!primary) {
+    return {
+      status: "unknown",
+      primaryBalance: null,
+      lines: [],
+      total: 0,
+      meta: { source: "estimated", freshness: null },
+    };
+  }
 
-  const isPercent = jar.allocation.mode === "percent";
-  const allocated: number | null = isPercent
-    ? income.value === "unknown"
-      ? null
-      : (income.value * jar.allocation.value) / 100
-    : jar.allocation.value;
+  const balance = primary.balance;
+  const byCat = netExpenseByCategory(txns, period);
+  const byCatPrev = netExpenseByCategory(txns, prevPeriod);
 
-  const pct = allocated !== null && allocated > 0 ? used / allocated : null;
-  const status: JarStatus = allocated === null ? "unknown" : statusOf(used, allocated);
+  const explicit: JarPartitionLine[] = config.jars.map((jar) => {
+    const earmark = resolveAllocation(jar, balance);
+    const perCategory = jar.categoryIds.map((categoryId) => ({
+      categoryId,
+      label: labelOf(categoryId),
+      spent: Math.max(0, byCat.get(categoryId) ?? 0),
+    }));
+    const spentThisPeriod = spentOver(byCat, jar.categoryIds);
+    return {
+      jarId: jar.id,
+      label: jar.label,
+      categoryIds: jar.categoryIds,
+      earmark,
+      spentThisPeriod,
+      spentPrevPeriod: spentOver(byCatPrev, jar.categoryIds),
+      isOverBudget: spentThisPeriod > earmark,
+      perCategory,
+      meta: foldSpendProvenance(txns, period, new Set(jar.categoryIds)),
+    };
+  });
 
+  const allocated = explicit.reduce((s, l) => s + l.earmark, 0);
+  const residualEarmark = balance - allocated; // absorbs the rounding remainder
+
+  const residual: JarPartitionLine = {
+    jarId: "unallocated",
+    label: "Chưa phân bổ",
+    categoryIds: [],
+    earmark: residualEarmark,
+    spentThisPeriod: 0,
+    spentPrevPeriod: 0,
+    isOverBudget: false,
+    perCategory: [],
+    // The residual has no feeding transactions — its provenance is the primary
+    // account's own source / freshness ONLY (red-team #9).
+    meta: { source: primary.source, freshness: primary.lastSyncedAt },
+    isResidual: true,
+    isOverAllocated: residualEarmark < 0,
+  };
+
+  const lines = [...explicit, residual];
   return {
-    jarId: jar.id,
-    label: jar.label,
-    categoryIds: jar.categoryIds,
-    allocated,
-    used,
-    pct,
-    daysLeft,
-    status,
-    perCategory,
-    meta: foldProvenance(txns, period, new Set(jar.categoryIds), isPercent ? income : null),
+    status: "ok",
+    primaryBalance: balance,
+    lines,
+    total: lines.reduce((s, l) => s + l.earmark, 0),
+    meta: {
+      source: lowestTrustSource(lines.map((l) => l.meta.source)) ?? primary.source,
+      freshness: oldestFreshness(lines.map((l) => l.meta.freshness)),
+    },
   };
 }
 
 /**
- * Evaluate all jars for a period. Empty config → no lines. Any expense category
- * with spend that no jar covers surfaces as a single neutral "Chưa phân hũ"
- * line (never dropped — invariant #6).
+ * Dev-only identity guard: `Σ earmark === primaryBalance`. Logs (never throws) in
+ * non-production so a broken partition surfaces in tests/dev without crashing a
+ * prototype build. A no-op in production.
  */
-export function evaluateJars(
-  config: JarConfig,
-  txns: Transaction[],
-  period: Period,
-  now: Date,
-  income: IncomeBasis,
-): JarLine[] {
-  if (config.jars.length === 0) return [];
-
-  const byCat = netExpenseByCategory(txns, period);
-  const daysLeft = daysLeftIn(period, now);
-  const assigned = new Set(config.jars.flatMap((j) => j.categoryIds));
-
-  const lines = config.jars.map((jar) =>
-    buildJarLine(jar, byCat, txns, period, daysLeft, income),
-  );
-
-  const unassigned = [...byCat.entries()]
-    .filter(([catId, amount]) => !assigned.has(catId) && Math.max(0, amount) > 0)
-    .map(([catId]) => catId);
-
-  if (unassigned.length > 0) {
-    const perCategory = unassigned.map((categoryId) => ({
-      categoryId,
-      label: labelOf(categoryId),
-      used: Math.max(0, byCat.get(categoryId) ?? 0),
-    }));
-    lines.push({
-      jarId: "unassigned",
-      label: "Chưa phân hũ",
-      categoryIds: unassigned,
-      allocated: null,
-      used: perCategory.reduce((s, c) => s + c.used, 0),
-      pct: null,
-      daysLeft,
-      status: "unknown",
-      perCategory,
-      meta: foldProvenance(txns, period, new Set(unassigned), null),
-      isUnassigned: true,
-    });
+export function assertPartitionBalances(result: JarPartitionResult): void {
+  if (process.env.NODE_ENV === "production") return;
+  if (result.status !== "ok" || result.primaryBalance === null) return;
+  const sum = result.lines.reduce((s, l) => s + l.earmark, 0);
+  if (sum !== result.primaryBalance) {
+    // eslint-disable-next-line no-console
+    console.error(`[jars] partition sum ${sum} !== balance ${result.primaryBalance}`);
   }
-
-  return lines;
 }

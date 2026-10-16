@@ -1,82 +1,80 @@
 import { AlertTriangle } from "lucide-react";
-import type { JarConfig } from "@/domain/models";
-import { Money, SourceBadge, type Source } from "@/components/primitives";
+import type { JarPartitionResult } from "@/domain/engine";
+import { Money, SourceBadge } from "@/components/primitives";
 import { cn } from "@/lib/cn";
 
+const PALETTE = ["bg-primary", "bg-source-msb", "bg-source-self", "bg-source-estimated", "bg-warning", "bg-positive"];
+
 /**
- * Live allocation total against the resolved income (F5 — income value + source
- * shown next to the meter). Over-allocation is a WARNING, never a block (KISS):
- * percent jars over 100%, or (when income is known) total allocated VND over
- * income. Income unknown → percent-only meter with an "đặt thu nhập" nudge.
+ * Stacked composition of the partition against the current balance: every
+ * explicit jar's "chia" (earmark) plus the "Chưa phân bổ" residual, which by
+ * construction sum to the balance. Over-allocation (Σ chia > số dư → residual
+ * negative) is a WARNING, never a block (KISS): the explicit segments are capped
+ * at 100% with an overflow marker and the copy says how much to trim, not
+ * "còn −N". Unknown balance → a muted note (invariant #6, never a 0-bar).
  */
-export function AllocationMeter({
-  config,
-  income,
-}: {
-  config: JarConfig;
-  income: { value: number | "unknown"; source: Source };
-}) {
-  const percentSum = config.jars
-    .filter((j) => j.allocation.mode === "percent")
-    .reduce((s, j) => s + j.allocation.value, 0);
-  const amountSum = config.jars
-    .filter((j) => j.allocation.mode === "amount")
-    .reduce((s, j) => s + j.allocation.value, 0);
+export function AllocationMeter({ partition }: { partition: JarPartitionResult }) {
+  if (partition.status !== "ok" || partition.primaryBalance === null) {
+    return (
+      <div className="rounded-2xl bg-surface-muted/40 p-3 text-sm text-muted">
+        Số dư tài khoản chính chưa xác định — chưa thể chia hũ.
+      </div>
+    );
+  }
 
-  const known = income.value !== "unknown";
-  const allocatedVnd = known
-    ? config.jars.reduce(
-        (s, j) =>
-          s + (j.allocation.mode === "percent"
-            ? ((income.value as number) * j.allocation.value) / 100
-            : j.allocation.value),
-        0,
-      )
-    : null;
+  const balance = partition.primaryBalance;
+  const explicit = partition.lines.filter((l) => !l.isResidual);
+  const residual = partition.lines.find((l) => l.isResidual);
+  const allocated = explicit.reduce((s, l) => s + l.earmark, 0);
+  const residualEarmark = residual?.earmark ?? balance - allocated;
+  const overAllocated = residualEarmark < 0;
 
-  const overPercent = percentSum > 100;
-  const overIncome = allocatedVnd !== null && allocatedVnd > (income.value as number);
-  const warn = overPercent || overIncome;
-
-  const fill = Math.min(100, Math.max(0, Math.round(percentSum)));
+  // Segment widths as a share of the balance. When over-allocated the explicit
+  // earmarks exceed the balance, so normalise against the allocated total and
+  // cap at 100% — the overflow is shown as a marker + warning, not a bar.
+  const denom = overAllocated ? allocated : balance;
+  const widthOf = (v: number) => (denom > 0 ? Math.max(0, Math.min(100, (v / denom) * 100)) : 0);
 
   return (
     <div className="rounded-2xl bg-surface-muted/40 p-3">
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="font-medium text-text">Tổng phân bổ</span>
-        <span className={cn("font-semibold", overPercent ? "text-negative" : "text-text")}>
-          {Math.round(percentSum)}%
+        <span className="font-medium text-text">Phân chia số dư</span>
+        <span className="flex items-center gap-1.5 text-xs text-muted">
+          <Money amount={balance} className="text-text" /> số dư
+          <SourceBadge source={partition.meta.source} />
         </span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
-        <div
-          className={cn("h-full rounded-full", overPercent ? "bg-negative" : "bg-primary")}
-          style={{ width: `${fill}%` }}
-        />
+
+      <div className={cn("relative flex h-2.5 w-full overflow-hidden rounded-full bg-surface-muted", overAllocated && "ring-1 ring-negative")}>
+        {explicit.map((l, i) => (
+          <div
+            key={l.jarId}
+            className={cn("h-full", PALETTE[i % PALETTE.length])}
+            style={{ width: `${widthOf(l.earmark)}%` }}
+            title={l.label}
+          />
+        ))}
+        {!overAllocated && residualEarmark > 0 && (
+          <div className="h-full bg-surface-muted" style={{ width: `${widthOf(residualEarmark)}%` }} title="Chưa phân bổ" />
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-muted">
-        <span className="flex items-center gap-1.5">
-          Thu nhập tháng: {known ? <Money amount={income.value as number} className="text-text" /> : "chưa xác định"}
-          <SourceBadge source={income.source} />
+        <span>
+          Đã chia <Money amount={allocated} className="text-text" /> / <Money amount={balance} />
         </span>
-        {amountSum > 0 && (
+        {!overAllocated && (
           <span>
-            Cố định: <Money amount={amountSum} className="text-text" />
+            còn <Money amount={residualEarmark} className="text-text" /> chưa phân bổ
           </span>
         )}
       </div>
 
-      {warn && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-warning">
+      {overAllocated && (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-negative">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          {overPercent
-            ? "Tổng phần trăm vượt 100% — phân bổ nhiều hơn thu nhập."
-            : "Tổng phân bổ vượt thu nhập tháng."}
+          Đã chia vượt số dư <Money amount={-residualEarmark} className="font-medium text-negative" /> — giảm bớt một hũ.
         </p>
-      )}
-      {!known && (
-        <p className="mt-1 text-xs text-muted">Đặt thu nhập để quy đổi phần trăm sang số tiền.</p>
       )}
     </div>
   );

@@ -25,7 +25,7 @@ export function TxnRow({ txn, onEdit }: { txn: Transaction; onEdit: (t: Transact
     <button
       type="button"
       onClick={() => onEdit(txn)}
-      className="flex w-full items-center gap-3 rounded-lg px-1 py-2.5 text-left transition-colors hover:bg-surface-muted"
+      className="flex min-h-16 w-full items-center gap-3 rounded-lg px-1 py-2.5 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

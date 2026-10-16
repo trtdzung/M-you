@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { CATEGORIES } from "@/domain/models";
 import { useCorrections } from "@/state/corrections";
 import { cn } from "@/lib/cn";
+import { Sheet } from "@/components/primitives";
 
 /** Bottom-sheet to re-categorize a transaction. Writes an in-session correction. */
 export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
@@ -17,19 +18,7 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Sửa danh mục">
-      <button type="button" aria-label="Đóng" className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-device-width rounded-t-2xl bg-surface p-4 pb-6 shadow-xl">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-text">Sửa danh mục</p>
-            <p className="text-xs text-muted">{txn.merchantName}</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-full p-1 text-muted hover:bg-surface-muted">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Sheet title="Sửa danh mục" description={txn.merchantName} onClose={onClose}>
         <div className="grid max-h-[50vh] grid-cols-2 gap-2 overflow-y-auto">
           {options.map((c) => {
             const active = c.id === txn.categoryId;
@@ -39,7 +28,7 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
                 type="button"
                 onClick={() => choose(c.id)}
                 className={cn(
-                  "flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors",
+                  "flex min-h-11 items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                   active ? "border-primary bg-primary/10 font-medium text-text" : "border-border bg-surface text-text hover:bg-surface-muted",
                 )}
               >
@@ -57,13 +46,12 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
               reset(txn.id);
               onClose();
             }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border py-2 text-sm text-muted hover:bg-surface-muted"
+            className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border py-2 text-sm text-muted hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <RotateCcw size={14} />
             Khôi phục danh mục gốc
           </button>
         )}
-      </div>
-    </div>
+    </Sheet>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { JarConfig } from "@/domain/models";
+import type { Asset, JarConfig, Liability } from "@/domain/models";
 import { getProviders, type PersonaId } from "@/providers";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
 import {
@@ -7,9 +7,10 @@ import {
   calculateNetWorth,
   detectRecurring,
   evaluateBudget,
-  evaluateJars,
+  evaluateJarPartition,
+  financialHealth,
   monthPeriodFromKey,
-  resolveIncomeBasis,
+  resolvePrimaryAccount,
   spendingByCategory,
   upcomingObligations,
 } from "..";
@@ -87,29 +88,106 @@ describe("computeFinancials", () => {
     expect(past.endOfMonth.meta.source).toBe("estimated");
   });
 
-  it("yields no jar lines when no jarConfig is supplied (default empty config)", async () => {
+  it("yields a full-balance residual partition when no jarConfig is supplied", async () => {
     const raw = await loadRaw("stable");
     const f = computeFinancials(raw, MONTH);
-    expect(f.jarLines).toEqual([]);
+    const balance = resolvePrimaryAccount(raw.accounts)!.balance;
+    expect(f.jarPartition.status).toBe("ok");
+    expect(f.jarPartition.lines).toHaveLength(1); // residual only
+    expect(f.jarPartition.lines[0].isResidual).toBe(true);
+    expect(f.jarPartition.total).toBe(balance);
   });
 
-  it("threads a supplied jarConfig through to jarLines + jarIncomeBasis", async () => {
+  it("threads a supplied jarConfig through to jarPartition, reconciling to balance", async () => {
     const raw = await loadRaw("stable");
     const jarConfig: JarConfig = {
-      version: 1,
+      version: 2,
       jars: [
         { id: "food", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } },
       ],
-      incomeBasis: "auto",
     };
     const f = computeFinancials(raw, MONTH, { jarConfig });
 
     const period = monthPeriodFromKey(MONTH);
-    const recurring = detectRecurring(raw.transactions);
-    const basis = resolveIncomeBasis(jarConfig, { transactions: raw.transactions }, recurring);
+    const prevPeriod = monthPeriodFromKey(prevMonthKey(MONTH));
+    const primary = resolvePrimaryAccount(raw.accounts);
 
-    expect(f.jarLines).toEqual(evaluateJars(jarConfig, raw.transactions, period, DEMO_NOW, basis));
-    expect(f.jarLines.length).toBeGreaterThan(0);
-    expect(f.jarIncomeBasis).toEqual({ value: basis.value, source: basis.source });
+    expect(f.jarPartition).toEqual(
+      evaluateJarPartition(jarConfig, primary, raw.transactions, period, prevPeriod),
+    );
+    expect(f.jarPartition.total).toBe(primary!.balance); // Σ ≡ số dư
+    expect(f.jarPartition.lines.length).toBeGreaterThan(1); // explicit jar + residual
+  });
+
+  it("[red-team #3] merges user assets/liabilities into net worth without double-counting seed", async () => {
+    const raw = await loadRaw("stable");
+    const seed = computeFinancials(raw, MONTH);
+
+    const userAsset: Asset = {
+      id: "ua", type: "cash", name: "Ví", value: 6_000_000, currency: "VND",
+      source: "self_reported", lastUpdatedAt: "2026-09-09T00:00:00.000Z", isEstimated: true,
+    };
+    const userLiability: Liability = {
+      id: "ul", type: "credit_card", name: "Thẻ", outstandingPrincipal: 2_000_000,
+      interestRate: 0.3, minimumPayment: 200_000, dueDate: null, remainingTerm: null,
+      source: "self_reported", lastUpdatedAt: "2026-09-09T00:00:00.000Z",
+    };
+
+    const withUser = computeFinancials(raw, MONTH, {
+      userAssets: [userAsset],
+      userLiabilities: [userLiability],
+    });
+
+    // Each user record is counted EXACTLY once on top of the seed totals.
+    expect(withUser.networth.assetsTotal).toBe(seed.networth.assetsTotal + 6_000_000);
+    expect(withUser.networth.liabilitiesTotal).toBe(seed.networth.liabilitiesTotal + 2_000_000);
+    expect(withUser.networth.breakdown.filter((i) => i.id === "ua")).toHaveLength(1);
+
+    // The seed-only path is untouched (listAssets stays seed-only, red-team #3).
+    expect(computeFinancials(raw, MONTH).networth).toEqual(seed.networth);
+  });
+
+  it("[red-team #6] keeps a user asset with unknown valuation unknown (never 0)", async () => {
+    const raw = await loadRaw("stable");
+    const seed = computeFinancials(raw, MONTH);
+    const unvalued: Asset = {
+      id: "ua_unknown", type: "real_estate", name: "Đất chưa định giá", value: null,
+      currency: "VND", source: "self_reported", lastUpdatedAt: "2026-09-09T00:00:00.000Z", isEstimated: true,
+    };
+    const withUser = computeFinancials(raw, MONTH, { userAssets: [unvalued] });
+    expect(withUser.networth.assetsTotal).toBe(seed.networth.assetsTotal); // not summed
+    expect(withUser.networth.hasUnknown).toBe(true);
+    expect(withUser.networth.unknownFields).toContain("Đất chưa định giá");
+  });
+
+  it("composes financial health from the same inputs (non-trivial: debt + assets)", async () => {
+    // The "wealthy" persona carries multiple assets (incl. one unvalued property)
+    // and three liabilities — a genuine wealth picture, not the empty default.
+    const raw = await loadRaw("wealthy");
+    const f = computeFinancials(raw, MONTH);
+
+    // Composed once here — every indicator must trace to the SAME cashflow /
+    // accounts / networth the rest of `Financials` exposes (DRY, no local recompute).
+    expect(f.health).toEqual(financialHealth(f.cashflow, raw.accounts, f.networth));
+
+    // All four indicators are populated (not the null default) for this persona.
+    expect(f.health.runwayMonths.value).not.toBeNull();
+    expect(typeof f.health.surplus.value).toBe("number");
+    expect(f.health.essentialCoverage.value).not.toBeNull();
+    expect(f.health.concentration.value).not.toBeNull();
+
+    // Derived → provenance forced to "estimated" (invariant #5).
+    for (const ind of [
+      f.health.runwayMonths,
+      f.health.surplus,
+      f.health.essentialCoverage,
+      f.health.concentration,
+    ]) {
+      expect(ind.source).toBe("estimated");
+    }
+
+    // Concentration must flag the unvalued property so its % isn't read as whole
+    // (invariant #6 — unknown assets stay unknown, never counted as 0).
+    expect(f.health.concentration.hasUnknown).toBe(true);
   });
 });
