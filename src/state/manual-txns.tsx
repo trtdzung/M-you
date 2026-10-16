@@ -7,12 +7,19 @@
  * alongside provider data in `useFinancials`, so they count toward spend/report
  * exactly like a provider txn (every record carries `source: "self_reported"`,
  * never presented as bank-verified — invariant #5).
+ *
+ * Storage is scoped per persona (`msb-pfm.manual-txns.<cif>`): each persona's
+ * self-reported records — including recipient names on transfer txns — stay
+ * isolated, and the store re-loads when the persona switches (H: never leak a
+ * record across personas). The legacy global key is intentionally NOT migrated
+ * (prototype, mock data).
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Transaction } from "@/domain/models";
+import { usePersona } from "@/providers/context";
 
-const STORAGE_KEY = "msb-pfm.manual-txns";
+const STORAGE_PREFIX = "msb-pfm.manual-txns";
 export const MANUAL_ACCOUNT_ID = "self-reported";
 
 /** The fields a user supplies in the Add-transaction form. */
@@ -22,11 +29,20 @@ export interface ManualTxnInput {
   categoryId: string;
   merchantName: string;
   postedAt: string;
+  /** Explicit transaction type; defaults to income/expense inferred from `direction`. */
+  type?: Transaction["type"];
 }
 
 interface ManualTxnsContextValue {
   manualTxns: Transaction[];
-  add: (input: ManualTxnInput) => void;
+  /** Record a self-reported txn; returns the new txn id (for later `update`). */
+  add: (input: ManualTxnInput) => string;
+  /**
+   * Patch category/type of an existing record. Returns `true` when a record
+   * matched and was updated, `false` when no record has that id (never throws) —
+   * callers rely on this to only reflect a successful edit in the UI.
+   */
+  update: (id: string, patch: Partial<Pick<Transaction, "categoryId" | "type">>) => boolean;
   remove: (id: string) => void;
 }
 
@@ -36,10 +52,10 @@ function isTransactionArray(v: unknown): v is Transaction[] {
   return Array.isArray(v) && v.every((t) => t && typeof t === "object" && typeof (t as Transaction).id === "string");
 }
 
-function read(): Transaction[] {
+function read(key: string): Transaction[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     return isTransactionArray(parsed) ? parsed : [];
@@ -48,9 +64,9 @@ function read(): Transaction[] {
   }
 }
 
-function write(next: Transaction[]): void {
+function write(key: string, next: Transaction[]): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.localStorage.setItem(key, JSON.stringify(next));
   } catch {
     // ignore storage errors
   }
@@ -73,7 +89,7 @@ function toTransaction(input: ManualTxnInput): Transaction {
     amount: Math.abs(input.amount),
     currency: "VND",
     direction: input.direction,
-    type: input.direction === "credit" ? "income" : "expense",
+    type: input.type ?? (input.direction === "credit" ? "income" : "expense"),
     merchantName: input.merchantName,
     merchantNormalizedName: input.merchantName.toLowerCase(),
     categoryId: input.categoryId,
@@ -85,29 +101,61 @@ function toTransaction(input: ManualTxnInput): Transaction {
 }
 
 export function ManualTxnsProvider({ children }: { children: React.ReactNode }) {
+  const { persona } = usePersona();
+  const key = `${STORAGE_PREFIX}.${persona.cif}`;
   const [manualTxns, setManualTxns] = useState<Transaction[]>([]);
+  // Mirror of the current array so `add`/`update` can compute their return value
+  // synchronously (a setState updater's run timing is not guaranteed).
+  const txnsRef = useRef<Transaction[]>([]);
 
+  const apply = useCallback((key: string, next: Transaction[]) => {
+    txnsRef.current = next;
+    write(key, next);
+    setManualTxns(next);
+  }, []);
+
+  // Load on mount and whenever the persona (storage key) changes. Reset to []
+  // FIRST so the previous persona's records never linger while the new key loads.
   useEffect(() => {
-    setManualTxns(read());
-  }, []);
+    txnsRef.current = [];
+    setManualTxns([]);
+    const loaded = read(key);
+    txnsRef.current = loaded;
+    setManualTxns(loaded);
+  }, [key]);
 
-  const add = useCallback((input: ManualTxnInput) => {
-    setManualTxns((prev) => {
-      const next = [toTransaction(input), ...prev];
-      write(next);
-      return next;
-    });
-  }, []);
+  const add = useCallback(
+    (input: ManualTxnInput): string => {
+      const txn = toTransaction(input);
+      apply(key, [txn, ...txnsRef.current]);
+      return txn.id;
+    },
+    [key, apply],
+  );
 
-  const remove = useCallback((id: string) => {
-    setManualTxns((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      write(next);
-      return next;
-    });
-  }, []);
+  const update = useCallback(
+    (id: string, patch: Partial<Pick<Transaction, "categoryId" | "type">>): boolean => {
+      if (!txnsRef.current.some((t) => t.id === id)) return false;
+      apply(
+        key,
+        txnsRef.current.map((t) => (t.id === id ? { ...t, ...patch, userEdited: true } : t)),
+      );
+      return true;
+    },
+    [key, apply],
+  );
 
-  const value = useMemo(() => ({ manualTxns, add, remove }), [manualTxns, add, remove]);
+  const remove = useCallback(
+    (id: string) => {
+      apply(
+        key,
+        txnsRef.current.filter((t) => t.id !== id),
+      );
+    },
+    [key, apply],
+  );
+
+  const value = useMemo(() => ({ manualTxns, add, update, remove }), [manualTxns, add, update, remove]);
   return <ManualTxnsContext.Provider value={value}>{children}</ManualTxnsContext.Provider>;
 }
 

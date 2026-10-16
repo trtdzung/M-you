@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronUp, Home, Lock, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Card } from "@/components/primitives";
@@ -8,12 +8,14 @@ import { formatDateTime } from "@/lib/format";
 import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBank, findBankByName } from "@/lib/transfer-banks";
 import { BankLogo } from "@/components/transfer/BankLogo";
+import { TransferCategorizeSection } from "@/components/transfer/TransferCategorizeSection";
 import { usePersona, useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useManualTxns } from "@/state/manual-txns";
+import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
-import { getTransferDraft } from "@/lib/transfer-draft-store";
-import { CURRENCY_VND, type DataSource } from "@/domain/models";
+import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
+import { CATEGORY, CURRENCY_VND, type DataSource } from "@/domain/models";
 
 /**
  * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field,
@@ -60,9 +62,10 @@ export function TransferConfirm() {
   const { add: addManualTxn } = useManualTxns();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
+  const draftIdParam = params.get("draftId") ?? "";
   // Draft fields come from session storage keyed by id (Red Team #11) — never
   // from the URL. Only `draftId` is read from the query string.
-  const draft = useMemo(() => getTransferDraft(params.get("draftId") ?? ""), [params]);
+  const draft = useMemo(() => getTransferDraft(draftIdParam), [draftIdParam]);
   const isValidDraft = Boolean(draft?.name.trim() && draft.accountMasked && Number.isFinite(draft.amount) && draft.amount > 0);
 
   const [name, setName] = useState(draft?.name ?? "");
@@ -72,8 +75,16 @@ export function TransferConfirm() {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<MockExecutedTransfer | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [recipientSaved, setRecipientSaved] = useState(false);
+  // Categorization (phase 04): the txn recorded on confirm and its source jar.
+  const [createdTxnId, setCreatedTxnId] = useState<string | null>(null);
+  const [createdSourceJarId, setCreatedSourceJarId] = useState<string | null>(null);
+  // Latches true the moment a txn is committed. A `useState` flag can't stop a
+  // synchronous double-tap (both handlers read the same stale state) — the ref
+  // does (Red Team F#3). Set only after validation so a failed attempt can retry.
+  const committedRef = useRef(false);
   const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
 
   function saveRecipient() {
@@ -89,45 +100,76 @@ export function TransferConfirm() {
   }
 
   async function confirm() {
+    // In-flight / already-done guard: a double-tap or re-entry must never create
+    // a second txn or debit twice (Red Team F#3).
+    if (committedRef.current || submitting || done) return;
     if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
     if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (ít nhất 4 chữ số).");
     setError(null);
-    // Mock-only: no real money moves, no API call, no facade involvement.
-    // Chuyển tiền Phần 1: nguồn là hũ → trừ cả hũ (Thực tế) và tài khoản
-    // thanh toán đang giữ hũ đó (tiền trong hũ vốn là một phần tiền trong
-    // tài khoản), VÀ ghi thêm 1 giao dịch (self-reported, như nút ＋ thêm
-    // giao dịch tay) vào đúng danh mục đầu tiên của hũ đó — để "Ngân sách"
-    // (tính từ lịch sử giao dịch thật, xem `evaluateJarBudget`) cũng phản
-    // ánh đúng số đã tiêu, không lệch với "Thực tế". Nguồn là tài khoản (như
-    // trước giờ) → không trừ/ghi gì (hành vi cũ giữ nguyên).
-    if (draft?.sourceJarId) {
-      spendFromJar(draft.sourceJarId, amount);
-      const accounts = await providers.listAccounts();
-      const currentAccount = accounts.find((a) => a.type === "current");
-      if (currentAccount) await providers.applyAccountDebit(currentAccount.id, amount);
-      const sourceJar = jarConfig.jars.find((j) => j.id === draft.sourceJarId);
-      const categoryId = sourceJar?.categoryIds[0];
-      if (categoryId) {
-        addManualTxn({ amount, direction: "debit", categoryId, merchantName: name.trim(), postedAt: new Date().toISOString() });
+    committedRef.current = true; // latch before any await — blocks a synchronous re-entry
+    setSubmitting(true);
+    try {
+      // Mock-only: no real money moves, no API call, no facade involvement.
+      // Every transfer now records exactly ONE self-reported txn (like the ＋
+      // manual entry). Jar-sourced: default category = jar's first category and
+      // debit both the jar (Thực tế) and its underlying current account, so
+      // "Ngân sách" (from real txn history, see `evaluateJarBudget`) matches
+      // "Thực tế". Account-sourced: default category = "Chuyển khoản"
+      // (type:transfer, excluded from spend), no jar/account debit (old behavior).
+      // Do the fail-prone async work (account lookup/debit) BEFORE any local
+      // ledger write, so a provider failure leaves nothing partially applied and
+      // the retry (after the catch releases the latch) can't double-debit.
+      let defaultCategoryId: string;
+      if (draft?.sourceJarId) {
+        const accounts = await providers.listAccounts();
+        const currentAccount = accounts.find((a) => a.type === "current");
+        if (currentAccount) await providers.applyAccountDebit(currentAccount.id, amount);
+        spendFromJar(draft.sourceJarId, amount);
+        const sourceJar = jarConfig.jars.find((j) => j.id === draft.sourceJarId);
+        defaultCategoryId = sourceJar?.categoryIds[0] ?? CATEGORY.transfer; // 0-category jar → transfer
+      } else {
+        defaultCategoryId = CATEGORY.transfer;
       }
+      const txnId = addManualTxn({
+        amount,
+        direction: "debit",
+        categoryId: defaultCategoryId,
+        type: typeForCategory(defaultCategoryId), // derived from kind, never hardcoded
+        merchantName: name.trim(),
+        postedAt: new Date().toISOString(),
+      });
+      setCreatedTxnId(txnId);
+      // Jar-sourced always debits its source jar above (regardless of category
+      // count), so the categorize section seeds `appliedJarId` from this directly.
+      setCreatedSourceJarId(draft?.sourceJarId ?? null);
+      // Consume the draft immediately so a reload/replay can't resubmit (F#2).
+      if (draftIdParam) deleteTransferDraft(draftIdParam);
+
+      const stamp = Date.now().toString();
+      setDone({
+        recipientName: name.trim(),
+        recipientAccountMasked: acct,
+        recipientAccountNumber: draft?.accountNumber ?? null,
+        recipientBankName: draft?.recipientBankName ?? null,
+        senderName,
+        amount,
+        currency: CURRENCY_VND,
+        memo: memo.trim() || null,
+        executedAt: new Date().toISOString(),
+        transactionCode: `FT${stamp.slice(-9)}`,
+        referenceCode: `MSB${stamp.slice(-6)}`,
+        source: "mock",
+      });
+    } catch {
+      // A provider/store failure must not permanently lock the flow: release the
+      // latch so the user can retry, and surface the error.
+      committedRef.current = false;
+      setError("Không hoàn tất được giao dịch. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
     }
-    const stamp = Date.now().toString();
-    setDone({
-      recipientName: name.trim(),
-      recipientAccountMasked: acct,
-      recipientAccountNumber: draft?.accountNumber ?? null,
-      recipientBankName: draft?.recipientBankName ?? null,
-      senderName,
-      amount,
-      currency: CURRENCY_VND,
-      memo: memo.trim() || null,
-      executedAt: new Date().toISOString(),
-      transactionCode: `FT${stamp.slice(-9)}`,
-      referenceCode: `MSB${stamp.slice(-6)}`,
-      source: "mock",
-    });
   }
 
   if (done) {
@@ -201,6 +243,10 @@ export function TransferConfirm() {
               </Row>
             </div>
 
+            {createdTxnId && (
+              <TransferCategorizeSection txnId={createdTxnId} sourceJarId={createdSourceJarId} amount={done.amount} />
+            )}
+
             <button
               type="button"
               onClick={() => setShowDetails((v) => !v)}
@@ -250,6 +296,28 @@ export function TransferConfirm() {
             onClick={() => router.push("/transfer")}
             className="mt-4 flex h-13 w-full items-center justify-center rounded-full bg-primary text-base font-bold text-primary-fg"
           >
+            Giao dịch khác
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Draft consumed after a completed transfer (F#2): a reload/replay must NOT
+  // show an editable form again. Distinguish "already completed" from "no draft".
+  if (!isValidDraft && draftIdParam && isTransferDraftUsed(draftIdParam)) {
+    return (
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
+        <ConfirmHeader />
+        <Card role="status">
+          <p className="text-sm font-semibold text-text">Giao dịch đã hoàn tất</p>
+          <p className="mt-1 text-xs text-muted">Bản nháp này đã được sử dụng. Không thể xác nhận lại.</p>
+        </Card>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => router.push("/")} className="flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text">
+            Về trang chủ
+          </button>
+          <button type="button" onClick={() => router.push("/transfer")} className="flex-1 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
             Giao dịch khác
           </button>
         </div>
@@ -331,9 +399,10 @@ export function TransferConfirm() {
       <button
         type="button"
         onClick={confirm}
-        className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+        disabled={submitting}
+        className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
       >
-        Xác nhận chuyển tiền
+        {submitting ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
       </button>
     </div>
   );

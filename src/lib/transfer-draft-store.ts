@@ -44,3 +44,31 @@ export function getTransferDraft(id: string): StoredTransferDraft | null {
     return null;
   }
 }
+
+const USED_PREFIX = "msb-pfm.used-draft.";
+
+/**
+ * Consume a draft after a transfer is recorded so a reload/replay of
+ * `/transfer-confirm?draftId=…` can never resubmit it. Removes the draft and
+ * leaves a lightweight "used" marker the confirm screen checks to distinguish
+ * "already completed" from "no draft".
+ */
+export function deleteTransferDraft(id: string): void {
+  if (!id) return;
+  try {
+    window.sessionStorage.removeItem(`${PREFIX}${id}`);
+    window.sessionStorage.setItem(`${USED_PREFIX}${id}`, "1");
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Whether a draft id was already consumed by a completed transfer. */
+export function isTransferDraftUsed(id: string): boolean {
+  if (!id) return false;
+  try {
+    return window.sessionStorage.getItem(`${USED_PREFIX}${id}`) === "1";
+  } catch {
+    return false;
+  }
+}
