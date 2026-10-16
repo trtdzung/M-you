@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* MSB PFM design tokens — mobile-first bank-app aesthetic */
+@theme {
+  /* Fonts */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* Surfaces & text */
+  --color-background: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+
+  /* Brand */
+  --color-primary: #d81f36;
+  --color-primary-fg: #ffffff;
+  --color-primary-soft: #fde8ea;
+
+  /* Semantic money colors */
+  --color-positive: #16a34a;
+  --color-positive-soft: #dcfce7;
+  --color-negative: #dc2626;
+  --color-negative-soft: #fee2e2;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+
+  /* Source-label palette */
+  --color-source-msb: #1d4ed8;
+  --color-source-msb-soft: #dbeafe;
+  --color-source-self: #7c3aed;
+  --color-source-self-soft: #ede9fe;
+  --color-source-estimated: #0891b2;
+  --color-source-estimated-soft: #cffafe;
+  --color-source-mock: #64748b;
+  --color-source-mock-soft: #e2e8f0;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Phone frame width */
+  --spacing-phone: 420px;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
