@@ -39,6 +39,7 @@ export function PhoneShell({
       )}
     >
       <div
+        id="device-canvas"
         className={cn(
           "device-canvas relative isolate flex h-[100dvh] w-full flex-col overflow-hidden bg-transparent lg:rounded-screen",
           className,

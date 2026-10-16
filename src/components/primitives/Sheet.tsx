@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -27,6 +28,16 @@ export function Sheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+
+  // Anchor the sheet inside the device frame, not the browser viewport. The
+  // desktop preview applies `zoom` to `.device-canvas`, which breaks
+  // `position: fixed` (it would sink below the phone frame). Portalling into the
+  // canvas and positioning `absolute` keeps the sheet clipped to the frame on
+  // both desktop and mobile. Resolved after mount so SSR stays inert.
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setContainer(document.getElementById("device-canvas") ?? document.body);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -74,10 +85,10 @@ export function Sheet({
     };
   }, [onClose, open]);
 
-  if (!open) return null;
+  if (!open || !container) return null;
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center" data-testid="sheet-root">
+  return createPortal(
+    <div className="absolute inset-0 z-40 flex items-end justify-center" data-testid="sheet-root">
       <button
         type="button"
         aria-label={closeLabel}
@@ -120,6 +131,7 @@ export function Sheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    container,
   );
 }
