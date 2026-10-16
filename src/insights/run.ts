@@ -6,16 +6,16 @@
 import type { Financials } from "@/state/useFinancials";
 import type { Insight } from "./types";
 import { SEVERITY_RANK } from "./types";
-import { budgetPressure } from "./detectors/budget-pressure";
 import { jarPressure } from "./detectors/jar-pressure";
 import { upcomingObligation } from "./detectors/upcoming-obligation";
 import { spendingSpike } from "./detectors/spending-spike";
 import { incomeChange } from "./detectors/income-change";
 import { newRecurring } from "./detectors/new-recurring";
 
-// No cross-detector dedup in v1 (M10/AD2/F3): budget_pressure and jar_pressure
-// may both surface; SEVERITY_RANK below orders them.
-const DETECTORS = [budgetPressure, jarPressure, upcomingObligation, spendingSpike, incomeChange, newRecurring];
+// Per-hũ `jarPressure` is the sole budget warning (phase 08 retired the per-
+// category `budgetPressure` so the two never double-warn — H3). SEVERITY_RANK
+// orders the remaining detectors.
+const DETECTORS = [jarPressure, upcomingObligation, spendingSpike, incomeChange, newRecurring];
 
 export function runDetectors(f: Financials): Insight[] {
   return DETECTORS.map((d) => d(f))

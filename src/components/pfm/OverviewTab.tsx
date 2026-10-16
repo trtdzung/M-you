@@ -7,6 +7,9 @@ import { ChevronRight } from "lucide-react";
 import { ErrorState, SkeletonCard, UnknownValue } from "@/components/states";
 import { Freshness, Money, ProvenanceChip, Sheet, SourceBadge } from "@/components/primitives";
 import { DeltaBadge } from "@/components/common/DeltaBadge";
+import { SpendingSection } from "@/components/report/SpendingSection";
+import { SpendingReport } from "@/components/report/SpendingReport";
+import { cashflowTrend } from "@/domain/engine";
 import type { NetWorthResult, Obligation } from "@/domain/engine";
 import { HeroNetWorth } from "./cockpit/HeroNetWorth";
 import { StatTile } from "./cockpit/StatTile";
@@ -31,14 +34,18 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
   // month selected on the other tabs' shared PeriodPicker. This keeps the
   // "Cuối tháng" projection valid (now == displayed month) and every tile
   // consistent, without a picker on this tab.
-  const { loading, error, financials, visible } = useInsights(currentMonthKey());
+  const { loading, error, financials, transactions, visible } = useInsights(currentMonthKey());
   const router = useRouter();
   const [detail, setDetail] = useState<"projection" | "obligations" | "runway" | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const topInsight = useMemo(
     () => [...visible].sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])[0] ?? null,
     [visible],
   );
+
+  const monthKey = financials?.monthKey ?? currentMonthKey();
+  const trend = useMemo(() => cashflowTrend(transactions, monthKey), [transactions, monthKey]);
 
   if (loading) {
     return (
@@ -111,7 +118,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
               ? daysUntilLabel(nextObligation.dueDate)
               : "Không có khoản sắp tới"
           }
-          onTap={() => onNavigate("cashflow")}
+          onTap={() => onNavigate("transactions")}
         />
         <StatTile
           label="Khả năng trang trải"
@@ -129,6 +136,14 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
 
       <NetWorthSummary networth={networth} />
 
+      <SpendingSection
+        lines={financials.jarBudget.lines}
+        expense={cashflow.expense}
+        prevExpense={prevCashflow.expense}
+        trend={trend}
+        onOpenReport={() => setReportOpen(true)}
+      />
+
       {topInsight ? (
         <InsightStrip insight={topInsight} onTap={() => router.push("/assistant")} />
       ) : (
@@ -142,6 +157,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
       </div>
 
       {detail && <OverviewDetail detail={detail} financials={financials} onClose={() => setDetail(null)} />}
+      {reportOpen && <SpendingReport monthKey={monthKey} onClose={() => setReportOpen(false)} />}
     </div>
   );
 }

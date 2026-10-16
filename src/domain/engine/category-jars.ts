@@ -75,9 +75,20 @@ export function duplicateCategoryIds(config: JarConfig): string[] {
 }
 
 /** Every expense category id in the taxonomy (chip-coverage source of truth). */
-const EXPENSE_CATEGORY_IDS: readonly string[] = CATEGORIES.filter(
+export const EXPENSE_CATEGORY_IDS: readonly string[] = CATEGORIES.filter(
   (c) => c.kind === "expense",
 ).map((c) => c.id);
+
+/**
+ * Expense category ids that no jar in `config` claims — the "orphans" the exactly-
+ * one invariant heals into the "Khác" jar on load (`state/jars`). Pure and
+ * order-stable (taxonomy order) so the heal + any validator agree. Empty when the
+ * config already covers every expense category (every template does).
+ */
+export function orphanExpenseCategoryIds(config: JarConfig): string[] {
+  const mapped = categoryToJarMap(config);
+  return EXPENSE_CATEGORY_IDS.filter((id) => !mapped.has(id));
+}
 
 /**
  * The filter chips for Dòng tiền: one per configured jar (in config order), plus

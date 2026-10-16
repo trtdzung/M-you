@@ -17,25 +17,30 @@
 /** Tab hub fallback — safe landing for any unrecognized intent. */
 export const PFM_HUB = "/pfm";
 
-/** Fixed in-page anchor for the Dòng tiền monthly-report card (red-team #12). */
+/** Fixed in-page anchor for the monthly-report card, now on the overview tab. */
 export const REPORT_ANCHOR = "bao-cao-brief";
 
 /** Whitelisted navigation intents. Kept separate from LLM `IntentKind`. */
 export type CopilotIntent =
-  | "open-cashflow" // Dòng tiền (chart chi tiêu theo hũ)
-  | "open-hu" // Hũ top-level tab (số dư chia theo hũ)
+  | "open-cashflow" // Dòng tiền → gộp vào Tổng quan (plan 260910-1626)
+  | "open-hu" // Hũ → tab Ngân sách (hạn mức/tháng theo hũ)
   | "open-transactions" // full transaction feed (Tài khoản)
-  | "open-report" // Dòng tiền · report card (advisory entry)
+  | "open-report" // báo cáo tháng (nay trên Tổng quan)
   | "open-wealth" // Tài sản & Nợ manager
   | "open-overview" // Tổng quan
   | "open-assistant"; // dedicated copilot chat
 
-/** Each intent resolves to one fixed route. No params, no interpolation. */
+/**
+ * Each intent resolves to one fixed route. No params, no interpolation. Remapped
+ * for the BIDV 4-tab IA (plan 260910-1626): the `hu`/`cashflow` tabs are retired
+ * so `open-hu` → the Ngân sách tab and `open-cashflow`/`open-report` → Tổng quan
+ * (Dòng tiền + report folded in, phase 04). Deep links never dead-end (H1).
+ */
 const ROUTES: Record<CopilotIntent, string> = {
-  "open-cashflow": `${PFM_HUB}?tab=cashflow`,
-  "open-hu": `${PFM_HUB}?tab=hu`,
+  "open-cashflow": `${PFM_HUB}?tab=overview`,
+  "open-hu": `${PFM_HUB}?tab=budget`,
   "open-transactions": "/transactions",
-  "open-report": `${PFM_HUB}?tab=cashflow#${REPORT_ANCHOR}`,
+  "open-report": `${PFM_HUB}?tab=overview#${REPORT_ANCHOR}`,
   "open-wealth": `${PFM_HUB}/wealth`,
   "open-overview": `${PFM_HUB}?tab=overview`,
   "open-assistant": "/assistant",

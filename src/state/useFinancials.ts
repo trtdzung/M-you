@@ -12,7 +12,8 @@ import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { useProviders } from "@/providers/context";
 import { useAssetLiabilities } from "./assets";
-import { useCorrections, applyCorrections } from "./corrections";
+import { useCorrections, applyCorrections, isHidden } from "./corrections";
+import { useManualTxns } from "./manual-txns";
 import { useGoals } from "./goals";
 import { useJarConfig } from "./jars";
 import { usePeriod } from "./period";
@@ -24,8 +25,16 @@ export interface UseFinancialsResult {
   loading: boolean;
   error: boolean;
   raw: RawData | null;
-  /** All transactions with corrections applied (newest first). */
+  /**
+   * The spend-truth view: provider + manual txns, category corrections applied,
+   * hidden rows EXCLUDED. This feeds the engine and every aggregate.
+   */
   transactions: Transaction[];
+  /**
+   * The list view: same, but hidden rows INCLUDED (so they stay visible +
+   * searchable, flagged via `useCorrections`). Use for transaction lists.
+   */
+  allTransactions: Transaction[];
   financials: Financials | null;
 }
 
@@ -38,6 +47,7 @@ export interface UseFinancialsResult {
 export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const providers = useProviders();
   const { corrections } = useCorrections();
+  const { manualTxns } = useManualTxns();
   const { config: jarConfig } = useJarConfig();
   const { assets: userAssets, liabilities: userLiabilities } = useAssetLiabilities();
   const { goals: userGoals } = useGoals();
@@ -77,9 +87,17 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
     };
   }, [providers]);
 
+  // List view: provider + manual txns, category overrides applied, hidden kept.
+  const allTransactions = useMemo(
+    () => (raw ? applyCorrections([...manualTxns, ...raw.transactions], corrections) : []),
+    [raw, manualTxns, corrections],
+  );
+
+  // Engine view: same array minus rows the user hid from reports (invariant #6 —
+  // excluded like reversed/pending, never deleted).
   const transactions = useMemo(
-    () => (raw ? applyCorrections(raw.transactions, corrections) : []),
-    [raw, corrections],
+    () => allTransactions.filter((t) => !isHidden(corrections, t.id)),
+    [allTransactions, corrections],
   );
 
   // `userAssets`/`userLiabilities` are context state (single source of truth),
@@ -99,5 +117,5 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
     [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals],
   );
 
-  return { loading, error, raw, transactions, financials };
+  return { loading, error, raw, transactions, allTransactions, financials };
 }

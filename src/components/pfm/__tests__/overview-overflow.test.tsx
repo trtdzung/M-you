@@ -4,6 +4,7 @@ import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { GoalProvider } from "@/state/goals";
 import { CorrectionsProvider } from "@/state/corrections";
+import { ManualTxnsProvider } from "@/state/manual-txns";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
@@ -41,6 +42,7 @@ function renderOverview() {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
+      <ManualTxnsProvider>
         <JarConfigProvider>
           <AssetLiabilityProvider>
             <GoalProvider>
@@ -50,7 +52,8 @@ function renderOverview() {
             </GoalProvider>
           </AssetLiabilityProvider>
         </JarConfigProvider>
-      </CorrectionsProvider>
+        </ManualTxnsProvider>
+    </CorrectionsProvider>
     </PersonaProvider>,
   );
 }

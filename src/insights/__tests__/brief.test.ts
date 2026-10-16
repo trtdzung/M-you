@@ -99,20 +99,20 @@ describe("composeMonthlyBrief — data-rich but detector-quiet month", () => {
     const brief = composeMonthlyBrief(surplus);
     expect(brief.highlights).toHaveLength(0);
     expect(brief.actions).toHaveLength(1);
-    // Red-team #1: the surplus fallback now points at Hũ (Kế hoạch tab removed).
-    // Assert the RESOLVED ROUTE, not the intent string, so the CTA can never
-    // dead-link to a retired tab.
-    expect(resolveIntentRoute(brief.actions[0].intentId)).toBe("/pfm?tab=hu");
+    // Red-team #1: the surplus fallback points at the Hũ intent, which now
+    // resolves to the Ngân sách tab (BIDV 4-tab IA, plan 260910-1626). Assert the
+    // RESOLVED ROUTE, not the intent string, so the CTA can never dead-link.
+    expect(resolveIntentRoute(brief.actions[0].intentId)).toBe("/pfm?tab=budget");
   });
 });
 
 describe("advisory CTAs resolve to live routes (red-team #1)", () => {
-  it("routes the remapped upcoming_obligation / income_change CTAs to Hũ, never a dead /pfm", () => {
+  it("routes the remapped upcoming_obligation / income_change CTAs to the Ngân sách tab, never a dead /pfm", () => {
     for (const type of ["upcoming_obligation", "income_change"] as const) {
       for (const band of ["low", "medium", "high"] as const) {
         const copy = advisoryFor(type, band);
         expect(copy).not.toBeNull();
-        expect(resolveIntentRoute(copy!.intentId)).toBe("/pfm?tab=hu");
+        expect(resolveIntentRoute(copy!.intentId)).toBe("/pfm?tab=budget");
       }
     }
   });

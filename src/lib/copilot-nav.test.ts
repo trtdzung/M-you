@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { PFM_HUB, REPORT_ANCHOR, isCopilotIntent, resolveIntentRoute } from "./copilot-nav";
 
-describe("resolveIntentRoute — whitelisted mappings", () => {
-  it("maps open-cashflow → Dòng tiền tab (no dock)", () => {
-    expect(resolveIntentRoute("open-cashflow")).toBe("/pfm?tab=cashflow");
+describe("resolveIntentRoute — whitelisted mappings (BIDV 4-tab IA, plan 260910-1626)", () => {
+  it("maps open-cashflow → Tổng quan (Dòng tiền folded in)", () => {
+    expect(resolveIntentRoute("open-cashflow")).toBe("/pfm?tab=overview");
   });
 
-  it("maps open-hu → Hũ top-level tab", () => {
-    expect(resolveIntentRoute("open-hu")).toBe("/pfm?tab=hu");
+  it("maps open-hu → the Ngân sách tab (hạn mức/tháng theo hũ)", () => {
+    expect(resolveIntentRoute("open-hu")).toBe("/pfm?tab=budget");
   });
 
   it("maps open-transactions → the full transaction feed", () => {
     expect(resolveIntentRoute("open-transactions")).toBe("/transactions");
   });
 
-  it("maps open-report → Dòng tiền with the fixed report anchor", () => {
-    expect(resolveIntentRoute("open-report")).toBe(`/pfm?tab=cashflow#${REPORT_ANCHOR}`);
+  it("maps open-report → Tổng quan with the fixed report anchor", () => {
+    expect(resolveIntentRoute("open-report")).toBe(`/pfm?tab=overview#${REPORT_ANCHOR}`);
   });
 
   it("maps open-wealth → Tài sản & Nợ manager", () => {

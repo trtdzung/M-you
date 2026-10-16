@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { currentMonthKey } from "@/lib/demo-clock";
 import { runDetectors } from "../run";
-import { budgetPressure } from "../detectors/budget-pressure";
 import { spendingSpike } from "../detectors/spending-spike";
 import { incomeChange } from "../detectors/income-change";
 import { numbersIn, factValues } from "../narrate";
 import { answerPrompt } from "../assistant";
 import type { Insight } from "../types";
-import { makeCashflow, makeFinancials } from "./helpers";
+import { makeCashflow, makeFinancials, makeJarBudgetLine, makeJarBudgetResult } from "./helpers";
 
 /**
  * Every money-scale number in an explanation must trace to a sourceFact.
@@ -20,27 +20,6 @@ function assertGrounded(insight: Insight) {
     if (n >= 1000 && !isYear) expect(facts, `${n} not grounded in "${insight.explanation}"`).toContain(n);
   }
 }
-
-describe("budgetPressure detector", () => {
-  it("flags over-budget as urgent", () => {
-    const insight = budgetPressure(
-      makeFinancials({ budgetLines: [{ categoryId: "dining", label: "Ăn uống", limit: 4_000_000, used: 4_800_000, pct: 1.2, daysLeft: 5, status: "over" }] }),
-    );
-    expect(insight?.severity).toBe("urgent");
-    assertGrounded(insight!);
-  });
-
-  it("flags near-budget as attention", () => {
-    const insight = budgetPressure(
-      makeFinancials({ budgetLines: [{ categoryId: "shopping", label: "Mua sắm", limit: 2_000_000, used: 1_800_000, pct: 0.9, daysLeft: 5, status: "near" }] }),
-    );
-    expect(insight?.severity).toBe("attention");
-  });
-
-  it("returns null when no pressure", () => {
-    expect(budgetPressure(makeFinancials())).toBeNull();
-  });
-});
 
 describe("spendingSpike detector", () => {
   it("flags a category that jumped vs last month and stays grounded", () => {
@@ -80,7 +59,12 @@ describe("runDetectors", () => {
   it("ranks urgent before info", () => {
     const insights = runDetectors(
       makeFinancials({
-        budgetLines: [{ categoryId: "dining", label: "Ăn uống", limit: 4_000_000, used: 4_800_000, pct: 1.2, daysLeft: 5, status: "over" }],
+        monthKey: currentMonthKey(),
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, limitState: "set", status: "over", pct: 1.2, remaining: -800_000, thresholdHit: true }),
+          ],
+        }),
         recurring: [{ merchantNormalizedName: "netflix", label: "Netflix", categoryId: "subscriptions", direction: "debit", occurrences: 6, distinctMonths: 6, averageAmount: 260_000, averageDayOfMonth: 15, lastPostedAt: "2026-06-15T10:00:00.000Z", isExpense: true }],
       }),
     );

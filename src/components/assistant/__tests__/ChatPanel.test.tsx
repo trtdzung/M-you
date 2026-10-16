@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
@@ -53,6 +54,7 @@ function renderPanel() {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
+      <ManualTxnsProvider>
         <JarConfigProvider>
           <AssetLiabilityProvider>
             <GoalProvider>
@@ -62,7 +64,8 @@ function renderPanel() {
             </GoalProvider>
           </AssetLiabilityProvider>
         </JarConfigProvider>
-      </CorrectionsProvider>
+        </ManualTxnsProvider>
+    </CorrectionsProvider>
     </PersonaProvider>,
   );
 }

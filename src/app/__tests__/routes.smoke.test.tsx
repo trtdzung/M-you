@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
@@ -45,6 +46,7 @@ function renderScreen(ui: ReactElement) {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
+      <ManualTxnsProvider>
         <JarConfigProvider>
           <AssetLiabilityProvider>
             <GoalProvider>
@@ -52,7 +54,8 @@ function renderScreen(ui: ReactElement) {
             </GoalProvider>
           </AssetLiabilityProvider>
         </JarConfigProvider>
-      </CorrectionsProvider>
+        </ManualTxnsProvider>
+    </CorrectionsProvider>
     </PersonaProvider>,
   );
 }
@@ -83,18 +86,18 @@ describe("route smoke — all screens mount", () => {
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
-  it("PFM jars setup (/pfm/jars) redirects to the Hũ tab", async () => {
+  it("PFM jars setup (/pfm/jars) redirects to the Ngân sách tab", async () => {
     redirect.mockClear();
     const { default: Page } = await import("../pfm/jars/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=hu");
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=budget");
   });
 
-  it("PFM cashflow (/pfm/cashflow) redirects to the host tab param", async () => {
+  it("PFM cashflow (/pfm/cashflow) redirects to the overview tab", async () => {
     redirect.mockClear();
     const { default: Page } = await import("../pfm/cashflow/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=cashflow");
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=overview");
   });
 
   it("PFM wealth (/pfm/wealth) mounts the Tài sản & Nợ manager", async () => {
@@ -137,11 +140,11 @@ describe("route smoke — all screens mount", () => {
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
-  it("legacy /cashflow redirects directly to /pfm?tab=cashflow", async () => {
+  it("legacy /cashflow redirects directly to /pfm?tab=overview", async () => {
     redirect.mockClear();
     const { default: Page } = await import("../(festive)/cashflow/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=cashflow");
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=overview");
   });
 
   it("legacy /wealth redirects to the /pfm/wealth manager", async () => {
@@ -153,14 +156,15 @@ describe("route smoke — all screens mount", () => {
 });
 
 /**
- * Chrome-separation guards (plan 260908-pfm-chrome-redesign): the whole point of
- * the route-group split is that `/pfm/*` sheds the festive photo + 3-tab bottom
- * bar and gains a calm sub-app shell, while every other route keeps the festive
- * chrome. These assertions fail if PFM ever regains the bottom nav / festive bg,
- * or if the festive routes lose theirs.
+ * Chrome-separation guards. Plan 260910-1626 (BIDV wallet reformat) SUPERSEDES the
+ * no-bottom-nav decision of plan 260908: `/pfm/*` now carries its OWN wallet bottom
+ * nav (4 tabs + center ＋ FAB) — distinct from the festive 3-tab "Điều hướng chính"
+ * bar — while keeping the calm sub-app shell (back-arrow header, no festive photo).
+ * Every other route keeps the festive chrome. These assertions fail if PFM loses
+ * its wallet nav, regains the festive nav/bg, or if festive routes lose theirs.
  */
-describe("chrome separation — PFM calm shell vs festive shell", () => {
-  it("PFM: PfmHeader + 3 tabs, no BottomNav, no 2/9 festive bg", async () => {
+describe("chrome separation — PFM wallet shell vs festive shell", () => {
+  it("PFM: PfmHeader + own 4-tab wallet nav + ＋ FAB, no festive nav/bg", async () => {
     const { default: PfmLayout } = await import("../pfm/layout");
     const { default: PfmPage } = await import("../pfm/page");
     const { container } = renderScreen(
@@ -172,14 +176,15 @@ describe("chrome separation — PFM calm shell vs festive shell", () => {
     // Back-arrow sub-app header → Home
     expect(screen.getByLabelText("Về Trang chủ")).toHaveAttribute("href", "/");
 
-    // The 3 segmented tabs are the sole PFM navigation
-    const tablist = screen.getByRole("tablist", { name: "Phân mục PFM" });
-    expect(within(tablist).getAllByRole("tab")).toHaveLength(3);
-    for (const label of ["Tổng quan", "Hũ", "Dòng tiền"]) {
-      expect(within(tablist).getByText(label)).toBeInTheDocument();
+    // The 4-tab wallet bottom nav is the sole PFM navigation (supersedes 260908)
+    const nav = screen.getByRole("navigation", { name: "Điều hướng PFM" });
+    for (const label of ["Tổng quan", "Giao dịch", "Ngân sách", "Cài đặt"]) {
+      expect(within(nav).getByText(label)).toBeInTheDocument();
     }
+    // Center ＋ FAB records a manual transaction (never moves money, invariant #3)
+    expect(within(nav).getByLabelText("Thêm giao dịch")).toBeInTheDocument();
 
-    // No 3-tab MSB bottom nav, no 2/9 festive photo background
+    // Distinct from the festive 3-tab bar; no 2/9 festive photo background
     expect(screen.queryByLabelText("Điều hướng chính")).toBeNull();
     expect(container.innerHTML).not.toContain("bg-2-9");
   });

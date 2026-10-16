@@ -2,30 +2,35 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PfmTabs, isPfmTab, type PfmTabId } from "./PfmTabs";
+import { isPfmTab, resolveLegacyTab, type PfmTabId } from "./PfmTabs";
 import { OverviewTab } from "./OverviewTab";
-import { HuTab } from "./HuTab";
-import { CashflowChartView } from "@/components/cashflow/CashflowChartView";
+import { BudgetTab } from "@/components/budget/BudgetTab";
+import { PfmTxnList } from "@/components/transactions/PfmTxnList";
+import { HuCategoryTab } from "@/components/settings/HuCategoryTab";
 
 /**
  * Single-route PFM host: client-side tab switching with no navigation, no data
- * refetch (`useFinancials` is single-load). The active tab comes from `?tab=` for
- * deep links AND stays in sync with it — a same-route jump (copilot universal
- * jump, P07) updates the visible panel. Each panel owns one scroll region so
- * short viewports and larger text never lose the lower content.
+ * refetch (`useFinancials` is single-load). The visible panel is driven by `?tab=`
+ * — the wallet bottom nav (`PfmBottomNav`, in the layout) replaces the tab param
+ * and this host reflects it. Legacy ids from the 3-tab IA (`hu`, `cashflow`, and
+ * the `cashflow&dock=hu` combo) resolve forward so old deep links + copilot jumps
+ * never dead-end (invariant #3). Each panel owns one scroll region.
  */
 export function PfmTabHost() {
   const params = useSearchParams();
   const router = useRouter();
   const tabParam = params?.get("tab");
   const dockParam = params?.get("dock");
-  // Legacy: Hũ used to be a dock inside Dòng tiền (`?tab=cashflow&dock=hu`). It is
-  // now a top-level tab, so an old deep link must land on the Hũ tab, never a
-  // dead dock (invariant #3). Resolve it before seeding `active`.
+  // Legacy `?tab=cashflow&dock=hu` (Hũ was a Dòng tiền dock) → the budget tab.
   const isLegacyHuDock = tabParam === "cashflow" && dockParam === "hu";
-  const [active, setActive] = useState<PfmTabId>(
-    isLegacyHuDock ? "hu" : isPfmTab(tabParam) ? tabParam : "overview",
+
+  const resolve = useCallback(
+    (raw: string | null | undefined): PfmTabId =>
+      isLegacyHuDock ? "budget" : resolveLegacyTab(raw) ?? (isPfmTab(raw) ? raw : "overview"),
+    [isLegacyHuDock],
   );
+
+  const [active, setActive] = useState<PfmTabId>(() => resolve(tabParam));
 
   const selectTab = useCallback(
     (next: PfmTabId) => {
@@ -39,25 +44,21 @@ export function PfmTabHost() {
     [params, router],
   );
 
-  // Re-sync on same-route jumps (red-team #1): `useState` seeds only at mount, so
-  // a `router.push`/`Link` to `?tab=...` while already on `/pfm` would otherwise
-  // no-op. Validate `?tab` against the known set (fallback `overview`) and update
-  // only when it actually differs from `active`, so this never fights a user tap.
+  // Re-sync on same-route jumps (bottom nav, copilot deep link): `useState` seeds
+  // only at mount, so a `?tab=` change while already on `/pfm` must update here.
+  // A resolved legacy id is also normalized back into the URL so the address bar
+  // never keeps a retired param.
   useEffect(() => {
-    if (isLegacyHuDock) {
-      setActive("hu");
-      router.replace("/pfm?tab=hu", { scroll: false });
-      return;
+    const next = resolve(tabParam);
+    if (isLegacyHuDock || (resolveLegacyTab(tabParam) && tabParam !== next)) {
+      router.replace(`/pfm?tab=${next}`, { scroll: false });
     }
-    const next = isPfmTab(tabParam) ? tabParam : "overview";
     setActive((current) => (current === next ? current : next));
-  }, [tabParam, isLegacyHuDock, router]);
+  }, [tabParam, isLegacyHuDock, resolve, router]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PfmTabs active={active} onChange={selectTab} />
-
-      <div className="min-h-0 flex-1 pt-3">
+      <div className="min-h-0 flex-1">
         {PFM_PANELS.map(({ id, node }) => {
           const shown = id === active;
           return (
@@ -80,6 +81,7 @@ export function PfmTabHost() {
 
 const PFM_PANELS: { id: PfmTabId; node: (nav: (t: PfmTabId) => void) => React.ReactNode }[] = [
   { id: "overview", node: (nav) => <OverviewTab onNavigate={nav} /> },
-  { id: "hu", node: () => <HuTab /> },
-  { id: "cashflow", node: () => <CashflowChartView /> },
+  { id: "transactions", node: () => <PfmTxnList /> },
+  { id: "budget", node: () => <BudgetTab /> },
+  { id: "settings", node: () => <HuCategoryTab /> },
 ];

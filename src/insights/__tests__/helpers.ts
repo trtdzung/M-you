@@ -4,7 +4,8 @@ import type {
   CashflowResult,
   FinancialHealth,
   HealthIndicator,
-  JarPartitionResult,
+  JarBudgetLine,
+  JarBudgetResult,
   NetWorthResult,
 } from "@/domain/engine";
 import type { Financials } from "@/state/useFinancials";
@@ -34,13 +35,50 @@ const NETWORTH: NetWorthResult = {
   meta: { ...META, period: { from: "", to: "", label: "Hiện tại" } },
 };
 
-const EMPTY_PARTITION: JarPartitionResult = {
-  status: "ok",
-  primaryBalance: 0,
+const EMPTY_JAR_BUDGET: JarBudgetResult = {
   lines: [],
-  total: 0,
-  meta: { source: "mock", freshness: null },
+  summary: {
+    totalLimit: null,
+    totalSpent: 0,
+    totalSpentSet: 0,
+    totalRemaining: null,
+    pctUsed: null,
+    daysLeft: 0,
+    setCount: 0,
+    unsetCount: 0,
+  },
+  meta: META,
 };
+
+/** A full JarBudgetResult, defaulted to empty (no lines, nothing set). */
+export function makeJarBudgetResult(over: Partial<JarBudgetResult> = {}): JarBudgetResult {
+  return {
+    lines: over.lines ?? EMPTY_JAR_BUDGET.lines,
+    summary: over.summary ?? EMPTY_JAR_BUDGET.summary,
+    meta: over.meta ?? EMPTY_JAR_BUDGET.meta,
+  };
+}
+
+/** A single jarBudget line, defaulted to an unset (no-limit) jar with no spend. */
+export function makeJarBudgetLine(over: Partial<JarBudgetLine> = {}): JarBudgetLine {
+  return {
+    huId: over.huId ?? "food",
+    label: over.label ?? "Ăn uống",
+    categoryIds: over.categoryIds ?? ["dining"],
+    spent: over.spent ?? 0,
+    prevSpent: over.prevSpent ?? 0,
+    momDelta: over.momDelta ?? 0,
+    momPct: over.momPct ?? null,
+    limit: over.limit ?? null,
+    limitState: over.limitState ?? "unset",
+    remaining: over.remaining ?? null,
+    pct: over.pct ?? null,
+    status: over.status ?? null,
+    thresholdHit: over.thresholdHit ?? false,
+    source: over.source ?? "mock",
+    freshness: over.freshness ?? null,
+  };
+}
 
 /** All-null health indicator — the safe default when a fixture omits inputs. */
 const NULL_INDICATOR: HealthIndicator = {
@@ -74,7 +112,7 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     networthPrevious: over.networthPrevious ?? null,
     networthSeries: over.networthSeries ?? [],
     networthSeriesMeta: over.networthSeriesMeta ?? { source: null, count: 0, freshness: null },
-    jarPartition: over.jarPartition ?? EMPTY_PARTITION,
+    jarBudget: over.jarBudget ?? EMPTY_JAR_BUDGET,
     health: over.health ?? EMPTY_HEALTH,
     goals: over.goals ?? [],
   };

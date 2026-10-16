@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { Account, JarConfig } from "@/domain/models";
+import type { JarConfig } from "@/domain/models";
 import {
   categoryToJarMap,
   duplicateCategoryIds,
   groupSpendingByJar,
   jarChipList,
+  orphanExpenseCategoryIds,
   KHAC_JAR_ID,
 } from "../category-jars";
 import { spendingByCategory } from "../category";
-import { evaluateJarPartition } from "../jars";
 import { monthPeriod } from "../types";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 import { txn } from "./helpers";
@@ -16,7 +16,23 @@ import { txn } from "./helpers";
 const JUNE = monthPeriod(2026, 5);
 const MAY = monthPeriod(2026, 4);
 
-const cfg = (jars: JarConfig["jars"]): JarConfig => ({ version: 2, jars });
+const cfg = (jars: JarConfig["jars"]): JarConfig => ({ version: 3, jars });
+
+describe("orphanExpenseCategoryIds — the exactly-one heal source", () => {
+  it("returns every expense category no jar claims (config order)", () => {
+    const partial = cfg([
+      { id: "a", label: "A", categoryIds: ["dining", "groceries"] },
+    ]);
+    const orphans = orphanExpenseCategoryIds(partial);
+    expect(orphans).toContain("housing");
+    expect(orphans).not.toContain("dining");
+    expect(orphans).not.toContain("salary"); // income is not an expense category
+  });
+
+  it("is empty when every expense category is covered (all templates are)", () => {
+    expect(orphanExpenseCategoryIds(DEFAULT_JAR_CONFIG)).toEqual([]);
+  });
+});
 
 /** A few expense transactions across categories, all posted in June. */
 const spend = [
@@ -27,25 +43,11 @@ const spend = [
   txn({ categoryId: "entertainment", amount: 300_000 }),
 ];
 
-function acct(over: Partial<Account> = {}): Account {
-  return {
-    id: over.id ?? "acc_current",
-    type: over.type ?? "current",
-    institution: "MSB",
-    currency: "VND",
-    balance: over.balance ?? 20_000_000,
-    availableBalance: over.availableBalance ?? over.balance ?? 20_000_000,
-    lastSyncedAt: "2026-09-15T00:00:00.000Z",
-    source: over.source ?? "msb",
-    maskedNumber: "•••• 1991",
-  };
-}
-
 describe("categoryToJarMap / duplicateCategoryIds", () => {
   it("maps each category to its jar (first-wins on overlap)", () => {
     const config = cfg([
-      { id: "a", label: "A", categoryIds: ["dining", "groceries"], allocation: { mode: "percent", value: 20 } },
-      { id: "b", label: "B", categoryIds: ["dining", "transport"], allocation: { mode: "percent", value: 10 } },
+      { id: "a", label: "A", categoryIds: ["dining", "groceries"] },
+      { id: "b", label: "B", categoryIds: ["dining", "transport"] },
     ]);
     const map = categoryToJarMap(config);
     expect(map.get("dining")).toBe("a"); // first jar keeps it
@@ -84,9 +86,9 @@ describe("groupSpendingByJar — orphan handling", () => {
   it("routes an unmapped expense category to Khác (pinned last)", () => {
     // A config that leaves `entertainment` in no jar → it must land in Khác.
     const config = cfg([
-      { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], allocation: { mode: "percent", value: 30 } },
-      { id: "home", label: "Nhà", categoryIds: ["housing"], allocation: { mode: "percent", value: 40 } },
-      { id: "move", label: "Đi lại", categoryIds: ["transport"], allocation: { mode: "percent", value: 10 } },
+      { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"] },
+      { id: "home", label: "Nhà", categoryIds: ["housing"] },
+      { id: "move", label: "Đi lại", categoryIds: ["transport"] },
     ]);
     const groups = groupSpendingByJar(config, spend, JUNE);
     const khac = groups.find((g) => g.jarId === KHAC_JAR_ID);
@@ -99,8 +101,8 @@ describe("groupSpendingByJar — orphan handling", () => {
 
   it("does not double-count a category listed by two jars (first-wins)", () => {
     const config = cfg([
-      { id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "percent", value: 20 } },
-      { id: "b", label: "B", categoryIds: ["dining"], allocation: { mode: "percent", value: 20 } },
+      { id: "a", label: "A", categoryIds: ["dining"] },
+      { id: "b", label: "B", categoryIds: ["dining"] },
     ]);
     const groups = groupSpendingByJar(config, spend, JUNE);
     const a = groups.find((g) => g.jarId === "a");
@@ -131,23 +133,9 @@ describe("jarChipList", () => {
 
   it("adds a trailing Khác chip when some expense category is unmapped", () => {
     const config = cfg([
-      { id: "a", label: "A", categoryIds: ["dining"], allocation: { mode: "percent", value: 20 } },
+      { id: "a", label: "A", categoryIds: ["dining"] },
     ]);
     const chips = jarChipList(config);
     expect(chips[chips.length - 1].jarId).toBe(KHAC_JAR_ID);
-  });
-});
-
-describe("parity with evaluateJarPartition (red-team #9)", () => {
-  it("per-jar group amount === partition spentThisPeriod for the default template", () => {
-    const groups = groupSpendingByJar(DEFAULT_JAR_CONFIG, spend, JUNE);
-    const byJar = new Map(groups.map((g) => [g.jarId, g.amount]));
-    const partition = evaluateJarPartition(DEFAULT_JAR_CONFIG, acct(), spend, JUNE, MAY);
-
-    for (const line of partition.lines) {
-      if (line.isResidual) continue; // residual has no categories / spend
-      const groupAmount = byJar.get(line.jarId) ?? 0; // 0-spend jars dropped from chart data
-      expect(groupAmount).toBe(line.spentThisPeriod);
-    }
   });
 });

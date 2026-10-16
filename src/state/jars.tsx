@@ -12,13 +12,14 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { Jar, JarAllocation, JarConfig } from "@/domain/models";
+import type { Jar, JarConfig } from "@/domain/models";
 import {
   configFromTemplate,
   DEFAULT_JAR_CONFIG,
   JAR_TEMPLATES,
   type JarTemplate,
 } from "@/domain/models/jar-defaults";
+import { KHAC_JAR_ID, KHAC_JAR_LABEL, orphanExpenseCategoryIds } from "@/domain/engine/category-jars";
 import { useProviders } from "@/providers/context";
 
 /** Fresh, deep copy of the seed so callers never share a mutable reference. */
@@ -27,14 +28,44 @@ function seed(): JarConfig {
 }
 
 /**
- * Migrate a loaded config to v2. Model A dropped anchor + income basis, so a
- * stored v1 is structurally incompatible — the migration DISCARDS it and reseeds
- * (KISS; this is prototype localStorage, not a ledger — the accepted data loss is
- * documented in the plan, red-team #11). A v2 config is normalized (dedupe).
+ * Normalize a loaded config. The provider boundary (`migrateStoredJarConfig`)
+ * already migrated any legacy v2 forward to v3 (allocation dropped) or returned
+ * null; here a v3 config is deduped (one-category-one-jar) then HEALED so every
+ * expense category belongs to exactly one jar (orphans → the "Khác" jar). The
+ * heal is a no-op for any config that already covers every expense category (all
+ * templates do), so a normal seed is untouched. A null/wrong-version config
+ * reseeds (KISS; prototype localStorage, not a ledger).
  */
 function migrateJarConfig(stored: JarConfig | null): JarConfig {
-  if (!stored || stored.version !== 2) return seed();
-  return dedupeCategories(stored);
+  if (!stored || stored.version !== 3) return seed();
+  return healOrphanCategories(dedupeCategories(stored));
+}
+
+/**
+ * Enforce the exactly-one invariant on load: any expense category no jar claims
+ * is moved into the "Khác" jar (created if absent) so it is never dropped from
+ * budgets/report (invariant #6, Σ-conservation). The "Khác" jar carries a 0
+ * legacy allocation (harmless; retired phase 08) and NO budgetLimit — an
+ * unassigned catch-all has no meaningful monthly limit (unknown, never 0).
+ */
+function healOrphanCategories(config: JarConfig): JarConfig {
+  const orphans = orphanExpenseCategoryIds(config);
+  if (orphans.length === 0) return config;
+  const existing = config.jars.find((j) => j.id === KHAC_JAR_ID);
+  if (existing) {
+    return {
+      ...config,
+      jars: config.jars.map((j) =>
+        j.id === KHAC_JAR_ID ? { ...j, categoryIds: [...j.categoryIds, ...orphans] } : j,
+      ),
+    };
+  }
+  const khac: Jar = {
+    id: KHAC_JAR_ID,
+    label: KHAC_JAR_LABEL,
+    categoryIds: orphans,
+  };
+  return { ...config, jars: [...config.jars, khac] };
 }
 
 /** Remove `catIds` from every jar except `exceptId` (keeps categories unique). */
@@ -57,7 +88,7 @@ function uniqueJarId(jars: Jar[], base: string): string {
  * Enforce one-category-one-jar on an arbitrary config (first jar to claim a
  * category keeps it). The mutators already guarantee this, but a config coming
  * straight from storage — hand-edited, or written by a future migration — has
- * not been through them, and `evaluateJarPartition` would double-count an overlap. So
+ * not been through them, and `evaluateJarBudget` would double-count an overlap. So
  * every loaded config is normalized here before it can reach the engine.
  */
 function dedupeCategories(config: JarConfig): JarConfig {
@@ -75,10 +106,14 @@ interface JarConfigContextValue {
   config: JarConfig;
   addJar: (jar: Jar) => void;
   updateJar: (id: string, patch: Partial<Omit<Jar, "id">>) => void;
+  /** Remove a jar; its categories are force-moved to "Khác" first (exactly-one). */
   removeJar: (id: string) => void;
-  /** Move a category into `jarId` (removing it from any other), or out (null). */
+  /**
+   * Move a category into `jarId` (removing it from any other). Under exactly-one a
+   * category can never be unassigned: `jarId === null` is a no-op (a category
+   * always belongs to some jar). Pass a real jar id to move it.
+   */
   assignCategory: (categoryId: string, jarId: string | null) => void;
-  setAllocation: (id: string, allocation: JarAllocation) => void;
   /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
   applyTemplate: (templateId: JarTemplate["id"]) => void;
   resetToSeed: () => void;
@@ -144,28 +179,36 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
           if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds, id);
           return { ...c, jars };
         }),
-      removeJar: (id) => mutate((c) => ({ ...c, jars: c.jars.filter((j) => j.id !== id) })),
-      assignCategory: (categoryId, jarId) =>
+      removeJar: (id) =>
         mutate((c) => {
-          const jars = stripCategories(c.jars, [categoryId]);
-          return {
-            ...c,
-            jars: jarId
-              ? jars.map((j) =>
-                  j.id === jarId ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j,
-                )
-              : jars,
-          };
+          const target = c.jars.find((j) => j.id === id);
+          // Force-move the removed jar's categories to "Khác" so no expense
+          // category is orphaned (exactly-one). Heal creates/extends "Khác".
+          const moved =
+            target && target.categoryIds.length > 0
+              ? healOrphanCategories({ ...c, jars: c.jars.filter((j) => j.id !== id) })
+              : { ...c, jars: c.jars.filter((j) => j.id !== id) };
+          return moved;
         }),
-      setAllocation: (id, allocation) =>
-        mutate((c) => ({
-          ...c,
-          jars: c.jars.map((j) => (j.id === id ? { ...j, allocation } : j)),
-        })),
+      assignCategory: (categoryId, jarId) =>
+        // Unassign is forbidden under exactly-one — a null target is a no-op.
+        jarId === null
+          ? undefined
+          : mutate((c) => {
+              const jars = stripCategories(c.jars, [categoryId]);
+              return {
+                ...c,
+                jars: jars.map((j) =>
+                  j.id === jarId ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j,
+                ),
+              };
+            }),
       applyTemplate: (templateId) =>
         mutate(() =>
-          dedupeCategories(
-            JSON.parse(JSON.stringify(configFromTemplate(JAR_TEMPLATES[templateId]))) as JarConfig,
+          healOrphanCategories(
+            dedupeCategories(
+              JSON.parse(JSON.stringify(configFromTemplate(JAR_TEMPLATES[templateId]))) as JarConfig,
+            ),
           ),
         ),
       resetToSeed: () => mutate(() => seed()),

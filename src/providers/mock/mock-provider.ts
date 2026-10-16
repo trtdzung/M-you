@@ -4,7 +4,7 @@
  * TransactionQuery filtering server-side so callers get exactly what they ask.
  */
 
-import type { Asset, JarConfig, Liability, Transaction, TransactionQuery } from "@/domain/models";
+import type { Asset, Jar, JarConfig, Liability, Transaction, TransactionQuery } from "@/domain/models";
 import {
   ASSET_STORE_VERSION,
   isUserRecordStore,
@@ -79,36 +79,60 @@ function userRecordStore<T extends { id: string }>(
 }
 
 /**
- * Structural guard (M11). Any parse error or shape mismatch → treated as absent
- * so the caller seeds a default; never throws. `version` gates future migration.
+ * True for a structurally-sound jar (shared by the v3 guard and v2 migration).
+ * `budgetLimit` is optional (`undefined` = chưa đặt, invariant #6); when present
+ * it must be a finite, non-negative amount so a corrupted record never smuggles a
+ * NaN/Infinity/negative past this storage boundary. `color`/`icon` are optional
+ * presentation overrides. The legacy `allocation` field is ignored (dropped on
+ * migration), so a v2 jar validates on its shared fields alone.
+ */
+function isValidJar(jar: unknown): boolean {
+  if (typeof jar !== "object" || jar === null) return false;
+  const j = jar as Record<string, unknown>;
+  if (typeof j.id !== "string" || typeof j.label !== "string") return false;
+  if (!Array.isArray(j.categoryIds) || !j.categoryIds.every((c) => typeof c === "string")) return false;
+  if (
+    j.budgetLimit !== undefined &&
+    !(typeof j.budgetLimit === "number" && Number.isFinite(j.budgetLimit) && j.budgetLimit >= 0)
+  ) {
+    return false;
+  }
+  if (j.color !== undefined && typeof j.color !== "string") return false;
+  if (j.icon !== undefined && typeof j.icon !== "string") return false;
+  return true;
+}
+
+/**
+ * Structural guard (M11) for a current v3 jar config (BIDV wallet model — no
+ * `allocation`). Any parse error or shape mismatch → treated as absent so the
+ * caller seeds a default; never throws.
  */
 function isValidJarConfig(value: unknown): value is JarConfig {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  // v2 (Model A). A stored v1 fails here → treated as absent → caller reseeds.
-  if (v.version !== 2 || !Array.isArray(v.jars)) return false;
-  return v.jars.every((jar) => {
-    if (typeof jar !== "object" || jar === null) return false;
-    const j = jar as Record<string, unknown>;
-    const a = j.allocation as Record<string, unknown> | undefined;
-    if (
-      typeof j.id !== "string" ||
-      typeof j.label !== "string" ||
-      !Array.isArray(j.categoryIds) ||
-      !j.categoryIds.every((c) => typeof c === "string") ||
-      !a ||
-      !(a.mode === "percent" || a.mode === "amount") ||
-      typeof a.value !== "number"
-    ) {
-      return false;
-    }
-    // The value must be a real, sane allocation — a corrupted / hand-edited
-    // record must never smuggle a NaN/Infinity/negative (or a >100% percent) past
-    // this boundary and into `resolveAllocation`, where it would break the
-    // `Σ ≡ số dư` identity. `validateJarInput` guards the in-app UI path; this
-    // guards the storage path with the same contract.
-    return Number.isFinite(a.value) && a.value >= 0 && (a.mode !== "percent" || a.value <= 100);
+  if (v.version !== 3 || !Array.isArray(v.jars)) return false;
+  return v.jars.every(isValidJar);
+}
+
+/**
+ * Load-time migration (phase 08). A stored v3 loads unchanged. A legacy v2
+ * (balance-lens — carried `allocation`) is migrated FORWARD: allocation dropped,
+ * `budgetLimit`/`color`/`icon` kept, version bumped to 3 — so an upgrading user
+ * is never wiped. Anything else (v1, garbage, malformed jar) → null → reseed.
+ */
+function migrateStoredJarConfig(value: unknown): JarConfig | null {
+  if (isValidJarConfig(value)) return value;
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (v.version !== 2 || !Array.isArray(v.jars) || !v.jars.every(isValidJar)) return null;
+  const jars: Jar[] = (v.jars as Record<string, unknown>[]).map((j) => {
+    const jar: Jar = { id: j.id as string, label: j.label as string, categoryIds: j.categoryIds as string[] };
+    if (j.budgetLimit !== undefined) jar.budgetLimit = j.budgetLimit as number;
+    if (j.color !== undefined) jar.color = j.color as string;
+    if (j.icon !== undefined) jar.icon = j.icon as string;
+    return jar;
   });
+  return { version: 3, jars };
 }
 
 function matches(txn: Transaction, q: TransactionQuery): boolean {
@@ -210,7 +234,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId): Prov
         const raw = window.localStorage.getItem(jarKey(personaId));
         if (!raw) return null;
         const parsed: unknown = JSON.parse(raw);
-        return isValidJarConfig(parsed) ? parsed : null;
+        return migrateStoredJarConfig(parsed);
       } catch {
         return null; // corrupt/unavailable storage → seed a default
       }

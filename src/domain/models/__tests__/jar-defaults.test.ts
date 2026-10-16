@@ -7,10 +7,7 @@ import {
   JAR_TEMPLATE_LIST,
 } from "@/domain/models/jar-defaults";
 
-const percentSum = (jars: { allocation: { mode: string; value: number } }[]) =>
-  jars.reduce((s, j) => s + (j.allocation.mode === "percent" ? j.allocation.value : 0), 0);
-
-describe("jar templates (Model A / v2)", () => {
+describe("jar templates (BIDV wallet model / v3)", () => {
   it("ships exactly three templates: Cá nhân (6), Gia đình (4), Kinh doanh (3)", () => {
     expect(JAR_TEMPLATE_LIST.map((t) => t.id)).toEqual(["caNhan", "giaDinh", "kinhDoanh"]);
     expect(JAR_TEMPLATES.caNhan.jars).toHaveLength(6);
@@ -18,10 +15,11 @@ describe("jar templates (Model A / v2)", () => {
     expect(JAR_TEMPLATES.kinhDoanh.jars).toHaveLength(3);
   });
 
-  it("every template's percents sum ≤ 100 (never starts over-allocated)", () => {
-    for (const t of JAR_TEMPLATE_LIST) {
-      expect(percentSum(t.jars)).toBeLessThanOrEqual(100);
-    }
+  it("the caNhan savings jar has no categories and NO budgetLimit (chưa đặt, never 0)", () => {
+    const savings = JAR_TEMPLATES.caNhan.jars.find((j) => j.id === "savings");
+    expect(savings).toBeDefined();
+    expect(savings?.categoryIds).toEqual([]);
+    expect(savings?.budgetLimit).toBeUndefined();
   });
 
   it("no category appears in two jars within a template (one-category-one-jar)", () => {
@@ -41,9 +39,15 @@ describe("jar templates (Model A / v2)", () => {
     }
   });
 
-  it("DEFAULT_JAR_CONFIG is v2 Cá nhân, with no legacy fields", () => {
-    expect(DEFAULT_JAR_CONFIG.version).toBe(2);
+  it("DEFAULT_JAR_CONFIG is v3 Cá nhân, with no legacy allocation field", () => {
+    expect(DEFAULT_JAR_CONFIG.version).toBe(3);
     expect(DEFAULT_JAR_CONFIG).toEqual(configFromTemplate(JAR_TEMPLATES.caNhan));
     expect("incomeBasis" in DEFAULT_JAR_CONFIG).toBe(false);
+    expect(DEFAULT_JAR_CONFIG.jars.every((j) => !("allocation" in j))).toBe(true);
+  });
+
+  it("configFromTemplate returns a version 3 config", () => {
+    expect(configFromTemplate(JAR_TEMPLATES.giaDinh).version).toBe(3);
+    expect(configFromTemplate(JAR_TEMPLATES.kinhDoanh).version).toBe(3);
   });
 });

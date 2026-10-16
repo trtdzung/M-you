@@ -43,3 +43,17 @@ const COLOR_BY_ID: Map<string, string> = new Map(
 export function categoryColor(categoryId: string): string {
   return COLOR_BY_ID.get(categoryId) ?? CATEGORY_COLOR_FALLBACK;
 }
+
+/** The jar-color swatches offered in settings (the shared accent family). */
+export const JAR_COLOR_OPTIONS: readonly string[] = PALETTE;
+
+/**
+ * A jar's display accent: its stored `color` if the user picked one, else the
+ * hue of its first category, else neutral slate (a category-less jar like
+ * "Tiết kiệm"). Keeps one source of truth for jar color across screens.
+ */
+export function jarAccent(jar: { color?: string; categoryIds: string[] }): string {
+  if (jar.color) return jar.color;
+  const first = jar.categoryIds[0];
+  return first ? categoryColor(first) : CATEGORY_COLOR_FALLBACK;
+}

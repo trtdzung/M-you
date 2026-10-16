@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { PersonaProvider, usePersona } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
+import { ManualTxnsProvider } from "@/state/manual-txns";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { AssetLiabilityProvider } from "@/state/assets";
@@ -21,6 +22,7 @@ function wrapper({ children }: { children: ReactNode }) {
   return (
     <PersonaProvider>
       <CorrectionsProvider>
+      <ManualTxnsProvider>
         <JarConfigProvider>
           <AssetLiabilityProvider>
             <GoalProvider>
@@ -28,7 +30,8 @@ function wrapper({ children }: { children: ReactNode }) {
             </GoalProvider>
           </AssetLiabilityProvider>
         </JarConfigProvider>
-      </CorrectionsProvider>
+        </ManualTxnsProvider>
+    </CorrectionsProvider>
     </PersonaProvider>
   );
 }

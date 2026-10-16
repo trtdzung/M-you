@@ -20,18 +20,16 @@ import type {
 } from "@/domain/models";
 import {
   aggregateCashflow,
-  assertPartitionBalances,
   calculateNetWorth,
   cashRunwayMonths,
   dateToMonthKey,
   detectRecurring,
   estimateEndOfMonth,
   evaluateBudget,
-  evaluateJarPartition,
+  evaluateJarBudget,
   financialHealth,
   monthPeriodFromKey,
   networthTrend,
-  resolvePrimaryAccount,
   spendingByCategory,
   upcomingObligations,
   type BudgetLine,
@@ -40,7 +38,7 @@ import {
   type CategorySpend,
   type EndOfMonthEstimate,
   type FinancialHealth,
-  type JarPartitionResult,
+  type JarBudgetResult,
   type NetWorthResult,
   type NetWorthTrendMeta,
   type Obligation,
@@ -84,11 +82,12 @@ export interface Financials {
   /** Lowest-trust provenance over the exact snapshots feeding the series (H2). */
   networthSeriesMeta: NetWorthTrendMeta;
   /**
-   * Snapshot partition of the current primary-account balance (Model A):
-   * explicit jar earmarks + a "Chưa phân bổ" residual, `Σ ≡ balance`. Status is
-   * "unknown" when the primary account is ambiguous (0 or 2+ current accounts).
+   * Per-jar budget (BIDV wallet model, plan 260910-1626): đã tiêu vs hạn mức for
+   * the selected period, with MoM + a total gauge. This is the source of truth for
+   * the Ngân sách tab + the overview donut grouping — screens read THIS, never
+   * recompute jar spend (invariant #2). Unset limits stay unknown (never 0).
    */
-  jarPartition: JarPartitionResult;
+  jarBudget: JarBudgetResult;
   /**
    * Financial-health indicators (runway, surplus, essential coverage, asset
    * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
@@ -168,18 +167,7 @@ export function computeFinancials(
     ? estimateEndOfMonth(raw.accounts, cashflow, recurring, obligations, now)
     : { value: "unknown", meta: { source: "estimated", freshness: cashflow.meta.freshness } };
 
-  const jarConfig: JarConfig = options.jarConfig ?? { version: 2, jars: [] };
-  // Partition the CURRENT balance (Model A): earmarks resolve against the primary
-  // account, the per-jar "đã tiêu" overlay uses the selected + previous period.
-  const jarPartition = evaluateJarPartition(
-    jarConfig,
-    resolvePrimaryAccount(raw.accounts),
-    txns,
-    period,
-    prevPeriod,
-  );
-  // Dev-only defence-in-depth: `Σ earmark === balance`. No-op in production.
-  assertPartitionBalances(jarPartition);
+  const jarConfig: JarConfig = options.jarConfig ?? { version: 3, jars: [] };
 
   // Net worth is composed once and reused for `health` (DRY) so the concentration
   // indicator sees the exact same breakdown as the headline. Uses the merged
@@ -201,7 +189,7 @@ export function computeFinancials(
     networthPrevious: trend.previous,
     networthSeries: trend.series,
     networthSeriesMeta: trend.meta,
-    jarPartition,
+    jarBudget: evaluateJarBudget(jarConfig, txns, period, prevPeriod, now),
     health: financialHealth(cashflow, raw.accounts, networth),
     goals: [...raw.goals, ...(options.userGoals ?? [])],
   };

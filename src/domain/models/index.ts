@@ -161,38 +161,37 @@ export interface Budget {
 }
 
 /**
- * A jar's allocation — its SHARE of the current primary-account balance (Model
- * A, snapshot partition). `percent` is a percentage of that balance; `amount` is
- * a fixed VND earmark. It never moves money and never depends on income or a
- * clock — the earmark is resolved fresh against the live balance on every eval.
- */
-export type JarAllocation =
-  | { mode: "percent"; value: number }
-  | { mode: "amount"; value: number };
-
-/**
- * A user-defined jar. A jar is a display-only LENS over the current balance: it
- * earmarks a share of the balance and groups one or more real expense categories
- * so a per-period "đã tiêu" overlay can show budget-vs-actual. No sub-account, no
- * jar balance, no money movement. Presentation assigns a palette by index.
+ * A user-defined jar. In the BIDV wallet model (plan 260910-1626) a jar is a
+ * GROUP of expense categories with a monthly spending limit (`budgetLimit`), so a
+ * per-period "đã tiêu vs hạn mức" gauge can show budget-vs-actual. Every expense
+ * category belongs to exactly one jar (enforced in `state/jars`). No sub-account,
+ * no jar balance, no money movement. Presentation assigns a palette by index.
+ *
+ * `budgetLimit` is OPTIONAL: `undefined` means "chưa đặt hạn mức" — a genuinely
+ * unknown limit, NEVER a silent 0 (invariant #6). A limit is set at onboarding /
+ * settings. The legacy balance-lens `allocation` share was dropped in phase 08.
  */
 export interface Jar {
   id: string;
   label: string;
   /** Real expense category IDs this jar covers (one-category-one-jar). */
   categoryIds: string[];
-  allocation: JarAllocation;
+  /** Monthly spending limit in VND. `undefined` = chưa đặt (unknown, never 0). */
+  budgetLimit?: number;
+  /** Optional presentation overrides (settings). Absent = derive from category. */
+  color?: string;
+  icon?: string;
 }
 
 /**
  * Persisted jar configuration (user state, threaded into the engine — never
- * provider RawData). Model A / v2: a flat list of jars that partition the
- * current balance. No `incomeBasis`, no anchor, no clock — those belonged to the
- * superseded spending-envelope model. Stored v1 configs are discarded and
- * reseeded on load (see `state/jars` migration).
+ * provider RawData). v3 (phase 08): a flat list of category-group jars, each with
+ * an optional monthly `budgetLimit`. This is the BIDV wallet model — the legacy
+ * balance-lens `allocation` was dropped here. A stored v2 config migrates forward
+ * (allocation stripped, `budgetLimit` kept); v1 configs are reseeded on load.
  */
 export interface JarConfig {
-  version: 2;
+  version: 3;
   jars: Jar[];
 }
 

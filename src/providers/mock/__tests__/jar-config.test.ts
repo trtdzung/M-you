@@ -4,20 +4,20 @@ import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 import { getProviders } from "@/providers";
 
 const CFG: JarConfig = {
-  version: 2,
-  jars: [{ id: "j", label: "J", categoryIds: ["dining"], allocation: { mode: "amount", value: 1_000_000 } }],
+  version: 3,
+  jars: [{ id: "j", label: "J", categoryIds: ["dining"], budgetLimit: 1_000_000 }],
 };
 
 beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe("mock provider jar config (persona-scoped, schema-guarded, v2)", () => {
+describe("mock provider jar config (persona-scoped, schema-guarded, v3)", () => {
   it("returns null when nothing is stored, so the caller seeds a default", async () => {
     expect(await getProviders("stable").getJarConfig()).toBeNull();
   });
 
-  it("round-trips a saved v2 config", async () => {
+  it("round-trips a saved v3 config", async () => {
     const p = getProviders("stable");
     await p.saveJarConfig(CFG);
     expect(await p.getJarConfig()).toEqual(CFG);
@@ -30,35 +30,76 @@ describe("mock provider jar config (persona-scoped, schema-guarded, v2)", () => 
     window.localStorage.setItem(key, "not json");
     expect(await p.getJarConfig()).toBeNull();
 
-    // Legacy v1 is no longer valid — treated as absent → caller reseeds v2.
+    // Legacy v1 is no longer valid — treated as absent → caller reseeds v3.
     window.localStorage.setItem(key, JSON.stringify({ version: 1, incomeBasis: "auto", jars: [] }));
     expect(await p.getJarConfig()).toBeNull();
 
-    window.localStorage.setItem(key, JSON.stringify({ version: 2, jars: [{ id: 1 }] }));
+    window.localStorage.setItem(key, JSON.stringify({ version: 3, jars: [{ id: 1 }] }));
     expect(await p.getJarConfig()).toBeNull(); // malformed jar
 
-    window.localStorage.setItem(key, JSON.stringify({ version: 2, jars: "nope" }));
+    window.localStorage.setItem(key, JSON.stringify({ version: 3, jars: "nope" }));
     expect(await p.getJarConfig()).toBeNull(); // jars not an array
   });
 
-  it("[storage boundary] rejects NaN / Infinity / negative / >100% allocation values", async () => {
+  it("[storage boundary] rejects a v3 jar with a NaN/Infinity/negative budgetLimit", async () => {
     const p = getProviders("stable");
     const key = "msb-pfm.jars.stable";
-    const withValue = (mode: "percent" | "amount", value: unknown) =>
-      JSON.stringify({ version: 2, jars: [{ id: "j", label: "J", categoryIds: [], allocation: { mode, value } }] });
+    const withLimit = (value: unknown) =>
+      JSON.stringify({ version: 3, jars: [{ id: "j", label: "J", categoryIds: [], budgetLimit: value }] });
 
     // NaN / Infinity do not survive JSON.stringify (→ null), so inject them raw.
-    window.localStorage.setItem(key, '{"version":2,"jars":[{"id":"j","label":"J","categoryIds":[],"allocation":{"mode":"amount","value":NaN}}]}');
+    window.localStorage.setItem(
+      key,
+      '{"version":3,"jars":[{"id":"j","label":"J","categoryIds":[],"budgetLimit":NaN}]}',
+    );
     expect(await p.getJarConfig()).toBeNull();
 
-    window.localStorage.setItem(key, withValue("amount", -1));
+    window.localStorage.setItem(key, withLimit(-1));
     expect(await p.getJarConfig()).toBeNull(); // negative
 
-    window.localStorage.setItem(key, withValue("percent", 150));
-    expect(await p.getJarConfig()).toBeNull(); // percent over 100
+    window.localStorage.setItem(key, withLimit(5_000_000));
+    expect((await p.getJarConfig())?.jars[0].budgetLimit).toBe(5_000_000); // a valid one still round-trips
+  });
 
-    window.localStorage.setItem(key, withValue("percent", 60));
-    expect((await p.getJarConfig())?.jars[0].allocation.value).toBe(60); // a valid one still round-trips
+  it("[phase 08 migration] a stored legacy v2 config migrates forward to v3 (allocation dropped, budgetLimit + version kept — never wiped)", async () => {
+    const p = getProviders("stable");
+    const key = "msb-pfm.jars.stable";
+    const legacyV2 = {
+      version: 2,
+      jars: [
+        {
+          id: "food",
+          label: "Ăn uống",
+          categoryIds: ["dining", "groceries"],
+          allocation: { mode: "amount", value: 3_000_000 },
+          budgetLimit: 4_000_000,
+          color: "#ff0000",
+        },
+        {
+          id: "savings",
+          label: "Tiết kiệm",
+          categoryIds: [],
+          allocation: { mode: "percent", value: 20 },
+          // no budgetLimit — stays unset through migration
+        },
+      ],
+    };
+    window.localStorage.setItem(key, JSON.stringify(legacyV2));
+
+    const migrated = await p.getJarConfig();
+    expect(migrated).not.toBeNull();
+    expect(migrated!.version).toBe(3);
+    expect(migrated!.jars).toHaveLength(2);
+
+    const food = migrated!.jars.find((j) => j.id === "food")!;
+    expect(food.budgetLimit).toBe(4_000_000); // kept
+    expect(food.color).toBe("#ff0000"); // kept
+    expect(food.categoryIds).toEqual(["dining", "groceries"]); // kept
+    expect("allocation" in food).toBe(false); // dropped
+
+    const savings = migrated!.jars.find((j) => j.id === "savings")!;
+    expect(savings.budgetLimit).toBeUndefined(); // stays chưa đặt, never coerced to 0
+    expect("allocation" in savings).toBe(false);
   });
 
   it("[H5] isolates config per persona — no leak across personas", async () => {

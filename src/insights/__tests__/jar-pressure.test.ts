@@ -1,54 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { JarPartitionLine, JarPartitionResult } from "@/domain/engine";
 import { currentMonthKey } from "@/lib/demo-clock";
 import { jarPressure } from "../detectors/jar-pressure";
 import { numbersIn, factValues } from "../narrate";
 import type { Insight } from "../types";
-import { makeFinancials } from "./helpers";
+import { makeFinancials, makeJarBudgetLine, makeJarBudgetResult } from "./helpers";
 
 const THIS_MONTH = currentMonthKey();
-
-function jarLine(over: Partial<JarPartitionLine>): JarPartitionLine {
-  return {
-    jarId: "food",
-    label: "Ăn uống",
-    categoryIds: ["dining"],
-    earmark: 3_000_000,
-    spentThisPeriod: 1_000_000,
-    spentPrevPeriod: 900_000,
-    isOverBudget: false,
-    perCategory: [],
-    meta: { source: "mock", freshness: null },
-    ...over,
-  };
-}
-
-function residualLine(over: Partial<JarPartitionLine>): JarPartitionLine {
-  return {
-    jarId: "unallocated",
-    label: "Chưa phân bổ",
-    categoryIds: [],
-    earmark: 2_000_000,
-    spentThisPeriod: 0,
-    spentPrevPeriod: 0,
-    isOverBudget: false,
-    perCategory: [],
-    meta: { source: "msb", freshness: null },
-    isResidual: true,
-    isOverAllocated: false,
-    ...over,
-  };
-}
-
-function partition(lines: JarPartitionLine[], status: JarPartitionResult["status"] = "ok"): JarPartitionResult {
-  return {
-    status,
-    primaryBalance: status === "ok" ? 10_000_000 : null,
-    lines,
-    total: 10_000_000,
-    meta: { source: "msb", freshness: null },
-  };
-}
 
 /** Money-scale numbers (>=1000, non-year) in the explanation must be grounded. */
 function assertGrounded(insight: Insight) {
@@ -59,55 +16,137 @@ function assertGrounded(insight: Insight) {
   }
 }
 
-describe("jarPressure detector (Model A — over-budget / over-allocated)", () => {
-  it("flags an over-budget jar as attention and stays grounded", () => {
+describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
+  it("flags an over-limit SET jar as urgent", () => {
     const insight = jarPressure(
       makeFinancials({
         monthKey: THIS_MONTH,
-        jarPartition: partition([
-          jarLine({ spentThisPeriod: 4_000_000, earmark: 3_000_000, isOverBudget: true }),
-          residualLine({}),
-        ]),
-      }),
-    );
-    expect(insight?.severity).toBe("attention");
-    expect(insight?.type).toBe("jar_pressure");
-    expect(insight?.title).toContain("Ăn uống");
-    assertGrounded(insight!);
-  });
-
-  it("prioritises an over-allocated residual (urgent) over an over-budget jar", () => {
-    const insight = jarPressure(
-      makeFinancials({
-        monthKey: THIS_MONTH,
-        jarPartition: partition([
-          jarLine({ spentThisPeriod: 4_000_000, earmark: 3_000_000, isOverBudget: true }),
-          residualLine({ earmark: -2_000_000, isOverAllocated: true }),
-        ]),
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({
+              huId: "food",
+              label: "Ăn uống",
+              spent: 4_800_000,
+              limit: 4_000_000,
+              limitState: "set",
+              status: "over",
+              pct: 1.2,
+              remaining: -800_000,
+              thresholdHit: true,
+            }),
+          ],
+        }),
       }),
     );
     expect(insight?.severity).toBe("urgent");
-    expect(insight?.title).toContain("vượt số dư");
+    expect(insight?.type).toBe("jar_pressure");
+    expect(insight?.actionType).toBe("review_jars");
+    expect(insight?.title).toBe('Vượt hạn mức hũ "Ăn uống"');
+    expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:food`);
     assertGrounded(insight!);
   });
 
-  it("picks the largest breach when several jars are over budget", () => {
+  it("flags a near-limit SET jar (>=80% used, not over) as attention", () => {
     const insight = jarPressure(
       makeFinancials({
         monthKey: THIS_MONTH,
-        jarPartition: partition([
-          jarLine({ jarId: "small", label: "Nhỏ", spentThisPeriod: 1_100_000, earmark: 1_000_000, isOverBudget: true }),
-          jarLine({ jarId: "big", label: "Lớn", spentThisPeriod: 5_000_000, earmark: 2_000_000, isOverBudget: true }),
-          residualLine({}),
-        ]),
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({
+              huId: "transport",
+              label: "Di chuyển",
+              spent: 900_000,
+              limit: 1_000_000,
+              limitState: "set",
+              status: "near",
+              pct: 0.9,
+              remaining: 100_000,
+              thresholdHit: true,
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(insight?.severity).toBe("attention");
+    expect(insight?.title).toBe('Sắp vượt hạn mức hũ "Di chuyển"');
+    assertGrounded(insight!);
+  });
+
+  it("picks the largest breach (over jars ranked before near, by pct)", () => {
+    const insight = jarPressure(
+      makeFinancials({
+        monthKey: THIS_MONTH,
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({
+              huId: "small",
+              label: "Nhỏ",
+              spent: 1_100_000,
+              limit: 1_000_000,
+              limitState: "set",
+              status: "over",
+              pct: 1.1,
+            }),
+            makeJarBudgetLine({
+              huId: "big",
+              label: "Lớn",
+              spent: 5_000_000,
+              limit: 2_000_000,
+              limitState: "set",
+              status: "over",
+              pct: 2.5,
+            }),
+          ],
+        }),
       }),
     );
     expect(insight?.title).toContain("Lớn");
   });
 
-  it("returns null when nothing is over budget or over allocated", () => {
+  it("returns null when an unset-limit jar (limitState 'unset', status null) has spend", () => {
     expect(
-      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarPartition: partition([jarLine({}), residualLine({})]) })),
+      jarPressure(
+        makeFinancials({
+          monthKey: THIS_MONTH,
+          jarBudget: makeJarBudgetResult({
+            lines: [
+              makeJarBudgetLine({
+                huId: "savings",
+                label: "Tiết kiệm",
+                spent: 3_000_000,
+                limit: null,
+                limitState: "unset",
+                status: null,
+                pct: null,
+                remaining: null,
+              }),
+            ],
+          }),
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("returns null when every SET jar is ok (no over / near)", () => {
+    expect(
+      jarPressure(
+        makeFinancials({
+          monthKey: THIS_MONTH,
+          jarBudget: makeJarBudgetResult({
+            lines: [
+              makeJarBudgetLine({
+                huId: "food",
+                spent: 1_000_000,
+                limit: 4_000_000,
+                limitState: "set",
+                status: "ok",
+                pct: 0.25,
+                remaining: 3_000_000,
+              }),
+            ],
+          }),
+        }),
+      ),
     ).toBeNull();
   });
 
@@ -115,15 +154,26 @@ describe("jarPressure detector (Model A — over-budget / over-allocated)", () =
     const insight = jarPressure(
       makeFinancials({
         monthKey: "2026-06",
-        jarPartition: partition([jarLine({ spentThisPeriod: 4_000_000, earmark: 3_000_000, isOverBudget: true }), residualLine({})]),
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({
+              huId: "food",
+              spent: 4_800_000,
+              limit: 4_000_000,
+              limitState: "set",
+              status: "over",
+              pct: 1.2,
+            }),
+          ],
+        }),
       }),
     );
     expect(insight).toBeNull();
   });
 
-  it("returns null when the partition is unknown (ambiguous primary account)", () => {
+  it("returns null when there are no jarBudget lines at all", () => {
     expect(
-      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarPartition: partition([], "unknown") })),
+      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines: [] }) })),
     ).toBeNull();
   });
 });

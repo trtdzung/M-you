@@ -7,10 +7,9 @@ import {
   calculateNetWorth,
   detectRecurring,
   evaluateBudget,
-  evaluateJarPartition,
+  evaluateJarBudget,
   financialHealth,
   monthPeriodFromKey,
-  resolvePrimaryAccount,
   spendingByCategory,
   upcomingObligations,
 } from "..";
@@ -88,35 +87,33 @@ describe("computeFinancials", () => {
     expect(past.endOfMonth.meta.source).toBe("estimated");
   });
 
-  it("yields a full-balance residual partition when no jarConfig is supplied", async () => {
+  it("yields an empty jarBudget (no lines, no set limit) when no jarConfig is supplied", async () => {
     const raw = await loadRaw("stable");
     const f = computeFinancials(raw, MONTH);
-    const balance = resolvePrimaryAccount(raw.accounts)!.balance;
-    expect(f.jarPartition.status).toBe("ok");
-    expect(f.jarPartition.lines).toHaveLength(1); // residual only
-    expect(f.jarPartition.lines[0].isResidual).toBe(true);
-    expect(f.jarPartition.total).toBe(balance);
+    expect(f.jarBudget.lines).toEqual([]);
+    expect(f.jarBudget.summary.totalLimit).toBeNull();
+    expect(f.jarBudget.summary.totalSpent).toBe(0);
+    expect(f.jarBudget.summary.setCount).toBe(0);
+    expect(f.jarBudget.summary.unsetCount).toBe(0);
   });
 
-  it("threads a supplied jarConfig through to jarPartition, reconciling to balance", async () => {
+  it("threads a supplied jarConfig through to jarBudget, matching evaluateJarBudget directly", async () => {
     const raw = await loadRaw("stable");
     const jarConfig: JarConfig = {
-      version: 2,
-      jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } },
-      ],
+      version: 3,
+      jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 5_000_000 }],
     };
     const f = computeFinancials(raw, MONTH, { jarConfig });
 
     const period = monthPeriodFromKey(MONTH);
     const prevPeriod = monthPeriodFromKey(prevMonthKey(MONTH));
-    const primary = resolvePrimaryAccount(raw.accounts);
 
-    expect(f.jarPartition).toEqual(
-      evaluateJarPartition(jarConfig, primary, raw.transactions, period, prevPeriod),
+    expect(f.jarBudget).toEqual(
+      evaluateJarBudget(jarConfig, raw.transactions, period, prevPeriod, DEMO_NOW),
     );
-    expect(f.jarPartition.total).toBe(primary!.balance); // Σ ≡ số dư
-    expect(f.jarPartition.lines.length).toBeGreaterThan(1); // explicit jar + residual
+    expect(f.jarBudget.lines).toHaveLength(1);
+    expect(f.jarBudget.lines[0].huId).toBe("food");
+    expect(f.jarBudget.lines[0].limit).toBe(5_000_000);
   });
 
   it("[red-team #3] merges user assets/liabilities into net worth without double-counting seed", async () => {

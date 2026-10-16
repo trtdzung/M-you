@@ -1,5 +1,5 @@
 import { PhoneShell } from "@/components/shell/PhoneShell";
-import { AssistantFab } from "@/components/shell/AssistantFab";
+import { PfmBottomNav } from "@/components/pfm/PfmBottomNav";
 import { PfmHeader } from "@/components/pfm/PfmHeader";
 
 /**
@@ -20,9 +20,10 @@ function CalmBg() {
 
 /**
  * Chrome for `/pfm/*`: the calm surface, a `PfmHeader` back-arrow sub-app header,
- * and the restyled AI FAB. Deliberately NO bottom nav — the 4 segmented tabs
- * inside the page are the sole PFM navigation. `shell-calm` retints the status
- * ink to navy; `shell-main--pfm` drops the reserved bottom-nav clearance.
+ * and the BIDV-style wallet `PfmBottomNav` (4 tabs + center ＋ FAB). This
+ * SUPERSEDES the no-bottom-nav decision of plan 260908 (the 3 segmented top-tabs)
+ * — the user chose the 4-tab + FAB IA. `shell-calm` retints the status ink to
+ * navy; `shell-main--pfm` reserves bottom-nav clearance for the panel content.
  */
 export default function PfmLayout({
   children,
@@ -32,7 +33,7 @@ export default function PfmLayout({
   return (
     <PhoneShell
       background={<CalmBg />}
-      fab={<AssistantFab />}
+      nav={<PfmBottomNav />}
       className="shell-calm lg:shadow-[0_24px_70px_-24px_rgba(31,42,68,0.45)] lg:ring-1 lg:ring-black/[0.06]"
       mainClassName="shell-main--pfm"
       stageClassName="lg:bg-stone-200"

@@ -91,11 +91,12 @@ body {
   padding-bottom: calc(var(--spacing-shell-nav-clearance) + var(--safe-area-bottom));
 }
 
-/* PFM main: no bottom nav — only the floating FAB needs clearance, so content
-   reclaims the ~104px the 3-tab bar used to reserve. Must follow `.shell-main`
-   (equal specificity → source order wins). */
+/* PFM main: the BIDV wallet bottom nav (4 tabs + center ＋ FAB) is pinned to the
+   device-canvas bottom, so content reserves the same nav clearance the festive
+   shell uses (plan 260910-1626 supersedes 260908's no-nav reclaim). Must follow
+   `.shell-main` (equal specificity → source order wins). */
 .shell-main--pfm {
-  padding-bottom: calc(var(--spacing-shell-fab-clearance) + var(--safe-area-bottom));
+  padding-bottom: calc(var(--spacing-shell-nav-clearance) + var(--safe-area-bottom));
 }
 
 /* Assistant: full-bleed chat surface — app-bar + docked composer own the edges,
