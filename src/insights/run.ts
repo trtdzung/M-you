@@ -6,11 +6,11 @@
 import type { Financials } from "@/state/useFinancials";
 import type { Insight } from "./types";
 import { SEVERITY_RANK } from "./types";
-import { budgetPressure } from "./detectors/budgetPressure";
-import { upcomingObligation } from "./detectors/upcomingObligation";
-import { spendingSpike } from "./detectors/spendingSpike";
-import { incomeChange } from "./detectors/incomeChange";
-import { newRecurring } from "./detectors/newRecurring";
+import { budgetPressure } from "./detectors/budget-pressure";
+import { upcomingObligation } from "./detectors/upcoming-obligation";
+import { spendingSpike } from "./detectors/spending-spike";
+import { incomeChange } from "./detectors/income-change";
+import { newRecurring } from "./detectors/new-recurring";
 
 const DETECTORS = [budgetPressure, upcomingObligation, spendingSpike, incomeChange, newRecurring];
 

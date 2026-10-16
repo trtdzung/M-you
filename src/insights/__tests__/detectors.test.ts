@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { runDetectors } from "../run";
-import { budgetPressure } from "../detectors/budgetPressure";
-import { spendingSpike } from "../detectors/spendingSpike";
-import { incomeChange } from "../detectors/incomeChange";
+import { budgetPressure } from "../detectors/budget-pressure";
+import { spendingSpike } from "../detectors/spending-spike";
+import { incomeChange } from "../detectors/income-change";
 import { numbersIn, factValues } from "../narrate";
 import { answerPrompt } from "../assistant";
 import type { Insight } from "../types";

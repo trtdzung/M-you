@@ -2,6 +2,11 @@
   "name": "msb-pfm",
   "version": "0.1.0",
   "private": true,
+  "description": "MSB Financial Copilot — a mock-data-first personal financial management (PFM) prototype with a grounded, non-committing AI facade.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

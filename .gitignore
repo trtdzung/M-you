@@ -17,6 +17,9 @@
 .DS_Store
 *.pem
 
+# local design reference (MSB app screenshots — not part of the codebase)
+/ref-ui-msb/
+
 # debug logs
 npm-debug.log*
 yarn-debug.log*
@@ -30,3 +33,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local working docs (plans, backlog, research reports — not part of the codebase)
+/plans/
