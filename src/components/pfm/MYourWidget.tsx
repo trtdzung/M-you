@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { Loading, ErrorState } from "@/components/states";
 import { usePersona } from "@/providers/context";
 import { getChatHistory, sendChatMessage, deleteChatHistory, type HistoryMessage } from "@/lib/agent-api";
+import { AgentMarkdown } from "./AgentMarkdown";
 
 interface ChatBubble {
   id: string;
@@ -205,7 +206,7 @@ export function MYourWidget() {
                             : "shadow-card rounded-bl-sm bg-surface-muted text-text",
                       )}
                     >
-                      {m.text}
+                      {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
                     </div>
                   </div>
                 ))}

@@ -105,6 +105,25 @@ describe("MYourWidget", () => {
     expect(await screen.findByText("Trả lời từ M-Your")).toBeInTheDocument();
   });
 
+  it("renders markdown in agent replies (bold text and a GFM table) as real elements", async () => {
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
+      answer:
+        "Bạn đang có **2 hũ**:\n\n| Hũ | Số tiền |\n|----|---------|\n| Giải trí | 600.000đ |\n| Tiết kiệm khẩn cấp | 5.000.000đ |",
+      thread_id: "CIF_0001",
+    });
+    renderWidget();
+    open();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Tôi có bao nhiêu hũ" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("cell", { name: "Giải trí" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "5.000.000đ" })).toBeInTheDocument();
+    expect(screen.getByText("2 hũ").tagName).toBe("STRONG");
+  });
+
   it("shows an inline error on the reply bubble when sending fails", async () => {
     vi.spyOn(agentApi, "sendChatMessage").mockRejectedValueOnce(new Error("network down"));
     renderWidget();
