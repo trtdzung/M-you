@@ -44,7 +44,7 @@ export function JarList({
           title="Chưa có hũ chi tiêu"
           description="Tạo hũ để chia số dư và theo dõi chi tiêu theo hạng mục."
           action={
-            <Link href="/pfm/jars" className="text-sm font-medium text-primary underline">
+            <Link href="/pfm?tab=hu&setup=1" className="text-sm font-medium text-primary underline">
               Thiết lập hũ
             </Link>
           }
@@ -62,7 +62,7 @@ export function JarList({
       <ul className="flex flex-col gap-2.5">
         {explicit.map((line, i) => (
           <li key={line.jarId}>
-            <JarCard line={line} accent={PALETTE[i % PALETTE.length]} />
+            <JarCard line={line} accent={PALETTE[i % PALETTE.length]} periodLabel={periodLabel} />
           </li>
         ))}
       </ul>

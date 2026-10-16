@@ -57,13 +57,13 @@ describe("JarList (snapshot partition)", () => {
     expect(screen.getByText(/Phần chia theo số dư hiện tại/)).toBeInTheDocument();
   });
 
-  it("marks an over-budget jar as a budget breach (non-blocking)", () => {
+  it("explains an over-allocation against the current share (non-blocking)", () => {
     render(
       <JarList
         partition={partition([jarLine({ spentThisPeriod: 4_000_000, earmark: 3_000_000, isOverBudget: true }), residual()])}
       />,
     );
-    expect(screen.getAllByText(/Vượt ngân sách/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Chi tháng này vượt phần chia hiện tại/).length).toBeGreaterThan(0);
   });
 
   it("renders the over-allocated warning when Σ chia exceeds the balance", () => {

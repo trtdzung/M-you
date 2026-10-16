@@ -2,7 +2,9 @@ import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { PersonaProvider } from "@/providers/context";
+import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
@@ -44,7 +46,11 @@ function renderScreen(ui: ReactElement) {
     <PersonaProvider>
       <CorrectionsProvider>
         <JarConfigProvider>
-          <PeriodProvider>{ui}</PeriodProvider>
+          <AssetLiabilityProvider>
+            <GoalProvider>
+              <PeriodProvider>{ui}</PeriodProvider>
+            </GoalProvider>
+          </AssetLiabilityProvider>
         </JarConfigProvider>
       </CorrectionsProvider>
     </PersonaProvider>,
@@ -77,9 +83,11 @@ describe("route smoke — all screens mount", () => {
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 
-  it("PFM jars setup (/pfm/jars)", async () => {
+  it("PFM jars setup (/pfm/jars) redirects to the Hũ tab", async () => {
+    redirect.mockClear();
     const { default: Page } = await import("../pfm/jars/page");
-    expect(() => renderScreen(<Page />)).not.toThrow();
+    Page();
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=hu");
   });
 
   it("PFM cashflow (/pfm/cashflow) redirects to the host tab param", async () => {
@@ -89,18 +97,17 @@ describe("route smoke — all screens mount", () => {
     expect(redirect).toHaveBeenCalledWith("/pfm?tab=cashflow");
   });
 
-  it("PFM wealth (/pfm/wealth) redirects to the host tab param", async () => {
-    redirect.mockClear();
+  it("PFM wealth (/pfm/wealth) mounts the Tài sản & Nợ manager", async () => {
     const { default: Page } = await import("../pfm/wealth/page");
-    Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=wealth");
+    expect(() => renderScreen(<Page />)).not.toThrow();
+    expect(screen.getByRole("heading", { name: "Tài sản & Nợ" })).toBeInTheDocument();
   });
 
-  it("PFM insights (/pfm/insights) redirects to the host tab param", async () => {
+  it("PFM insights (/pfm/insights) redirects to the assistant route", async () => {
     redirect.mockClear();
     const { default: Page } = await import("../pfm/insights/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=insights");
+    expect(redirect).toHaveBeenCalledWith("/assistant");
   });
 
   it("Settings (/settings)", async () => {
@@ -137,11 +144,11 @@ describe("route smoke — all screens mount", () => {
     expect(redirect).toHaveBeenCalledWith("/pfm?tab=cashflow");
   });
 
-  it("legacy /wealth redirects directly to /pfm?tab=wealth", async () => {
+  it("legacy /wealth redirects to the /pfm/wealth manager", async () => {
     redirect.mockClear();
     const { default: Page } = await import("../(festive)/wealth/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=wealth");
+    expect(redirect).toHaveBeenCalledWith("/pfm/wealth");
   });
 });
 
@@ -153,7 +160,7 @@ describe("route smoke — all screens mount", () => {
  * or if the festive routes lose theirs.
  */
 describe("chrome separation — PFM calm shell vs festive shell", () => {
-  it("PFM: PfmHeader + 4 tabs, no BottomNav, no 2/9 festive bg", async () => {
+  it("PFM: PfmHeader + 3 tabs, no BottomNav, no 2/9 festive bg", async () => {
     const { default: PfmLayout } = await import("../pfm/layout");
     const { default: PfmPage } = await import("../pfm/page");
     const { container } = renderScreen(
@@ -165,10 +172,10 @@ describe("chrome separation — PFM calm shell vs festive shell", () => {
     // Back-arrow sub-app header → Home
     expect(screen.getByLabelText("Về Trang chủ")).toHaveAttribute("href", "/");
 
-    // The 4 segmented tabs are the sole PFM navigation
+    // The 3 segmented tabs are the sole PFM navigation
     const tablist = screen.getByRole("tablist", { name: "Phân mục PFM" });
-    expect(within(tablist).getAllByRole("tab")).toHaveLength(4);
-    for (const label of ["Tổng quan", "Dòng tiền", "Tài sản", "Gợi ý"]) {
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(3);
+    for (const label of ["Tổng quan", "Hũ", "Dòng tiền"]) {
       expect(within(tablist).getByText(label)).toBeInTheDocument();
     }
 

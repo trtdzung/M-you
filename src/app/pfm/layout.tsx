@@ -12,7 +12,7 @@ function CalmBg() {
       <div aria-hidden className="absolute inset-0 -z-10 bg-background" />
       <div
         aria-hidden
-        className="absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-primary-soft/70 to-transparent"
+        className="absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-surface-tint/80 to-transparent"
       />
     </>
   );

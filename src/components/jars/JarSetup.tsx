@@ -10,7 +10,6 @@ import { useFinancials } from "@/state/useFinancials";
 import { AllocationMeter } from "./AllocationMeter";
 import { CategoryAssigner } from "./CategoryAssigner";
 import { JarEditor } from "./JarEditor";
-import { SurplusPanel } from "./SurplusPanel";
 import { cn } from "@/lib/cn";
 
 const PALETTE = ["bg-primary", "bg-source-msb", "bg-source-self", "bg-source-estimated", "bg-warning", "bg-positive"];
@@ -37,6 +36,9 @@ export function JarSetup() {
 
   return (
     <div className="flex flex-col gap-6">
+      <p role="status" className="rounded-2xl bg-positive-soft/60 px-3 py-2 text-xs text-text">
+        Thay đổi được lưu tự động. Khi đã xong, chọn Xong để đóng.
+      </p>
       <section>
         <SectionHeader title="Mẫu hũ" subtitle="Chọn mẫu phù hợp — sẽ thay toàn bộ hũ hiện tại" />
         <div className="grid grid-cols-3 gap-2">
@@ -45,7 +47,7 @@ export function JarSetup() {
               key={t.id}
               type="button"
               onClick={() => chooseTemplate(t.id)}
-              className="rounded-2xl border border-border bg-surface p-3 text-left"
+              className="min-h-[76px] cursor-pointer rounded-2xl border border-border bg-surface p-3 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             >
               <span className="block text-sm font-semibold text-text">{t.label}</span>
               <span className="mt-0.5 block text-xs text-muted">{t.description}</span>
@@ -62,11 +64,11 @@ export function JarSetup() {
                   applyTemplate(pending);
                   setPending(null);
                 }}
-                className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-fg"
+                className="min-h-11 rounded-full bg-primary px-4 text-xs font-semibold text-primary-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 Thay
               </button>
-              <button type="button" onClick={() => setPending(null)} className="rounded-full px-3 py-1 text-xs font-medium text-muted">
+              <button type="button" onClick={() => setPending(null)} className="min-h-11 rounded-full px-3 text-xs font-medium text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
                 Hủy
               </button>
             </span>
@@ -110,10 +112,10 @@ export function JarSetup() {
             })
           }
           className={cn(
-            "inline-flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text",
+            "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
           )}
         >
-          <Plus size={16} /> Thêm hũ
+          <Plus size={16} aria-hidden="true" /> Thêm hũ
         </button>
       </section>
 
@@ -122,11 +124,6 @@ export function JarSetup() {
         <Card>
           <CategoryAssigner config={config} onAssign={assignCategory} />
         </Card>
-      </section>
-
-      <section>
-        <SectionHeader title="Thặng dư" subtitle="Mô phỏng phân bổ phần chưa phân bổ vào mục tiêu" />
-        <SurplusPanel />
       </section>
     </div>
   );

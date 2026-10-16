@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
+import { WealthManager } from "@/components/wealth/WealthManager";
 
 /**
- * Redirect stub (Red Team C4): the Tài sản content now lives in the single-route
- * PFM host. This deep-link resolves to the tab; it renders no view of its own.
+ * Tài sản & Nợ manual manager (Phase 03). Previously a redirect stub; now the
+ * dedicated CRUD surface for self-reported assets & liabilities and the drill
+ * target the Tổng quan summary links to. Old links to `/pfm/wealth` land here.
  */
-export default function PfmWealthRedirect() {
-  redirect("/pfm?tab=wealth");
+export default function PfmWealthPage() {
+  return <WealthManager />;
 }

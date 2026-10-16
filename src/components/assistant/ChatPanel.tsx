@@ -11,6 +11,8 @@ import type { AssistantEvent } from "@/ai/pipeline/events";
 import type { AssistantOpener } from "@/ai/proactive/openers";
 import { ChatMessage } from "./ChatMessage";
 import { Composer } from "./Composer";
+import { InsightsView } from "@/components/insights/InsightsView";
+import { currentMonthKey } from "@/lib/demo-clock";
 import type { UiMessage } from "./types";
 
 function blankAssistant(id: string): UiMessage {
@@ -144,6 +146,16 @@ export function ChatPanel({
             {messages.map((m) => (
               <ChatMessage key={m.id} message={m} />
             ))}
+            {/* Doorway feed: the full insights list shown until the user starts a
+                conversation (red-team #4). Picker suppressed + pinned to the
+                current month so the chat never grows a second period picker
+                (red-team #5). Composer starters cover suggested prompts — no
+                separate SuggestedPrompts here. */}
+            {!hasUserMessage && (
+              <div className="pt-1">
+                <InsightsView hidePeriodPicker month={currentMonthKey()} />
+              </div>
+            )}
             <div ref={endRef} />
           </div>
         )}

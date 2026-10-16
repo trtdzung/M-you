@@ -1,6 +1,10 @@
 import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PersonaProvider } from "@/providers/context";
+import { AssetLiabilityProvider } from "@/state/assets";
+import { CorrectionsProvider } from "@/state/corrections";
+import { GoalProvider } from "@/state/goals";
+import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
 import { ChatPanel } from "../ChatPanel";
@@ -44,11 +48,21 @@ beforeEach(() => {
 });
 
 function renderPanel() {
+  // Full provider stack mirrors AppProviders: the empty state embeds
+  // <InsightsView/>, which reaches useFinancials → corrections/jars/assets/goals.
   return render(
     <PersonaProvider>
-      <PeriodProvider>
-        <ChatPanel />
-      </PeriodProvider>
+      <CorrectionsProvider>
+        <JarConfigProvider>
+          <AssetLiabilityProvider>
+            <GoalProvider>
+              <PeriodProvider>
+                <ChatPanel />
+              </PeriodProvider>
+            </GoalProvider>
+          </AssetLiabilityProvider>
+        </JarConfigProvider>
+      </CorrectionsProvider>
     </PersonaProvider>,
   );
 }

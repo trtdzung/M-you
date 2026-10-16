@@ -21,8 +21,19 @@ const SEVERITY_GROUPS: { severity: InsightSeverity; label: string }[] = [
   { severity: "info", label: "Thông tin" },
 ];
 
-export function InsightsView() {
-  const { loading, error, visible, dismiss, snooze, markHelpful } = useInsights();
+/**
+ * @param hidePeriodPicker Suppress the in-view `PeriodPicker` — used in the
+ *   `/assistant` empty-state so the chat doesn't grow a second month picker
+ *   (red-team #5); pass `month` to pin the feed to a fixed month (current).
+ */
+export function InsightsView({
+  hidePeriodPicker = false,
+  month,
+}: {
+  hidePeriodPicker?: boolean;
+  month?: string;
+} = {}) {
+  const { loading, error, visible, dismiss, snooze, markHelpful } = useInsights(month);
   const [filter, setFilter] = useState<InsightFilter>("all");
 
   const counts = useMemo(() => {
@@ -35,9 +46,11 @@ export function InsightsView() {
 
   return (
     <div>
-      <div className="mb-4">
-        <PeriodPicker />
-      </div>
+      {!hidePeriodPicker && (
+        <div className="mb-4">
+          <PeriodPicker />
+        </div>
+      )}
 
       {loading && (
         <SkeletonScreen>

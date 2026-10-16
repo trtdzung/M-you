@@ -1,3 +1,6 @@
+// DEFERRED: unmounted in the 3-tab reformat — the surplus what-if simulator is
+// off the tab bar; engine (`simulateSurplus`) + tests kept, UI re-enabled later.
+// See plans/260909-2254-pfm-3tab-reformat/ and plans/project-backlog.md.
 "use client";
 
 import { useState } from "react";
@@ -18,7 +21,7 @@ import { cn } from "@/lib/cn";
  * nudges the user instead of implying there is nothing to save.
  */
 export function SurplusPanel() {
-  const { financials, raw } = useFinancials();
+  const { financials } = useFinancials();
   const [split, setSplit] = useState<Record<string, number>>({});
 
   if (!financials) {
@@ -35,7 +38,8 @@ export function SurplusPanel() {
       ? (partition.lines.find((l) => l.isResidual)?.earmark ?? "unknown")
       : "unknown";
   const surplus = surplusFromResidual(residual);
-  const goals = raw?.goals ?? [];
+  // Merged seed + user goals — the single source of truth (red-team #2/#3).
+  const goals = financials.goals;
 
   const plan = simulateSurplusAllocation({ surplus, goals, split });
 

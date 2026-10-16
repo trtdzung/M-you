@@ -12,7 +12,7 @@ export function PfmHeader() {
       <Link
         href="/"
         aria-label="Về Trang chủ"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         <ArrowLeft size={22} strokeWidth={2} />
       </Link>

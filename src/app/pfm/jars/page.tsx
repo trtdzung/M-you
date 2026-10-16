@@ -1,32 +1,10 @@
-"use client";
-
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { ScreenHeader } from "@/components/shell/ScreenHeader";
-import { JarSetup } from "@/components/jars/JarSetup";
+import { redirect } from "next/navigation";
 
 /**
- * Thiết lập hũ chi tiêu — a dedicated setup route (keeps the PFM tabs at four).
- * CRUD, category assignment, and allocation live here; changes auto-persist and
- * reflect immediately in the Cashflow "Hũ chi tiêu" section. No money movement.
+ * Redirect stub (3-tab reformat): Hũ is now a top-level tab, not a Dòng tiền
+ * dock. This legacy path resolves to the Hũ tab. No view of its own; no money
+ * movement. See plans/260909-2254-pfm-3tab-reformat/.
  */
-export default function JarsSetupPage() {
-  return (
-    <div>
-      <ScreenHeader
-        title="Hũ chi tiêu"
-        subtitle="Thiết lập hũ và phân bổ theo hạng mục"
-        action={
-          <Link
-            href="/pfm?tab=cashflow"
-            aria-label="Quay lại Dòng tiền"
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary"
-          >
-            <ArrowLeft size={16} /> Dòng tiền
-          </Link>
-        }
-      />
-      <JarSetup />
-    </div>
-  );
+export default function PfmJarsRedirect() {
+  redirect("/pfm?tab=hu");
 }

@@ -6,7 +6,9 @@
  */
 
 import { PersonaProvider } from "@/providers/context";
+import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { ConsentGate } from "@/components/consent/ConsentGate";
@@ -16,9 +18,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <PersonaProvider>
       <CorrectionsProvider>
         <JarConfigProvider>
-          <PeriodProvider>
-            <ConsentGate>{children}</ConsentGate>
-          </PeriodProvider>
+          <AssetLiabilityProvider>
+            <GoalProvider>
+              <PeriodProvider>
+                <ConsentGate>{children}</ConsentGate>
+              </PeriodProvider>
+            </GoalProvider>
+          </AssetLiabilityProvider>
         </JarConfigProvider>
       </CorrectionsProvider>
     </PersonaProvider>

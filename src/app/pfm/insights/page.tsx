@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 
 /**
- * Redirect stub (Red Team C4): the Gợi ý content now lives in the single-route
- * PFM host. This deep-link resolves to the tab; it renders no view of its own.
+ * Legacy redirect stub: the standalone Gợi ý tab was folded away. The Trợ lý tab
+ * itself was later removed (3-tab reformat) — the assistant now lives at its own
+ * route, and the full insights feed is its empty-state doorway. Sending this old
+ * deep-link to `?tab=assistant` would silently fall back to Tổng quan, so it
+ * resolves to `/assistant` directly (red-team #6).
  */
 export default function PfmInsightsRedirect() {
-  redirect("/pfm?tab=insights");
+  redirect("/assistant");
 }
