@@ -41,6 +41,18 @@ interface JarConfigContextValue {
 
 const EMPTY_CONFIG: JarConfig = { version: 3, jars: [] };
 
+/**
+ * Every mutator below is fire-and-forget from its caller's point of view
+ * (none of them are awaited — e.g. `TransferConfirm`'s `spendFromJar` call
+ * during a money transfer). Without a `.catch`, a rejected fetch (offline, a
+ * 404/422/500) becomes an unhandled promise rejection and the failure is
+ * invisible — the UI silently keeps stale data instead of surfacing that the
+ * write never happened.
+ */
+function logJarMutationError(err: unknown): void {
+  console.error("Jar mutation failed", err);
+}
+
 const JarConfigContext = createContext<JarConfigContextValue | null>(null);
 
 export function JarConfigProvider({ children }: { children: React.ReactNode }) {
@@ -48,12 +60,20 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<JarConfig>(EMPTY_CONFIG);
 
   // Load on mount and on persona switch (providers identity changes per
-  // persona, so each persona loads its own jars — never leaks across personas).
+  // persona). Reset to empty FIRST, synchronously, before the async fetch —
+  // otherwise the previous persona's jars stay on screen until the new
+  // persona's fetch resolves (H5: config must never leak across personas).
   useEffect(() => {
     let active = true;
-    providers.getJarConfig().then((next) => {
-      if (active) setConfig(next);
-    });
+    setConfig(EMPTY_CONFIG);
+    providers
+      .getJarConfig()
+      .then((next) => {
+        if (active) setConfig(next);
+      })
+      .catch((err: unknown) => {
+        console.error("Failed to load jar config", err);
+      });
     return () => {
       active = false;
     };
@@ -63,29 +83,32 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
     () => ({
       config,
       addJar: (jar) => {
-        providers.createJar(jar).then(setConfig);
+        providers.createJar(jar).then(setConfig).catch(logJarMutationError);
       },
       updateJar: (id, patch) => {
-        providers.updateJar(id, patch).then(setConfig);
+        providers.updateJar(id, patch).then(setConfig).catch(logJarMutationError);
       },
       removeJar: (id) => {
-        providers.removeJar(id).then(setConfig);
+        providers.removeJar(id).then(setConfig).catch(logJarMutationError);
       },
       assignCategory: (categoryId, jarId) => {
         // Unassign is forbidden under exactly-one — a null target is a no-op.
         if (jarId === null) return;
-        providers.assignCategory(categoryId, jarId).then(setConfig);
+        providers.assignCategory(categoryId, jarId).then(setConfig).catch(logJarMutationError);
       },
       applyTemplate: (templateId) => {
-        providers.replaceJars(JAR_TEMPLATES[templateId].jars).then(setConfig);
+        providers.replaceJars(JAR_TEMPLATES[templateId].jars).then(setConfig).catch(logJarMutationError);
       },
       resetToSeed: () => {
-        providers.replaceJars(DEFAULT_JAR_CONFIG.jars).then(setConfig);
+        providers.replaceJars(DEFAULT_JAR_CONFIG.jars).then(setConfig).catch(logJarMutationError);
       },
       spendFromJar: (id, amount) => {
         const jar = config.jars.find((j) => j.id === id);
         if (!jar || jar.actualAmount === undefined) return;
-        providers.updateJar(id, { actualAmount: Math.max(0, jar.actualAmount - amount) }).then(setConfig);
+        providers
+          .updateJar(id, { actualAmount: Math.max(0, jar.actualAmount - amount) })
+          .then(setConfig)
+          .catch(logJarMutationError);
       },
     }),
     [config, providers],

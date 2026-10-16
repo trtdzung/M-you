@@ -4,7 +4,7 @@ import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-stor
 
 /**
  * One jar of one persona. `cif` travels in the QUERY STRING on every `:id`
- * route (consistent per path, not per method — see `data/schema.md`); the id is
+ * route (consistent per path, not per method — see `data/jars/schema.md`); the id is
  * the path segment. Both handlers return the persona's full, freshly-stored
  * `JarConfig` so the client never has to recompute or re-fetch.
  */

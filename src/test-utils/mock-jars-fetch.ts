@@ -30,6 +30,20 @@ function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
+/**
+ * The real `readJarConfig` normalizes (dedupe → heal → backfill)
+ * UNCONDITIONALLY on every read, and every write handler's response comes
+ * from calling it again afterward — so a write that only partially
+ * normalizes (e.g. PATCH shrinking `categoryIds` without healing the
+ * dropped category) still comes back healed. Routing every store update
+ * AND every GET through this same commit point reproduces that guarantee
+ * here, instead of each branch below needing to remember to normalize.
+ */
+function commit(next: JarConfig): JarConfig {
+  store = backfillActualAmount(healOrphanCategories(dedupeCategories(next)));
+  return store;
+}
+
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();
@@ -43,20 +57,17 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
   const idMatch = parsed.pathname.match(/^\/api\/jars\/([^/]+)(\/categories)?$/);
 
   if (!idMatch) {
-    if (method === "GET") return jsonResponse(store);
+    if (method === "GET") return jsonResponse(commit(store));
     if (method === "POST") {
       const jar = body?.jar as Jar;
       const created: Jar = { ...jar, id: uniqueJarId(store.jars, jar.id) };
-      store = backfillActualAmount({
-        version: 3,
-        jars: [...stripCategories(store.jars, created.categoryIds), created],
-      });
-      return jsonResponse(store, 201);
+      return jsonResponse(
+        commit({ version: 3, jars: [...stripCategories(store.jars, created.categoryIds), created] }),
+        201,
+      );
     }
     if (method === "PUT") {
-      const next = { version: 3 as const, jars: (body?.jars as Jar[]) ?? [] };
-      store = backfillActualAmount(healOrphanCategories(dedupeCategories(next)));
-      return jsonResponse(store);
+      return jsonResponse(commit({ version: 3, jars: (body?.jars as Jar[]) ?? [] }));
     }
     return jsonResponse({ error: "unhandled" }, 500);
   }
@@ -69,11 +80,12 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
     // POST /api/jars/:id/categories
     const categoryId = body?.categoryId as string;
     const stripped = stripCategories(store.jars, [categoryId]);
-    store = backfillActualAmount({
-      version: 3,
-      jars: stripped.map((j) => (j.id === id ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j)),
-    });
-    return jsonResponse(store);
+    return jsonResponse(
+      commit({
+        version: 3,
+        jars: stripped.map((j) => (j.id === id ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j)),
+      }),
+    );
   }
 
   if (method === "PATCH") {
@@ -88,13 +100,10 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
       return next as unknown as Jar;
     });
     if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds as string[], id);
-    store = backfillActualAmount({ version: 3, jars });
-    return jsonResponse(store);
+    return jsonResponse(commit({ version: 3, jars }));
   }
   if (method === "DELETE") {
-    const remaining = { version: 3 as const, jars: store.jars.filter((j) => j.id !== id) };
-    store = backfillActualAmount(target.categoryIds.length > 0 ? healOrphanCategories(remaining) : remaining);
-    return jsonResponse(store);
+    return jsonResponse(commit({ version: 3, jars: store.jars.filter((j) => j.id !== id) }));
   }
   return jsonResponse({ error: "unhandled" }, 500);
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Read/write access to the `jars` table (see `data/schema.md`) plus the shape
+ * Read/write access to the `jars` table (see `data/jars/schema.md`) plus the shape
  * guard for a jar arriving in a request body. Server only — imported by the
  * route handlers under `src/app/api/jars/`, never by client code
  * (architectural invariant #4).
@@ -129,9 +129,14 @@ export function sanitizeJars(input: unknown): Jar[] | null {
 }
 
 /**
- * The persona's jars in display order. An unknown `cif` (or one that has never
- * had a jar) yields an empty list — a valid v3 config, never a crash; the
- * caller decides what to do with it.
+ * The persona's jars in display order, normalized (dedupe → heal → backfill)
+ * on every call — this is what makes every route handler's response correct
+ * regardless of how the underlying rows got there. An unknown `cif` (or one
+ * that has never had a jar) does NOT yield an empty list: with zero stored
+ * rows, `healOrphanCategories` sees every expense category as orphaned and
+ * synthesizes a single catch-all "Khác" jar holding all of them (the same
+ * healing that runs for any other persona) — this config is never a crash,
+ * but callers should not assume "no rows" means "no jars back".
  */
 export function readJarConfig(cif: string): JarConfig {
   const rows = getDb()

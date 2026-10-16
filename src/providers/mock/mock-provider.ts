@@ -208,10 +208,18 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       return res.json();
     },
     async updateJar(id, patch) {
+      // `JSON.stringify` drops a key whose value is `undefined` entirely, but
+      // the API's PATCH contract uses `null` to mean "clear this field back
+      // to chưa đặt" (invariant #6) — an explicitly-present `undefined` (e.g.
+      // `{ budgetLimit: undefined }` from "Hạn mức: để trống") must survive
+      // the wire as `null`, or the clear silently becomes a no-op.
+      const wirePatch = Object.fromEntries(
+        Object.entries(patch).map(([key, value]) => [key, value === undefined ? null : value]),
+      );
       const res = await fetch(`/api/jars/${encodeURIComponent(id)}?cif=${encodeURIComponent(cif)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patch }),
+        body: JSON.stringify({ patch: wirePatch }),
       });
       if (!res.ok) throw new Error(`updateJar failed: ${res.status}`);
       return res.json();

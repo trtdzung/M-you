@@ -1,13 +1,16 @@
 /**
  * Shared persona-scoped localStorage resource — the single implementation of the
- * "load / save / schema-guard / reseed" pattern that jars pioneered
- * (`state/jars.tsx` + the mock provider's `jarKey`). Phase 03 (assets/liabilities)
- * and Phase 05 (goals) build their CRUD contexts on this one helper instead of
- * re-deriving persona keys, SSR guards, and try/catch each time (DRY, red-team #6).
+ * "load / save / schema-guard / reseed" pattern jars originally pioneered here
+ * (jars have since moved to a SQLite-backed `/api/jars*`, see `state/jars.tsx` and
+ * `data/jars/schema.md` — they no longer use this helper). Phase 03
+ * (assets/liabilities) and Phase 05 (goals) build their CRUD contexts on this one
+ * helper instead of re-deriving persona keys, SSR guards, and try/catch each time
+ * (DRY, red-team #6).
  *
  * Contract:
  * - Every record is namespaced per persona (`msb-pfm.{namespace}.{personaId}`) so
- *   one persona's user state never leaks into another (jars H5).
+ *   one persona's user state never leaks into another (the H5 red-team item that
+ *   originally motivated this).
  * - Reads validate through the caller's `guard`; anything missing, corrupt,
  *   schema-invalid, or unavailable (SSR / private mode / quota) falls back to a
  *   fresh deep-cloned `seed()` — it never throws and never returns a shared ref.

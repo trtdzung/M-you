@@ -106,7 +106,10 @@ export interface Providers
   /**
    * Read the user's current spending-jar configuration. Backed by
    * `data/pfm.sqlite3` via `/api/jars` (invariant #4) — always returns a
-   * config (possibly with an empty `jars` array), never `null`.
+   * config, never `null`. NOTE: a persona with zero stored rows does not
+   * come back with an empty `jars` array — the server's healing step
+   * synthesizes a single catch-all "Khác" jar in that case (see
+   * `src/lib/jars-store.ts`'s `readJarConfig`).
    */
   getJarConfig(): Promise<JarConfig>;
   /** Create a new jar. Returns the full updated config. */

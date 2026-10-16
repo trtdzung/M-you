@@ -10,7 +10,7 @@ import { readJarConfig, sanitizeJar, sanitizeJars, writeJarConfig } from "@/lib/
 
 /**
  * Spending jars ("hũ") for one persona (`cif`), backed by `data/pfm.sqlite3`
- * (see `data/schema.md`). Collection level — `cif` travels in the BODY here
+ * (see `data/jars/schema.md`). Collection level — `cif` travels in the BODY here
  * (no `:id` in the path); the per-jar routes take it as a query param.
  *
  * This is where the jar invariants are enforced (`@/domain/jar-rules`): the

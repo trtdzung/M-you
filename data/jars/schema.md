@@ -33,9 +33,10 @@ Primary key `(cif, id)`.
 
 ## Endpoints
 
-All under `src/app/api/jars/`. `cif` is a query param for every endpoint
-scoped to one jar (`:id` in the path, including the categories sub-resource
-below), and part of the JSON body for the two collection-level endpoints.
+All under `src/app/api/jars/`. `cif` travels in the query string for every
+`:id`-scoped endpoint (including the categories sub-resource) — GET also
+takes it as a query param, since it has no body at all; only the two
+mutating collection-level endpoints (POST, PUT) take it in the JSON body.
 No real auth — same trust model as every other endpoint in this prototype.
 
 | Method | Path | Body | Behavior |
@@ -49,3 +50,7 @@ No real auth — same trust model as every other endpoint in this prototype.
 
 Every endpoint (except GET) returns the full, freshly-read `JarConfig` —
 callers never need a second round-trip to see the result of their own write.
+POST returns `201`; every other success is `200`. Errors: `422` for a
+missing/invalid `cif`, `jar`, `jars`, `patch`, `categoryId`, or a `PUT` body
+with a duplicate jar `id`; `404` for `PATCH`/`DELETE`/categories-`POST`
+against an unknown jar `id`.
