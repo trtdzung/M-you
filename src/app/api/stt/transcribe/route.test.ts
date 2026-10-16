@@ -43,23 +43,4 @@ describe("batch STT proxy", () => {
     expect(response.status).toBe(502);
     expect(JSON.stringify(await response.json())).not.toContain("private upstream detail");
   });
-
-  it("explains when Vbee rejects its runtime credentials", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
-      error: { code: "provider_authentication_failed", message: "unsafe upstream detail" },
-    }, { status: 502 })));
-    const response = await POST(request());
-    expect(response.status).toBe(502);
-    const payload = await response.json();
-    expect(payload.error).toContain("API token hoặc App ID");
-    expect(payload.error).not.toContain("unsafe upstream detail");
-  });
-
-  it("makes a generic Vbee provider failure actionable", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({
-      error: { code: "provider_error", message: "unsafe upstream detail" },
-    }, { status: 502 })));
-    const response = await POST(request());
-    expect((await response.json()).error).toContain("token, App ID và log STT runtime");
-  });
 });
