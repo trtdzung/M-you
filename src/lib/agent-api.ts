@@ -2,9 +2,10 @@
  * Client for the real M-Your agent, proxied through `src/app/api/agent/chat`
  * (same-origin — the client never sees `AGENT_API_KEY`/Auth0 credentials,
  * see `route.ts`). `UiPayload` is a discriminated union the agent may return
- * alongside `answer` — `ChartUi` today (Feature 2), `{ type: string }` as a
- * catch-all for future/unsupported types (Features 3–4 add their own variant
- * here without changing this file's other exports).
+ * alongside `answer` — `ChartUi` (Feature 2) and `TransferFormUi` (Feature 3)
+ * today, `{ type: string }` as a catch-all for future/unsupported types
+ * (Feature 4 adds its own variant here without changing this file's other
+ * exports).
  */
 
 const PROXY_PATH = "/api/agent/chat";
@@ -17,7 +18,23 @@ export interface ChartUi {
   series: { name: string; data: number[] }[];
 }
 
-export type UiPayload = ChartUi | { type: string } | null;
+/**
+ * A proposal to pay down the customer's OWN credit-card debt (never a
+ * transfer to another person/merchant — see transfer-form.md's scope note).
+ * `account_number` is an opaque card id from the agent's own data source
+ * (e.g. `"card_001"`), not a real bank account number — never display it
+ * raw; `recipient` (the card/product name, e.g. "MSB Visa Signature") is
+ * what identifies this to the customer.
+ */
+export interface TransferFormUi {
+  type: "transfer_form";
+  recipient: string;
+  account_number: string;
+  amount: number;
+  note: string;
+}
+
+export type UiPayload = ChartUi | TransferFormUi | { type: string } | null;
 
 /**
  * True only for a `ui.type === "chart"` payload that is actually safe to
@@ -41,6 +58,27 @@ export function isChartUi(ui: UiPayload | null | undefined): ui is ChartUi {
       Array.isArray(s.data) &&
       s.data.length === c.labels!.length &&
       s.data.every((n) => typeof n === "number"),
+  );
+}
+
+/**
+ * True only for a `ui.type === "transfer_form"` payload with all 4 required
+ * fields present and well-typed, `amount > 0`. Same reliability posture as
+ * `isChartUi`: the agent's `ui` field is model-generated, so a malformed
+ * payload never throws — it just falls back to showing `answer` alone.
+ */
+export function isTransferFormUi(ui: UiPayload | null | undefined): ui is TransferFormUi {
+  if (!ui || ui.type !== "transfer_form") return false;
+  const f = ui as Partial<TransferFormUi>;
+  return (
+    typeof f.recipient === "string" &&
+    f.recipient.trim() !== "" &&
+    typeof f.account_number === "string" &&
+    f.account_number.trim() !== "" &&
+    typeof f.amount === "number" &&
+    Number.isFinite(f.amount) &&
+    f.amount > 0 &&
+    typeof f.note === "string"
   );
 }
 

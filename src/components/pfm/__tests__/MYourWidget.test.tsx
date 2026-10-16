@@ -197,19 +197,21 @@ describe("MYourWidget", () => {
 
   it("ignores an unsupported or malformed ui payload and shows only the text answer", async () => {
     vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
-      answer: "Đây là đề xuất trả nợ thẻ của bạn.",
+      answer: "Đây là đề xuất tạo hũ mới.",
       thread_id: "CIF_0001",
-      ui: { type: "transfer_form", recipient: "MSB Visa", account_number: "card_001", amount: 1000000, note: "note" } as agentApi.UiPayload,
+      // create_jar (Feature 4) isn't implemented yet — still an "unsupported type" today.
+      ui: { type: "create_jar", jar_name: "Du lịch", allocation_amount: 1000000, reason: "reason" } as agentApi.UiPayload,
     });
     renderWidget();
     open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Trả nợ thẻ" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Tạo hũ mới" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
-    expect(await screen.findByText("Đây là đề xuất trả nợ thẻ của bạn.")).toBeInTheDocument();
+    expect(await screen.findByText("Đây là đề xuất tạo hũ mới.")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thanh toán ngay" })).not.toBeInTheDocument();
   });
 
   it("shows an inline error on the reply bubble when sending fails", async () => {

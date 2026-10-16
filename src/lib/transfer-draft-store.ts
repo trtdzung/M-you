@@ -20,7 +20,7 @@ export interface StoredTransferDraft {
   sourceLabel: string;
   /** Set when the chosen source was a jar (Chuyển tiền Phần 1) — `/transfer-confirm` debits this jar plus its underlying account on confirm. */
   sourceJarId?: string;
-  recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed";
+  recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed" | "agent_proposed";
   riskFlags?: import("@/domain/models").TransferRiskFlag[];
   source?: "mock";
 }

@@ -5,9 +5,18 @@ import { Send, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Loading, ErrorState } from "@/components/states";
 import { usePersona } from "@/providers/context";
-import { getChatHistory, sendChatMessage, deleteChatHistory, isChartUi, type HistoryMessage, type UiPayload } from "@/lib/agent-api";
+import {
+  getChatHistory,
+  sendChatMessage,
+  deleteChatHistory,
+  isChartUi,
+  isTransferFormUi,
+  type HistoryMessage,
+  type UiPayload,
+} from "@/lib/agent-api";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
+import { AgentTransferFormCard } from "./AgentTransferFormCard";
 
 interface ChatBubble {
   id: string;
@@ -212,6 +221,7 @@ export function MYourWidget() {
                       {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
                     </div>
                     {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
+                    {m.role === "agent" && isTransferFormUi(m.ui) && <AgentTransferFormCard form={m.ui} />}
                   </div>
                 ))}
                 {sending && (
