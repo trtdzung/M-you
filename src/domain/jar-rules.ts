@@ -12,9 +12,10 @@
  *    `healOrphanCategories`) — invariant #6, Σ-conservation: a category is never
  *    claimed twice (the engine would double-count its spend) and never dropped
  *    (an orphan is healed into the "Khác" jar).
- *  - **`actualAmount` backfills from `budgetLimit`** (`backfillActualAmount`) —
- *    applied after EVERY mutation, not just on load, so a jar that just got its
- *    first limit is immediately usable as a transfer source.
+ *
+ * A jar carries NO stored balance: its spendable = max(0, remaining) is DERIVED
+ * from txn history (invariant #1), so there is no `actualAmount` backfill/resync
+ * here any more — `budgetLimit` is the only user-set number.
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
@@ -79,38 +80,4 @@ export function dedupeCategories(config: JarConfig): JarConfig {
       categoryIds: j.categoryIds.filter((c) => (seen.has(c) ? false : (seen.add(c), true))),
     })),
   };
-}
-
-/**
- * A jar that has a `budgetLimit` but no `actualAmount` yet starts with a real
- * balance equal to its set amount, so it is usable as a transfer source
- * immediately instead of requiring a separate funding step. A jar with no
- * `budgetLimit` (e.g. "Tiết kiệm") stays `actualAmount: undefined` — never
- * defaulted to 0 (invariant #6). Idempotent.
- */
-export function backfillActualAmount(config: JarConfig): JarConfig {
-  return {
-    ...config,
-    jars: config.jars.map((j) =>
-      j.budgetLimit !== undefined && j.actualAmount === undefined ? { ...j, actualAmount: j.budgetLimit } : j,
-    ),
-  };
-}
-
-/**
- * H3 (single-number model): when a jar's `budgetLimit` is RAISED and the jar has
- * not been drawn from yet (`actualAmount === old budgetLimit`), pull `actualAmount`
- * up to the new limit so the transfer-source balance keeps up with the single
- * number. LOWERING the limit never touches `actualAmount` (that would vaporise
- * real wallet money); a jar already drawn down (`actualAmount !== old limit`) is
- * also left alone (never fabricates wallet money). This is the ONLY place outside
- * the transfer flow allowed to move `actualAmount` (see plan Out of scope).
- */
-export function resyncActualOnRaise(prev: Jar, next: Jar): Jar {
-  const prevLimit = prev.budgetLimit;
-  const nextLimit = next.budgetLimit;
-  if (nextLimit !== undefined && prevLimit !== undefined && nextLimit > prevLimit && prev.actualAmount === prevLimit) {
-    return { ...next, actualAmount: nextLimit };
-  }
-  return next;
 }

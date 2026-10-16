@@ -3,17 +3,20 @@
 /**
  * Spending-jar configuration state. A thin client over `/api/jars*`
  * (SQLite-backed, see `data/jars/schema.md`) — every business invariant
- * (one-category-one-jar, `actualAmount` backfill) is enforced SERVER-SIDE
- * now (`src/domain/jar-rules.ts`, used by the route handlers); this provider
- * just calls the matching endpoint and stores whatever `JarConfig` comes
- * back. Loads on mount and whenever the persona changes (provider identity
- * change); every mutation re-syncs from that call's response.
+ * (one-category-one-jar) is enforced SERVER-SIDE now (`src/domain/jar-rules.ts`,
+ * used by the route handlers); this provider just calls the matching endpoint
+ * and stores whatever `JarConfig` comes back. Loads on mount and whenever the
+ * persona changes (provider identity change); every mutation re-syncs from that
+ * call's response.
+ *
+ * A jar has NO stored balance: its spendable = max(0, remaining) is DERIVED from
+ * txn history (invariant #1), so there is no `spendFromJar`/`applyReallocation`
+ * mutator here — a transfer's effect on a jar is expressed purely as the
+ * self-reported txn(s) `TransferConfirm` writes (see `jar-spendable.ts`).
  */
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Jar, JarConfig } from "@/domain/models";
-import type { DonorProposal } from "@/domain/engine";
-import { POOL_DONOR_ID } from "@/domain/engine";
 import { DEFAULT_JAR_CONFIG, JAR_TEMPLATES, type JarTemplate } from "@/domain/models/jar-defaults";
 import { useProviders } from "@/providers/context";
 
@@ -45,32 +48,13 @@ interface JarConfigContextValue {
   /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
   applyTemplate: (templateId: JarTemplate["id"]) => void;
   resetToSeed: () => void;
-  /**
-   * Debit `amount` from a jar's real balance (Chuyển tiền Phần 1 — chosen as
-   * a transfer source). No-op if the jar is missing or has no `actualAmount`
-   * yet — the UI already validates "đủ tiền" before this is ever called;
-   * this is only a defensive backstop, never the source of that check.
-   */
-  spendFromJar: (id: string, amount: number) => void;
-  /**
-   * Apply a PLANNED reallocation (top-up) atomically in ONE `updateJars` batch
-   * (Red Team #3/#4 — never pairwise `moveBetweenJars`, which loses updates and
-   * vaporises money). Each donor jar is decremented by its `take`; the target jar
-   * (if any) is credited the total; the "pool" donor produces NO patch (the pool
-   * is derived — draining it just means the jar decrements aren't offset by a
-   * credit). Hard-fails BEFORE any write if a donor would go negative (RT#6 — never
-   * relies on the server silently swallowing a negative). Returns the promise so
-   * `confirm()` can abort the whole transfer on a rejected write.
-   */
-  applyReallocation: (plan: { donors: DonorProposal[]; targetJarId: string | null }) => Promise<void>;
 }
 
 const EMPTY_CONFIG: JarConfig = { version: 3, jars: [] };
 
 /**
- * Every mutator below is fire-and-forget from its caller's point of view
- * (none of them are awaited — e.g. `TransferConfirm`'s `spendFromJar` call
- * during a money transfer). Without a `.catch`, a rejected fetch (offline, a
+ * Every config mutator below is fire-and-forget from its caller's point of view
+ * (none of them are awaited). Without a `.catch`, a rejected fetch (offline, a
  * 404/422/500) becomes an unhandled promise rejection and the failure is
  * invisible — the UI silently keeps stale data instead of surfacing that the
  * write never happened.
@@ -139,48 +123,6 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
       },
       resetToSeed: () => {
         providers.replaceJars(DEFAULT_JAR_CONFIG.jars).then(setConfig).catch(logJarMutationError);
-      },
-      spendFromJar: (id, amount) => {
-        const jar = config.jars.find((j) => j.id === id);
-        if (!jar || jar.actualAmount === undefined) return;
-        providers
-          .updateJar(id, { actualAmount: Math.max(0, jar.actualAmount - amount) })
-          .then(setConfig)
-          .catch(logJarMutationError);
-      },
-      applyReallocation: async (plan) => {
-        const byId = new Map(config.jars.map((j) => [j.id, j]));
-        // Accumulate every jar delta first, then emit ONE batch (a donor and the
-        // target could be the same set across a chain — merge before writing).
-        const nextAmount = new Map<string, number>();
-        const amountOf = (id: string) => nextAmount.get(id) ?? byId.get(id)?.actualAmount ?? 0;
-
-        let credited = 0;
-        for (const donor of plan.donors) {
-          if (donor.jarId === POOL_DONOR_ID) {
-            // Pool donor: no jar row to touch; it only offsets the target credit.
-            credited += donor.take;
-            continue;
-          }
-          const jar = byId.get(donor.jarId);
-          if (!jar) throw new Error(`applyReallocation: donor jar ${donor.jarId} not found`);
-          const after = amountOf(donor.jarId) - donor.take;
-          if (after < 0) throw new Error(`applyReallocation: donor ${donor.jarId} would go negative`);
-          nextAmount.set(donor.jarId, after);
-          credited += donor.take;
-        }
-
-        if (plan.targetJarId) {
-          const target = byId.get(plan.targetJarId);
-          if (!target) throw new Error(`applyReallocation: target jar ${plan.targetJarId} not found`);
-          nextAmount.set(plan.targetJarId, amountOf(plan.targetJarId) + credited);
-        }
-
-        if (nextAmount.size === 0) return; // pool-only chain with no jar rows (shouldn't happen)
-        const patches: Record<string, Partial<Omit<Jar, "id">>> = {};
-        for (const [id, actualAmount] of nextAmount) patches[id] = { actualAmount };
-        const next = await providers.updateJars(patches);
-        setConfig(next);
       },
     }),
     [config, loaded, providers],

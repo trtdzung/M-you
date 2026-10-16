@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  backfillActualAmount,
-  dedupeCategories,
-  healOrphanCategories,
-  resyncActualOnRaise,
-  stripCategories,
-  uniqueJarId,
-} from "@/domain/jar-rules";
-import { fitsActualCap, fitsCasaCap } from "@/domain/engine";
+import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
+import { fitsCasaCap } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { readJarConfig, sanitizeJar, sanitizeJarPatch, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
 import { casaPoolForCif } from "@/lib/casa-pool";
@@ -51,10 +44,10 @@ export async function POST(req: NextRequest) {
 
   const current = readJarConfig(cif);
   const created = { ...jar, id: uniqueJarId(current.jars, jar.id) };
-  const next = backfillActualAmount({
+  const next: { version: 3; jars: Jar[] } = {
     version: 3,
     jars: [...stripCategories(current.jars, created.categoryIds), created],
-  });
+  };
   return NextResponse.json(writeJarConfig(cif, next), { status: 201 });
 }
 
@@ -74,7 +67,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "duplicate jar id" }, { status: 422 });
   }
 
-  const next = backfillActualAmount(healOrphanCategories(dedupeCategories({ version: 3, jars })));
+  const next = healOrphanCategories(dedupeCategories({ version: 3, jars }));
   return NextResponse.json(writeJarConfig(cif, next));
 }
 
@@ -83,7 +76,6 @@ export async function PUT(req: NextRequest) {
  * patches: {jarId: patch}}`), used by "Chia ngay" to set every jar's
  * `budgetLimit` in one transaction. Server enforces the cap: if Σ budgetLimit of
  * the resulting set would exceed CASA it rejects 422 (client check is only UX).
- * `budgetLimit` raises re-sync `actualAmount` when the jar is undrawn (H3).
  * `categoryIds` are NOT honoured here — category moves go through the per-jar
  * route so the one-category-one-jar invariant stays in one place.
  */
@@ -100,7 +92,6 @@ export async function PATCH(req: NextRequest) {
   const current = readJarConfig(cif);
   const byId = new Map(current.jars.map((j) => [j.id, j]));
   const merged = new Map<string, Jar>();
-  let touchesActual = false;
 
   for (const [jarId, rawPatch] of Object.entries(rawPatches as Record<string, unknown>)) {
     const prev = byId.get(jarId);
@@ -108,8 +99,7 @@ export async function PATCH(req: NextRequest) {
     const patch = sanitizeJarPatch(rawPatch);
     if (!patch) return NextResponse.json({ error: `patch for ${jarId} is invalid` }, { status: 422 });
     delete patch.categoryIds; // category moves are not a batch concern
-    if ("actualAmount" in patch) touchesActual = true;
-    merged.set(jarId, resyncActualOnRaise(prev, { ...prev, ...patch }));
+    merged.set(jarId, { ...prev, ...patch });
   }
 
   const nextJars = current.jars.map((j) => merged.get(j.id) ?? j);
@@ -123,18 +113,5 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  // Reallocation (top-up) moves `actualAmount`, not `budgetLimit`, so it slips
-  // past the Σ budgetLimit cap above. Guard the SPENDABLE total too: Σ actualAmount
-  // ≤ CASA and no negative balance (RT#6/#7) — reject rather than vaporise money.
-  if (touchesActual) {
-    const actualCap = fitsActualCap(nextJars, casaPool);
-    if (!actualCap.ok) {
-      return NextResponse.json(
-        { error: "over CASA actual cap", overBy: actualCap.overBy ?? null },
-        { status: 422 },
-      );
-    }
-  }
-
-  return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars: nextJars })));
+  return NextResponse.json(writeJarConfig(cif, { version: 3, jars: nextJars }));
 }

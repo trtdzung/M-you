@@ -13,7 +13,7 @@ import "server-only";
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
-import { backfillActualAmount, dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
+import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
 import { getDb } from "./db";
 
 interface JarRow {
@@ -22,7 +22,6 @@ interface JarRow {
   label: string;
   category_ids: string;
   budget_limit: number | null;
-  actual_amount: number | null;
   color: string | null;
   icon: string | null;
   sort_order: number;
@@ -47,7 +46,6 @@ function parseCategoryIds(raw: string): string[] {
 function toJar(row: JarRow): Jar {
   const jar: Jar = { id: row.id, label: row.label, categoryIds: parseCategoryIds(row.category_ids) };
   if (row.budget_limit !== null) jar.budgetLimit = row.budget_limit;
-  if (row.actual_amount !== null) jar.actualAmount = row.actual_amount;
   if (row.color !== null) jar.color = row.color;
   if (row.icon !== null) jar.icon = row.icon;
   return jar;
@@ -60,7 +58,7 @@ function amount(value: unknown): number | undefined {
 
 /**
  * Guard for a jar coming off the wire (the old provider-boundary `isValidJar`,
- * moved server-side): `id`/`label`/`categoryIds` are required, the two amounts
+ * moved server-side): `id`/`label`/`categoryIds` are required, `budgetLimit`
  * must be finite and non-negative or absent, and unknown fields are dropped —
  * so a malformed body can never write a NaN/negative/garbage row.
  */
@@ -73,16 +71,14 @@ export function sanitizeJar(input: unknown): Jar | null {
 
   const jar: Jar = { id: j.id, label: j.label, categoryIds: categoryIds as string[] };
   const budgetLimit = amount(j.budgetLimit);
-  const actualAmount = amount(j.actualAmount);
   if (budgetLimit !== undefined) jar.budgetLimit = budgetLimit;
-  if (actualAmount !== undefined) jar.actualAmount = actualAmount;
   if (typeof j.color === "string") jar.color = j.color;
   if (typeof j.icon === "string") jar.icon = j.icon;
   return jar;
 }
 
 /**
- * Guard for a PATCH body. Only the six mutable fields are honoured (`id` is the
+ * Guard for a PATCH body. Only the mutable fields are honoured (`id` is the
  * path, never patchable) and an absent key is left alone.
  *
  * `null` means CLEAR — "Hạn mức: để trống" must be able to put `budgetLimit`
@@ -100,16 +96,15 @@ export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | nul
   if (Array.isArray(p.categoryIds) && p.categoryIds.every((c) => typeof c === "string")) {
     patch.categoryIds = p.categoryIds as string[];
   }
-  for (const key of ["budgetLimit", "actualAmount"] as const) {
-    if (!(key in p)) continue;
-    if (p[key] === null) patch[key] = undefined;
+  if ("budgetLimit" in p) {
+    if (p.budgetLimit === null) patch.budgetLimit = undefined;
     else {
       // A present numeric value that is negative (or non-finite) must be REJECTED,
-      // not silently dropped (RT#6): a swallowed negative `actualAmount` decrement
-      // would leave Σ inconsistent while the client believes the write applied.
-      if (typeof p[key] === "number" && (!Number.isFinite(p[key]) || (p[key] as number) < 0)) return null;
-      const value = amount(p[key]);
-      if (value !== undefined) patch[key] = value;
+      // not silently dropped: a swallowed bad value would leave Σ inconsistent
+      // while the client believes the write applied.
+      if (typeof p.budgetLimit === "number" && (!Number.isFinite(p.budgetLimit) || p.budgetLimit < 0)) return null;
+      const value = amount(p.budgetLimit);
+      if (value !== undefined) patch.budgetLimit = value;
     }
   }
   for (const key of ["color", "icon"] as const) {
@@ -133,20 +128,20 @@ export function sanitizeJars(input: unknown): Jar[] | null {
 }
 
 /**
- * The persona's jars in display order, normalized (dedupe → heal → backfill)
- * on every call — this is what makes every route handler's response correct
- * regardless of how the underlying rows got there. An unknown `cif` (or one
- * that has never had a jar) does NOT yield an empty list: with zero stored
- * rows, `healOrphanCategories` sees every expense category as orphaned and
- * synthesizes a single catch-all "Khác" jar holding all of them (the same
- * healing that runs for any other persona) — this config is never a crash,
- * but callers should not assume "no rows" means "no jars back".
+ * The persona's jars in display order, normalized (dedupe → heal) on every call
+ * — this is what makes every route handler's response correct regardless of how
+ * the underlying rows got there. An unknown `cif` (or one that has never had a
+ * jar) does NOT yield an empty list: with zero stored rows,
+ * `healOrphanCategories` sees every expense category as orphaned and synthesizes
+ * a single catch-all "Khác" jar holding all of them (the same healing that runs
+ * for any other persona) — this config is never a crash, but callers should not
+ * assume "no rows" means "no jars back".
  */
 export function readJarConfig(cif: string): JarConfig {
   const rows = getDb()
     .prepare("SELECT * FROM jars WHERE cif = ? ORDER BY sort_order ASC")
     .all(cif) as JarRow[];
-  return backfillActualAmount(healOrphanCategories(dedupeCategories({ version: 3, jars: rows.map(toJar) })));
+  return healOrphanCategories(dedupeCategories({ version: 3, jars: rows.map(toJar) }));
 }
 
 /**
@@ -159,8 +154,8 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
   const db = getDb();
   const del = db.prepare("DELETE FROM jars WHERE cif = ?");
   const insert = db.prepare(
-    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, actual_amount, color, icon, sort_order)
-     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @actualAmount, @color, @icon, @sortOrder)`,
+    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, color, icon, sort_order)
+     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @color, @icon, @sortOrder)`,
   );
   const replaceAll = db.transaction((jars: Jar[]) => {
     del.run(cif);
@@ -171,9 +166,8 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
         label: jar.label,
         categoryIds: JSON.stringify(jar.categoryIds),
         // `undefined` is not a bindable value in better-sqlite3 — an unset
-        // amount is stored as NULL, which reads back as `undefined` again.
+        // limit is stored as NULL, which reads back as `undefined` again.
         budgetLimit: jar.budgetLimit ?? null,
-        actualAmount: jar.actualAmount ?? null,
         color: jar.color ?? null,
         icon: jar.icon ?? null,
         sortOrder: index,

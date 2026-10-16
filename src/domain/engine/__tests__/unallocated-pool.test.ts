@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Account, Jar } from "@/domain/models";
+import type { Account } from "@/domain/models";
 import { casaBalance } from "../casa-balance";
 import { computeUnallocatedPool } from "../unallocated-pool";
 
@@ -19,10 +19,6 @@ function account(id: string, availableBalance: number, over: Partial<Account> = 
     accountNumber: "000000000000",
     ...over,
   };
-}
-
-function jar(id: string, actualAmount?: number): Jar {
-  return { id, label: id, categoryIds: [], ...(actualAmount !== undefined ? { actualAmount } : {}) };
 }
 
 describe("casaBalance", () => {
@@ -52,43 +48,32 @@ describe("casaBalance", () => {
 });
 
 describe("computeUnallocatedPool", () => {
-  it("positive pool: CASA − Σactual", () => {
-    const pool = computeUnallocatedPool({
-      casaBalance: 18_000_000,
-      jars: [jar("a", 5_000_000), jar("b", 3_000_000)],
-    });
+  it("positive pool: CASA − Σspendable", () => {
+    const pool = computeUnallocatedPool({ casaBalance: 18_000_000, spendableTotal: 8_000_000 });
     expect(pool).toEqual({ amount: 10_000_000, overAllocated: false, source: "mock" });
   });
 
   it("exactly zero pool", () => {
-    const pool = computeUnallocatedPool({ casaBalance: 8_000_000, jars: [jar("a", 8_000_000)] });
+    const pool = computeUnallocatedPool({ casaBalance: 8_000_000, spendableTotal: 8_000_000 });
     expect(pool.amount).toBe(0);
     expect(pool.overAllocated).toBe(false);
   });
 
   it("negative pool → overAllocated, keeps true negative (invariant #6, no clamp)", () => {
-    const pool = computeUnallocatedPool({ casaBalance: 5_000_000, jars: [jar("a", 8_000_000)] });
+    const pool = computeUnallocatedPool({ casaBalance: 5_000_000, spendableTotal: 8_000_000 });
     expect(pool.amount).toBe(-3_000_000);
     expect(pool.overAllocated).toBe(true);
   });
 
-  it("jar without actualAmount contributes 0 (not fabricated)", () => {
-    const pool = computeUnallocatedPool({
-      casaBalance: 10_000_000,
-      jars: [jar("funded", 4_000_000), jar("unfunded")],
-    });
-    expect(pool.amount).toBe(6_000_000);
+  it("CASA dropped below Σspendable (after account-source debits) → overAllocated", () => {
+    // Steady state pool ≥ 0, but an account-source transfer debits CASA to 6tr while
+    // jars still claim 9tr of derived spendable → pool goes negative, badge stays live.
+    const pool = computeUnallocatedPool({ casaBalance: 6_000_000, spendableTotal: 9_000_000 });
+    expect(pool.amount).toBe(-3_000_000);
+    expect(pool.overAllocated).toBe(true);
   });
 
-  it("many jars sum correctly", () => {
-    const pool = computeUnallocatedPool({
-      casaBalance: 20_000_000,
-      jars: [jar("a", 2_000_000), jar("b", 3_000_000), jar("c", 1_500_000), jar("d")],
-    });
-    expect(pool.amount).toBe(13_500_000);
-  });
-
-  it("empty jars → whole CASA is unallocated", () => {
-    expect(computeUnallocatedPool({ casaBalance: 18_000_000, jars: [] }).amount).toBe(18_000_000);
+  it("spendableTotal 0 (no jar claims anything) → whole CASA is unallocated", () => {
+    expect(computeUnallocatedPool({ casaBalance: 18_000_000, spendableTotal: 0 }).amount).toBe(18_000_000);
   });
 });

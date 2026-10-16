@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backfillActualAmount, stripCategories } from "@/domain/jar-rules";
+import { stripCategories } from "@/domain/jar-rules";
 import { readJarConfig, writeJarConfig } from "@/lib/jars-store";
 
 /**
@@ -31,5 +31,5 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const jars = stripped.map((j) =>
     j.id === id ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j,
   );
-  return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars })));
+  return NextResponse.json(writeJarConfig(cif, { version: 3, jars }));
 }

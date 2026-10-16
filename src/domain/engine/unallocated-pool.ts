@@ -1,25 +1,25 @@
 /**
  * The virtual "Chưa phân bổ" (unallocated) pool — the CASA money that no jar's
- * real spendable balance (`actualAmount`) currently claims:
+ * DERIVED spendable balance currently claims:
  *
- *   amount = casaBalance − Σ (jar.actualAmount ?? 0)
+ *   amount = casaBalance − Σ spendable(jar)
  *
- * It answers "chuyển không chọn hũ → trừ ở đâu?": the pool is the visible,
- * default source for a no-jar transfer, and it self-shrinks because it is a
- * DERIVED number — never a stored field (no new column, no drift, invariant #1).
+ * where `spendable(jar) = max(0, remaining)` (see `jar-spendable.ts`) — the SAME
+ * number the overview and the transfer picker show. It answers "chuyển không
+ * chọn hũ → trừ ở đâu?": the pool is the visible, default source for a no-jar
+ * transfer, and it self-shrinks because it is a DERIVED number — never a stored
+ * field (no column, no drift, invariant #1).
  *
  * Invariant #6 (missing stays unknown, never a silent 0):
- *  - A jar with no `actualAmount` yet contributes 0 (it has drawn nothing from
- *    the pool), NOT a fabricated balance.
+ *  - A jar with no limit contributes 0 to the pool total (`spendable == null` →
+ *    counted as 0 here — it claims nothing), NOT a fabricated balance.
  *  - When jars claim MORE than CASA holds, `amount` keeps its true negative value
  *    and `overAllocated` is set. The engine never clamps to 0 — the UI decides how
  *    to present "Vượt phân bổ" (available = 0), but the truth stays negative here.
  */
 
-import type { Jar } from "@/domain/models";
-
 export interface UnallocatedPool {
-  /** casaBalance − Σ actualAmount. May be negative (see `overAllocated`). */
+  /** casaBalance − Σ spendable. May be negative (see `overAllocated`). */
   amount: number;
   /** True when jars claim more spendable money than CASA holds (`amount < 0`). */
   overAllocated: boolean;
@@ -29,9 +29,9 @@ export interface UnallocatedPool {
 
 export function computeUnallocatedPool(input: {
   casaBalance: number;
-  jars: Pick<Jar, "actualAmount">[];
+  /** Σ of every jar's derived `spendable` (a null-spendable jar contributes 0). */
+  spendableTotal: number;
 }): UnallocatedPool {
-  const claimed = input.jars.reduce((sum, jar) => sum + (jar.actualAmount ?? 0), 0);
-  const amount = input.casaBalance - claimed;
+  const amount = input.casaBalance - input.spendableTotal;
   return { amount, overAllocated: amount < 0, source: "mock" };
 }

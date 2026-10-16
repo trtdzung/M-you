@@ -31,6 +31,7 @@ import {
   evaluateJarBudget,
   evaluateJarEnvelope,
   financialHealth,
+  jarSpendable,
   monthPeriodFromKey,
   networthTrend,
   spendingByCategory,
@@ -101,11 +102,12 @@ export interface Financials {
    */
   jarEnvelope: JarEnvelopeResult;
   /**
-   * The virtual "Chưa phân bổ" pool = casaBalance(current) − Σ jar.actualAmount.
-   * Derived (never stored), so every screen showing jar totals / CASA can read
-   * one truth — including `overAllocated` ("Vượt phân bổ"), which must surface on
-   * every such surface, not just the transfer sheet (Red Team #13). Negative
-   * `amount` is kept as-is (invariant #6); the UI presents available as 0.
+   * The virtual "Chưa phân bổ" pool = casaBalance(current) − Σ jar spendable
+   * (`max(0, remaining)`, the SAME number the overview + picker show). Derived
+   * (never stored), so every screen showing jar totals / CASA reads one truth —
+   * including `overAllocated` ("Vượt phân bổ"), which must surface on every such
+   * surface, not just the transfer sheet (Red Team #13). Negative `amount` is
+   * kept as-is (invariant #6); the UI presents available as 0.
    */
   unallocatedPool: UnallocatedPool;
   /**
@@ -200,11 +202,14 @@ export function computeFinancials(
   const spentByJar = new Map(jarBudget.lines.map((l) => [l.huId, l.spent]));
   const jarEnvelope = evaluateJarEnvelope(jarConfig, raw.accounts, spentByJar, period);
   // Unallocated pool: CASA (current-only, via the shared selector so it never
-  // swallows savings/credit — RT#9) minus what jars actually claim. Derived here
-  // once so every screen reads the same `overAllocated` (RT#13).
+  // swallows savings/credit — RT#9) minus what jars actually claim (Σ derived
+  // spendable = Σ max(0, remaining), the same jarBudget.lines the overview +
+  // picker read). Derived here once so every screen reads the same
+  // `overAllocated` (RT#13).
+  const spendableTotal = jarBudget.lines.reduce((sum, l) => sum + (jarSpendable(l.remaining) ?? 0), 0);
   const unallocatedPool = computeUnallocatedPool({
     casaBalance: casaBalance(raw.accounts),
-    jars: jarConfig.jars,
+    spendableTotal,
   });
 
   return {

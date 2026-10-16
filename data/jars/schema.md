@@ -13,15 +13,13 @@ itself holds no constraints beyond its primary key and `NOT NULL` columns:
 
 - **One category belongs to exactly one jar.** Enforced on every write
   (`stripCategories`/`healOrphanCategories`/`dedupeCategories`).
-- **`actual_amount` backfills from `budget_limit`** the first time a jar gets
-  a real budget, so it becomes usable as a Chuyển tiền source immediately
-  (`backfillActualAmount`).
-- **Single-number model:** a jar's `budget_limit` IS its allocation, ceiling and
-  starting balance — the Overview envelope derives "còn lại trong hũ" as
-  `budget_limit − đã tiêu`. There is no separate allocation ledger (the legacy
-  `jar_allocations` table was retired). `actual_amount` is the distinct
-  Chuyển-tiền spendable balance; it only re-syncs UP when `budget_limit` is
-  raised on an undrawn jar (`resyncActualOnRaise`), never on a decrease.
+- **Single-number model, single DERIVED balance:** a jar's `budget_limit` IS its
+  allocation and ceiling. The jar has NO stored balance — its spendable
+  `= max(0, remaining)` where `remaining = budget_limit − đã tiêu` is DERIVED
+  from txn history (invariant #1), the SAME number the Overview envelope and the
+  Chuyển-tiền source picker show. There is no separate allocation ledger and no
+  `actual_amount` column (both retired): a jar-sourced transfer books a
+  self-reported expense txn, which drops the derived `remaining` — nothing else.
 
 | column | type | notes |
 |---|---|---|
@@ -30,7 +28,6 @@ itself holds no constraints beyond its primary key and `NOT NULL` columns:
 | `label` | TEXT | display name |
 | `category_ids` | TEXT | JSON array of expense-category ids this jar covers |
 | `budget_limit` | REAL, nullable | "Đã set" — the monthly target. `NULL` = chưa đặt (never 0) |
-| `actual_amount` | REAL, nullable | "Thực tế" — real spendable balance, used to pick this jar as a Chuyển tiền source. `NULL` = chưa có số dư (never 0) |
 | `color` | TEXT, nullable | presentation override |
 | `icon` | TEXT, nullable | presentation override |
 | `sort_order` | INTEGER | display order |
