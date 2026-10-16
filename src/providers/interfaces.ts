@@ -12,6 +12,7 @@ import type {
   Beneficiary,
   Budget,
   Goal,
+  JarConfig,
   Liability,
   MockProduct,
   MonthlySnapshot,
@@ -60,4 +61,13 @@ export interface Providers
     BeneficiaryDataProvider {
   getBudgets(): Promise<Budget[]>;
   listGoals(): Promise<Goal[]>;
+  /**
+   * Read the user's saved spending-jar configuration, or `null` when none is
+   * stored (or the stored shape is invalid — the caller then seeds a default).
+   * User config, like `getBudgets`; the mock impl is client-local storage, a
+   * real adapter maps to the MSB preferences API (invariant #4).
+   */
+  getJarConfig(): Promise<JarConfig | null>;
+  /** Persist the user's spending-jar configuration. First write on `Providers`. */
+  saveJarConfig(config: JarConfig): Promise<void>;
 }

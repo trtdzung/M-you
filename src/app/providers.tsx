@@ -7,6 +7,7 @@
 
 import { PersonaProvider } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
+import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 
@@ -14,9 +15,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <PersonaProvider>
       <CorrectionsProvider>
-        <PeriodProvider>
-          <ConsentGate>{children}</ConsentGate>
-        </PeriodProvider>
+        <JarConfigProvider>
+          <PeriodProvider>
+            <ConsentGate>{children}</ConsentGate>
+          </PeriodProvider>
+        </JarConfigProvider>
       </CorrectionsProvider>
     </PersonaProvider>
   );

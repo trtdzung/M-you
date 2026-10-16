@@ -12,6 +12,7 @@ import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { useProviders } from "@/providers/context";
 import { useCorrections, applyCorrections } from "./corrections";
+import { useJarConfig } from "./jars";
 import { usePeriod } from "./period";
 
 /** Re-exported so existing screens keep importing these from the hook. */
@@ -29,6 +30,7 @@ export interface UseFinancialsResult {
 export function useFinancials(): UseFinancialsResult {
   const providers = useProviders();
   const { corrections } = useCorrections();
+  const { config: jarConfig } = useJarConfig();
   const { month } = usePeriod();
 
   const [raw, setRaw] = useState<RawData | null>(null);
@@ -70,8 +72,8 @@ export function useFinancials(): UseFinancialsResult {
   );
 
   const financials = useMemo<Financials | null>(
-    () => (raw ? computeFinancials(raw, month, { transactions }) : null),
-    [raw, transactions, month],
+    () => (raw ? computeFinancials(raw, month, { transactions, jarConfig }) : null),
+    [raw, transactions, month, jarConfig],
   );
 
   return { loading, error, raw, transactions, financials };

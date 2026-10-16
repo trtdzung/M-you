@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
+import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
 
@@ -42,7 +43,9 @@ function renderScreen(ui: ReactElement) {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
-        <PeriodProvider>{ui}</PeriodProvider>
+        <JarConfigProvider>
+          <PeriodProvider>{ui}</PeriodProvider>
+        </JarConfigProvider>
       </CorrectionsProvider>
     </PersonaProvider>,
   );

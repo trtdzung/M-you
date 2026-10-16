@@ -103,6 +103,7 @@ Key shared components introduced by the refactor:
 - Exclude internal transfers from cash-flow totals.
 - Separate fixed and discretionary spending.
 - Calculate period comparisons and end-of-period estimates.
+- Evaluate user-defined spending jars against real spend (`jars.ts` — `evaluateJars`); the config now persists per persona (Phase 02), no UI yet. See "Spending jars" below.
 
 ### Balance-sheet module
 
@@ -110,6 +111,19 @@ Key shared components introduced by the refactor:
 - Calculate net worth and net-worth trend.
 - Keep source and freshness metadata.
 - Distinguish verified, self-reported, and estimated values.
+
+### Spending jars (engine + persistence, Phase 02 of 6 — no UI yet)
+
+`evaluateJars(config, txns, period, now, income)` (`src/domain/engine/jars.ts`) groups real expense categories into user-defined "jars" and compares their net spend against an allocation (`% of income` or a fixed VND cap). `resolveIncomeBasis` picks the income used by percent-mode jars, in priority order: detected recurring salary → manual `JarConfig.incomeBasis` override number → `"unknown"`.
+
+- **Spend-only, never a second ledger:** a jar's `used` is exactly `netExpenseByCategory` for its categories (transfers excluded, refunds reversed, reversed dropped) — invariant #1/#6.
+- **Unknown income never fakes "ok":** if the income basis is unknown, percent-mode jars report `allocated: null`, `pct: null`, `status: "unknown"` rather than defaulting to a false-healthy verdict (invariant #6).
+- **Provenance is worst-case:** each `JarLine.meta` folds the lowest-trust source and oldest freshness across its feeding transactions (and the income basis, for percent jars) — invariant #5.
+- Spend not covered by any configured jar surfaces as a single `"Chưa phân hũ"` (unassigned) line rather than being dropped.
+- `NEAR_THRESHOLD`, `statusOf`, and `daysLeftIn` were extracted into a shared `src/domain/engine/pressure.ts` so budgets and jars share one ok/near/over classification (DRY) instead of duplicating the rule.
+- `JarConfig`/`Jar`/`JarAllocation` (`src/domain/models`) are **user state**, not provider `RawData` — threaded into the engine via `ComposeOptions.jarConfig` (`finance-compose.ts`). `Financials` gained `jarLines: JarLine[]` and `jarIncomeBasis`.
+- **Persistence (Phase 02):** `Providers.getJarConfig()` / `saveJarConfig()` (`src/providers/interfaces.ts`) are the first *write* methods on `Providers` — every other provider method is read-only. The mock adapter (`src/providers/mock/mock-provider.ts`) backs them with **persona-scoped `localStorage`** (key `msb-pfm.jars.<personaId>`) plus a structural schema guard (`isValidJarConfig`: `version === 1` + shape checks); a missing, corrupt, or wrong-shape record reads back as `null` so the caller reseeds from `DEFAULT_JAR_CONFIG` (`src/domain/models/jar-defaults.ts` — spend-only, all 10 expense categories, percents summing to 100). A real adapter maps these two methods to the MSB preferences API (invariant #4) without changing the interface.
+- **`JarConfigProvider` context (`src/state/jars.tsx`):** loads the config through the provider seam on mount and on persona switch (reseeding per persona so configs never leak across personas), normalizes overlapping categories on load (`dedupeCategories`), enforces one-category-one-jar on every mutation, and persists each mutation back through `saveJarConfig`. `useFinancials` threads the live `config` into `computeFinancials` via `ComposeOptions.jarConfig`. No jars UI consumes this context yet — that's Phase 03/04 of `plans/260908-1311-spending-jars`.
 
 ### Asset and liability module
 
@@ -275,6 +289,8 @@ BeneficiaryDataProvider  # saved payees for Tier B recipient resolution (findRec
 ```
 
 The mock provider supplies deterministic fixtures for the prototype. Production providers can later connect to MSB core banking, card, savings, or investment systems without changing calculation and presentation contracts.
+
+The composed `Providers` bundle (`src/providers/interfaces.ts`) also exposes `getJarConfig()` / `saveJarConfig()` — the first *write* pair on this interface, all other methods being reads. See "Spending jars" above for the mock persistence strategy and the intended real-adapter mapping.
 
 ## Financial calculation rules
 
