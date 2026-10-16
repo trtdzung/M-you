@@ -22,9 +22,7 @@ describe("MYourWidget", () => {
     render(<MYourWidget />);
     fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý M-Your" }));
 
-    expect(
-      screen.getByText("Trợ lý đồng hành giúp bạn nắm rõ tình hình tài chính — hỏi bất kỳ điều gì bạn quan tâm."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Trợ lý Tài chính của bạn")).toBeInTheDocument();
   });
 
   it("sends a message and shows a reply from M-Your", () => {
