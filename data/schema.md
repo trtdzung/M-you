@@ -75,8 +75,18 @@ in the background, and imports any legacy localStorage rows once on first load.
 
 ¹ Composite primary key `(cif, id)`. Writes are `INSERT OR REPLACE` (idempotent on
 a replayed create); PATCH is a read-modify-write over a whitelist
-(`categoryId` / `type` / `transferPurpose` / `note`), where a `null` value CLEARS
-an optional field. No seed — a persona starts with zero self-reported rows.
+(`categoryId` / `type` / `transferPurpose` / `note` / `rebalance`), where a `null`
+value CLEARS an optional field. No seed — a persona starts with zero self-reported
+rows.
+
+**Inter-jar rebalance txns (plan 260918-1120, Phase 03)** live in THIS table — no
+separate ledger. A rebalance is one row whose `payload` Transaction carries
+`categoryId: "dieu-chinh-hu"` (a system category excluded from thu/chi + spend-by-
+category, like `type:"transfer"`) plus a `rebalance` meta
+`{ fromJarId, toJarId, triggerTxnId, origin: "auto"|"manual" }`. Because `payload`
+is the full JSON Transaction, the meta persists with no column change; the engine
+folds `Σ nhận − Σ cho` into each jar's `remaining`. The `rebalance` whitelist entry
+above is what keeps a PATCH from silently dropping the meta.
 
 ## `jars`
 
