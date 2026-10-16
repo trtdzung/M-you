@@ -8,7 +8,7 @@ import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
 import { assessTransferRisk } from "@/lib/transfer-risk";
-import { casaBalance, computeUnallocatedPool, evaluateFunding } from "@/domain/engine";
+import { casaBalance, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
 import { TransferHeader } from "./TransferHeader";
 import { type SelectedRecipient } from "./RecipientPicker";
@@ -82,12 +82,27 @@ export function TransferCompose() {
     return () => { active = false; };
   }, [providers]);
 
+  // The single derived quantity every jar number keys off (invariant #1): built
+  // from the SAME `jarBudget.lines` the Tổng quan overview reads, so the picker
+  // and the overview can never disagree. `spendable = max(0, remaining)`; null
+  // (no limit) is non-fundable ("Chưa có số dư"), never a fabricated 0 (#6).
+  const jarSpendables = useMemo<JarSpendable[]>(
+    () =>
+      (financials?.jarBudget.lines ?? []).map((line) => ({
+        id: line.huId,
+        label: line.label,
+        categoryIds: line.categoryIds,
+        spendable: jarSpendable(line.remaining),
+      })),
+    [financials],
+  );
+
   const jars = useMemo(
     () =>
-      jarConfig.jars.map((jar) => ({
-        ...jar,
-        remaining: financials?.jarBudget.lines.find((line) => line.huId === jar.id)?.remaining ?? null,
-      })),
+      jarConfig.jars.map((jar) => {
+        const remaining = financials?.jarBudget.lines.find((line) => line.huId === jar.id)?.remaining ?? null;
+        return { ...jar, remaining, spendable: jarSpendable(remaining) };
+      }),
     [jarConfig, financials],
   );
 
@@ -96,25 +111,32 @@ export function TransferCompose() {
   const selectedJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
   // The virtual "Chưa phân bổ" pool — computed HERE from the shared selector on
   // the already-current-filtered `accounts` (never via useFinancials' unfiltered
-  // RawData.accounts — RT#9), and only once jars have loaded (else `jars: []`
-  // would report the whole CASA as unallocated — RT#14).
+  // RawData.accounts — RT#9), and only once jars have loaded AND financials have
+  // arrived (else `spendableTotal: 0` would report the whole CASA as unallocated
+  // — RT#14). Σ derived spendable, the same number the overview shows.
   const pool = useMemo(
-    () => (jarsLoaded ? computeUnallocatedPool({ casaBalance: casaBalance(accounts), jars: jarConfig.jars }) : null),
-    [jarsLoaded, accounts, jarConfig.jars],
+    () =>
+      jarsLoaded && financials
+        ? computeUnallocatedPool({
+            casaBalance: casaBalance(accounts),
+            spendableTotal: jarSpendables.reduce((sum, jar) => sum + (jar.spendable ?? 0), 0),
+          })
+        : null,
+    [jarsLoaded, financials, accounts, jarSpendables],
   );
 
   // Funding assessment for jar/pool sources (RT — Câu 2). An account source is a
   // plain balance check (no jar-model shortfall). `undefined` = account source.
   const fundingSourceJarId = source?.kind === "jar" ? source.id : source?.kind === "pool" ? null : undefined;
   const assessment = useMemo(() => {
-    if (source?.kind === "account" || !jarsLoaded || !(numericAmount > 0)) return null;
+    if (source?.kind === "account" || !jarsLoaded || !financials || !(numericAmount > 0)) return null;
     return evaluateFunding({
       amount: numericAmount,
       sourceJarId: fundingSourceJarId ?? null,
       casaBalance: casaBalance(accounts),
-      jars: jarConfig.jars,
+      jars: jarSpendables,
     });
-  }, [source?.kind, fundingSourceJarId, jarsLoaded, numericAmount, accounts, jarConfig.jars]);
+  }, [source?.kind, fundingSourceJarId, jarsLoaded, financials, numericAmount, accounts, jarSpendables]);
 
   const accountSourceValid = source?.kind === "account" && Boolean(selectedAccount && numericAmount <= selectedAccount.balance);
   const insufficient = assessment?.tier === "insufficient";

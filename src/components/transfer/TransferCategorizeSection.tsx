@@ -20,21 +20,22 @@ import {
 
 /**
  * Optional "Phân loại giao dịch" section on the transfer success card. It edits
- * the category of the ONE self-reported txn recorded on confirm (never money
- * movement — invariant #3) and keeps the affected jar's "Thực tế" in sync with
- * "Ngân sách": re-categorizing into a jar-owned expense debits that jar
- * (`spendFromJar`); switching away refunds it (F#5, "trừ luôn hũ").
+ * the category of the ONE self-reported (primary) txn recorded on confirm (never
+ * money movement — invariant #3). No jar bookkeeping is needed here any more: a
+ * jar's spendable is DERIVED from txn history (invariant #1), so changing the
+ * txn's category alone re-routes `spent`/`remaining` between jars via
+ * `evaluateJarBudget`'s category→jar map — no double count, nothing to refund.
  *
  * Transfer PURPOSE layer (separate taxonomy): while the transfer is still
  * unclassified, AI *suggests* a purpose (pending — invariant #6). Accepting a
  * `spending` purpose reclassifies into its mapped expense category (flipping the
- * txn to expense + jar sync, via the same path as a manual pick); a non-spending
- * purpose stays `type:"transfer"` and only records `transferPurpose` metadata.
- * Nothing here mutates the record until the USER taps a choice.
+ * txn to expense, via the same path as a manual pick); a non-spending purpose
+ * stays `type:"transfer"` and only records `transferPurpose` metadata. Nothing
+ * here mutates the record until the USER taps a choice.
  *
- * `sourceJarId` is the jar already debited in `confirm()` (null for an
- * account-sourced transfer) — it seeds `appliedJarId` so the first refund
- * targets the right jar, matching what `confirm()` actually charged.
+ * `sourceJarId` is the jar this transfer sourced from (null for an
+ * account/pool-sourced transfer) — it constrains the category picker to that
+ * jar's categories.
  */
 export function TransferCategorizeSection({
   txnId,
@@ -45,17 +46,11 @@ export function TransferCategorizeSection({
   sourceJarId: string | null;
   amount: number;
 }) {
-  const { config: jarConfig, spendFromJar } = useJarConfig();
+  const { config: jarConfig } = useJarConfig();
   const { manualTxns, update: updateManualTxn } = useManualTxns();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [purposeOpen, setPurposeOpen] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
-  // The jar whose "Thực tế" is currently charged for this txn, and the amount it
-  // was actually debited. Seeded from the jar confirm() already debited (the full
-  // amount — transfer sourcing validated funds) so a later refund targets the
-  // right jar for the right amount (F#5).
-  const [appliedJarId, setAppliedJarId] = useState<string | null>(sourceJarId);
-  const [appliedDebit, setAppliedDebit] = useState<number>(sourceJarId ? amount : 0);
 
   // Read the CURRENT record from the store — never recompute an independent
   // default (avoids drift with the real txn, Red Team F#7).
@@ -82,12 +77,10 @@ export function TransferCategorizeSection({
     enabled: Boolean(currentTxn) && isUnclassified,
   });
 
-  /** The jar (if any) that owns a category — used to keep "Thực tế" in sync (F#5). */
-  function jarOfCategory(categoryId: string): string | null {
-    return jarConfig.jars.find((j) => j.categoryIds.includes(categoryId))?.id ?? null;
-  }
-
-  /** Set category (+ optional purpose) and keep the charged jar in sync (F#5). */
+  /**
+   * Set category (+ optional purpose). The category change alone re-routes this
+   * txn's spend between jars (derived model, invariant #1) — no jar bookkeeping.
+   */
   function applyCategory(categoryId: string, purposeId?: string) {
     const nextType = typeForCategory(categoryId);
     // Always send transferPurpose so a plain category pick (purposeId omitted)
@@ -97,21 +90,6 @@ export function TransferCategorizeSection({
     if (!ok) {
       setPickError("Không cập nhật được phân loại. Vui lòng thử lại.");
       return;
-    }
-    const nextJarId = nextType === "expense" ? jarOfCategory(categoryId) : null;
-    if (nextJarId !== appliedJarId) {
-      // Refund EXACTLY what was debited. `spendFromJar` clamps at 0, so a charge
-      // against an underfunded jar debits less than `amount`; a blind -amount
-      // refund would inflate that jar's real spendable balance (invariant #6).
-      if (appliedJarId) spendFromJar(appliedJarId, -appliedDebit);
-      let charged = 0;
-      if (nextJarId) {
-        const jar = jarConfig.jars.find((j) => j.id === nextJarId);
-        charged = jar ? Math.min(amount, Math.max(0, jar.actualAmount ?? 0)) : amount;
-        spendFromJar(nextJarId, amount); // spendFromJar clamps internally to the same value
-      }
-      setAppliedJarId(nextJarId);
-      setAppliedDebit(charged);
     }
     setPickError(null);
     setPickerOpen(false);

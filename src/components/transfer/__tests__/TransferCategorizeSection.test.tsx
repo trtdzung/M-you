@@ -6,8 +6,9 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
  * (invariant #6-safe): a heuristic/AI suggestion is ALWAYS pending and must
  * NEVER by itself mutate the record; only the user tapping a choice does
  * ("Đồng ý" on the banner or a manual pick in the sheet). Accepting a
- * `spending` purpose flips the txn transfer→expense and syncs the owning
- * jar; a non-spending purpose stays `type:"transfer"` and only records
+ * `spending` purpose flips the txn transfer→expense (the category change alone
+ * re-routes spend to the owning jar — derived model, no separate bookkeeping);
+ * a non-spending purpose stays `type:"transfer"` and only records
  * `transferPurpose` metadata (no number moves).
  *
  * Mirrors the mocking pattern in `TransferConfirm.test.tsx`: `@/state/jars`
@@ -33,12 +34,20 @@ const h = vi.hoisted(() => {
     store: [] as MockTxn[],
     jarConfig: {
       version: 3,
-      jars: [{ id: "essentials", categoryIds: ["housing"], actualAmount: 8_000_000 }],
+      jars: [{ id: "essentials", categoryIds: ["housing"] }],
     },
-    spendFromJar: vi.fn(),
+    // Subscribers, so a successful `update` re-renders consumers like the real
+    // manual-txns context does (its setState triggers a re-render). Without this
+    // the mock is inert and a banner-accept — which changes no local component
+    // state — would never refresh the displayed category label.
+    listeners: new Set<() => void>(),
+    notify() {
+      state.listeners.forEach((fn) => fn());
+    },
     update: vi.fn((id: string, patch: Partial<MockTxn>) => {
       if (!state.store.some((t) => t.id === id)) return false;
       state.store = state.store.map((t) => (t.id === id ? { ...t, ...patch } : t));
+      state.notify();
       return true;
     }),
   };
@@ -50,12 +59,25 @@ vi.mock("@/providers/context", () => ({
 }));
 
 vi.mock("@/state/jars", () => ({
-  useJarConfig: () => ({ config: h.jarConfig, spendFromJar: h.spendFromJar }),
+  useJarConfig: () => ({ config: h.jarConfig }),
 }));
 
-vi.mock("@/state/manual-txns", () => ({
-  useManualTxns: () => ({ manualTxns: h.store, update: h.update }),
-}));
+vi.mock("@/state/manual-txns", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
+  return {
+    useManualTxns: () => {
+      const [, force] = React.useState(0);
+      React.useEffect(() => {
+        const fn = () => force((n) => n + 1);
+        h.listeners.add(fn);
+        return () => {
+          h.listeners.delete(fn);
+        };
+      }, []);
+      return { manualTxns: h.store, update: h.update };
+    },
+  };
+});
 
 import { TransferCategorizeSection } from "../TransferCategorizeSection";
 
@@ -67,12 +89,13 @@ function seedTxn(over: Partial<MockTxn> = {}): MockTxn {
 
 beforeEach(() => {
   h.store = [];
-  h.jarConfig = { version: 3, jars: [{ id: "essentials", categoryIds: ["housing"], actualAmount: 8_000_000 }] };
-  h.spendFromJar.mockClear();
+  h.jarConfig = { version: 3, jars: [{ id: "essentials", categoryIds: ["housing"] }] };
+  h.listeners.clear();
   h.update.mockClear();
   h.update.mockImplementation((id: string, patch: Partial<MockTxn>) => {
     if (!h.store.some((t) => t.id === id)) return false;
     h.store = h.store.map((t) => (t.id === id ? { ...t, ...patch } : t));
+    h.notify();
     return true;
   });
 });
@@ -87,7 +110,6 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
 
     // Suggestion is purely visual — the record itself is untouched.
     expect(h.update).not.toHaveBeenCalled();
-    expect(h.spendFromJar).not.toHaveBeenCalled();
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
     expect(h.store[0].transferPurpose).toBeUndefined();
   });
@@ -111,10 +133,9 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
 
     expect(h.update).toHaveBeenCalledTimes(1);
     expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "transfer", type: "transfer", transferPurpose: "debt" });
-    expect(h.spendFromJar).not.toHaveBeenCalled(); // never a number move for a non-spending purpose
   });
 
-  it("accepting a SPENDING purpose ('Đồng ý') flips type→expense and debits the owning jar", async () => {
+  it("accepting a SPENDING purpose ('Đồng ý') flips type→expense (the category move re-routes spend)", async () => {
     h.store = [seedTxn({ note: "tien nha" })]; // heuristic → "rent" (spending, maps to "housing")
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
@@ -122,10 +143,10 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
     expect(screen.getByText(/tính vào chi tiêu/)).toBeInTheDocument(); // spending purposes are labelled as such
     fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
 
+    // The category change alone re-routes the spend to the owning jar (derived
+    // model) — no separate jar bookkeeping call.
     expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "housing", type: "expense", transferPurpose: "rent" });
-    // "housing" is owned by the "essentials" jar in the mocked config → charged once.
-    expect(h.spendFromJar).toHaveBeenCalledTimes(1);
-    expect(h.spendFromJar).toHaveBeenCalledWith("essentials", AMOUNT);
+    expect(h.update).toHaveBeenCalledTimes(1);
   });
 
   it("'Chọn khác' opens the full purpose picker without mutating, and a manual pick applies the SAME rule", async () => {
@@ -142,7 +163,6 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
 
     fireEvent.click(within(dialog).getByRole("button", { name: /Kinh doanh/ }));
     expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "transfer", type: "transfer", transferPurpose: "business" });
-    expect(h.spendFromJar).not.toHaveBeenCalled();
   });
 
   it("a failed update surfaces an error and never optimistically charges the jar", async () => {
@@ -154,7 +174,7 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
     fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
 
     expect(screen.getByText(/Không cập nhật được phân loại/)).toBeInTheDocument();
-    expect(h.spendFromJar).not.toHaveBeenCalled();
+    expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" }); // record unchanged
   });
 
   it("no suggestion is offered once the txn is already classified (isUnclassified=false)", async () => {
@@ -181,24 +201,5 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
 
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
     expect(h.store[0].transferPurpose).toBeUndefined(); // stale purpose cleared, not lingering
-  });
-
-  // Regression (code-review #1): spendFromJar clamps at 0, so charging an
-  // underfunded jar debits less than `amount`; the refund must give back only
-  // the clamped debit, never the full amount (which would inflate the balance).
-  it("reverting an underfunded-jar charge refunds only the clamped debit (no inflation)", async () => {
-    h.jarConfig = { version: 3, jars: [{ id: "poor", categoryIds: ["shopping"], actualAmount: 200_000 }] };
-    h.store = [seedTxn({ note: "mua hang" })]; // pay_goods → shopping (spending)
-    render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
-
-    await screen.findByText("Trả tiền mua đồ/dịch vụ");
-    fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
-    expect(h.spendFromJar).toHaveBeenCalledWith("poor", AMOUNT); // request full; jar clamps internally
-
-    // Revert → refund must be the CLAMPED 200k, NOT the full 500k.
-    fireEvent.click(screen.getByRole("button", { name: "Mua sắm" }));
-    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Không phân loại" }));
-    expect(h.spendFromJar).toHaveBeenCalledWith("poor", -200_000);
-    expect(h.spendFromJar).not.toHaveBeenCalledWith("poor", -AMOUNT);
   });
 });

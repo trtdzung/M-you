@@ -20,7 +20,7 @@ export interface StoredTransferDraft {
   sourceLabel: string;
   /** The CASA account the money actually leaves — `/transfer-confirm` debits it on EVERY transfer (jar money physically lives in this account). Absent on legacy drafts → confirm falls back to the single `current` account. */
   sourceAccountId?: string;
-  /** Set when the chosen source was a jar (Chuyển tiền Phần 1) — `/transfer-confirm` debits this jar (its `actualAmount`) in addition to `sourceAccountId`. */
+  /** Set when the chosen source was a jar — `/transfer-confirm` books the spend into this jar's first category (dropping its derived `remaining`) alongside the `sourceAccountId` debit. */
   sourceJarId?: string;
   recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed" | "agent_proposed";
   riskFlags?: import("@/domain/models").TransferRiskFlag[];

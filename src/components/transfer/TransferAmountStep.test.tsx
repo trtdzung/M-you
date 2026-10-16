@@ -14,8 +14,9 @@ const savings: Account = {
 };
 const recipient: SelectedRecipient = { name: "Nguyen Van A", accountMasked: "****6677", accountNumber: "0281000556677", source: "saved_beneficiary", isNewPayee: false, bankName: "MSB" };
 
-const jarWithLimit: Jar & { remaining: number | null } = { id: "j1", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 3_000_000, remaining: 1_210_000 };
-const jarNoLimit: Jar & { remaining: number | null } = { id: "j2", label: "Giải trí", categoryIds: ["entertainment"], remaining: null };
+type PickerJar = Jar & { remaining: number | null; spendable: number | null };
+const jarWithLimit: PickerJar = { id: "j1", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 3_000_000, remaining: 1_210_000, spendable: 1_210_000 };
+const jarNoLimit: PickerJar = { id: "j2", label: "Giải trí", categoryIds: ["entertainment"], remaining: null, spendable: null };
 
 function renderStep(overrides: Partial<Parameters<typeof TransferAmountStep>[0]> = {}) {
   const onChangeRecipient = vi.fn();
@@ -105,27 +106,32 @@ describe("TransferAmountStep", () => {
     expect(rows[1]).not.toHaveTextContent("Mặc định");
   });
 
-  it("lists jars below the accounts in the source-account sheet; a jar with no actualAmount yet stays non-selectable", () => {
+  it("lists jars below the accounts; a jar with a limit is selectable (shows còn lại), one with no limit stays non-selectable", () => {
     const { onSourceChange } = renderStep({ jars: [jarWithLimit, jarNoLimit] });
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));
 
     expect(screen.getByText("Ăn uống")).toBeInTheDocument();
     expect(screen.getByText("Giải trí")).toBeInTheDocument();
-    expect(screen.getAllByText("Chưa có số dư")).toHaveLength(2);
+    // The no-limit jar shows "Chưa có số dư"; the funded one shows its còn lại.
+    expect(screen.getAllByText("Chưa có số dư")).toHaveLength(1);
+    expect(screen.getByText("1.210.000 ₫")).toBeInTheDocument();
 
-    expect(screen.queryByRole("button", { name: /Ăn uống/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Ăn uống"));
+    // The no-limit jar is not a button; tapping its label does nothing.
+    fireEvent.click(screen.getByText("Giải trí"));
     expect(onSourceChange).not.toHaveBeenCalled();
+    // The funded jar is selectable.
+    fireEvent.click(screen.getByText("Ăn uống"));
+    expect(onSourceChange).toHaveBeenCalledWith({ kind: "jar", id: "j1" });
   });
 
-  it("a funded jar shows only its transferable balance (no spending limit) and is selectable", () => {
-    const funded: Jar & { remaining: number | null } = {
-      id: "j3", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 8_000_000, actualAmount: 8_000_000, remaining: null,
+  it("a jar with a set limit shows its derived còn lại (= max(0, remaining)), no spending-limit wording, and is selectable", () => {
+    const funded: PickerJar = {
+      id: "j3", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 8_000_000, remaining: 8_000_000, spendable: 8_000_000,
     };
     const { onSourceChange } = renderStep({ jars: [funded] });
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));
 
-    // The balance is shown; the "đã set"/limit wording is gone.
+    // The còn lại is shown; the "đã set"/limit wording is gone.
     expect(screen.getByText("8.000.000 ₫")).toBeInTheDocument();
     expect(screen.queryByText(/Đã set/)).not.toBeInTheDocument();
 

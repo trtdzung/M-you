@@ -23,9 +23,10 @@ const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
 export const POOL_SOURCE_LABEL = "Chưa phân bổ";
 
 /**
- * A transfer source: a real account, a jar (Chuyển tiền Phần 1 — a jar with a
- * real `actualAmount`), or the virtual "Chưa phân bổ" pool (the CASA money no jar
- * claims — a no-jar transfer debits the account and lets the derived pool shrink).
+ * A transfer source: a real account, a jar (a jar with a derived spendable
+ * balance = `max(0, remaining)`), or the virtual "Chưa phân bổ" pool (the CASA
+ * money no jar claims — a no-jar transfer debits the account and lets the derived
+ * pool shrink).
  */
 export type TransferSource = { kind: "account" | "jar"; id: string } | { kind: "pool" };
 
@@ -51,8 +52,8 @@ export function TransferAmountStep({
 }: {
   recipient: SelectedRecipient;
   accounts: Account[];
-  /** A jar with a real `actualAmount` is selectable as a source (Phần 1); one without (no `budgetLimit` yet set) stays view-only. */
-  jars?: (Jar & { remaining: number | null })[];
+  /** A jar with a set limit is selectable as a source (its derived `spendable = max(0, remaining)`); one with no limit (`remaining == null`) stays view-only. */
+  jars?: (Jar & { remaining: number | null; spendable: number | null })[];
   /** The virtual "Chưa phân bổ" pool (null/omitted while jars are still loading — RT#14). */
   pool?: UnallocatedPool | null;
   source: TransferSource | null;
@@ -119,13 +120,13 @@ export function TransferAmountStep({
                 {sourceAccount
                   ? `${sourceAccount.accountNumber} · ${ACCOUNT_TYPE_LABEL[sourceAccount.type]}`
                   : sourceJar
-                    ? `Hũ ${sourceJar.label} · Thực tế`
+                    ? `Hũ ${sourceJar.label} · Còn lại`
                     : sourcePool
                       ? `${POOL_SOURCE_LABEL} · Số dư khả dụng`
                       : "Chọn tài khoản"}
               </p>
               {sourceAccount && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceAccount.balance)}</p>}
-              {sourceJar && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceJar.actualAmount)}</p>}
+              {sourceJar && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceJar.spendable ?? 0)}</p>}
               {sourcePool && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(poolAvailable)}</p>}
             </div>
             <ChevronDown size={16} className="shrink-0 text-muted" />
@@ -213,6 +214,9 @@ export function TransferAmountStep({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold text-text">{POOL_SOURCE_LABEL}</p>
                 <p className="mt-0.5 text-base font-bold tabular-nums text-text">{formatVnd(poolAvailable)}</p>
+                {/* Spendable-lens subtitle — distinguishes this pool (CASA − Σ còn-lại-các-hũ)
+                    from the Tổng quan "Chờ phân bổ" budget-headroom card (CASA − Σ hạn mức). */}
+                <p className="mt-0.5 text-[11px] text-muted">số dư khả dụng ngoài hũ</p>
               </div>
               {pool.overAllocated && (
                 <span className="shrink-0 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
@@ -254,7 +258,7 @@ export function TransferAmountStep({
                 {jars.map((jar) => {
                   const Icon = jarIcon(jar.icon);
                   const accent = jarAccent(jar);
-                  const fundable = jar.actualAmount !== undefined;
+                  const fundable = jar.remaining != null;
                   const row = (
                     <>
                       <span
@@ -267,10 +271,10 @@ export function TransferAmountStep({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-semibold text-text">{jar.label}</p>
                         {fundable ? (
-                          // Source picker → only the transferable balance matters; the
-                          // spending limit ("đã set") is irrelevant here and confusing.
+                          // Source picker → the derived "còn lại" (= max(0, remaining)),
+                          // the SAME number the Tổng quan overview shows for this jar.
                           <Money
-                            amount={jar.actualAmount}
+                            amount={jar.spendable}
                             unknownLabel="—"
                             className="mt-0.5 block text-base font-bold tabular-nums text-text"
                           />
