@@ -13,6 +13,7 @@ import { CategoryOptionGrid } from "./CategoryPickerSheet";
 import { CategoryProvenanceBadge } from "./CategoryProvenanceBadge";
 
 const TYPE_LABEL: Record<TransactionType, string> = {
+  income: "Tiền vào",
   expense: "Chi tiêu",
   transfer: "Chuyển khoản",
   refund: "Hoàn tiền",

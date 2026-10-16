@@ -17,6 +17,31 @@ describe("aggregateCashflow", () => {
     expect(result.expense).toBe(6_200_000);
   });
 
+  it("sums money-in from posted income and reports net (income − expense)", () => {
+    const result = aggregateCashflow(
+      [
+        txn({ type: "income", direction: "credit", categoryId: "unclassified", amount: 25_000_000 }),
+        txn({ type: "income", direction: "credit", categoryId: "unclassified", amount: 3_000_000 }),
+        txn({ type: "expense", categoryId: "dining", amount: 2_000_000 }),
+      ],
+      JUNE,
+    );
+    expect(result.income).toBe(28_000_000);
+    expect(result.expense).toBe(2_000_000);
+    expect(result.net).toBe(26_000_000);
+  });
+
+  it("keeps income out of the category breakdown", () => {
+    const result = aggregateCashflow(
+      [
+        txn({ type: "income", direction: "credit", categoryId: "unclassified", amount: 25_000_000 }),
+        txn({ type: "expense", categoryId: "dining", amount: 200_000 }),
+      ],
+      JUNE,
+    );
+    expect(result.byCategory).toEqual([{ categoryId: "dining", amount: 200_000 }]);
+  });
+
   it("excludes internal transfers and card payments from expense", () => {
     const result = aggregateCashflow(
       [

@@ -15,6 +15,8 @@ export {
   FIXED_CATEGORY_IDS,
   UNCLASSIFIED,
   UNCLASSIFIED_LABEL,
+  INCOME,
+  INCOME_LABEL,
   isUnclassifiedCategory,
   categoryLabel,
 } from "./categories";
@@ -40,7 +42,14 @@ export const CURRENCY_VND = "VND" as const;
 // ---------------------------------------------------------------------------
 
 export type TransactionDirection = "credit" | "debit";
+/**
+ * `income` is money-IN, shown only as an aggregate "Tiền vào" total — it carries
+ * NO spending-category taxonomy (there are no income categories like "Lương").
+ * Income transactions are excluded from expense/category truth and are never an
+ * AI categorization target (see `src/domain/categorize/unclassified.ts`).
+ */
 export type TransactionType =
+  | "income"
   | "expense"
   | "transfer"
   | "refund"

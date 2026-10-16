@@ -1,9 +1,10 @@
 /**
- * Cash-flow aggregation — the core expense truth (income was removed; the product
- * only tracks spending).
+ * Cash-flow aggregation — the core income/expense truth. `income` is money-IN as
+ * a single aggregate ("Tiền vào") only: it has NO category breakdown (there are
+ * no income categories) and never feeds `byCategory`.
  *
  * Rules enforced here (architectural invariants):
- *  - internal transfers and credit-card payments are excluded from expense
+ *  - internal transfers and credit-card payments are excluded from income/expense
  *  - refunds reverse the matching expense category (applied as negative expense)
  *  - reversed transactions are excluded from all totals
  *  - pending is kept separate from posted
@@ -19,8 +20,12 @@ export interface CategoryAmount {
 }
 
 export interface CashflowResult {
+  /** Money-in for the period (posted `income` txns). No category breakdown. */
+  income: number;
   /** Net expense (gross expense − refunds), excludes transfers/card payments. */
   expense: number;
+  /** Money-in minus expense; keeps its sign (never a false 0, invariant #6). */
+  net: number;
   /** Net expense per category (may include refunds), positive-ish, sorted desc. */
   byCategory: CategoryAmount[];
   fixed: number;
@@ -51,6 +56,7 @@ export function netExpenseByCategory(txns: Transaction[], period: Period): Map<s
 }
 
 export function aggregateCashflow(txns: Transaction[], period: Period): CashflowResult {
+  let income = 0;
   let pendingExpense = 0;
   let latest: string | null = null;
   const sources: Transaction["source"][] = [];
@@ -66,6 +72,7 @@ export function aggregateCashflow(txns: Transaction[], period: Period): Cashflow
 
     sources.push(t.source);
     if (!latest || t.postedAt > latest) latest = t.postedAt;
+    if (t.type === "income") income += t.amount;
   }
 
   const byCatMap = netExpenseByCategory(txns, period);
@@ -86,7 +93,9 @@ export function aggregateCashflow(txns: Transaction[], period: Period): Cashflow
   };
 
   return {
+    income,
     expense,
+    net: income - expense,
     byCategory,
     fixed,
     discretionary: expense - fixed,

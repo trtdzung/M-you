@@ -1,9 +1,10 @@
 /**
  * Deterministic transaction + snapshot generator. Given a persona it produces
- * ~6 months of realistic VN transactions (recurring bills, discretionary spend,
- * internal transfers, a refund, a reversal, pending items) plus accounts and
- * net-worth snapshots. Income was removed — the ledger is spending-only. Seeded —
- * same persona always yields the same data.
+ * ~6 months of realistic VN transactions (money-in, recurring bills, discretionary
+ * spend, internal transfers, a refund, a reversal, pending items) plus accounts
+ * and net-worth snapshots. Money-in is uncategorized (no income categories) —
+ * shown only as a "Tiền vào" aggregate. Seeded — same persona always yields the
+ * same data.
  */
 
 import type {
@@ -16,7 +17,7 @@ import type {
   MonthlySnapshot,
   Transaction,
 } from "@/domain/models";
-import { CATEGORY, CURRENCY_VND, UNCLASSIFIED } from "@/domain/models";
+import { CATEGORY, CURRENCY_VND, INCOME, UNCLASSIFIED } from "@/domain/models";
 import { maskAccountNumber } from "@/lib/format";
 import type { PersonaMeta } from "../personas";
 import { chance, jitter, mulberry32, pick, randInt, type Rng } from "../rng";
@@ -115,8 +116,13 @@ export function generateDataset(meta: PersonaMeta): Dataset {
 
   const monthList = months();
   monthList.forEach(({ year, month, cap }, mi) => {
-    // Income was removed from the product — the ledger tracks spending only. The
-    // CASA account balance (funded elsewhere) is the envelope/net-worth source.
+    // Money-in (salary / freelance). Shown as an aggregate "Tiền vào" only — no
+    // income category (categoryId is the INCOME sentinel, never a spending
+    // category, never an AI target). The CASA account balance is seeded separately.
+    add({ accountId: accCurrent, postedAt: iso(year, month, 5), amount: jitter(rng, p.salaryBase, p.salaryVariance, 100_000), direction: "credit", type: "income", merchantName: "MSB Payroll", merchantNormalizedName: "payroll", categoryId: INCOME, status: "posted", isRecurring: true, userEdited: false });
+    if (chance(rng, p.extraIncomeChance)) {
+      add({ accountId: accCurrent, postedAt: iso(year, month, randInt(rng, 12, 22)), amount: jitter(rng, p.salaryBase * 0.3, 0.5, 100_000), direction: "credit", type: "income", merchantName: "Thu nhập thêm", merchantNormalizedName: "side income", categoryId: INCOME, status: "posted", isRecurring: false, userEdited: false });
+    }
 
     // Recurring fixed bills
     add({ accountId: accCurrent, postedAt: iso(year, month, 3), amount: jitter(rng, p.housingBase, 0.02, 100_000), direction: "debit", type: "expense", merchantName: "Chủ nhà / Vay nhà", merchantNormalizedName: "housing", categoryId: CATEGORY.housing, status: "posted", isRecurring: true, userEdited: false });

@@ -19,8 +19,12 @@ const META = {
 
 export function makeCashflow(over: Partial<CashflowResult> = {}): CashflowResult {
   const byCategory = over.byCategory ?? [];
+  const expense = over.expense ?? byCategory.reduce((s, c) => s + c.amount, 0);
+  const income = over.income ?? 0;
   return {
-    expense: over.expense ?? byCategory.reduce((s, c) => s + c.amount, 0),
+    income,
+    expense,
+    net: over.net ?? income - expense,
     byCategory,
     fixed: over.fixed ?? 0,
     discretionary: over.discretionary ?? 0,

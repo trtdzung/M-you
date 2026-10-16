@@ -21,7 +21,9 @@ function account(over: Partial<Account> = {}): Account {
 
 function cashflow(over: Partial<CashflowResult> = {}): CashflowResult {
   return {
+    income: over.income ?? 0,
     expense: over.expense ?? 0,
+    net: over.net ?? (over.income ?? 0) - (over.expense ?? 0),
     byCategory: [],
     fixed: over.fixed ?? 0,
     discretionary: over.discretionary ?? 0,

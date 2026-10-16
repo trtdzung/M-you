@@ -51,6 +51,17 @@ describe("cashflowTrend", () => {
     expect(jun.hasData).toBe(false);
   });
 
+  it("carries money-in (income) per point alongside expense", () => {
+    const withIncome = [
+      txn({ postedAt: "2026-09-05T10:00:00.000Z", amount: 20_000_000, direction: "credit", type: "income", categoryId: "unclassified" }),
+      txn({ postedAt: "2026-09-12T10:00:00.000Z", amount: 6_000_000, direction: "debit", type: "expense", categoryId: "dining" }),
+    ];
+    const t = cashflowTrend(withIncome, "2026-09", 2);
+    const sep = t.points.find((p) => p.month === "2026-09")!;
+    expect(sep.income).toBe(20_000_000);
+    expect(sep.expense).toBe(6_000_000);
+  });
+
   it("reports the freshest record with data in meta", () => {
     const t = cashflowTrend(txns, "2026-09", 6);
     expect(t.meta.freshness).toBe("2026-09-12T10:00:00.000Z");

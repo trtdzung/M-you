@@ -45,17 +45,29 @@ export const CATEGORY_BY_ID: Record<string, CategoryDef> = Object.fromEntries(
 export const UNCLASSIFIED = "unclassified" as const;
 export const UNCLASSIFIED_LABEL = "Chưa phân loại";
 
+/**
+ * Sentinel carried by money-IN (`type:"income"`) transactions. Like UNCLASSIFIED
+ * it is deliberately OUT of `CATEGORIES`/`CATEGORY_BY_ID`: money-in is shown only
+ * as a "Tiền vào" aggregate — there are NO income categories, it belongs to no
+ * jar, and it is never an AI suggestion target. It exists so income never reuses
+ * the UNCLASSIFIED "unenriched expense" bucket.
+ */
+export const INCOME = "income" as const;
+export const INCOME_LABEL = "Tiền vào";
+
 /** True for the unclassified sentinel (not a real taxonomy id). */
 export function isUnclassifiedCategory(id: string): boolean {
   return id === UNCLASSIFIED;
 }
 
 /**
- * Human label for any category id: taxonomy label, the "Chưa phân loại" label
- * for the sentinel, else the raw id (defensive — an orphaned id still renders).
+ * Human label for any category id: taxonomy label, the "Chưa phân loại" /
+ * "Tiền vào" labels for the sentinels, else the raw id (defensive — an orphaned
+ * id still renders).
  */
 export function categoryLabel(id: string): string {
   if (id === UNCLASSIFIED) return UNCLASSIFIED_LABEL;
+  if (id === INCOME) return INCOME_LABEL;
   return CATEGORY_BY_ID[id]?.label ?? id;
 }
 

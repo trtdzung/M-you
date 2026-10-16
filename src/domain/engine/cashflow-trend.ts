@@ -1,8 +1,8 @@
 /**
- * Multi-month spending trend — the primary Chi tiêu visual. Reuses the
+ * Multi-month thu/chi trend — the primary cash-flow visual. Reuses the
  * single-month `aggregateCashflow` rule per month (DRY) so transfers, refunds
- * and reversals are excluded identically everywhere. (Income was removed from
- * the product, so each point carries expense only.)
+ * and reversals are excluded identically everywhere. Each point carries money-in
+ * (`income`, a single aggregate) and `expense`.
  *
  * Red Team H3: `aggregateCashflow` returns expense:0 for BOTH a truly empty
  * month and a month that predates any data. Its only tell is
@@ -17,6 +17,8 @@ import { addMonthsToKey, monthPeriodFromKey } from "./types";
 export interface CashflowTrendPoint {
   /** "YYYY-MM". */
   month: string;
+  /** Money-in for the month (aggregate "Tiền vào"). */
+  income: number;
   expense: number;
   /** False when the month has no underlying data (render as gap, not 0). */
   hasData: boolean;
@@ -53,6 +55,7 @@ export function cashflowTrend(
     }
     points.push({
       month: monthKey,
+      income: result.income,
       expense: result.expense,
       hasData,
     });

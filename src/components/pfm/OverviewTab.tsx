@@ -14,11 +14,11 @@ import { useInsights } from "@/state/useInsights";
 import { currentMonthKey } from "@/lib/demo-clock";
 
 /**
- * Tổng quan — the current-month spending picture in three sections: "Tổng quan
- * chi tiêu" (Chi tiêu bar), "Báo cáo chi tiêu" (donut + detailed report), and
- * "Biến động chi tiêu" (spend trend). Every number traces to the deterministic
- * engine (invariant #1); missing values render "—", never 0 (#6). Income was
- * removed — spending only. Wealth/net-worth lives on its own tab.
+ * Tổng quan — the current-month picture in three sections: "Tổng quan thu chi"
+ * (Tiền vào + Chi tiêu bars), "Báo cáo chi tiêu" (donut + detailed report), and
+ * "Biến động thu chi" (thu/chi trend). Every number traces to the deterministic
+ * engine (invariant #1); missing values render "—", never 0 (#6). Money-in is a
+ * single aggregate (no income categories). Wealth/net-worth lives on its own tab.
  */
 export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => void }) {
   // Always the current month, independent of any month picked on other tabs.
