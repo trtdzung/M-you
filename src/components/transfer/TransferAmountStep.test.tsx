@@ -118,6 +118,21 @@ describe("TransferAmountStep", () => {
     expect(onSourceChange).not.toHaveBeenCalled();
   });
 
+  it("a funded jar shows only its transferable balance (no spending limit) and is selectable", () => {
+    const funded: Jar & { remaining: number | null } = {
+      id: "j3", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 8_000_000, actualAmount: 8_000_000, remaining: null,
+    };
+    const { onSourceChange } = renderStep({ jars: [funded] });
+    fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));
+
+    // The balance is shown; the "đã set"/limit wording is gone.
+    expect(screen.getByText("8.000.000 ₫")).toBeInTheDocument();
+    expect(screen.queryByText(/Đã set/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Thiết yếu"));
+    expect(onSourceChange).toHaveBeenCalledWith({ kind: "jar", id: "j3" });
+  });
+
   it("reports amount and memo changes", () => {
     const { onAmountChange, onMemoChange } = renderStep();
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "1000000" } });

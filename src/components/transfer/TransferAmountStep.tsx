@@ -223,12 +223,13 @@ export function TransferAmountStep({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-semibold text-text">{jar.label}</p>
                         {fundable ? (
-                          <p className="mt-0.5 text-xs text-muted">
-                            <span>Đã set </span>
-                            <Money amount={jar.budgetLimit} unknownLabel="—" className="text-xs text-muted" />
-                            <span> · Thực tế </span>
-                            <Money amount={jar.actualAmount} unknownLabel="—" className="text-xs font-semibold text-text" />
-                          </p>
+                          // Source picker → only the transferable balance matters; the
+                          // spending limit ("đã set") is irrelevant here and confusing.
+                          <Money
+                            amount={jar.actualAmount}
+                            unknownLabel="—"
+                            className="mt-0.5 block text-base font-bold tabular-nums text-text"
+                          />
                         ) : (
                           <p className="mt-0.5 text-xs text-muted">Chưa có số dư</p>
                         )}
