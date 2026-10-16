@@ -4,7 +4,7 @@
  * TransactionQuery filtering server-side so callers get exactly what they ask.
  */
 
-import type { Asset, Jar, JarConfig, Liability, Transaction, TransactionQuery } from "@/domain/models";
+import type { Asset, Liability, Transaction, TransactionQuery } from "@/domain/models";
 import {
   ASSET_STORE_VERSION,
   isUserRecordStore,
@@ -25,9 +25,6 @@ import {
 import type { Providers, UserRecordsResult } from "../interfaces";
 import type { PersonaId } from "./personas";
 import type { Dataset } from "./fixtures/generate";
-
-/** Persona-scoped storage key so jar config never leaks across personas (H5). */
-const jarKey = (personaId: PersonaId) => `msb-pfm.jars.${personaId}`;
 
 /**
  * A persona-scoped, versioned collection of user-authored records with a
@@ -76,69 +73,6 @@ function userRecordStore<T extends { id: string }>(
       persist(readValid().valid.filter((r) => r.id !== id));
     },
   };
-}
-
-/**
- * True for a structurally-sound jar (shared by the v3 guard and v2 migration).
- * `budgetLimit` is optional (`undefined` = chưa đặt, invariant #6); when present
- * it must be a finite, non-negative amount so a corrupted record never smuggles a
- * NaN/Infinity/negative past this storage boundary. `color`/`icon` are optional
- * presentation overrides. The legacy `allocation` field is ignored (dropped on
- * migration), so a v2 jar validates on its shared fields alone.
- */
-function isValidJar(jar: unknown): boolean {
-  if (typeof jar !== "object" || jar === null) return false;
-  const j = jar as Record<string, unknown>;
-  if (typeof j.id !== "string" || typeof j.label !== "string") return false;
-  if (!Array.isArray(j.categoryIds) || !j.categoryIds.every((c) => typeof c === "string")) return false;
-  if (
-    j.budgetLimit !== undefined &&
-    !(typeof j.budgetLimit === "number" && Number.isFinite(j.budgetLimit) && j.budgetLimit >= 0)
-  ) {
-    return false;
-  }
-  if (
-    j.actualAmount !== undefined &&
-    !(typeof j.actualAmount === "number" && Number.isFinite(j.actualAmount) && j.actualAmount >= 0)
-  ) {
-    return false;
-  }
-  if (j.color !== undefined && typeof j.color !== "string") return false;
-  if (j.icon !== undefined && typeof j.icon !== "string") return false;
-  return true;
-}
-
-/**
- * Structural guard (M11) for a current v3 jar config (BIDV wallet model — no
- * `allocation`). Any parse error or shape mismatch → treated as absent so the
- * caller seeds a default; never throws.
- */
-function isValidJarConfig(value: unknown): value is JarConfig {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  if (v.version !== 3 || !Array.isArray(v.jars)) return false;
-  return v.jars.every(isValidJar);
-}
-
-/**
- * Load-time migration (phase 08). A stored v3 loads unchanged. A legacy v2
- * (balance-lens — carried `allocation`) is migrated FORWARD: allocation dropped,
- * `budgetLimit`/`color`/`icon` kept, version bumped to 3 — so an upgrading user
- * is never wiped. Anything else (v1, garbage, malformed jar) → null → reseed.
- */
-function migrateStoredJarConfig(value: unknown): JarConfig | null {
-  if (isValidJarConfig(value)) return value;
-  if (typeof value !== "object" || value === null) return null;
-  const v = value as Record<string, unknown>;
-  if (v.version !== 2 || !Array.isArray(v.jars) || !v.jars.every(isValidJar)) return null;
-  const jars: Jar[] = (v.jars as Record<string, unknown>[]).map((j) => {
-    const jar: Jar = { id: j.id as string, label: j.label as string, categoryIds: j.categoryIds as string[] };
-    if (j.budgetLimit !== undefined) jar.budgetLimit = j.budgetLimit as number;
-    if (j.color !== undefined) jar.color = j.color as string;
-    if (j.icon !== undefined) jar.icon = j.icon as string;
-    return jar;
-  });
-  return { version: 3, jars };
 }
 
 function matches(txn: Transaction, q: TransactionQuery): boolean {
@@ -260,23 +194,52 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       return res.json();
     },
     async getJarConfig() {
-      if (typeof window === "undefined") return null;
-      try {
-        const raw = window.localStorage.getItem(jarKey(personaId));
-        if (!raw) return null;
-        const parsed: unknown = JSON.parse(raw);
-        return migrateStoredJarConfig(parsed);
-      } catch {
-        return null; // corrupt/unavailable storage → seed a default
-      }
+      const res = await fetch(`/api/jars?cif=${encodeURIComponent(cif)}`);
+      if (!res.ok) return { version: 3, jars: [] };
+      return res.json();
     },
-    async saveJarConfig(config) {
-      if (typeof window === "undefined") return;
-      try {
-        window.localStorage.setItem(jarKey(personaId), JSON.stringify(config));
-      } catch {
-        // ignore storage errors (private mode, quota)
-      }
+    async createJar(jar) {
+      const res = await fetch("/api/jars", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, jar }),
+      });
+      if (!res.ok) throw new Error(`createJar failed: ${res.status}`);
+      return res.json();
+    },
+    async updateJar(id, patch) {
+      const res = await fetch(`/api/jars/${encodeURIComponent(id)}?cif=${encodeURIComponent(cif)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patch }),
+      });
+      if (!res.ok) throw new Error(`updateJar failed: ${res.status}`);
+      return res.json();
+    },
+    async removeJar(id) {
+      const res = await fetch(`/api/jars/${encodeURIComponent(id)}?cif=${encodeURIComponent(cif)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(`removeJar failed: ${res.status}`);
+      return res.json();
+    },
+    async assignCategory(categoryId, jarId) {
+      const res = await fetch(`/api/jars/${encodeURIComponent(jarId)}/categories?cif=${encodeURIComponent(cif)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId }),
+      });
+      if (!res.ok) throw new Error(`assignCategory failed: ${res.status}`);
+      return res.json();
+    },
+    async replaceJars(jars) {
+      const res = await fetch("/api/jars", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, jars }),
+      });
+      if (!res.ok) throw new Error(`replaceJars failed: ${res.status}`);
+      return res.json();
     },
     async getAccountAdjustments() {
       return accountAdjustments.load();

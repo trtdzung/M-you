@@ -12,6 +12,7 @@ import type {
   Beneficiary,
   Budget,
   Goal,
+  Jar,
   JarConfig,
   Liability,
   MockProduct,
@@ -103,14 +104,21 @@ export interface Providers
     BeneficiaryDataProvider {
   getBudgets(): Promise<Budget[]>;
   /**
-   * Read the user's saved spending-jar configuration, or `null` when none is
-   * stored (or the stored shape is invalid — the caller then seeds a default).
-   * User config, like `getBudgets`; the mock impl is client-local storage, a
-   * real adapter maps to the MSB preferences API (invariant #4).
+   * Read the user's current spending-jar configuration. Backed by
+   * `data/pfm.sqlite3` via `/api/jars` (invariant #4) — always returns a
+   * config (possibly with an empty `jars` array), never `null`.
    */
-  getJarConfig(): Promise<JarConfig | null>;
-  /** Persist the user's spending-jar configuration. First write on `Providers`. */
-  saveJarConfig(config: JarConfig): Promise<void>;
+  getJarConfig(): Promise<JarConfig>;
+  /** Create a new jar. Returns the full updated config. */
+  createJar(jar: Jar): Promise<JarConfig>;
+  /** Patch an existing jar's fields. Returns the full updated config. */
+  updateJar(id: string, patch: Partial<Omit<Jar, "id">>): Promise<JarConfig>;
+  /** Remove a jar (its categories move to "Khác"). Returns the full updated config. */
+  removeJar(id: string): Promise<JarConfig>;
+  /** Move `categoryId` into `jarId`, removing it from every other jar first. Returns the full updated config. */
+  assignCategory(categoryId: string, jarId: string): Promise<JarConfig>;
+  /** Replace the whole jar set (template apply / reset to default). Returns the full updated config. */
+  replaceJars(jars: Jar[]): Promise<JarConfig>;
   /**
    * Cumulative amount already debited from each account via a jar-sourced
    * transfer (Chuyển tiền Phần 1) — a mock ledger overlay on top of the

@@ -28,10 +28,7 @@ the Agent backend's `user_id` convention).
 Unique on `(cif, bank_name, account_number)` — saving an already-known
 account again updates its `name` instead of creating a duplicate row.
 
-## Not yet in this database
+## `jars`
 
-Spending jars ("hũ") still live in browser `localStorage`
-(`src/providers/mock/mock-provider.ts`) — moving them into this database,
-plus real create/edit/delete endpoints for them, is tracked as pending work
-in `todo.md` (kept out of this pass on purpose — jars were explicitly
-descoped from this round).
+See `data/jars/schema.md` — documented in its own file/folder rather than
+here, since it's a separate, independently-evolving table.

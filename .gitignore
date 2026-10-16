@@ -30,6 +30,11 @@
 /plans/
 /todo.md
 
+# subagent-driven-development scratch workspace (ledgers, task briefs, review
+# packages — per-plan, recreated each run; docs/superpowers/ plans and specs
+# ARE part of the codebase and are not covered by this)
+/.superpowers/
+
 # local reference docs for the real Agent backend (not part of the codebase)
 /agent_backend_docs/
 
