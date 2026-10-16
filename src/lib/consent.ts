@@ -16,6 +16,23 @@ export interface ConsentRecord {
 
 const STORAGE_KEY = "msb-pfm.consent";
 
+/**
+ * Same-tab consent changes are invisible to the native `storage` event (it only
+ * fires in OTHER tabs). Writers dispatch this so in-tab subscribers (e.g. the
+ * auto-categorize gate) re-read consent immediately on grant/revoke — otherwise
+ * revoking "ai" mid-session would keep producing suggestions until a reload.
+ */
+export const CONSENT_CHANGED_EVENT = "msb-pfm.consent-changed";
+
+function announceConsentChange(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
 export const ALL_SCOPES: ConsentScope[] = ["transactions", "assets", "liabilities", "ai"];
 
 export function getConsent(): ConsentRecord | null {
@@ -35,6 +52,15 @@ export function hasValidConsent(): boolean {
   return getConsent() !== null;
 }
 
+/**
+ * Whether a consent record grants a specific scope. Use this — NOT
+ * `hasValidConsent()` — to gate anything that sends data out (e.g. the "ai"
+ * scope before a merchant name can leave the device). Null-safe.
+ */
+export function hasScope(record: ConsentRecord | null, scope: ConsentScope): boolean {
+  return record !== null && record.scopes.includes(scope);
+}
+
 export function setConsent(scopes: ConsentScope[] = ALL_SCOPES): ConsentRecord {
   const record: ConsentRecord = {
     version: CONSENT_VERSION,
@@ -46,6 +72,7 @@ export function setConsent(scopes: ConsentScope[] = ALL_SCOPES): ConsentRecord {
   } catch {
     // ignore storage errors
   }
+  announceConsentChange();
   return record;
 }
 
@@ -56,4 +83,5 @@ export function revokeConsent(): void {
   } catch {
     // ignore
   }
+  announceConsentChange();
 }

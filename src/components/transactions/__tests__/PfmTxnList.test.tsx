@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { CategoryMemoryProvider } from "@/state/category-memory";
+import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
@@ -53,20 +55,24 @@ function renderList() {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
-        <ManualTxnsProvider>
-          <JarConfigProvider>
-            <JarAllocationsProvider>
-              <AssetLiabilityProvider>
-                <GoalProvider>
-                  <PeriodProvider>
-                    <CountProbe />
-                    <PfmTxnList />
-                  </PeriodProvider>
-                </GoalProvider>
-              </AssetLiabilityProvider>
-            </JarAllocationsProvider>
-          </JarConfigProvider>
-        </ManualTxnsProvider>
+        <CategoryMemoryProvider>
+          <ManualTxnsProvider>
+            <JarConfigProvider>
+              <JarAllocationsProvider>
+                <AssetLiabilityProvider>
+                  <GoalProvider>
+                    <PeriodProvider>
+                      <AutoCategorizeProvider>
+                        <CountProbe />
+                        <PfmTxnList />
+                      </AutoCategorizeProvider>
+                    </PeriodProvider>
+                  </GoalProvider>
+                </AssetLiabilityProvider>
+              </JarAllocationsProvider>
+            </JarConfigProvider>
+          </ManualTxnsProvider>
+        </CategoryMemoryProvider>
       </CorrectionsProvider>
     </PersonaProvider>,
   );
@@ -159,7 +165,7 @@ describe("PfmTxnList", () => {
     expect(dialog.textContent).toMatch(/₫/);
   });
 
-  it("changing category via the inline picker calls setCategory (persists through corrections)", async () => {
+  it("changing category via the inline picker persists a user correction", async () => {
     const { container } = renderList();
     await waitForLoaded(container);
 
@@ -175,7 +181,7 @@ describe("PfmTxnList", () => {
 
     // The correction persisted to storage (the corrections seam, never a
     // provider mutation — invariant #4).
-    const raw = window.localStorage.getItem("msb-pfm.corrections");
+    const raw = window.localStorage.getItem("msb-pfm.corrections.CIF_0001");
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw as string) as Record<string, { categoryId?: string }>;
     expect(Object.values(parsed).some((c) => c.categoryId === "health")).toBe(true);

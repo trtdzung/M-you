@@ -9,12 +9,14 @@ import { Card } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonScreen, SkeletonRow } from "@/components/states";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
 import { useFinancials } from "@/state/useFinancials";
-import { useCorrections } from "@/state/corrections";
+import { useCorrections, useConfirmCategory } from "@/state/corrections";
 import { useJarConfig } from "@/state/jars";
 import { usePeriod } from "@/state/period";
 import { cn } from "@/lib/cn";
 import { TxnRow } from "./TxnRow";
 import { TxnDetail } from "./TxnDetail";
+import { AutoCategorizeBar } from "./AutoCategorizeBar";
+import { TxnSuggestionBar } from "./TxnSuggestionBar";
 
 const ALL = "all";
 
@@ -50,6 +52,7 @@ function groupByDay(txns: Transaction[]): { key: string; rows: Transaction[] }[]
 export function PfmTxnList() {
   const { loading, error, allTransactions } = useFinancials();
   const { corrections } = useCorrections();
+  const confirmCategory = useConfirmCategory();
   const { config } = useJarConfig();
   const { month } = usePeriod();
   const [selected, setSelected] = useState<Transaction | null>(null);
@@ -71,6 +74,8 @@ export function PfmTxnList() {
   return (
     <div className="flex flex-col gap-5">
       <PeriodPicker />
+
+      <AutoCategorizeBar />
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc theo hũ">
         {chips.map((chip) => {
@@ -107,8 +112,10 @@ export function PfmTxnList() {
               <h3 className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{dayLabel(key)}</h3>
               <Card className="divide-y divide-border">
                 {rows.map((t) => {
-                  const hidden = corrections[t.id]?.hidden === true;
+                  const correction = corrections[t.id];
+                  const hidden = correction?.hidden === true;
                   const uncategorized = !CATEGORY_BY_ID[t.categoryId];
+                  const pending = correction?.status === "pending" && correction.categoryId !== undefined;
                   return (
                     <div
                       key={t.id}
@@ -117,7 +124,13 @@ export function PfmTxnList() {
                         uncategorized && "rounded-row bg-warning-soft/40",
                       )}
                     >
-                      <TxnRow txn={t} onEdit={setSelected} />
+                      <TxnRow txn={t} onEdit={setSelected} correction={correction} />
+                      {pending && (
+                        <TxnSuggestionBar
+                          correction={correction}
+                          onAccept={(categoryId) => confirmCategory(t, categoryId)}
+                        />
+                      )}
                       {hidden && (
                         <span className="mb-1 ml-1 inline-flex items-center gap-1 text-[11px] text-muted">
                           <EyeOff size={11} aria-hidden /> Đã ẩn khỏi báo cáo

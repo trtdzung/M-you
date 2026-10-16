@@ -139,6 +139,8 @@ export function TransferConfirm() {
         type: typeForCategory(defaultCategoryId), // derived from kind, never hardcoded
         merchantName: name.trim(),
         postedAt: new Date().toISOString(),
+        // Keep the memo as a signal for AI purpose suggestion (data, not a command).
+        ...(draft?.memo ? { note: draft.memo } : {}),
       });
       setCreatedTxnId(txnId);
       // Jar-sourced always debits its source jar above (regardless of category

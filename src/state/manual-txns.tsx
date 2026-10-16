@@ -31,6 +31,8 @@ export interface ManualTxnInput {
   postedAt: string;
   /** Explicit transaction type; defaults to income/expense inferred from `direction`. */
   type?: Transaction["type"];
+  /** Optional free-text memo ("Nội dung"); kept as a purpose-suggestion signal. */
+  note?: string;
 }
 
 interface ManualTxnsContextValue {
@@ -42,7 +44,10 @@ interface ManualTxnsContextValue {
    * matched and was updated, `false` when no record has that id (never throws) —
    * callers rely on this to only reflect a successful edit in the UI.
    */
-  update: (id: string, patch: Partial<Pick<Transaction, "categoryId" | "type">>) => boolean;
+  update: (
+    id: string,
+    patch: Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note">>,
+  ) => boolean;
   remove: (id: string) => void;
 }
 
@@ -97,6 +102,7 @@ function toTransaction(input: ManualTxnInput): Transaction {
     source: "self_reported",
     isRecurring: false,
     userEdited: true,
+    ...(input.note ? { note: input.note } : {}),
   };
 }
 
@@ -134,7 +140,7 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   );
 
   const update = useCallback(
-    (id: string, patch: Partial<Pick<Transaction, "categoryId" | "type">>): boolean => {
+    (id: string, patch: Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note">>): boolean => {
       if (!txnsRef.current.some((t) => t.id === id)) return false;
       apply(
         key,

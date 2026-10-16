@@ -13,9 +13,10 @@ import type { Corrections } from "@/state/corrections";
  * its own.
  */
 let correctionsState: Corrections = {};
-const setCategory = vi.fn();
 const setHidden = vi.fn();
 const clearCategory = vi.fn();
+const confirmCategory = vi.fn();
+const forget = vi.fn();
 
 vi.mock("@/state/corrections", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/state/corrections")>();
@@ -23,11 +24,23 @@ vi.mock("@/state/corrections", async (importOriginal) => {
     ...actual,
     useCorrections: () => ({
       corrections: correctionsState,
-      setCategory,
+      setCategory: vi.fn(),
       setHidden,
       clearCategory,
       reset: vi.fn(),
+      upsertAssignments: vi.fn(),
+      promoteToUser: vi.fn(),
+      unsaved: false,
     }),
+    useConfirmCategory: () => confirmCategory,
+  };
+});
+
+vi.mock("@/state/category-memory", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/state/category-memory")>();
+  return {
+    ...actual,
+    useCategoryMemory: () => ({ memory: {}, remember: vi.fn(), lookup: vi.fn(), forget }),
   };
 });
 
@@ -52,9 +65,10 @@ const TXN: Transaction = {
 
 beforeEach(() => {
   correctionsState = {};
-  setCategory.mockClear();
   setHidden.mockClear();
   clearCategory.mockClear();
+  confirmCategory.mockClear();
+  forget.mockClear();
 });
 
 describe("TxnDetail", () => {
@@ -71,7 +85,7 @@ describe("TxnDetail", () => {
     expect(screen.getByText("Ăn uống")).toBeInTheDocument(); // current category label
   });
 
-  it("changing category via the inline picker calls setCategory with the new id", () => {
+  it("changing category via the inline picker confirms the new id (correction + memory)", () => {
     render(<TxnDetail txn={TXN} onClose={vi.fn()} />);
 
     // Opens the category grid.
@@ -79,8 +93,8 @@ describe("TxnDetail", () => {
     // Picks a different category (Di chuyển / transport).
     fireEvent.click(screen.getByRole("button", { name: /Di chuyển/ }));
 
-    expect(setCategory).toHaveBeenCalledWith("tx_1", "transport");
-    expect(setCategory).toHaveBeenCalledTimes(1);
+    expect(confirmCategory).toHaveBeenCalledWith(TXN, "transport");
+    expect(confirmCategory).toHaveBeenCalledTimes(1);
   });
 
   it("the hidden toggle (role=switch) starts unchecked and flips setHidden(true) on click", () => {

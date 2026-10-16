@@ -2,118 +2,177 @@
 
 /**
  * In-session transaction corrections — a separate overlay, never a mutation of
- * provider data (invariant #4). Two kinds:
- *  - `categoryId` re-categorizes a transaction (merged onto the txn before any
- *    engine call, so cash flow + budgets recompute).
- *  - `hidden` excludes a transaction from spend/report totals WITHOUT deleting it
- *    (the row stays visible + searchable in the list). Exclusion is applied by
- *    dropping hidden rows from the array the engine sees (`useFinancials`), the
- *    same way reversed/pending are already excluded downstream.
+ * provider data (invariant #4). It is the SINGLE txn-keyed overlay (Red Team #7)
+ * and carries three kinds of record:
+ *  - a user `categoryId` correction (origin "user", always wins);
+ *  - an AI/memory/heuristic assignment (origin non-"user", may be `pending`);
+ *  - a `hidden` flag excluding a txn from spend/report totals (row stays visible).
+ *
+ * Pure logic (migration, resolution, race guard) lives in `corrections-core.ts`.
+ * This module owns persistence: per-persona storage, one-time legacy migration,
+ * cross-tab sync, and honest write-failure signalling (Red Team #11/#12/#13).
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Transaction } from "@/domain/models";
+import { usePersona } from "@/providers/context";
+import { useCategoryMemory } from "./category-memory";
+import {
+  type Assignment,
+  type Correction,
+  type Corrections,
+  applyCorrections,
+  isHidden,
+  mergeAssignments,
+  normalize,
+  patch,
+  promoteToUser as promoteCore,
+} from "./corrections-core";
 
-const STORAGE_KEY = "msb-pfm.corrections";
+export type { Assignment, Correction, CorrectionOrigin, Corrections } from "./corrections-core";
+export { applyCorrections, isHidden, resolveEffective } from "./corrections-core";
 
-/** One transaction's overrides. Absent fields mean "no override". */
-export interface Correction {
-  categoryId?: string;
-  hidden?: boolean;
-}
-export type Corrections = Record<string, Correction>; // txnId -> overrides
+const STORAGE_PREFIX = "msb-pfm.corrections";
+/** Pre-per-cif flat key — migrated into the active persona once, then removed. */
+const LEGACY_FLAT_KEY = "msb-pfm.corrections";
 
 interface CorrectionsContextValue {
   corrections: Corrections;
   setCategory: (txnId: string, categoryId: string) => void;
   setHidden: (txnId: string, hidden: boolean) => void;
-  /** Clear the category override only (keeps a hidden flag). */
   clearCategory: (txnId: string) => void;
-  /** Clear all overrides for a transaction. */
   reset: (txnId: string) => void;
+  /** Merge classify-pipeline assignments (race-guarded; user records survive). */
+  upsertAssignments: (assignments: Assignment[]) => void;
+  /** Confirm a category as a user correction (accept/correct). */
+  promoteToUser: (txnId: string, categoryId: string) => void;
+  /** True when the last write to localStorage failed (quota/private mode). */
+  unsaved: boolean;
 }
 
 const CorrectionsContext = createContext<CorrectionsContextValue | null>(null);
 
-/** Migrate the legacy flat `txnId -> categoryId` string map to the object shape. */
-function normalize(parsed: unknown): Corrections {
-  if (!parsed || typeof parsed !== "object") return {};
-  const out: Corrections = {};
-  for (const [txnId, value] of Object.entries(parsed as Record<string, unknown>)) {
-    if (typeof value === "string") out[txnId] = { categoryId: value };
-    else if (value && typeof value === "object") {
-      const v = value as Correction;
-      const rec: Correction = {};
-      if (typeof v.categoryId === "string") rec.categoryId = v.categoryId;
-      if (v.hidden === true) rec.hidden = true;
-      if (rec.categoryId !== undefined || rec.hidden) out[txnId] = rec;
-    }
-  }
-  return out;
+function keyFor(cif: string): string {
+  return `${STORAGE_PREFIX}.${cif}`;
 }
 
-function read(): Corrections {
+function readKey(key: string): Corrections {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     return raw ? normalize(JSON.parse(raw)) : {};
   } catch {
     return {};
   }
 }
 
-function write(next: Corrections): void {
+/** Write, returning success — a false result tells the UI the change is unsaved. */
+function writeKey(key: string, next: Corrections): boolean {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    window.localStorage.setItem(key, JSON.stringify(next));
+    return true;
   } catch {
-    // ignore storage errors
+    return false;
   }
 }
 
-/** Apply a patch to one txn's record; drop the key when nothing is left. */
-function patch(prev: Corrections, txnId: string, change: Partial<Correction>): Corrections {
-  const merged: Correction = { ...prev[txnId], ...change };
-  if (merged.hidden !== true) delete merged.hidden;
-  if (merged.categoryId === undefined) delete merged.categoryId;
-  const next = { ...prev };
-  if (merged.categoryId === undefined && merged.hidden !== true) delete next[txnId];
-  else next[txnId] = merged;
-  write(next);
-  return next;
+/**
+ * One-time migration of the legacy flat key into a persona's key. The legacy
+ * store was shared across every persona (a latent leak); we fold it into the
+ * active persona once and delete it so it cannot re-apply elsewhere.
+ */
+function migrateLegacy(cif: string): void {
+  if (typeof window === "undefined") return;
+  if (keyFor(cif) === LEGACY_FLAT_KEY) return; // never happens (prefix has a dot), defensive
+  try {
+    const legacyRaw = window.localStorage.getItem(LEGACY_FLAT_KEY);
+    if (!legacyRaw) return;
+    const legacy = normalize(JSON.parse(legacyRaw));
+    if (Object.keys(legacy).length > 0) {
+      const current = readKey(keyFor(cif));
+      // Existing per-cif records win over legacy on a key clash.
+      writeKey(keyFor(cif), { ...legacy, ...current });
+    }
+    window.localStorage.removeItem(LEGACY_FLAT_KEY);
+  } catch {
+    // ignore migration failures — legacy data simply stays untouched
+  }
 }
 
 export function CorrectionsProvider({ children }: { children: React.ReactNode }) {
+  const { persona } = usePersona();
+  const key = keyFor(persona.cif);
   const [corrections, setCorrections] = useState<Corrections>({});
+  const [unsaved, setUnsaved] = useState(false);
+  // Mirror so read-merge-write can base off the freshest value synchronously.
+  const keyRef = useRef(key);
+  keyRef.current = key;
 
+  // Load on mount and whenever the persona (storage key) changes. Reset to {}
+  // FIRST so the previous persona's overlay never lingers while the new key loads.
   useEffect(() => {
-    setCorrections(read());
+    setCorrections({});
+    setUnsaved(false);
+    migrateLegacy(persona.cif);
+    setCorrections(readKey(key));
+  }, [key, persona.cif]);
+
+  // Cross-tab sync: rehydrate from storage when THIS key changes in another tab.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === keyRef.current) setCorrections(readKey(keyRef.current));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const setCategory = useCallback((txnId: string, categoryId: string) => {
-    setCorrections((prev) => patch(prev, txnId, { categoryId }));
-  }, []);
-
-  const setHidden = useCallback((txnId: string, hidden: boolean) => {
-    setCorrections((prev) => patch(prev, txnId, { hidden }));
-  }, []);
-
-  const clearCategory = useCallback((txnId: string) => {
-    setCorrections((prev) => patch(prev, txnId, { categoryId: undefined }));
-  }, []);
-
-  const reset = useCallback((txnId: string) => {
-    setCorrections((prev) => {
-      if (!prev[txnId]) return prev;
-      const next = { ...prev };
-      delete next[txnId];
-      write(next);
+  /**
+   * Read-merge-write: re-read localStorage right before writing so a concurrent
+   * write from another tab is merged in, not blindly overwritten (Red Team #11).
+   * `merge` receives the freshest persisted state and returns the next state.
+   */
+  const commit = useCallback((merge: (fresh: Corrections) => Corrections) => {
+    const k = keyRef.current;
+    setCorrections((inMemory) => {
+      const fresh = readKey(k);
+      // Prefer the freshest persisted view, but keep any in-memory keys not yet
+      // flushed (e.g. a prior failed write) so nothing silently regresses.
+      const base: Corrections = { ...inMemory, ...fresh };
+      const next = merge(base);
+      const ok = writeKey(k, next);
+      setUnsaved(!ok);
       return next;
     });
   }, []);
 
+  const setCategory = useCallback(
+    (txnId: string, categoryId: string) => commit((c) => patch(c, txnId, { categoryId, origin: "user", status: "applied" })),
+    [commit],
+  );
+  const setHidden = useCallback((txnId: string, hidden: boolean) => commit((c) => patch(c, txnId, { hidden })), [commit]);
+  const clearCategory = useCallback((txnId: string) => commit((c) => patch(c, txnId, { categoryId: undefined })), [commit]);
+  const reset = useCallback(
+    (txnId: string) =>
+      commit((c) => {
+        if (!c[txnId]) return c;
+        const next = { ...c };
+        delete next[txnId];
+        return next;
+      }),
+    [commit],
+  );
+  const upsertAssignments = useCallback(
+    (assignments: Assignment[]) => commit((c) => mergeAssignments(c, assignments)),
+    [commit],
+  );
+  const promoteToUser = useCallback(
+    (txnId: string, categoryId: string) => commit((c) => promoteCore(c, txnId, categoryId)),
+    [commit],
+  );
+
   const value = useMemo(
-    () => ({ corrections, setCategory, setHidden, clearCategory, reset }),
-    [corrections, setCategory, setHidden, clearCategory, reset],
+    () => ({ corrections, setCategory, setHidden, clearCategory, reset, upsertAssignments, promoteToUser, unsaved }),
+    [corrections, setCategory, setHidden, clearCategory, reset, upsertAssignments, promoteToUser, unsaved],
   );
   return <CorrectionsContext.Provider value={value}>{children}</CorrectionsContext.Provider>;
 }
@@ -124,21 +183,20 @@ export function useCorrections(): CorrectionsContextValue {
   return ctx;
 }
 
-/** Whether a transaction is hidden from spend/report totals. */
-export function isHidden(corrections: Corrections, txnId: string): boolean {
-  return corrections[txnId]?.hidden === true;
-}
-
 /**
- * Merge category corrections onto transactions (pure). Flags overridden rows
- * `userEdited`. Does NOT drop hidden rows — that exclusion is applied by the
- * caller (`useFinancials`) so the list can still show hidden rows while the
- * engine array excludes them.
+ * The single shared accept/correct action (Red Team #15): promote the category
+ * to a user correction AND teach the per-persona memory (validated in phase-02).
+ * Every accept/correct button funnels through here so learning can never diverge
+ * or be applied from a non-user source (Red Team #3).
  */
-export function applyCorrections(txns: Transaction[], corrections: Corrections): Transaction[] {
-  if (Object.keys(corrections).length === 0) return txns;
-  return txns.map((t) => {
-    const override = corrections[t.id]?.categoryId;
-    return override && override !== t.categoryId ? { ...t, categoryId: override, userEdited: true } : t;
-  });
+export function useConfirmCategory(): (txn: Transaction, categoryId: string) => void {
+  const { promoteToUser } = useCorrections();
+  const { remember } = useCategoryMemory();
+  return useCallback(
+    (txn: Transaction, categoryId: string) => {
+      promoteToUser(txn.id, categoryId);
+      remember(txn.merchantNormalizedName || txn.merchantName, categoryId);
+    },
+    [promoteToUser, remember],
+  );
 }

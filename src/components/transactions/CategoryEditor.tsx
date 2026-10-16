@@ -2,16 +2,21 @@
 
 import { RotateCcw } from "lucide-react";
 import type { Transaction } from "@/domain/models";
-import { useCorrections } from "@/state/corrections";
+import { useCorrections, useConfirmCategory } from "@/state/corrections";
 import { Sheet } from "@/components/primitives";
 import { CategoryOptionGrid } from "./CategoryPickerSheet";
 
-/** Bottom-sheet to re-categorize a transaction. Writes an in-session correction. */
+/**
+ * Bottom-sheet to re-categorize a transaction. Writes an in-session user
+ * correction AND teaches the per-persona memory (via `confirmCategory`), so the
+ * same merchant is recognised next time (invariant #4 — overlay, never mutation).
+ */
 export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
-  const { setCategory, clearCategory } = useCorrections();
+  const { clearCategory } = useCorrections();
+  const confirmCategory = useConfirmCategory();
 
   function choose(categoryId: string) {
-    setCategory(txn.id, categoryId);
+    confirmCategory(txn, categoryId);
     onClose();
   }
 

@@ -4,7 +4,7 @@
  */
 
 import type { Transaction } from "@/domain/models";
-import { CATEGORY_BY_ID } from "@/domain/models";
+import { categoryLabel } from "@/domain/models";
 import { netExpenseByCategory } from "./cashflow";
 import type { Period } from "./types";
 
@@ -26,7 +26,7 @@ function toRows(byCat: Map<string, number>, topN?: number): CategorySpend[] {
     .filter(([, amount]) => amount > 0)
     .map(([categoryId, amount]) => ({
       categoryId,
-      label: CATEGORY_BY_ID[categoryId]?.label ?? categoryId,
+      label: categoryLabel(categoryId),
       amount,
       share: total > 0 ? amount / total : 0,
     }))

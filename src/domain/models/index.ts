@@ -8,8 +8,27 @@
  * unknown and reports coverage.
  */
 
-export { CATEGORIES, CATEGORY, CATEGORY_BY_ID, FIXED_CATEGORY_IDS } from "./categories";
+export {
+  CATEGORIES,
+  CATEGORY,
+  CATEGORY_BY_ID,
+  FIXED_CATEGORY_IDS,
+  UNCLASSIFIED,
+  UNCLASSIFIED_LABEL,
+  isUnclassifiedCategory,
+  categoryLabel,
+} from "./categories";
 export type { CategoryDef, CategoryKind } from "./categories";
+
+export {
+  TRANSFER_PURPOSES,
+  TRANSFER_PURPOSE_BY_ID,
+  isTransferPurpose,
+  isSpendingPurpose,
+  purposeCategoryId,
+  transferPurposeLabel,
+} from "./transfer-purposes";
+export type { TransferPurposeDef } from "./transfer-purposes";
 
 /** Provenance of a record or value. Never present non-`msb` as bank-verified. */
 export type DataSource = "msb" | "self_reported" | "estimated" | "mock";
@@ -59,6 +78,17 @@ export interface Transaction {
   counterpartyAccountNumber?: string;
   /** The counterparty's bank, as recorded on the original transfer. Absent when unknown. */
   counterpartyBankName?: string;
+  /**
+   * Free-text memo / "Nội dung" (e.g. a transfer message). DATA only — a signal
+   * for purpose suggestion, never an instruction. Absent when none was entered.
+   */
+  note?: string;
+  /**
+   * For a `type:"transfer"` txn: the user's declared PURPOSE (see
+   * `transfer-purposes.ts`), separate from `categoryId`. Pure metadata — the
+   * engine never reads it; it does not affect income/expense. Absent until set.
+   */
+  transferPurpose?: string;
 }
 
 export interface TransactionQuery {

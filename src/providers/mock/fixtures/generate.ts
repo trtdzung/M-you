@@ -15,7 +15,7 @@ import type {
   MonthlySnapshot,
   Transaction,
 } from "@/domain/models";
-import { CATEGORY, CURRENCY_VND } from "@/domain/models";
+import { CATEGORY, CURRENCY_VND, UNCLASSIFIED } from "@/domain/models";
 import { maskAccountNumber } from "@/lib/format";
 import type { PersonaMeta } from "../personas";
 import { chance, jitter, mulberry32, pick, randInt, type Rng } from "../rng";
@@ -43,6 +43,15 @@ const ANCHOR_YEAR = 2026;
 const ANCHOR_MONTH = 8; // 0-based September
 const ANCHOR_DAY = 15; // current month only has data up to here
 const MONTHS = 6;
+
+/**
+ * Fraction of discretionary spend the bank ships WITHOUT an enrichment label —
+ * simulates real un-enriched data so the AI auto-categorization feature has a
+ * genuine backfill target (Red Team #1). Deterministic via the seeded RNG: the
+ * real merchant name/normalized-name is still recorded (the classifier's signal);
+ * only `categoryId` becomes the `UNCLASSIFIED` sentinel.
+ */
+const UNCLASSIFIED_RATE = 0.18;
 
 const MERCHANTS: Record<string, [string, string][]> = {
   [CATEGORY.groceries]: [["Bách hóa Xanh", "bach hoa xanh"], ["WinMart", "winmart"], ["Co.opmart", "coopmart"]],
@@ -93,10 +102,13 @@ export function generateDataset(meta: PersonaMeta): Dataset {
   const add = (t: Omit<Transaction, "id" | "currency" | "source">): void => {
     txns.push({ id: `tx_${meta.id}_${String(seq++).padStart(4, "0")}`, currency: CURRENCY_VND, source: "mock", ...t });
   };
-  const spend = (year: number, month: number, day: number, categoryId: string, base: number, status: Transaction["status"] = "posted"): Transaction["id"] => {
+  const spend = (year: number, month: number, day: number, categoryId: string, base: number, status: Transaction["status"] = "posted", canBeUnclassified = false): Transaction["id"] => {
+    // Pick the merchant from the REAL category so its name/norm stays a valid
+    // classifier signal even when we drop the label below.
     const [name, norm] = pick(rng, MERCHANTS[categoryId] ?? [["Cửa hàng", "cua hang"]]);
     const id = `tx_${meta.id}_${String(seq).padStart(4, "0")}`;
-    add({ accountId: accCurrent, postedAt: iso(year, month, day), amount: jitter(rng, base, 0.35, 1000), direction: "debit", type: "expense", merchantName: name, merchantNormalizedName: norm, categoryId, status, isRecurring: false, userEdited: false });
+    const unclassified = canBeUnclassified && status === "posted" && chance(rng, UNCLASSIFIED_RATE);
+    add({ accountId: accCurrent, postedAt: iso(year, month, day), amount: jitter(rng, base, 0.35, 1000), direction: "debit", type: "expense", merchantName: name, merchantNormalizedName: norm, categoryId: unclassified ? UNCLASSIFIED : categoryId, status, isRecurring: false, userEdited: false });
     return id;
   };
 
@@ -129,7 +141,9 @@ export function generateDataset(meta: PersonaMeta): Dataset {
     ];
     for (const [cat, count, base] of bursts) {
       for (let i = 0; i < count; i++) {
-        const id = spend(year, month, randInt(rng, 1, cap), cat, base);
+        // Discretionary spend may ship un-enriched (UNCLASSIFIED) — the AI
+        // backfill target. Recurring bills + income stay labelled.
+        const id = spend(year, month, randInt(rng, 1, cap), cat, base, "posted", true);
         if (cat === CATEGORY.shopping) lastShopId.push(id);
       }
     }

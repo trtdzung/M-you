@@ -21,13 +21,22 @@
  */
 
 import type { JarConfig, Transaction } from "@/domain/models";
-import { CATEGORIES } from "@/domain/models";
+import { CATEGORIES, UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
 import { spendingByCategory, type CategorySpend } from "./category";
 import type { Period } from "./types";
 
 /** Catch-all group id/label for expense categories in no jar (orphans). */
 export const KHAC_JAR_ID = "khac";
 export const KHAC_JAR_LABEL = "Khác";
+
+/**
+ * Dedicated group for un-enriched spend (the `UNCLASSIFIED` sentinel). Kept
+ * SEPARATE from "Khác" so unlabelled money never silently mixes into a real
+ * catch-all jar — it stays visible as "cần gắn nhãn" (invariant #6). Pinned
+ * after "Khác" in the ordering below.
+ */
+export const UNCLASSIFIED_JAR_ID = UNCLASSIFIED;
+export const UNCLASSIFIED_JAR_LABEL = UNCLASSIFIED_LABEL;
 
 /** One jar's slice of the period's spend, with its categories broken out. */
 export interface JarSpendGroup {
@@ -127,30 +136,43 @@ export function groupSpendingByJar(
   const catToJar = categoryToJarMap(config);
   const jarLabels = labelByJarId(config);
 
-  // Accumulate categories under their jar id (orphans → "khac").
+  // Accumulate categories under their jar id. Unclassified spend goes to its own
+  // group (never "Khác"); other unmapped expense categories → "Khác".
   const byJar = new Map<string, CategorySpend[]>();
   for (const spend of spends) {
-    const jarId = catToJar.get(spend.categoryId) ?? KHAC_JAR_ID;
+    const jarId =
+      spend.categoryId === UNCLASSIFIED
+        ? UNCLASSIFIED_JAR_ID
+        : catToJar.get(spend.categoryId) ?? KHAC_JAR_ID;
     const bucket = byJar.get(jarId);
     if (bucket) bucket.push(spend);
     else byJar.set(jarId, [spend]);
   }
 
+  const groupLabel = (jarId: string): string => {
+    if (jarId === KHAC_JAR_ID) return KHAC_JAR_LABEL;
+    if (jarId === UNCLASSIFIED_JAR_ID) return UNCLASSIFIED_JAR_LABEL;
+    return jarLabels.get(jarId) ?? jarId;
+  };
+
   const groups: JarSpendGroup[] = Array.from(byJar.entries()).map(([jarId, categories]) => {
     const amount = categories.reduce((s, c) => s + c.amount, 0);
     return {
       jarId,
-      label: jarId === KHAC_JAR_ID ? KHAC_JAR_LABEL : jarLabels.get(jarId) ?? jarId,
+      label: groupLabel(jarId),
       amount,
       share: total > 0 ? amount / total : 0,
       categories: [...categories].sort((a, b) => b.amount - a.amount),
     };
   });
 
-  // Amount-desc, but the "Khác" catch-all is always pinned last.
+  // Amount-desc, but "Khác" then "Chưa phân loại" are always pinned last.
+  const pinRank = (jarId: string): number =>
+    jarId === UNCLASSIFIED_JAR_ID ? 2 : jarId === KHAC_JAR_ID ? 1 : 0;
   groups.sort((a, b) => {
-    if (a.jarId === KHAC_JAR_ID) return 1;
-    if (b.jarId === KHAC_JAR_ID) return -1;
+    const ra = pinRank(a.jarId);
+    const rb = pinRank(b.jarId);
+    if (ra !== rb) return ra - rb;
     return b.amount - a.amount;
   });
 

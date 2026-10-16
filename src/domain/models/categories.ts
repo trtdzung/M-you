@@ -37,6 +37,30 @@ export const CATEGORY_BY_ID: Record<string, CategoryDef> = Object.fromEntries(
   CATEGORIES.map((c) => [c.id, c]),
 );
 
+/**
+ * Sentinel for a transaction the bank shipped WITHOUT an enrichment label — a
+ * "missing label" state, NOT a spending category. Deliberately kept OUT of
+ * `CATEGORIES`/`CATEGORY_BY_ID` (it belongs to no jar and is never a valid AI
+ * suggestion target). The engine surfaces it as its own "Chưa phân loại" bucket
+ * instead of silently defaulting to 0 (invariant #6).
+ */
+export const UNCLASSIFIED = "unclassified" as const;
+export const UNCLASSIFIED_LABEL = "Chưa phân loại";
+
+/** True for the unclassified sentinel (not a real taxonomy id). */
+export function isUnclassifiedCategory(id: string): boolean {
+  return id === UNCLASSIFIED;
+}
+
+/**
+ * Human label for any category id: taxonomy label, the "Chưa phân loại" label
+ * for the sentinel, else the raw id (defensive — an orphaned id still renders).
+ */
+export function categoryLabel(id: string): string {
+  if (id === UNCLASSIFIED) return UNCLASSIFIED_LABEL;
+  return CATEGORY_BY_ID[id]?.label ?? id;
+}
+
 /** Category IDs flagged as fixed (recurring, non-discretionary) spend. */
 export const FIXED_CATEGORY_IDS: ReadonlySet<string> = new Set(
   CATEGORIES.filter((c) => c.fixed).map((c) => c.id),

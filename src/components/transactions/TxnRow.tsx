@@ -2,11 +2,13 @@
 
 import { Pencil } from "lucide-react";
 import type { Transaction, TransactionStatus } from "@/domain/models";
-import { CATEGORY_BY_ID } from "@/domain/models";
+import { categoryLabel } from "@/domain/models";
+import type { Correction } from "@/state/corrections";
 import { Money, SourceBadge } from "@/components/primitives";
 import { formatRelativeDate } from "@/lib/format";
 import { DEMO_NOW } from "@/lib/demo-clock";
 import { cn } from "@/lib/cn";
+import { CategoryProvenanceBadge } from "./CategoryProvenanceBadge";
 
 const STATUS_META: Record<TransactionStatus, { label: string; className: string }> = {
   posted: { label: "Đã ghi nhận", className: "bg-surface-muted text-muted" },
@@ -16,8 +18,8 @@ const STATUS_META: Record<TransactionStatus, { label: string; className: string 
 };
 
 /** One transaction row. Tapping opens the category editor. */
-export function TxnRow({ txn, onEdit }: { txn: Transaction; onEdit: (t: Transaction) => void }) {
-  const category = CATEGORY_BY_ID[txn.categoryId]?.label ?? txn.categoryId;
+export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: (t: Transaction) => void; correction?: Correction }) {
+  const category = categoryLabel(txn.categoryId);
   const status = STATUS_META[txn.status];
   const isCredit = txn.direction === "credit";
 
@@ -34,6 +36,7 @@ export function TxnRow({ txn, onEdit }: { txn: Transaction; onEdit: (t: Transact
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
           <span>{category}</span>
+          {correction?.status !== "pending" && <CategoryProvenanceBadge correction={correction} />}
           <span aria-hidden>·</span>
           <span>{formatRelativeDate(txn.postedAt, DEMO_NOW)}</span>
           <SourceBadge source={txn.source} />
