@@ -37,8 +37,26 @@ function seed(): JarConfig {
  * reseeds (KISS; prototype localStorage, not a ledger).
  */
 function migrateJarConfig(stored: JarConfig | null): JarConfig {
-  if (!stored || stored.version !== 3) return seed();
-  return healOrphanCategories(dedupeCategories(stored));
+  if (!stored || stored.version !== 3) return backfillActualAmount(seed());
+  return healOrphanCategories(dedupeCategories(backfillActualAmount(stored)));
+}
+
+/**
+ * One-time-per-jar backfill (Chuyển tiền Phần 1): a jar that has a
+ * `budgetLimit` but no `actualAmount` yet starts with a real balance equal to
+ * its set amount, so it becomes usable as a transfer source immediately
+ * instead of requiring a separate funding step first. A jar with no
+ * `budgetLimit` (e.g. "Tiết kiệm") stays `actualAmount: undefined` — never
+ * defaulted to 0 (invariant #6). Computed on every load, like `healOrphan
+ * Categories`; persists naturally on the next real mutation.
+ */
+function backfillActualAmount(config: JarConfig): JarConfig {
+  return {
+    ...config,
+    jars: config.jars.map((j) =>
+      j.budgetLimit !== undefined && j.actualAmount === undefined ? { ...j, actualAmount: j.budgetLimit } : j,
+    ),
+  };
 }
 
 /**
@@ -117,6 +135,13 @@ interface JarConfigContextValue {
   /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
   applyTemplate: (templateId: JarTemplate["id"]) => void;
   resetToSeed: () => void;
+  /**
+   * Debit `amount` from a jar's real balance (Chuyển tiền Phần 1 — chosen as
+   * a transfer source). No-op if the jar is missing or has no `actualAmount`
+   * yet — the UI already validates "đủ tiền" before this is ever called;
+   * this is only a defensive backstop, never the source of that check.
+   */
+  spendFromJar: (id: string, amount: number) => void;
 }
 
 const JarConfigContext = createContext<JarConfigContextValue | null>(null);
@@ -156,9 +181,14 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   // Apply a pure transform to the current config and persist the result. The
   // persist is a plain side effect here (never inside a setState updater), so it
   // fires exactly once per mutation even under StrictMode double-invocation.
+  // `backfillActualAmount` runs after EVERY mutation (not just on load) — a jar
+  // that just got its first `budgetLimit` via any path (Cài đặt hũ's `updateJar`,
+  // `applyTemplate`, `resetToSeed`) becomes usable as a transfer source
+  // immediately, instead of only after the next full reload. Idempotent/no-op
+  // for jars that already have `actualAmount` or still have no `budgetLimit`.
   const mutate = useCallback(
     (fn: (current: JarConfig) => JarConfig) => {
-      const next = fn(configRef.current);
+      const next = backfillActualAmount(fn(configRef.current));
       apply(next);
       providers.saveJarConfig(next).catch(() => {});
     },
@@ -212,6 +242,15 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
           ),
         ),
       resetToSeed: () => mutate(() => seed()),
+      spendFromJar: (id, amount) =>
+        mutate((c) => ({
+          ...c,
+          jars: c.jars.map((j) =>
+            j.id === id && j.actualAmount !== undefined
+              ? { ...j, actualAmount: Math.max(0, j.actualAmount - amount) }
+              : j,
+          ),
+        })),
     }),
     [config, mutate],
   );

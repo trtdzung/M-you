@@ -112,7 +112,7 @@ describe("route smoke — all screens mount", () => {
   });
 
   it("Transfer confirm (/transfer-confirm)", async () => {
-    const { TransferConfirm } = await import("../(festive)/transfer-confirm/TransferConfirm");
+    const { TransferConfirm } = await import("../transfer-confirm/TransferConfirm");
     expect(() => renderScreen(<TransferConfirm />)).not.toThrow();
   });
 

@@ -11,9 +11,15 @@ export interface StoredTransferDraft {
   id: string;
   name: string;
   accountMasked: string;
+  /** Full (unmasked) account number — only used by the post-confirm success receipt (Chuyển tiền never masks). */
+  accountNumber?: string;
+  /** Recipient's bank, for the success receipt's bank logo. */
+  recipientBankName?: string;
   amount: number;
   memo: string | null;
   sourceLabel: string;
+  /** Set when the chosen source was a jar (Chuyển tiền Phần 1) — `/transfer-confirm` debits this jar plus its underlying account on confirm. */
+  sourceJarId?: string;
   recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed";
   riskFlags?: import("@/domain/models").TransferRiskFlag[];
   source?: "mock";

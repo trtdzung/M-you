@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
+import { applyAccountAdjustments } from "@/lib/account-adjustments";
 import { useProviders } from "@/providers/context";
 import { useAssetLiabilities } from "./assets";
 import { useCorrections, applyCorrections, isHidden } from "./corrections";
@@ -71,10 +72,11 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
       providers.getMonthlySnapshots(),
       providers.listGoals(),
       providers.listMockProducts(),
+      providers.getAccountAdjustments(),
     ])
-      .then(([transactions, accounts, assets, liabilities, budgets, snapshots, goals, products]) => {
+      .then(([transactions, accounts, assets, liabilities, budgets, snapshots, goals, products, adjustments]) => {
         if (!active) return;
-        setRaw({ transactions, accounts, assets, liabilities, budgets, snapshots, goals, products });
+        setRaw({ transactions, accounts: applyAccountAdjustments(accounts, adjustments), assets, liabilities, budgets, snapshots, goals, products });
         setLoading(false);
       })
       .catch(() => {

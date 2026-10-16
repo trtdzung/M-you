@@ -18,8 +18,11 @@ const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
   credit_card: "Thẻ tín dụng",
 };
 
+/** Either a real account or a jar (Chuyển tiền Phần 1 — a jar with a real `actualAmount` may be chosen as a source too). */
+export type TransferSource = { kind: "account" | "jar"; id: string };
+
 /**
- * Bước cuối của Chuyển tiền (sau khi đã có người nhận): chọn tài khoản
+ * Bước cuối của Chuyển tiền (sau khi đã có người nhận): chọn tài khoản/hũ
  * nguồn, nhập số tiền/nội dung. "Đặt lịch chuyển tiền" chỉ là UI hiển thị —
  * prototype này chưa có lịch chuyển tiền thật, không có logic đứng sau.
  */
@@ -27,7 +30,7 @@ export function TransferAmountStep({
   recipient,
   accounts,
   jars = [],
-  sourceAccountId,
+  source,
   amount,
   memo,
   canContinue,
@@ -39,21 +42,22 @@ export function TransferAmountStep({
 }: {
   recipient: SelectedRecipient;
   accounts: Account[];
-  /** Shown below a divider in the source-account sheet, for a quick balance glance only — never selectable as a source (a jar isn't a real bank account, invariant #3/#4). */
+  /** A jar with a real `actualAmount` is selectable as a source (Phần 1); one without (no `budgetLimit` yet set) stays view-only. */
   jars?: (Jar & { remaining: number | null })[];
-  sourceAccountId: string;
+  source: TransferSource | null;
   amount: string;
   memo: string;
   canContinue: boolean;
   onChangeRecipient: () => void;
-  onSourceChange: (id: string) => void;
+  onSourceChange: (source: TransferSource) => void;
   onAmountChange: (amount: string) => void;
   onMemoChange: (memo: string) => void;
   onContinue: () => void;
 }) {
   const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
   const [scheduled, setScheduled] = useState(false);
-  const sourceAccount = accounts.find((account) => account.id === sourceAccountId);
+  const sourceAccount = source?.kind === "account" ? accounts.find((account) => account.id === source.id) : undefined;
+  const sourceJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
   const recipientBank = findBankByName(recipient.bankName);
   const showRecipientBankName = Boolean(recipient.bankName) && recipient.bankName !== recipient.name;
 
@@ -97,9 +101,14 @@ export function TransferAmountStep({
           >
             <div className="min-w-0 flex-1 text-left">
               <p className="truncate text-xs text-muted">
-                {sourceAccount ? `${sourceAccount.accountNumber} · ${ACCOUNT_TYPE_LABEL[sourceAccount.type]}` : "Chọn tài khoản"}
+                {sourceAccount
+                  ? `${sourceAccount.accountNumber} · ${ACCOUNT_TYPE_LABEL[sourceAccount.type]}`
+                  : sourceJar
+                    ? `Hũ ${sourceJar.label} · Thực tế`
+                    : "Chọn tài khoản"}
               </p>
               {sourceAccount && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceAccount.balance)}</p>}
+              {sourceJar && <p className="mt-0.5 text-lg font-bold tabular-nums text-text">{formatVnd(sourceJar.actualAmount)}</p>}
             </div>
             <ChevronDown size={16} className="shrink-0 text-muted" />
           </button>
@@ -174,7 +183,7 @@ export function TransferAmountStep({
                 <button
                   type="button"
                   onClick={() => {
-                    onSourceChange(account.id);
+                    onSourceChange({ kind: "account", id: account.id });
                     setSourceSheetOpen(false);
                   }}
                   className="flex w-full flex-col items-start gap-1 px-1 py-3 text-left"
@@ -196,13 +205,14 @@ export function TransferAmountStep({
           {jars.length > 0 && (
             <>
               <div className="my-2 border-t border-border" />
-              <p className="px-1 pb-2 text-xs font-semibold text-muted">Hũ chi tiêu — chỉ để xem số dư</p>
+              <p className="px-1 pb-2 text-xs font-semibold text-muted">Hũ chi tiêu</p>
               <ul className="flex flex-col divide-y divide-border">
                 {jars.map((jar) => {
                   const Icon = jarIcon(jar.icon);
                   const accent = jarAccent(jar);
-                  return (
-                    <li key={jar.id} className="flex items-center gap-3 px-1 py-3">
+                  const fundable = jar.actualAmount !== undefined;
+                  const row = (
+                    <>
                       <span
                         aria-hidden
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white"
@@ -212,11 +222,35 @@ export function TransferAmountStep({
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-semibold text-text">{jar.label}</p>
-                        <p className="mt-0.5 text-xs text-muted">
-                          <span>Còn lại </span>
-                          <Money amount={jar.remaining} unknownLabel="chưa đặt hạn mức" className="text-xs text-muted" />
-                        </p>
+                        {fundable ? (
+                          <p className="mt-0.5 text-xs text-muted">
+                            <span>Đã set </span>
+                            <Money amount={jar.budgetLimit} unknownLabel="—" className="text-xs text-muted" />
+                            <span> · Thực tế </span>
+                            <Money amount={jar.actualAmount} unknownLabel="—" className="text-xs font-semibold text-text" />
+                          </p>
+                        ) : (
+                          <p className="mt-0.5 text-xs text-muted">Chưa có số dư</p>
+                        )}
                       </div>
+                    </>
+                  );
+                  return (
+                    <li key={jar.id}>
+                      {fundable ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSourceChange({ kind: "jar", id: jar.id });
+                            setSourceSheetOpen(false);
+                          }}
+                          className="flex w-full items-center gap-3 px-1 py-3 text-left"
+                        >
+                          {row}
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-3 px-1 py-3 opacity-60">{row}</div>
+                      )}
                     </li>
                   );
                 })}

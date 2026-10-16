@@ -93,6 +93,14 @@ export function formatDate(date: Date | string | number): string {
   });
 }
 
+/** Format a date+time as "HH:mm, dd/MM/yyyy" (e.g. transfer receipts). */
+export function formatDateTime(date: Date | string | number): string {
+  const d = toDate(date);
+  if (!d) return "—";
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${time}, ${formatDate(d)}`;
+}
+
 /**
  * Relative date in Vietnamese, e.g. "Hôm nay", "Hôm qua", "3 ngày trước".
  * Falls back to an absolute date beyond ~30 days.

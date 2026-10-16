@@ -186,6 +186,13 @@ export interface Jar {
   categoryIds: string[];
   /** Monthly spending limit in VND. `undefined` = chưa đặt (unknown, never 0). */
   budgetLimit?: number;
+  /**
+   * Real spendable balance in VND — lets this jar be chosen as a transfer
+   * source (Chuyển tiền). `undefined` = no real balance yet (never defaulted
+   * to 0, invariant #6) — a jar without `budgetLimit` stays `undefined` here
+   * too, and is not selectable as a source until funded (future work).
+   */
+  actualAmount?: number;
   /** Optional presentation overrides (settings). Absent = derive from category. */
   color?: string;
   icon?: string;

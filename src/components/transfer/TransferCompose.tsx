@@ -6,6 +6,7 @@ import { Home, QrCode } from "lucide-react";
 import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
+import { applyAccountAdjustments } from "@/lib/account-adjustments";
 import { putTransferDraft } from "@/lib/transfer-draft-store";
 import { assessTransferRisk } from "@/lib/transfer-risk";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
@@ -14,7 +15,7 @@ import { type SelectedRecipient } from "./RecipientPicker";
 import { TransferAccountPicker } from "./TransferAccountPicker";
 import { TransferBankEntry } from "./TransferBankEntry";
 import { TransferSaveRecipient } from "./TransferSaveRecipient";
-import { TransferAmountStep } from "./TransferAmountStep";
+import { TransferAmountStep, type TransferSource } from "./TransferAmountStep";
 
 type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
 
@@ -32,7 +33,7 @@ export function TransferCompose() {
   const [recipient, setRecipient] = useState<SelectedRecipient | null>(null);
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
-  const [sourceAccountId, setSourceAccountId] = useState("");
+  const [source, setSource] = useState<TransferSource | null>(null);
 
   function selectRecipient(next: SelectedRecipient) {
     setRecipient(next);
@@ -61,14 +62,21 @@ export function TransferCompose() {
     let active = true;
     setLoading(true);
     setError(false);
-    Promise.all([providers.listBeneficiaries(), providers.listTransactions(), providers.listAccounts()])
-      .then(([nextBeneficiaries, nextTransactions, nextAccounts]) => {
+    Promise.all([
+      providers.listBeneficiaries(),
+      providers.listTransactions(),
+      providers.listAccounts(),
+      providers.getAccountAdjustments(),
+    ])
+      .then(([nextBeneficiaries, nextTransactions, nextAccounts, adjustments]) => {
         if (!active) return;
-        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current");
+        const eligibleAccounts = applyAccountAdjustments(nextAccounts, adjustments).filter(
+          (account) => account.type === "current",
+        );
         setBeneficiaries(nextBeneficiaries);
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
-        setSourceAccountId(eligibleAccounts.find((account) => account.type === "current")?.id ?? eligibleAccounts[0]?.id ?? "");
+        setSource(eligibleAccounts[0] ? { kind: "account", id: eligibleAccounts[0].id } : null);
       })
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
@@ -85,20 +93,30 @@ export function TransferCompose() {
   );
 
   const numericAmount = Number(amount);
-  const selectedAccount = accounts.find((account) => account.id === sourceAccountId);
+  const selectedAccount = source?.kind === "account" ? accounts.find((account) => account.id === source.id) : undefined;
+  const selectedJar = source?.kind === "jar" ? jars.find((jar) => jar.id === source.id) : undefined;
+  const sourceValid =
+    source?.kind === "jar"
+      ? Boolean(selectedJar && selectedJar.actualAmount !== undefined && numericAmount <= selectedJar.actualAmount)
+      : Boolean(selectedAccount);
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
-  const canContinue = Boolean(recipient && Number.isFinite(numericAmount) && numericAmount > 0 && selectedAccount);
+  const canContinue = Boolean(recipient && Number.isFinite(numericAmount) && numericAmount > 0 && sourceValid);
 
   function continueToConfirm() {
-    if (!recipient || !canContinue || !selectedAccount) return;
+    if (!recipient || !canContinue) return;
     const id = `form_${Date.now()}`;
     putTransferDraft({
       id,
       name: recipient.name,
       accountMasked: recipient.accountMasked,
+      accountNumber: recipient.accountNumber,
+      recipientBankName: recipient.bankName,
       amount: numericAmount,
       memo: memo.trim() || null,
-      sourceLabel: `${selectedAccount.institution} · ${selectedAccount.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
+      sourceLabel: selectedJar
+        ? `Hũ ${selectedJar.label}`
+        : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
+      sourceJarId: selectedJar?.id,
       recipientSource: recipient.source,
       riskFlags,
       source: "mock",
@@ -133,12 +151,12 @@ export function TransferCompose() {
           recipient={recipient}
           accounts={accounts}
           jars={jars}
-          sourceAccountId={sourceAccountId}
+          source={source}
           amount={amount}
           memo={memo}
           canContinue={canContinue}
           onChangeRecipient={backToPick}
-          onSourceChange={setSourceAccountId}
+          onSourceChange={setSource}
           onAmountChange={setAmount}
           onMemoChange={setMemo}
           onContinue={continueToConfirm}

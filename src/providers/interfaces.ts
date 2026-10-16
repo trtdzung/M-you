@@ -111,4 +111,13 @@ export interface Providers
   getJarConfig(): Promise<JarConfig | null>;
   /** Persist the user's spending-jar configuration. First write on `Providers`. */
   saveJarConfig(config: JarConfig): Promise<void>;
+  /**
+   * Cumulative amount already debited from each account via a jar-sourced
+   * transfer (Chuyển tiền Phần 1) — a mock ledger overlay on top of the
+   * engine-computed `Account.balance`, which itself is never mutated
+   * (invariant #1). Keyed by account id.
+   */
+  getAccountAdjustments(): Promise<Record<string, number>>;
+  /** Record an additional debit against an account (adds to, never replaces, any existing adjustment). */
+  applyAccountDebit(accountId: string, amount: number): Promise<void>;
 }

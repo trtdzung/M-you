@@ -1,0 +1,370 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, ChevronDown, ChevronUp, Home, Lock, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { Card } from "@/components/primitives";
+import { formatDateTime } from "@/lib/format";
+import { avatarColor, initialOf } from "@/lib/avatar";
+import { findBank, findBankByName } from "@/lib/transfer-banks";
+import { BankLogo } from "@/components/transfer/BankLogo";
+import { usePersona, useProviders } from "@/providers/context";
+import { useJarConfig } from "@/state/jars";
+import { useManualTxns } from "@/state/manual-txns";
+import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
+import { getTransferDraft } from "@/lib/transfer-draft-store";
+import { CURRENCY_VND, type DataSource } from "@/domain/models";
+
+/**
+ * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field,
+ * enters a simulated OTP THEY type, and explicitly confirms. "Executing" here
+ * only builds a local `source: "mock"` record; no facade/API is ever called and
+ * the assistant never reaches this code. Cancel returns control with no effect.
+ */
+
+interface MockExecutedTransfer {
+  recipientName: string;
+  recipientAccountMasked: string;
+  recipientAccountNumber: string | null;
+  recipientBankName: string | null;
+  senderName: string;
+  amount: number;
+  currency: string;
+  memo: string | null;
+  executedAt: string;
+  transactionCode: string;
+  referenceCode: string;
+  source: DataSource; // always "mock" — never presented as a real MSB transfer
+}
+
+/** Comma-grouped, "VND" suffix — matches the real MSB receipt screen exactly (the rest of the app uses "₫"/period-grouping; this one screen deliberately doesn't). */
+function formatVndComma(amount: number): string {
+  return new Intl.NumberFormat("en-US").format(amount);
+}
+
+/** Uppercase, diacritics-stripped — matches the real app's auto-generated memo style (e.g. "NGUYEN VIET DUNG chuyen tien"). */
+function toPlainUpper(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toUpperCase();
+}
+
+export function TransferConfirm() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const providers = useProviders();
+  const { config: jarConfig, spendFromJar } = useJarConfig();
+  const { add: addManualTxn } = useManualTxns();
+  const { persona } = usePersona();
+  const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
+  // Draft fields come from session storage keyed by id (Red Team #11) — never
+  // from the URL. Only `draftId` is read from the query string.
+  const draft = useMemo(() => getTransferDraft(params.get("draftId") ?? ""), [params]);
+  const isValidDraft = Boolean(draft?.name.trim() && draft.accountMasked && Number.isFinite(draft.amount) && draft.amount > 0);
+
+  const [name, setName] = useState(draft?.name ?? "");
+  const [acct] = useState(draft?.accountMasked ?? "");
+  const [amount, setAmount] = useState<number>(draft?.amount ?? 0);
+  const [memo, setMemo] = useState(draft?.memo ?? "");
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<MockExecutedTransfer | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const [recipientSaved, setRecipientSaved] = useState(false);
+  const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
+
+  function saveRecipient() {
+    if (!done || recipientSaved) return;
+    setRecipientSaved(true);
+    providers
+      .createBeneficiary({
+        name: done.recipientName,
+        accountNumber: done.recipientAccountNumber ?? done.recipientAccountMasked,
+        bankName: done.recipientBankName ?? "",
+      })
+      .catch(() => {});
+  }
+
+  async function confirm() {
+    if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
+    if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
+    if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
+    if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (ít nhất 4 chữ số).");
+    setError(null);
+    // Mock-only: no real money moves, no API call, no facade involvement.
+    // Chuyển tiền Phần 1: nguồn là hũ → trừ cả hũ (Thực tế) và tài khoản
+    // thanh toán đang giữ hũ đó (tiền trong hũ vốn là một phần tiền trong
+    // tài khoản), VÀ ghi thêm 1 giao dịch (self-reported, như nút ＋ thêm
+    // giao dịch tay) vào đúng danh mục đầu tiên của hũ đó — để "Ngân sách"
+    // (tính từ lịch sử giao dịch thật, xem `evaluateJarBudget`) cũng phản
+    // ánh đúng số đã tiêu, không lệch với "Thực tế". Nguồn là tài khoản (như
+    // trước giờ) → không trừ/ghi gì (hành vi cũ giữ nguyên).
+    if (draft?.sourceJarId) {
+      spendFromJar(draft.sourceJarId, amount);
+      const accounts = await providers.listAccounts();
+      const currentAccount = accounts.find((a) => a.type === "current");
+      if (currentAccount) await providers.applyAccountDebit(currentAccount.id, amount);
+      const sourceJar = jarConfig.jars.find((j) => j.id === draft.sourceJarId);
+      const categoryId = sourceJar?.categoryIds[0];
+      if (categoryId) {
+        addManualTxn({ amount, direction: "debit", categoryId, merchantName: name.trim(), postedAt: new Date().toISOString() });
+      }
+    }
+    const stamp = Date.now().toString();
+    setDone({
+      recipientName: name.trim(),
+      recipientAccountMasked: acct,
+      recipientAccountNumber: draft?.accountNumber ?? null,
+      recipientBankName: draft?.recipientBankName ?? null,
+      senderName,
+      amount,
+      currency: CURRENCY_VND,
+      memo: memo.trim() || null,
+      executedAt: new Date().toISOString(),
+      transactionCode: `FT${stamp.slice(-9)}`,
+      referenceCode: `MSB${stamp.slice(-6)}`,
+      source: "mock",
+    });
+  }
+
+  if (done) {
+    const recipientBank = findBankByName(done.recipientBankName ?? undefined);
+    const senderBank = findBank("msb");
+    const memoText = done.memo ?? `${toPlainUpper(done.senderName)} chuyen tien`;
+    return (
+      <div className="flex h-full flex-col">
+        <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-[calc(var(--safe-area-top)+0.25rem)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/msb-logo.png" alt="MSB" className="h-7 w-auto" />
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            aria-label="Về trang chủ"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80"
+          >
+            <Home size={20} strokeWidth={2} />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+          <Card className="flex flex-col" padding="none">
+            <div className="flex items-start gap-3 px-5 pt-5 pb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon_success.png" alt="" aria-hidden className="mt-0.5 h-10 w-10 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-positive">Chuyển tiền thành công</p>
+                <p className="mt-1 tabular-nums text-text">
+                  <span className="text-2xl font-bold">{formatVndComma(done.amount)}</span>{" "}
+                  <span className="text-base text-muted">{done.currency}</span>
+                </p>
+                <p className="mt-0.5 text-xs text-muted">{formatDateTime(done.executedAt)}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col divide-y divide-border border-t border-border">
+              <Row label="Người nhận">
+                <div className="flex items-center gap-2.5">
+                  {recipientBank ? (
+                    <BankLogo bank={recipientBank} />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+                      style={{ background: avatarColor(done.recipientName) }}
+                    >
+                      {initialOf(done.recipientName)}
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-bold text-text">{toPlainUpper(done.recipientName)}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted">
+                      {done.recipientBankName && <span>{done.recipientBankName} · </span>}
+                      <span className="tabular-nums">{done.recipientAccountNumber ?? done.recipientAccountMasked}</span>
+                    </p>
+                  </div>
+                </div>
+              </Row>
+              <Row label="Người chuyển">
+                <div className="flex items-center gap-2.5">
+                  {senderBank && <BankLogo bank={senderBank} />}
+                  <p className="truncate text-[15px] font-bold text-text">{toPlainUpper(done.senderName)}</p>
+                </div>
+              </Row>
+              <Row label="Nội dung">
+                <p className="text-sm text-text">{memoText}</p>
+              </Row>
+              <Row label="Phí (bao gồm VAT)">
+                <p className="text-sm text-text">Miễn phí</p>
+              </Row>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="flex items-center justify-center gap-1 border-b border-border py-3 text-sm font-semibold text-primary"
+            >
+              {showDetails ? "Ẩn chi tiết" : "Chi tiết giao dịch"}
+              {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {showDetails && (
+              <div className="flex flex-col divide-y divide-border border-b border-border">
+                <Row label="Hình thức">
+                  <p className="text-sm text-text">Chuyển nhanh 24/7</p>
+                </Row>
+                <Row label="Mã giao dịch">
+                  <p className="text-sm tabular-nums text-text">{done.transactionCode}</p>
+                </Row>
+                <Row label="Mã tham chiếu">
+                  <p className="text-sm tabular-nums text-text">{done.referenceCode}</p>
+                </Row>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {}}
+                className="flex flex-col items-center gap-1.5 text-primary"
+              >
+                <Share2 size={20} strokeWidth={1.8} />
+                <span className="text-xs font-medium text-text">Chia sẻ</span>
+              </button>
+              <button
+                type="button"
+                onClick={saveRecipient}
+                disabled={recipientSaved}
+                className="flex flex-col items-center gap-1.5 text-primary disabled:text-positive"
+              >
+                <UserPlus size={20} strokeWidth={1.8} />
+                <span className="text-xs font-medium text-text">{recipientSaved ? "Đã lưu" : "Lưu người nhận"}</span>
+              </button>
+            </div>
+          </Card>
+
+          <button
+            type="button"
+            onClick={() => router.push("/transfer")}
+            className="mt-4 flex h-13 w-full items-center justify-center rounded-full bg-primary text-base font-bold text-primary-fg"
+          >
+            Giao dịch khác
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isValidDraft) {
+    return (
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
+        <ConfirmHeader />
+        <Card className="bg-warning-soft" role="alert">
+          <p className="text-sm font-semibold text-warning">Không tìm thấy bản nháp hợp lệ</p>
+          <p className="mt-1 text-xs text-warning">Để bảo vệ thông tin người nhận, hãy tạo lại bản nháp từ luồng chuyển tiền.</p>
+        </Card>
+        <button type="button" onClick={() => router.push("/transfer")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
+          Tạo lại bản nháp
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
+      <ConfirmHeader />
+
+      <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-muted">
+        <ArrowLeft size={16} /> Huỷ &amp; quay lại
+      </button>
+
+      <Card className="bg-primary-soft/40">
+        <p className="flex items-start gap-2 text-xs text-text">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
+          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận và nhập OTP, trợ lý không làm bước này.
+        </p>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <Labeled label="Người nhận">
+          <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+        </Labeled>
+        <Labeled label="Số tài khoản">
+          <input value={acct} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
+        </Labeled>
+        <Labeled label="Số tiền (VND)">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            className={`${inputCls} tabular-nums`}
+          />
+        </Labeled>
+        <Labeled label="Nội dung">
+          <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} placeholder="Tuỳ chọn" />
+        </Labeled>
+        <Labeled label="Từ tài khoản">
+          <input value={sourceLabel} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
+        </Labeled>
+      </Card>
+
+      <Card className="flex flex-col gap-2">
+        <Labeled label="Mã OTP">
+          <div className="flex items-center gap-2">
+            <Lock size={15} className="text-muted" />
+            <input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              inputMode="numeric"
+              placeholder="Bạn tự nhập OTP"
+              className={`${inputCls} tabular-nums`}
+            />
+          </div>
+        </Labeled>
+        <p className="text-[11px] text-muted">OTP do bạn tự nhập, không gửi đi đâu.</p>
+      </Card>
+
+      {error && <p className="text-sm text-negative">{error}</p>}
+
+      <button
+        type="button"
+        onClick={confirm}
+        className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
+      >
+        Xác nhận chuyển tiền
+      </button>
+    </div>
+  );
+}
+
+function ConfirmHeader() {
+  return (
+    <header>
+      <h1 className="text-lg font-semibold text-text">Xác nhận chuyển tiền</h1>
+      <p className="text-xs text-muted">Bạn kiểm tra, chỉnh sửa và tự xác nhận.</p>
+    </header>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 px-4 py-3">
+      <span className="text-xs text-muted">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+const inputCls =
+  "w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary";
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</span>
+      {children}
+    </label>
+  );
+}

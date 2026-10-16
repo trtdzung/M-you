@@ -10,7 +10,7 @@ import { LoginScreen } from "./LoginScreen";
  * persona's `label` (a financial-profile description used elsewhere, e.g. the
  * Settings persona switcher), so that switcher keeps its own copy untouched.
  */
-const LOGIN_DISPLAY_NAME: Record<string, string> = {
+export const LOGIN_DISPLAY_NAME: Record<string, string> = {
   CIF_0001: "Ly Lã",
   CIF_0002: "Toàn Trần",
   CIF_0003: "Đào Nguyên",

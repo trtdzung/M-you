@@ -27,7 +27,7 @@ function renderStep(overrides: Partial<Parameters<typeof TransferAmountStep>[0]>
     <TransferAmountStep
       recipient={recipient}
       accounts={[current, savings]}
-      sourceAccountId="current"
+      source={{ kind: "account", id: "current" }}
       amount=""
       memo=""
       canContinue={false}
@@ -92,7 +92,7 @@ describe("TransferAmountStep", () => {
     const { onSourceChange } = renderStep();
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));
     fireEvent.click(screen.getByRole("button", { name: /2003/ }));
-    expect(onSourceChange).toHaveBeenCalledWith("savings");
+    expect(onSourceChange).toHaveBeenCalledWith({ kind: "account", id: "savings" });
   });
 
   it("marks the current (Tài khoản thanh toán) account as Mặc định in the source-account sheet, keeping it first", () => {
@@ -105,14 +105,13 @@ describe("TransferAmountStep", () => {
     expect(rows[1]).not.toHaveTextContent("Mặc định");
   });
 
-  it("lists jars below the accounts in the source-account sheet, for a quick glance only (not selectable)", () => {
+  it("lists jars below the accounts in the source-account sheet; a jar with no actualAmount yet stays non-selectable", () => {
     const { onSourceChange } = renderStep({ jars: [jarWithLimit, jarNoLimit] });
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));
 
     expect(screen.getByText("Ăn uống")).toBeInTheDocument();
-    expect(screen.getByText("1.210.000 ₫", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Giải trí")).toBeInTheDocument();
-    expect(screen.getByText("chưa đặt hạn mức")).toBeInTheDocument();
+    expect(screen.getAllByText("Chưa có số dư")).toHaveLength(2);
 
     expect(screen.queryByRole("button", { name: /Ăn uống/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("Ăn uống"));
@@ -146,7 +145,7 @@ describe("TransferAmountStep", () => {
         <TransferAmountStep
           recipient={recipient}
           accounts={[current]}
-          sourceAccountId="current"
+          source={{ kind: "account", id: "current" }}
           amount=""
           memo=""
           canContinue={false}
@@ -165,7 +164,7 @@ describe("TransferAmountStep", () => {
       <TransferAmountStep
         recipient={recipient}
         accounts={[current]}
-        sourceAccountId="current"
+        source={{ kind: "account", id: "current" }}
         amount="1000000"
         memo=""
         canContinue
