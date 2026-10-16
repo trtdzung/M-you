@@ -47,3 +47,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# SQLite journal sidecar files (data/pfm.sqlite3 itself IS committed — only
+# these ephemeral WAL-mode files, present while a dev server holds an open
+# connection, are excluded)
+data/*.sqlite3-shm
+data/*.sqlite3-wal
+
