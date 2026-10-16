@@ -106,6 +106,13 @@ body {
   padding: 0;
 }
 
+/* Transfer: own back-arrow header owns the edges (like assistant's app-bar) —
+   no bottom nav to clear, so main carries no padding of its own. Must follow
+   `.shell-main` (equal specificity → source order wins). */
+.shell-main--transfer {
+  padding: 0;
+}
+
 /* Login: no bottom nav to clear, so drop only the reserved nav-clearance
    bottom padding — the horizontal `px-shell-main-inset` utility on `main`
    must stay in effect (PromoCarousel's `-mx-4` bleed depends on it), so this

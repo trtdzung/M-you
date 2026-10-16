@@ -117,7 +117,7 @@ describe("route smoke — all screens mount", () => {
   });
 
   it("Transfer compose (/transfer)", async () => {
-    const { default: Page } = await import("../(festive)/transfer/page");
+    const { default: Page } = await import("../transfer/page");
     expect(() => renderScreen(<Page />)).not.toThrow();
   });
 

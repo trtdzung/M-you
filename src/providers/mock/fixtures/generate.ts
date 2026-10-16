@@ -38,7 +38,7 @@ export interface Dataset {
  * resolve a recipient from real transaction history (with a real account number)
  * rather than fabricating one. Kept stable so history resolution is testable.
  */
-const HISTORY_PAYEE = { name: "Phạm Thu Hà", norm: "pham thu ha", account: "0281000556677" };
+const HISTORY_PAYEE = { name: "Phạm Thu Hà", norm: "pham thu ha", account: "0281000556677", bankName: "Techcombank" };
 
 /** Anchor "today" for fixtures — keeps data stable regardless of wall clock. */
 const ANCHOR_YEAR = 2026;
@@ -154,7 +154,7 @@ export function generateDataset(meta: PersonaMeta): Dataset {
     // A past external P2P transfer to a non-saved payee (real counterparty
     // account) — the assistant can resolve this recipient from history.
     if (mi === 2) {
-      add({ accountId: accCurrent, postedAt: iso(year, month, 8), amount: 3_000_000, direction: "debit", type: "transfer", merchantName: HISTORY_PAYEE.name, merchantNormalizedName: HISTORY_PAYEE.norm, categoryId: CATEGORY.transfer, status: "posted", isRecurring: false, userEdited: false, counterpartyAccountNumber: HISTORY_PAYEE.account });
+      add({ accountId: accCurrent, postedAt: iso(year, month, 8), amount: 3_000_000, direction: "debit", type: "transfer", merchantName: HISTORY_PAYEE.name, merchantNormalizedName: HISTORY_PAYEE.norm, categoryId: CATEGORY.transfer, status: "posted", isRecurring: false, userEdited: false, counterpartyAccountNumber: HISTORY_PAYEE.account, counterpartyBankName: HISTORY_PAYEE.bankName });
     }
 
     // A reversed (failed) transaction in the second month — excluded from totals
@@ -184,7 +184,7 @@ export function generateDataset(meta: PersonaMeta): Dataset {
 
 /**
  * Deterministic, real-shaped mock account number from the persona seed + a salt.
- * Kept internal — only the masked form ever reaches the UI-facing `Account`.
+ * Carried on `Account.accountNumber` (full) alongside the masked display form.
  */
 function acctNumber(seed: number, salt: number): string {
   const base = String((seed * 1_000_003 + salt * 97) % 1_000_000_000_000).padStart(12, "0");
@@ -195,11 +195,12 @@ function buildAccounts(meta: PersonaMeta, current: string, savings: string, cred
   const now = "2026-09-15T00:00:00.000Z";
   const scale = meta.params.salaryBase / 25_000_000;
   const seed = meta.params.seed;
-  const mask = (salt: number) => maskAccountNumber(acctNumber(seed, salt));
+  const number = (salt: number) => acctNumber(seed, salt);
+  const mask = (salt: number) => maskAccountNumber(number(salt));
   return [
-    { id: current, type: "current", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(18_000_000 * scale), availableBalance: Math.round(18_000_000 * scale), lastSyncedAt: now, source: "msb", tier: meta.tier, maskedNumber: mask(1) },
-    { id: savings, type: "savings", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(45_000_000 * scale), availableBalance: Math.round(45_000_000 * scale), lastSyncedAt: now, source: "msb", maskedNumber: mask(2) },
-    { id: credit, type: "credit_card", institution: "MSB", currency: CURRENCY_VND, balance: -Math.round(8_000_000 * scale), availableBalance: Math.round(50_000_000 * scale), lastSyncedAt: now, source: "msb", maskedNumber: mask(3) },
+    { id: current, type: "current", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(18_000_000 * scale), availableBalance: Math.round(18_000_000 * scale), lastSyncedAt: now, source: "msb", tier: meta.tier, maskedNumber: mask(1), accountNumber: number(1) },
+    { id: savings, type: "savings", institution: "MSB", currency: CURRENCY_VND, balance: Math.round(45_000_000 * scale), availableBalance: Math.round(45_000_000 * scale), lastSyncedAt: now, source: "msb", maskedNumber: mask(2), accountNumber: number(2) },
+    { id: credit, type: "credit_card", institution: "MSB", currency: CURRENCY_VND, balance: -Math.round(8_000_000 * scale), availableBalance: Math.round(50_000_000 * scale), lastSyncedAt: now, source: "msb", maskedNumber: mask(3), accountNumber: number(3) },
   ];
 }
 

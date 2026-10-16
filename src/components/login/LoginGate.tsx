@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePersona } from "@/providers/context";
 import { LoginScreen } from "./LoginScreen";
 
@@ -24,6 +25,7 @@ const LOGIN_DISPLAY_NAME: Record<string, string> = {
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   const { personas, setPersona } = usePersona();
+  const router = useRouter();
 
   if (!authenticated) {
     const customers = personas.map((p) => ({ ...p, label: LOGIN_DISPLAY_NAME[p.cif] ?? p.label }));
@@ -33,6 +35,9 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
         onLogin={(customer) => {
           setPersona(customer.id);
           setAuthenticated(true);
+          // Login can be reached from any deep link (e.g. /transfer) — always
+          // land on Trang chủ, matching the real MSB app's post-login behavior.
+          router.push("/");
         }}
       />
     );

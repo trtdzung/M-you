@@ -143,7 +143,7 @@ const WEALTHY: PersonaMeta = {
   products: MSB_PRODUCTS,
   beneficiaries: [
     bene("b_w_quan", "Vũ Đình Quân", "19055443322110", "MSB"),
-    bene("b_w_broker", "Công ty CP Đầu tư An Phú", "0331000445566", "ACB"),
+    bene("b_w_broker", "Công ty CP Đầu tư An Phú", "0331000445566", "BIDV"),
     bene("b_w_hoa", "Lê Thị Hoa", "0071000998877", "Vietcombank"),
   ],
 };
