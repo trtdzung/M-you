@@ -44,8 +44,11 @@ function line(over: Partial<JarBudgetResult["lines"][number]>): JarBudgetResult[
   };
 }
 
-function withBudget(jb: JarBudgetResult): Financials {
-  return { jarBudget: jb } as unknown as Financials;
+function withBudget(jb: JarBudgetResult, overAllocated = false): Financials {
+  return {
+    jarBudget: jb,
+    unallocatedPool: { amount: overAllocated ? -1 : 0, overAllocated, source: "mock" },
+  } as unknown as Financials;
 }
 
 describe("BudgetTab", () => {
@@ -84,5 +87,17 @@ describe("BudgetTab", () => {
     mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [])) };
     render(<BudgetTab />);
     expect(screen.getByText("Chưa có hũ nào")).toBeInTheDocument();
+  });
+
+  it("shows the 'Vượt phân bổ' badge when unallocatedPool.overAllocated is true (RT#13)", () => {
+    mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [line({})]), true) };
+    render(<BudgetTab />);
+    expect(screen.getByText("Vượt phân bổ")).toBeInTheDocument();
+  });
+
+  it("hides the 'Vượt phân bổ' badge when unallocatedPool.overAllocated is false", () => {
+    mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [line({})]), false) };
+    render(<BudgetTab />);
+    expect(screen.queryByText("Vượt phân bổ")).not.toBeInTheDocument();
   });
 });

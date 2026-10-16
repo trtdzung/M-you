@@ -34,7 +34,12 @@ const h = vi.hoisted(() => {
     used: {} as Record<string, boolean>,
     query: "draftId=d1",
     spendFromJar: vi.fn(),
-    listAccounts: vi.fn(async () => [{ id: "acc1", type: "current" }]),
+    applyReallocation: vi.fn(async () => {}),
+    listAccounts: vi.fn(
+      async (): Promise<Array<{ id: string; type: string; availableBalance?: number }>> => [
+        { id: "acc1", type: "current" },
+      ],
+    ),
     applyAccountDebit: vi.fn(async () => {}),
     push: vi.fn(),
     add: vi.fn((input: { categoryId: string; type: string; amount: number; merchantName: string }) => {
@@ -66,7 +71,7 @@ vi.mock("@/providers/context", () => ({
 }));
 
 vi.mock("@/state/jars", () => ({
-  useJarConfig: () => ({ config: h.jarConfig, spendFromJar: h.spendFromJar }),
+  useJarConfig: () => ({ config: h.jarConfig, spendFromJar: h.spendFromJar, applyReallocation: h.applyReallocation }),
 }));
 
 vi.mock("@/state/manual-txns", () => ({
@@ -108,7 +113,10 @@ beforeEach(() => {
   h.used = {};
   h.query = "draftId=d1";
   h.spendFromJar.mockClear();
+  h.applyReallocation.mockClear();
+  h.applyReallocation.mockImplementation(async () => {});
   h.listAccounts.mockClear();
+  h.listAccounts.mockImplementation(async () => [{ id: "acc1", type: "current" }]);
   h.applyAccountDebit.mockClear();
   h.add.mockClear();
   h.update.mockClear();
@@ -232,5 +240,122 @@ describe("TransferConfirm — always create + categorize", () => {
 
     expect(screen.getByText(/Không cập nhật được phân loại/)).toBeInTheDocument();
     expect(h.store[0]).toMatchObject({ categoryId: "dining" });
+  });
+});
+
+/**
+ * Funding reallocation path (EPIC — unallocated pool / donor chain). `confirm()`
+ * re-runs `evaluateFunding` on the FRESHEST accounts/jars right before touching
+ * money: a `plannedReallocation`/`overspend` draft only reallocates when the
+ * fresh tier is still "topup", aborts outright on "insufficient" (no debit, no
+ * jar mutation), and skips reallocation on "ok" (state already improved). The
+ * jar fixture here (food actualAmount 2_000_000) comes from the shared `h.jarConfig`.
+ */
+describe("TransferConfirm — funding reallocation (topup/insufficient/overspend)", () => {
+  it('plannedReallocation topup: applyReallocation runs BEFORE the debit, then the debit happens', async () => {
+    // CASA=10tr; food(src)=2tr, shop=1tr, empty=0 → claimed=3tr, pool=7tr.
+    // amount=2.5tr → shortfall from food = 0.5tr, fully covered by the pool.
+    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
+    h.draft = {
+      id: "d1",
+      name: "Nguyen Van A",
+      accountMasked: "****1234",
+      amount: 2_500_000,
+      memo: null,
+      sourceLabel: "Hũ Ăn uống",
+      sourceJarId: "food",
+      sourceAccountId: "acc1",
+      plannedReallocation: true,
+    };
+    render(<TransferConfirm />);
+    await completeTransfer();
+
+    expect(h.applyReallocation).toHaveBeenCalledTimes(1);
+    expect(h.applyReallocation).toHaveBeenCalledWith({
+      donors: [{ jarId: "pool", label: "Chưa phân bổ", take: 500_000 }],
+      targetJarId: "food",
+    });
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 2_500_000);
+    expect(h.spendFromJar).toHaveBeenCalledWith("food", 2_500_000);
+
+    // Reallocation is applied ATOMICALLY before the debit — never after.
+    const reallocOrder = h.applyReallocation.mock.invocationCallOrder[0];
+    const debitOrder = h.applyAccountDebit.mock.invocationCallOrder[0];
+    expect(reallocOrder).toBeLessThan(debitOrder);
+  });
+
+  it("re-validation returns insufficient: no debit, no reallocation, no txn — error shown", async () => {
+    // CASA=1tr < amount(2.5tr) → hard block regardless of the jar/donor chain.
+    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 1_000_000 }]);
+    h.draft = {
+      id: "d1",
+      name: "Nguyen Van A",
+      accountMasked: "****1234",
+      amount: 2_500_000,
+      memo: null,
+      sourceLabel: "Hũ Ăn uống",
+      sourceJarId: "food",
+      sourceAccountId: "acc1",
+      plannedReallocation: true,
+    };
+    render(<TransferConfirm />);
+    fireEvent.change(screen.getByPlaceholderText("Bạn tự nhập OTP"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+
+    await screen.findByText(/Số dư không đủ để hoàn tất giao dịch/);
+    expect(h.applyReallocation).not.toHaveBeenCalled();
+    expect(h.applyAccountDebit).not.toHaveBeenCalled();
+    expect(h.spendFromJar).not.toHaveBeenCalled();
+    expect(h.add).not.toHaveBeenCalled();
+  });
+
+  it("overspend flag but a feasible fresh state: debit happens, reallocation is skipped", async () => {
+    // food actualAmount=2tr already covers amount=1.5tr → tier resolves "ok".
+    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
+    h.draft = {
+      id: "d1",
+      name: "Nguyen Van A",
+      accountMasked: "****1234",
+      amount: 1_500_000,
+      memo: null,
+      sourceLabel: "Hũ Ăn uống",
+      sourceJarId: "food",
+      sourceAccountId: "acc1",
+      overspend: true,
+    };
+    render(<TransferConfirm />);
+    await completeTransfer();
+
+    expect(h.applyReallocation).not.toHaveBeenCalled();
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 1_500_000);
+    expect(h.spendFromJar).toHaveBeenCalledWith("food", 1_500_000);
+  });
+
+  it("REGRESSION: overspend flag with fresh tier==topup still skips reallocation — debit + floored spendFromJar happen anyway", async () => {
+    // food(src)=2tr, amount=3tr → shortfall 1tr from food; CASA=10tr, claimed=3tr,
+    // pool=7tr → fresh evaluateFunding resolves "topup" (pool alone covers it).
+    // The bug: applyReallocation used to fire whenever tier==="topup", ignoring
+    // that the user picked "Bỏ qua, vượt hũ" (overspend), not "Đồng ý rót"
+    // (plannedReallocation). The fix gates on `draft.plannedReallocation &&
+    // tier === "topup"` — an overspend draft must fall through to the debit and
+    // let the jar go over-budget (spendFromJar floors internally at 0).
+    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
+    h.draft = {
+      id: "d1",
+      name: "Nguyen Van A",
+      accountMasked: "****1234",
+      amount: 3_000_000,
+      memo: null,
+      sourceLabel: "Hũ Ăn uống",
+      sourceJarId: "food",
+      sourceAccountId: "acc1",
+      overspend: true,
+    };
+    render(<TransferConfirm />);
+    await completeTransfer();
+
+    expect(h.applyReallocation).not.toHaveBeenCalled();
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 3_000_000);
+    expect(h.spendFromJar).toHaveBeenCalledWith("food", 3_000_000);
   });
 });

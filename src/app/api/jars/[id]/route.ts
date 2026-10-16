@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backfillActualAmount, healOrphanCategories, resyncActualOnRaise, stripCategories } from "@/domain/jar-rules";
-import { fitsCasaCap } from "@/domain/engine";
+import { fitsActualCap, fitsCasaCap } from "@/domain/engine";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
 import { casaPoolForCif } from "@/lib/casa-pool";
 
@@ -42,6 +42,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const cap = fitsCasaCap(jars, casaPoolForCif(cif) ?? "unknown", {});
     if (!cap.ok) {
       return NextResponse.json({ error: "over CASA cap", overBy: cap.overBy ?? null }, { status: 422 });
+    }
+  }
+
+  // A patch that sets `actualAmount` (spendFromJar, or a single-jar reallocation
+  // leg) must keep Σ actualAmount ≤ CASA and never go negative (RT#6/#7).
+  if ("actualAmount" in patch) {
+    const actualCap = fitsActualCap(jars, casaPoolForCif(cif) ?? "unknown");
+    if (!actualCap.ok) {
+      return NextResponse.json({ error: "over CASA actual cap", overBy: actualCap.overBy ?? null }, { status: 422 });
     }
   }
   return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars })));

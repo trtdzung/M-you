@@ -104,6 +104,10 @@ export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | nul
     if (!(key in p)) continue;
     if (p[key] === null) patch[key] = undefined;
     else {
+      // A present numeric value that is negative (or non-finite) must be REJECTED,
+      // not silently dropped (RT#6): a swallowed negative `actualAmount` decrement
+      // would leave Σ inconsistent while the client believes the write applied.
+      if (typeof p[key] === "number" && (!Number.isFinite(p[key]) || (p[key] as number) < 0)) return null;
       const value = amount(p[key]);
       if (value !== undefined) patch[key] = value;
     }

@@ -133,6 +133,48 @@ describe("PATCH /api/jars (batch cap door)", () => {
     const config: JarConfig = await res.json();
     expect(findJar(config, "a")?.actualAmount).toBe(8_000_000);
   });
+
+  // Reallocation (top-up) moves `actualAmount`, not `budgetLimit` — it slips past
+  // the Σ budgetLimit cap above, so the route guards Σ actualAmount separately.
+  it("rejects a batch whose resulting Σ actualAmount exceeds CASA even though Σ budgetLimit stays within cap (422 + overBy)", async () => {
+    seed([
+      { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000, actualAmount: 5_000_000 },
+      { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000, actualAmount: 5_000_000 },
+    ]);
+    // Σ budgetLimit stays 10tr (≤18tr) — only actualAmount is patched.
+    const res = await batchPatch({ a: { actualAmount: 12_000_000 }, b: { actualAmount: 10_000_000 } });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBe("over CASA actual cap");
+    expect(body.overBy).toBe(22_000_000 - CASA); // 4tr over
+    // Store untouched — the atomic write never ran.
+    const after = await readConfig();
+    expect(findJar(after, "a")?.actualAmount).toBe(5_000_000);
+    expect(findJar(after, "b")?.actualAmount).toBe(5_000_000);
+  });
+
+  it("rejects a negative actualAmount patch as invalid (422) rather than silently swallowing it (RT#6)", async () => {
+    seed([{ id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000, actualAmount: 5_000_000 }]);
+    const res = await batchPatch({ a: { actualAmount: -1 } });
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBe("patch for a is invalid");
+    // Store untouched.
+    const after = await readConfig();
+    expect(findJar(after, "a")?.actualAmount).toBe(5_000_000);
+  });
+
+  it("accepts a within-actual-cap reallocation batch and persists the new balances", async () => {
+    seed([
+      { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000, actualAmount: 2_000_000 },
+      { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000, actualAmount: 5_000_000 },
+    ]);
+    const res = await batchPatch({ a: { actualAmount: 5_000_000 }, b: { actualAmount: 2_000_000 } });
+    expect(res.status).toBe(200);
+    const config: JarConfig = await res.json();
+    expect(findJar(config, "a")?.actualAmount).toBe(5_000_000);
+    expect(findJar(config, "b")?.actualAmount).toBe(2_000_000);
+  });
 });
 
 describe("PATCH /api/jars/:id (single cap door)", () => {

@@ -24,6 +24,16 @@ export interface StoredTransferDraft {
   sourceJarId?: string;
   recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed" | "agent_proposed";
   riskFlags?: import("@/domain/models").TransferRiskFlag[];
+  /**
+   * A PLANNED (not yet applied) jar reallocation attached when the user accepted
+   * a top-up suggestion. It is NOT executed here — `/transfer-confirm` re-validates
+   * and applies it atomically at `confirm()` alongside the debit (Red Team #1/#2).
+   * `donors` may include the "pool" sentinel (no jar patch; affects Σactual only);
+   * `targetJarId` is the jar to credit, or `null` for a pool-source transfer.
+   */
+  plannedReallocation?: { donors: import("@/domain/engine").DonorProposal[]; targetJarId: string | null };
+  /** Set when the user chose "Bỏ qua, vượt hũ" — spend past the jar's balance. */
+  overspend?: boolean;
   source?: "mock";
 }
 

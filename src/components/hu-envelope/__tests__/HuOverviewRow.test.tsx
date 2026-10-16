@@ -38,8 +38,11 @@ function envelope(over: Partial<JarEnvelopeResult>): JarEnvelopeResult {
   };
 }
 
-function withEnvelope(env: JarEnvelopeResult): Financials {
-  return { jarEnvelope: env } as unknown as Financials;
+function withEnvelope(env: JarEnvelopeResult, overAllocated = false): Financials {
+  return {
+    jarEnvelope: env,
+    unallocatedPool: { amount: overAllocated ? -1 : 0, overAllocated, source: "mock" },
+  } as unknown as Financials;
 }
 
 describe("HuOverviewRow", () => {
@@ -126,5 +129,15 @@ describe("HuOverviewRow", () => {
   it("renders nothing when there are no jars configured", () => {
     const { container } = render(<HuOverviewRow financials={withEnvelope(envelope({ jars: [] }))} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows the 'Vượt phân bổ' badge when unallocatedPool.overAllocated is true (RT#13)", () => {
+    render(<HuOverviewRow financials={withEnvelope(envelope({}), true)} />);
+    expect(screen.getByText("Vượt phân bổ")).toBeInTheDocument();
+  });
+
+  it("hides the 'Vượt phân bổ' badge when unallocatedPool.overAllocated is false", () => {
+    render(<HuOverviewRow financials={withEnvelope(envelope({}), false)} />);
+    expect(screen.queryByText("Vượt phân bổ")).not.toBeInTheDocument();
   });
 });

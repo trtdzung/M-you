@@ -1,0 +1,98 @@
+"use client";
+
+import { useState } from "react";
+import { ArrowRight } from "lucide-react";
+import { Sheet } from "@/components/primitives";
+import { formatVnd } from "@/lib/format";
+import type { FundingAssessment } from "@/domain/engine";
+
+/**
+ * "Hũ thiếu tiền → gợi ý rót" popup. Every number (shortfall, each donor's take)
+ * comes straight from the engine's `FundingAssessment` (invariant #1) — this
+ * component only presents them and records the user's choice. It NEVER moves
+ * money: "Đồng ý rót" attaches a PLANNED reallocation to the draft (applied
+ * atomically at confirm, RT#1); "Bỏ qua, vượt hũ" flags an overspend. Relabeling
+ * jars is an internal, non-OTP action; the outward payment still runs the MSB
+ * confirm + OTP flow.
+ *
+ * Copy is static (deterministic) for the MVP — Phase 03 may swap in an
+ * AI-narrated line WITHOUT changing any figure.
+ */
+export function JarTopupSuggestionSheet({
+  assessment,
+  targetLabel,
+  onAccept,
+  onOverspend,
+  onChooseAnother,
+  onClose,
+}: {
+  assessment: FundingAssessment;
+  /** The jar (or pool) the shortfall funds, e.g. "Hũ Thiết yếu". */
+  targetLabel: string;
+  onAccept: () => void;
+  onOverspend: () => void;
+  onChooseAnother: () => void;
+  onClose: () => void;
+}) {
+  // Double-tap guard (RT#10): latch on the first tap so a second synchronous tap
+  // can't fire a second navigation / draft. Mirrors confirm()'s committedRef.
+  const [pending, setPending] = useState(false);
+  const guard = (fn: () => void) => () => {
+    if (pending) return;
+    setPending(true);
+    fn();
+  };
+
+  return (
+    <Sheet
+      title="Hũ chưa đủ tiền"
+      description={`${targetLabel} còn thiếu ${formatVnd(assessment.shortfall)} cho giao dịch này.`}
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="rounded-2xl border border-border bg-surface p-3">
+          <p className="mb-2 text-xs font-semibold text-muted">Đề xuất rót từ</p>
+          <ul className="flex flex-col divide-y divide-border">
+            {assessment.donors.map((donor) => (
+              <li key={donor.jarId} className="flex items-center justify-between py-2">
+                <span className="text-[15px] text-text">{donor.label}</span>
+                <span className="text-[15px] font-semibold tabular-nums text-text">{formatVnd(donor.take)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={guard(onAccept)}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+          >
+            Đồng ý rót <ArrowRight size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={guard(onChooseAnother)}
+            className="w-full rounded-full border border-border bg-surface px-4 py-3 text-sm font-semibold text-text disabled:opacity-60"
+          >
+            Chọn nguồn khác
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={guard(onOverspend)}
+            className="w-full rounded-full px-4 py-2 text-sm font-medium text-muted disabled:opacity-60"
+          >
+            Bỏ qua, vượt hũ
+          </button>
+        </div>
+
+        <p className="text-[11px] text-muted">
+          Rót hũ chỉ đổi nhãn nội bộ, không cần OTP. Giao dịch chuyển tiền vẫn cần bạn xác nhận và nhập OTP ở bước sau.
+        </p>
+      </div>
+    </Sheet>
+  );
+}

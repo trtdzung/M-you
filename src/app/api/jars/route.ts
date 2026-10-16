@@ -7,7 +7,7 @@ import {
   stripCategories,
   uniqueJarId,
 } from "@/domain/jar-rules";
-import { fitsCasaCap } from "@/domain/engine";
+import { fitsActualCap, fitsCasaCap } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { readJarConfig, sanitizeJar, sanitizeJarPatch, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
 import { casaPoolForCif } from "@/lib/casa-pool";
@@ -100,6 +100,7 @@ export async function PATCH(req: NextRequest) {
   const current = readJarConfig(cif);
   const byId = new Map(current.jars.map((j) => [j.id, j]));
   const merged = new Map<string, Jar>();
+  let touchesActual = false;
 
   for (const [jarId, rawPatch] of Object.entries(rawPatches as Record<string, unknown>)) {
     const prev = byId.get(jarId);
@@ -107,17 +108,32 @@ export async function PATCH(req: NextRequest) {
     const patch = sanitizeJarPatch(rawPatch);
     if (!patch) return NextResponse.json({ error: `patch for ${jarId} is invalid` }, { status: 422 });
     delete patch.categoryIds; // category moves are not a batch concern
+    if ("actualAmount" in patch) touchesActual = true;
     merged.set(jarId, resyncActualOnRaise(prev, { ...prev, ...patch }));
   }
 
   const nextJars = current.jars.map((j) => merged.get(j.id) ?? j);
+  const casaPool = casaPoolForCif(cif) ?? "unknown";
 
-  const cap = fitsCasaCap(nextJars, casaPoolForCif(cif) ?? "unknown", {});
+  const cap = fitsCasaCap(nextJars, casaPool, {});
   if (!cap.ok) {
     return NextResponse.json(
       { error: "over CASA cap", overBy: cap.overBy ?? null },
       { status: 422 },
     );
+  }
+
+  // Reallocation (top-up) moves `actualAmount`, not `budgetLimit`, so it slips
+  // past the Σ budgetLimit cap above. Guard the SPENDABLE total too: Σ actualAmount
+  // ≤ CASA and no negative balance (RT#6/#7) — reject rather than vaporise money.
+  if (touchesActual) {
+    const actualCap = fitsActualCap(nextJars, casaPool);
+    if (!actualCap.ok) {
+      return NextResponse.json(
+        { error: "over CASA actual cap", overBy: actualCap.overBy ?? null },
+        { status: 422 },
+      );
+    }
   }
 
   return NextResponse.json(writeJarConfig(cif, backfillActualAmount({ version: 3, jars: nextJars })));

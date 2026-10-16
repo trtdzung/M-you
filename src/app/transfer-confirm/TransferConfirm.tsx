@@ -12,6 +12,7 @@ import { TransferCategorizeSection } from "@/components/transfer/TransferCategor
 import { usePersona, useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useManualTxns } from "@/state/manual-txns";
+import { casaBalance, evaluateFunding } from "@/domain/engine";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
@@ -58,7 +59,7 @@ export function TransferConfirm() {
   const router = useRouter();
   const params = useSearchParams();
   const providers = useProviders();
-  const { config: jarConfig, spendFromJar } = useJarConfig();
+  const { config: jarConfig, spendFromJar, applyReallocation } = useJarConfig();
   const { add: addManualTxn } = useManualTxns();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
@@ -122,13 +123,46 @@ export function TransferConfirm() {
       // "Thực tế". Account-sourced defaults to "Chuyển khoản" (type:transfer,
       // excluded from spend so it doesn't inflate expense — invariant #6).
       //
-      // Do the fail-prone async work (account lookup + debit) BEFORE any local
-      // ledger write, so a provider failure leaves nothing partially applied and
-      // the retry (after the catch releases the latch) can't double-debit.
+      // Do the fail-prone async work (re-validate → reallocation → debit) BEFORE
+      // any local ledger write, so a provider failure leaves nothing partially
+      // applied and the retry (after the catch releases the latch) can't
+      // double-debit. Fetch accounts ONLY when needed — a top-up/overspend re-check
+      // (needs casaBalance) or the legacy source-account fallback; a plain draft
+      // with an explicit source account never hits the network here.
+      const sourceJarId = draft?.sourceJarId ?? null;
+      const needsAccounts = Boolean(draft?.plannedReallocation || draft?.overspend || !draft?.sourceAccountId);
+      const accounts = needsAccounts ? await providers.listAccounts() : [];
+
+      // Top-up / overspend drafts assumed a shortfall computed at popup time. Re-run
+      // the engine on the FRESHEST state (RT#2): a drifted state must not let a
+      // stale plan push Σactual > CASA. Apply the freshly-computed donor chain
+      // (never the stale one) so amounts always match current balances (RT#1/#3/#4).
+      if (draft?.plannedReallocation || draft?.overspend) {
+        const assessment = evaluateFunding({
+          amount,
+          sourceJarId,
+          casaBalance: casaBalance(accounts),
+          jars: jarConfig.jars,
+        });
+        if (assessment.tier === "insufficient") {
+          committedRef.current = false;
+          setSubmitting(false);
+          return setError("Số dư không đủ để hoàn tất giao dịch. Vui lòng kiểm tra lại.");
+        }
+        // Apply the reallocation ONLY when the user accepted the top-up
+        // (`plannedReallocation`). "Bỏ qua, vượt hũ" (`overspend`) explicitly
+        // DECLINED it — it must fall through to the debit + floored `spendFromJar`
+        // so the jar goes over-budget and the pool absorbs the shortfall (RT — the
+        // overspend choice must never be silently converted into a reallocation).
+        // tier "ok" → state improved, no reallocation needed either way.
+        if (draft?.plannedReallocation && assessment.tier === "topup") {
+          await applyReallocation({ donors: assessment.donors, targetJarId: assessment.targetJarId });
+        }
+      }
+
       let accountToDebit = draft?.sourceAccountId ?? null;
       if (!accountToDebit) {
         // Legacy draft without an explicit source account → the single current account.
-        const accounts = await providers.listAccounts();
         accountToDebit = accounts.find((a) => a.type === "current")?.id ?? null;
       }
       if (accountToDebit) await providers.applyAccountDebit(accountToDebit, amount);

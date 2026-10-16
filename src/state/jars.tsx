@@ -12,11 +12,19 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Jar, JarConfig } from "@/domain/models";
+import type { DonorProposal } from "@/domain/engine";
+import { POOL_DONOR_ID } from "@/domain/engine";
 import { DEFAULT_JAR_CONFIG, JAR_TEMPLATES, type JarTemplate } from "@/domain/models/jar-defaults";
 import { useProviders } from "@/providers/context";
 
 interface JarConfigContextValue {
   config: JarConfig;
+  /**
+   * False until the first fetch for the current persona resolves. The transfer
+   * flow must not compute the unallocated pool or classify "insufficient" while
+   * jars are still empty-by-loading (would misread `jars: []` — RT#14).
+   */
+  loaded: boolean;
   addJar: (jar: Jar) => void;
   updateJar: (id: string, patch: Partial<Omit<Jar, "id">>) => void;
   /**
@@ -44,6 +52,17 @@ interface JarConfigContextValue {
    * this is only a defensive backstop, never the source of that check.
    */
   spendFromJar: (id: string, amount: number) => void;
+  /**
+   * Apply a PLANNED reallocation (top-up) atomically in ONE `updateJars` batch
+   * (Red Team #3/#4 — never pairwise `moveBetweenJars`, which loses updates and
+   * vaporises money). Each donor jar is decremented by its `take`; the target jar
+   * (if any) is credited the total; the "pool" donor produces NO patch (the pool
+   * is derived — draining it just means the jar decrements aren't offset by a
+   * credit). Hard-fails BEFORE any write if a donor would go negative (RT#6 — never
+   * relies on the server silently swallowing a negative). Returns the promise so
+   * `confirm()` can abort the whole transfer on a rejected write.
+   */
+  applyReallocation: (plan: { donors: DonorProposal[]; targetJarId: string | null }) => Promise<void>;
 }
 
 const EMPTY_CONFIG: JarConfig = { version: 3, jars: [] };
@@ -65,6 +84,7 @@ const JarConfigContext = createContext<JarConfigContextValue | null>(null);
 export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   const providers = useProviders();
   const [config, setConfig] = useState<JarConfig>(EMPTY_CONFIG);
+  const [loaded, setLoaded] = useState(false);
 
   // Load on mount and on persona switch (providers identity changes per
   // persona). Reset to empty FIRST, synchronously, before the async fetch —
@@ -73,10 +93,14 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let active = true;
     setConfig(EMPTY_CONFIG);
+    setLoaded(false);
     providers
       .getJarConfig()
       .then((next) => {
-        if (active) setConfig(next);
+        if (active) {
+          setConfig(next);
+          setLoaded(true);
+        }
       })
       .catch((err: unknown) => {
         console.error("Failed to load jar config", err);
@@ -89,6 +113,7 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<JarConfigContextValue>(
     () => ({
       config,
+      loaded,
       addJar: (jar) => {
         providers.createJar(jar).then(setConfig).catch(logJarMutationError);
       },
@@ -123,8 +148,42 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
           .then(setConfig)
           .catch(logJarMutationError);
       },
+      applyReallocation: async (plan) => {
+        const byId = new Map(config.jars.map((j) => [j.id, j]));
+        // Accumulate every jar delta first, then emit ONE batch (a donor and the
+        // target could be the same set across a chain — merge before writing).
+        const nextAmount = new Map<string, number>();
+        const amountOf = (id: string) => nextAmount.get(id) ?? byId.get(id)?.actualAmount ?? 0;
+
+        let credited = 0;
+        for (const donor of plan.donors) {
+          if (donor.jarId === POOL_DONOR_ID) {
+            // Pool donor: no jar row to touch; it only offsets the target credit.
+            credited += donor.take;
+            continue;
+          }
+          const jar = byId.get(donor.jarId);
+          if (!jar) throw new Error(`applyReallocation: donor jar ${donor.jarId} not found`);
+          const after = amountOf(donor.jarId) - donor.take;
+          if (after < 0) throw new Error(`applyReallocation: donor ${donor.jarId} would go negative`);
+          nextAmount.set(donor.jarId, after);
+          credited += donor.take;
+        }
+
+        if (plan.targetJarId) {
+          const target = byId.get(plan.targetJarId);
+          if (!target) throw new Error(`applyReallocation: target jar ${plan.targetJarId} not found`);
+          nextAmount.set(plan.targetJarId, amountOf(plan.targetJarId) + credited);
+        }
+
+        if (nextAmount.size === 0) return; // pool-only chain with no jar rows (shouldn't happen)
+        const patches: Record<string, Partial<Omit<Jar, "id">>> = {};
+        for (const [id, actualAmount] of nextAmount) patches[id] = { actualAmount };
+        const next = await providers.updateJars(patches);
+        setConfig(next);
+      },
     }),
-    [config, providers],
+    [config, loaded, providers],
   );
 
   return <JarConfigContext.Provider value={value}>{children}</JarConfigContext.Provider>;

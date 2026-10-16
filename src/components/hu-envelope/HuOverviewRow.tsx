@@ -31,6 +31,7 @@ export function HuOverviewRow({
   const { config } = useJarConfig();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { pending, jars } = financials.jarEnvelope;
+  const overAllocated = financials.unallocatedPool.overAllocated;
 
   // No jars configured → nothing to show (the row simply doesn't render).
   if (jars.length === 0) return null;
@@ -48,6 +49,11 @@ export function HuOverviewRow({
     <section aria-label="Hũ chi tiêu" className="flex flex-col gap-2">
       <div className="flex items-center justify-between px-1">
         <h2 className="text-sm font-semibold text-text">Hũ chi tiêu</h2>
+        {overAllocated && (
+          <span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
+            Vượt phân bổ
+          </span>
+        )}
       </div>
       <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1">
         {showPending && (
