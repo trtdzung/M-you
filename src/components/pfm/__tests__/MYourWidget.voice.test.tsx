@@ -21,7 +21,10 @@ beforeEach(() => {
   vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
   vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({ answer: "Xin chào", thread_id: "CIF_0001" });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 async function openWidget() {
   render(<PersonaProvider><MYourWidget /></PersonaProvider>);
@@ -34,13 +37,19 @@ describe("M-Your voice composer", () => {
     const input = screen.getByPlaceholderText("Nhắn tin cho M-Your…");
     fireEvent.change(input, { target: { value: "Cho tôi biết" } });
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
+    vi.useFakeTimers();
     act(() => voice.callbacks!.onTranscript("chi tiêu", false));
+    expect(input).toHaveValue("Cho tôi biết chi");
+    act(() => { vi.advanceTimersByTime(70); });
     expect(input).toHaveValue("Cho tôi biết chi tiêu");
     act(() => voice.callbacks!.onTranscript("chi tiêu tháng này", false));
+    expect(input).toHaveValue("Cho tôi biết chi tiêu tháng");
+    act(() => { vi.advanceTimersByTime(70); });
     expect(input).toHaveValue("Cho tôi biết chi tiêu tháng này");
     expect(screen.getByRole("button", { name: "Gửi" })).toBeDisabled();
     expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
     act(() => { voice.callbacks!.onTranscript("chi tiêu tháng này?", true); voice.callbacks!.onState("idle"); });
+    vi.useRealTimers();
     expect(input).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
     await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledWith("Cho tôi biết chi tiêu tháng này?", "CIF_0001"));
