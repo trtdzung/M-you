@@ -36,6 +36,8 @@ export interface PersonaParams {
 
 export interface PersonaMeta {
   id: PersonaId;
+  /** Sample customer id shown on the login screen (CIF_0001..0003). */
+  cif: string;
   label: string;
   description: string;
   /** Display-only membership tier shown on the primary account (source: mock). */
@@ -70,6 +72,7 @@ function bene(id: string, name: string, accountNumber: string, bankName: string)
 
 const STABLE: PersonaMeta = {
   id: "stable",
+  cif: "CIF_0001",
   label: "Minh — Lương ổn định",
   description: "Nhân viên văn phòng, lương cố định, ít nợ, chi tiêu đều đặn.",
   tier: "M-FIRST GOLD",
@@ -94,6 +97,7 @@ const STABLE: PersonaMeta = {
 
 const IRREGULAR: PersonaMeta = {
   id: "irregular",
+  cif: "CIF_0002",
   label: "Lan — Thu nhập biến động",
   description: "Freelancer, thu nhập lên xuống, chi tiêu tùy hứng, hay vượt ngân sách.",
   tier: "M-FIRST",
@@ -117,6 +121,7 @@ const IRREGULAR: PersonaMeta = {
 
 const WEALTHY: PersonaMeta = {
   id: "wealthy",
+  cif: "CIF_0003",
   label: "Hùng — Tài sản cao",
   description: "Thu nhập cao, nhiều tài sản & nhiều khoản nợ, có tài sản chưa định giá.",
   tier: "M-FIRST PRIVATE",

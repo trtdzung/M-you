@@ -13,23 +13,26 @@ import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { ConsentGate } from "@/components/consent/ConsentGate";
+import { LoginGate } from "@/components/login/LoginGate";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <PersonaProvider>
-      <CorrectionsProvider>
-        <ManualTxnsProvider>
-          <JarConfigProvider>
-            <AssetLiabilityProvider>
-              <GoalProvider>
-                <PeriodProvider>
-                  <ConsentGate>{children}</ConsentGate>
-                </PeriodProvider>
-              </GoalProvider>
-            </AssetLiabilityProvider>
-          </JarConfigProvider>
-        </ManualTxnsProvider>
-      </CorrectionsProvider>
+      <LoginGate>
+        <CorrectionsProvider>
+          <ManualTxnsProvider>
+            <JarConfigProvider>
+              <AssetLiabilityProvider>
+                <GoalProvider>
+                  <PeriodProvider>
+                    <ConsentGate>{children}</ConsentGate>
+                  </PeriodProvider>
+                </GoalProvider>
+              </AssetLiabilityProvider>
+            </JarConfigProvider>
+          </ManualTxnsProvider>
+        </CorrectionsProvider>
+      </LoginGate>
     </PersonaProvider>
   );
 }

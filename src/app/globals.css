@@ -106,6 +106,15 @@ body {
   padding: 0;
 }
 
+/* Login: no bottom nav to clear, so drop only the reserved nav-clearance
+   bottom padding — the horizontal `px-shell-main-inset` utility on `main`
+   must stay in effect (PromoCarousel's `-mx-4` bleed depends on it), so this
+   sets `padding-bottom` alone, never the `padding` shorthand. Must follow
+   `.shell-main` (equal specificity → source order wins). */
+.shell-main--login {
+  padding-bottom: var(--safe-area-bottom);
+}
+
 /* Calm PFM shell: navy status-bar ink over the light peach surface (festive keeps
    the default white ink over its dark 2/9 photo). */
 .shell-calm {

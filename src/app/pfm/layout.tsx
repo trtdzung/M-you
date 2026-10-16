@@ -1,6 +1,7 @@
 import { PhoneShell } from "@/components/shell/PhoneShell";
 import { PfmBottomNav } from "@/components/pfm/PfmBottomNav";
 import { PfmHeader } from "@/components/pfm/PfmHeader";
+import { MYourWidget } from "@/components/pfm/MYourWidget";
 
 /**
  * Calm PFM surface: blush base + a soft peach→transparent wash at the top. No
@@ -24,6 +25,9 @@ function CalmBg() {
  * SUPERSEDES the no-bottom-nav decision of plan 260908 (the 3 segmented top-tabs)
  * — the user chose the 4-tab + FAB IA. `shell-calm` retints the status ink to
  * navy; `shell-main--pfm` reserves bottom-nav clearance for the panel content.
+ * `MYourWidget` rides the `fab` slot (same corner as the festive `AssistantFab`,
+ * which self-hides inside `/pfm`) so the M-Your chat entry point floats above
+ * the bottom nav on every PFM screen without touching the center ＋ FAB.
  */
 export default function PfmLayout({
   children,
@@ -34,6 +38,7 @@ export default function PfmLayout({
     <PhoneShell
       background={<CalmBg />}
       nav={<PfmBottomNav />}
+      fab={<MYourWidget />}
       className="shell-calm lg:shadow-[0_24px_70px_-24px_rgba(31,42,68,0.45)] lg:ring-1 lg:ring-black/[0.06]"
       mainClassName="shell-main--pfm"
       stageClassName="lg:bg-stone-200"
