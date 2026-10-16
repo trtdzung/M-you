@@ -28,6 +28,10 @@
 
 # local planning workspace (not part of the codebase)
 /plans/
+/todo.md
+
+# local reference docs for the real Agent backend (not part of the codebase)
+/agent_backend_docs/
 
 # debug logs
 npm-debug.log*
