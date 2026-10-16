@@ -25,8 +25,9 @@ describe("isUnclassified (type gate — Red Team #4)", () => {
 });
 
 describe("mock generator ships unclassified transactions (Red Team #1)", () => {
-  it("produces >0 unclassified expenses for every persona, deterministically", () => {
-    for (const persona of Object.values(PERSONAS)) {
+  it("produces >0 unclassified expenses for every spending persona, deterministically", () => {
+    // The "fresh" persona is income-only (no expenses at all) — exclude it.
+    for (const persona of Object.values(PERSONAS).filter((p) => !p.params.incomeOnly)) {
       const a = generateDataset(persona);
       const b = generateDataset(persona);
       const countA = a.transactions.filter((t) => t.categoryId === UNCLASSIFIED).length;

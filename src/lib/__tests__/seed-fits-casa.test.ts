@@ -26,10 +26,15 @@ describe("seeded jars fit CASA (committed sqlite)", () => {
         const row = db
           .prepare("SELECT COALESCE(SUM(budget_limit), 0) AS sum, COUNT(*) AS n FROM jars WHERE cif = ?")
           .get(persona.cif) as { sum: number; n: number };
-        expect(row.n).toBeGreaterThan(0); // persona is actually seeded
+        expect(row.n).toBeGreaterThan(0); // persona is actually seeded (jars exist)
         const casa = Math.round(CASA_BASE * (persona.params.salaryBase / SALARY_REF));
         expect(row.sum).toBeLessThanOrEqual(casa);
-        expect(row.sum).toBeGreaterThan(0); // and not empty — real numbers on open
+        // A "fresh" persona seeds every jar with NULL limit (Σ = 0) on purpose —
+        // a new user who hasn't set any hạn mức. Only personas that ship limits
+        // must have real numbers on open.
+        if (!persona.params.incomeOnly) {
+          expect(row.sum).toBeGreaterThan(0);
+        }
       }
     } finally {
       db.close();
