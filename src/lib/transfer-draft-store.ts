@@ -22,7 +22,7 @@ export interface StoredTransferDraft {
   sourceAccountId?: string;
   /** Set when the chosen source was a jar — `/transfer-confirm` books the spend into this jar's first category (dropping its derived `remaining`) alongside the `sourceAccountId` debit. */
   sourceJarId?: string;
-  recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed" | "agent_proposed";
+  recipientSource?: "saved_beneficiary" | "transaction_history" | "user_typed";
   riskFlags?: import("@/domain/models").TransferRiskFlag[];
   /**
    * A PLANNED (not yet applied) jar reallocation attached when the user accepted
@@ -34,6 +34,13 @@ export interface StoredTransferDraft {
   plannedReallocation?: { donors: import("@/domain/engine").DonorProposal[]; targetJarId: string | null };
   /** Set when the user chose "Bỏ qua, vượt hũ" — spend past the jar's balance. */
   overspend?: boolean;
+  /**
+   * Category to record the resulting transaction under, when the draft
+   * already carries one (currently only agent-proposed transfers, Feature 3 —
+   * see `AgentTransferFormCard.tsx`). Takes priority over the source-jar/
+   * account default `/transfer-confirm` would otherwise pick.
+   */
+  categoryId?: string;
   source?: "mock";
 }
 

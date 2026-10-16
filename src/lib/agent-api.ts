@@ -8,6 +8,8 @@
  * exports).
  */
 
+import { CATEGORY_BY_ID } from "@/domain/models";
+
 const PROXY_PATH = "/api/agent/chat";
 
 export interface ChartUi {
@@ -19,19 +21,19 @@ export interface ChartUi {
 }
 
 /**
- * A proposal to pay down the customer's OWN credit-card debt (never a
- * transfer to another person/merchant — see transfer-form.md's scope note).
- * `account_number` is an opaque card id from the agent's own data source
- * (e.g. `"card_001"`), not a real bank account number — never display it
- * raw; `recipient` (the card/product name, e.g. "MSB Visa Signature") is
- * what identifies this to the customer.
+ * A proposal to transfer money to a recipient already in the customer's
+ * saved beneficiaries (`GET /api/beneficiaries` — see
+ * `backend_docs/pfm-read-api.md`). The agent never invents a recipient: it
+ * only returns `beneficiary_id`, which the UI resolves against `pfm`'s own
+ * beneficiaries data for the real name/account number/bank (never trusting
+ * the agent to relay those directly — invariant #3, no fabricated accounts).
  */
 export interface TransferFormUi {
   type: "transfer_form";
-  recipient: string;
-  account_number: string;
+  beneficiary_id: string;
   amount: number;
   note: string;
+  category: string;
 }
 
 export type UiPayload = ChartUi | TransferFormUi | { type: string } | null;
@@ -63,22 +65,25 @@ export function isChartUi(ui: UiPayload | null | undefined): ui is ChartUi {
 
 /**
  * True only for a `ui.type === "transfer_form"` payload with all 4 required
- * fields present and well-typed, `amount > 0`. Same reliability posture as
- * `isChartUi`: the agent's `ui` field is model-generated, so a malformed
- * payload never throws — it just falls back to showing `answer` alone.
+ * fields present and well-typed, `amount > 0`, `category` a known expense
+ * category id. Same reliability posture as `isChartUi`: the agent's `ui`
+ * field is model-generated, so a malformed payload never throws — it just
+ * falls back to showing `answer` alone. This only validates SHAPE —
+ * `beneficiary_id` matching a real saved beneficiary is checked separately
+ * by `AgentTransferFormCard` (it needs the live beneficiaries list to do so).
  */
 export function isTransferFormUi(ui: UiPayload | null | undefined): ui is TransferFormUi {
   if (!ui || ui.type !== "transfer_form") return false;
   const f = ui as Partial<TransferFormUi>;
   return (
-    typeof f.recipient === "string" &&
-    f.recipient.trim() !== "" &&
-    typeof f.account_number === "string" &&
-    f.account_number.trim() !== "" &&
+    typeof f.beneficiary_id === "string" &&
+    f.beneficiary_id.trim() !== "" &&
     typeof f.amount === "number" &&
     Number.isFinite(f.amount) &&
     f.amount > 0 &&
-    typeof f.note === "string"
+    typeof f.note === "string" &&
+    typeof f.category === "string" &&
+    CATEGORY_BY_ID[f.category]?.kind === "expense"
   );
 }
 

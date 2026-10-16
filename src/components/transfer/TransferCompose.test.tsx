@@ -11,7 +11,7 @@ const { push, putDraft, providers } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/transfer-draft-store", () => ({ putTransferDraft: putDraft }));
 vi.mock("@/providers/context", () => ({
   useProviders: () => providers,

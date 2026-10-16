@@ -210,7 +210,9 @@ export function TransferConfirm() {
         const primaryAmount = acceptedTopup ? Math.min(amount, spendableSource) : amount;
         charges.push({ categoryId: sourceJar?.categoryIds[0] ?? CATEGORY.transfer, amount: primaryAmount });
       } else {
-        charges.push({ categoryId: CATEGORY.transfer, amount });
+        // An agent-proposed transfer (Feature 3) carries its own category
+        // pick straight through instead of the "Chuyển khoản" default.
+        charges.push({ categoryId: draft?.categoryId ?? CATEGORY.transfer, amount });
       }
       charges.push(...donorCharges);
 

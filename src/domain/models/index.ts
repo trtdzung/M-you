@@ -275,15 +275,13 @@ export interface MockProduct {
 
 /**
  * Where a resolved recipient came from. NEVER a fabricated value: the assistant
- * may only reference a saved beneficiary, a number the user explicitly typed, a
- * counterparty found in real transaction history, or its own credit-card-debt
- * payment proposal (invariant #3 — a draft still, the human confirms/executes).
+ * may only reference a saved beneficiary, a number the user explicitly typed, or
+ * a counterparty found in real transaction history (invariant #3 — a draft
+ * still, the human confirms/executes). An agent-proposed transfer (Feature 3)
+ * always resolves to `"saved_beneficiary"` too — the agent only ever points at
+ * an id from `GET /api/beneficiaries`, never sends the recipient details itself.
  */
-export type RecipientSource =
-  | "saved_beneficiary"
-  | "user_typed"
-  | "transaction_history"
-  | "agent_proposed";
+export type RecipientSource = "saved_beneficiary" | "user_typed" | "transaction_history";
 
 /** Risk signals attached to a draft; surfaced to the user, never auto-cleared. */
 export type TransferRiskFlag = "new_payee" | "over_threshold" | "urgency_language";

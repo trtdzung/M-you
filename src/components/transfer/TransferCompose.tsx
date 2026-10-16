@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Home, QrCode } from "lucide-react";
 import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
+import { maskAccount } from "@/lib/mask-account";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
 import { assessTransferRisk } from "@/lib/transfer-risk";
 import { casaBalance, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
@@ -23,6 +24,7 @@ type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
 export function TransferCompose() {
   const providers = useProviders();
   const router = useRouter();
+  const params = useSearchParams();
   const { config: jarConfig, loaded: jarsLoaded } = useJarConfig();
   const { financials } = useFinancials();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
@@ -35,6 +37,10 @@ export function TransferCompose() {
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [source, setSource] = useState<TransferSource | null>(null);
+  // Category an agent-proposed transfer (Feature 3) arrived with — this screen
+  // has no category field of its own (that's only ever picked post-transfer,
+  // `TransferCategorizeSection`), so it just rides along to `writeDraftAndGo`.
+  const [agentCategoryId, setAgentCategoryId] = useState<string | undefined>(undefined);
 
   function selectRecipient(next: SelectedRecipient) {
     setRecipient(next);
@@ -76,10 +82,35 @@ export function TransferCompose() {
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
         setSource(eligibleAccounts[0] ? { kind: "account", id: eligibleAccounts[0].id } : null);
+
+        // Agent-proposed prefill (Feature 3, `AgentTransferFormCard`): a saved
+        // beneficiary id + optional amount/note/category in the query string
+        // jumps straight to the amount step, same as picking that recipient by
+        // hand — recipient identity always comes from THIS fresh fetch, never
+        // from the query string itself (invariant #3, no fabricated accounts).
+        const beneficiaryId = params?.get("beneficiaryId");
+        const match = beneficiaryId ? nextBeneficiaries.find((b) => b.id === beneficiaryId) : undefined;
+        if (match) {
+          selectRecipient({
+            name: match.name,
+            accountMasked: maskAccount(match.accountNumber),
+            accountNumber: match.accountNumber,
+            source: "saved_beneficiary",
+            isNewPayee: false,
+            bankName: match.bankName,
+          });
+          const amountParam = params?.get("amount");
+          if (amountParam) setAmount(amountParam);
+          const noteParam = params?.get("note");
+          if (noteParam) setMemo(noteParam);
+          const categoryParam = params?.get("category");
+          if (categoryParam) setAgentCategoryId(categoryParam);
+        }
       })
       .catch(() => { if (active) setError(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill from the query string only ever applies once, at the initial load
   }, [providers]);
 
   // The single derived quantity every jar number keys off (invariant #1): built
@@ -177,6 +208,7 @@ export function TransferCompose() {
       sourceJarId: selectedJar?.id,
       recipientSource: recipient.source,
       riskFlags,
+      categoryId: agentCategoryId,
       source: "mock",
       ...extras,
     });
