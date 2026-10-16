@@ -4,30 +4,21 @@ import "server-only";
  * Server-side CASA pool for a persona — the authoritative denominator for the
  * jar cap (`fitsCasaCap`). Enforcing Σ budgetLimit ≤ CASA on the server (not just
  * the client) is what stops two tabs / a curl from pushing the total over the
- * balance (red-team C2). Accounts are pure fixtures (never in sqlite), so the
- * pool is derived deterministically from the persona seed — the SAME formula as
- * the `current` account in `fixtures/generate.ts` (`buildAccounts`): 18tr scaled
- * by `salaryBase / 25tr`. Kept as a tiny standalone constant (rather than
- * generating the whole dataset) so a cap check stays cheap.
+ * balance (red-team C2).
  *
- * Transient wallet debits (a jar-sourced transfer) live in client localStorage
- * and only lower the live balance; the server uses the base pool, which is ≥ the
- * client's live pool — so the server never rejects a write the client allowed
- * (it is a backstop against gross violations, not a tighter gate).
+ * CASA is now DB-backed (`accounts` table): the pool is the live Σ
+ * `availableBalance` of the persona's `current` accounts, so a confirmed
+ * transfer that debited an account lowers this denominator too (envelope-label
+ * model — spending real money leaves less to allocate). An unknown persona (no
+ * `current` account) yields `null` → the caller treats it as "unknown" and the
+ * cap blocks (invariant #6: no denominator to validate against).
  */
 
-import { PERSONA_LIST } from "@/providers/mock/personas";
+import { readAccounts } from "@/lib/accounts-store";
 
-/** CASA base for the `current` account — mirrors `fixtures/generate.ts` buildAccounts. */
-const CASA_BASE_VND = 18_000_000;
-const SALARY_REF_VND = 25_000_000;
-
-/**
- * CASA pool (VND) for `cif`, or `null` when the cif is unknown (caller treats
- * `null` as "unknown" → cap blocks, invariant #6 — no denominator to validate).
- */
+/** CASA pool (VND) for `cif`, or `null` when there is no `current` account. */
 export function casaPoolForCif(cif: string): number | null {
-  const persona = PERSONA_LIST.find((p) => p.cif === cif);
-  if (!persona) return null;
-  return Math.round(CASA_BASE_VND * (persona.params.salaryBase / SALARY_REF_VND));
+  const current = readAccounts(cif).filter((account) => account.type === "current");
+  if (current.length === 0) return null;
+  return current.reduce((sum, account) => sum + account.availableBalance, 0);
 }

@@ -8,7 +8,6 @@ const { push, putDraft, providers } = vi.hoisted(() => ({
     listBeneficiaries: async () => [{ id: "b1", name: "Lan Anh", accountNumber: "0281000556677", bankName: "MSB", source: "mock" }],
     listTransactions: async () => [],
     listAccounts: async () => [{ id: "current", type: "current", institution: "MSB", currency: "VND", balance: 20_000_000, availableBalance: 20_000_000, lastSyncedAt: "2026-01-01", source: "mock", maskedNumber: "•••• 1991", accountNumber: "19881988181991" }],
-    getAccountAdjustments: async () => ({}),
   },
 }));
 

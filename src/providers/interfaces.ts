@@ -130,12 +130,12 @@ export interface Providers
   /** Replace the whole jar set (template apply / reset to default). Returns the full updated config. */
   replaceJars(jars: Jar[]): Promise<JarConfig>;
   /**
-   * Cumulative amount already debited from each account via a jar-sourced
-   * transfer (Chuyển tiền Phần 1) — a mock ledger overlay on top of the
-   * engine-computed `Account.balance`, which itself is never mutated
-   * (invariant #1). Keyed by account id.
+   * Debit a confirmed transfer's amount from an account, mutating its real
+   * balance in the store (SQLite `accounts` table — CASA is DB-backed now, not a
+   * fixture + localStorage overlay). Reached only from the human-confirmed
+   * Chuyển tiền flow (invariant #3); the resulting balance flows back through
+   * `listAccounts()`. Idempotency/replay is guarded by the caller (the draft is
+   * consumed on confirm), not here.
    */
-  getAccountAdjustments(): Promise<Record<string, number>>;
-  /** Record an additional debit against an account (adds to, never replaces, any existing adjustment). */
   applyAccountDebit(accountId: string, amount: number): Promise<void>;
 }

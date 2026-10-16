@@ -96,30 +96,21 @@ function clone<T>(items: T[]): T[] {
   return items.map((item) => ({ ...item }));
 }
 
-/** A finite, non-negative amount per account id — a corrupt/foreign shape is treated as absent (reseeds to `{}`). */
-function isValidAdjustmentMap(value: unknown): value is Record<string, number> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  return Object.values(value as Record<string, unknown>).every(
-    (v) => typeof v === "number" && Number.isFinite(v) && v >= 0,
-  );
-}
-
 export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: string): Providers {
   // Persistence-only user-record stores (client-local; a real MSB adapter maps
   // these to CRUD endpoints without changing the contract — invariant #4).
   const assetStore = userRecordStore<Asset>("assets", personaId, ASSET_STORE_VERSION, isValidAssetRecord);
   const liabilityStore = userRecordStore<Liability>("liabilities", personaId, LIABILITY_STORE_VERSION, isValidLiabilityRecord);
   const goalStore = userRecordStore<GoalRecord>("goals", personaId, GOAL_STORE_VERSION, isValidGoalRecord);
-  const accountAdjustments = personaLocalStorageResource<Record<string, number>>({
-    namespace: "account-adjustments",
-    personaId,
-    guard: isValidAdjustmentMap,
-    seed: () => ({}),
-  });
 
   return {
     async listAccounts() {
-      return clone(dataset.accounts);
+      // CASA is DB-backed now (SQLite `accounts`, seeded from the same builder
+      // as the fixtures). A real MSB adapter maps this to a balance endpoint
+      // without changing the contract (invariant #4).
+      const res = await fetch(`/api/accounts?cif=${encodeURIComponent(cif)}`);
+      if (!res.ok) return [];
+      return res.json();
     },
     async listTransactions(query?: TransactionQuery) {
       const rows = query ? dataset.transactions.filter((t) => matches(t, query)) : dataset.transactions;
@@ -267,12 +258,13 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       if (!res.ok) throw new Error(`replaceJars failed: ${res.status}`);
       return res.json();
     },
-    async getAccountAdjustments() {
-      return accountAdjustments.load();
-    },
     async applyAccountDebit(accountId, amount) {
-      const current = accountAdjustments.load();
-      accountAdjustments.save({ ...current, [accountId]: (current[accountId] ?? 0) + amount });
+      const res = await fetch("/api/accounts/debit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, accountId, amount }),
+      });
+      if (!res.ok) throw new Error(`applyAccountDebit failed: ${res.status}`);
     },
   };
 }

@@ -87,11 +87,12 @@ import { TransferConfirm } from "../TransferConfirm";
 
 const AMOUNT = 500_000;
 
+// No `sourceAccountId` → exercises the legacy fallback (look up the single current account).
 function jarDraft() {
   return { id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: AMOUNT, memo: null, sourceLabel: "Hũ Ăn uống", sourceJarId: "food" };
 }
 function accountDraft() {
-  return { id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: AMOUNT, memo: null, sourceLabel: "Tài khoản MSB" };
+  return { id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: AMOUNT, memo: null, sourceLabel: "Tài khoản MSB", sourceAccountId: "acc1" };
 }
 
 async function completeTransfer() {
@@ -126,6 +127,9 @@ describe("TransferConfirm — always create + categorize", () => {
 
     expect(h.spendFromJar).toHaveBeenCalledTimes(1);
     expect(h.spendFromJar).toHaveBeenCalledWith("food", AMOUNT);
+    // Jar money lives in the CASA account → the account is debited too (legacy
+    // fallback: no sourceAccountId, so the single current account is used).
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
     expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense" });
 
     fireEvent.click(screen.getByRole("button", { name: "Ăn uống" }));
@@ -145,6 +149,11 @@ describe("TransferConfirm — always create + categorize", () => {
     await completeTransfer();
 
     expect(h.spendFromJar).not.toHaveBeenCalled();
+    // Account-sourced STILL debits the real account (the reported bug: previously
+    // it debited nothing, so the balance never dropped). Uses the draft's explicit
+    // sourceAccountId — no current-account lookup needed.
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
+    expect(h.listAccounts).not.toHaveBeenCalled();
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
 
     // Pick an expense category owned by a jar → charge that jar once.

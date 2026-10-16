@@ -15,19 +15,35 @@
 import { backfillActualAmount, dedupeCategories, healOrphanCategories, resyncActualOnRaise, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import { fitsCasaCap } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
-import type { Jar, JarConfig } from "@/domain/models";
+import type { Account, Jar, JarConfig } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 import { PERSONA_LIST } from "@/providers/mock/personas";
+import { buildPersonaAccounts } from "@/providers/mock/fixtures/generate";
 
 /**
- * CASA pool for `cif`, mirroring the server's `casa-pool.ts` (which is
- * `server-only` and cannot be imported into a test). Same formula as
- * `fixtures/generate.ts` buildAccounts: 18tr × salaryBase/25tr.
+ * In-memory accounts per persona, mirroring the server's `accounts-store.ts`
+ * (which is `server-only`). Seeded from the same canonical builder as the
+ * fixtures/DB; a debit lowers `balance` + `availableBalance` so tests exercise
+ * the real "money leaves the account" behavior over the fetch boundary.
+ */
+let accountsStore: Record<string, Account[]> = {};
+
+function accountsFor(cif: string): Account[] {
+  const persona = PERSONA_LIST.find((p) => p.cif === cif);
+  if (!persona) return [];
+  if (!accountsStore[cif]) accountsStore[cif] = buildPersonaAccounts(persona);
+  return accountsStore[cif];
+}
+
+/**
+ * CASA pool for `cif`, mirroring the server's `casa-pool.ts` (server-only, can't
+ * be imported here): live Σ `availableBalance` of the `current` accounts.
  */
 function casaFor(cif: string | null): Amount {
-  const persona = cif ? PERSONA_LIST.find((p) => p.cif === cif) : undefined;
-  if (!persona) return "unknown";
-  return Math.round(18_000_000 * (persona.params.salaryBase / 25_000_000));
+  if (!cif) return "unknown";
+  const current = accountsFor(cif).filter((a) => a.type === "current");
+  if (current.length === 0) return "unknown";
+  return current.reduce((s, a) => s + a.availableBalance, 0);
 }
 
 let store: JarConfig = freshConfig();
@@ -149,6 +165,41 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
   return jsonResponse({ error: "unhandled" }, 500);
 }
 
+/**
+ * `/api/accounts` + `/api/accounts/debit`, mirroring the real route handlers
+ * over the fetch boundary: GET lists the persona's accounts, POST /debit lowers
+ * `balance` + `availableBalance` (floored at 0) on the target row. This is the
+ * test-side stand-in for the `server-only` `accounts-store.ts` DB.
+ */
+async function handleAccountsRequest(url: string, init?: RequestInit): Promise<Response> {
+  const parsed = new URL(url, "http://localhost");
+  const method = (init?.method ?? "GET").toUpperCase();
+  const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
+
+  if (parsed.pathname === "/api/accounts/debit") {
+    if (method !== "POST") return jsonResponse({ error: "unhandled" }, 500);
+    const cif = typeof body?.cif === "string" ? body.cif : null;
+    const accountId = typeof body?.accountId === "string" ? body.accountId : null;
+    const amount = typeof body?.amount === "number" ? body.amount : null;
+    if (!cif || !accountId || amount === null || amount < 0) {
+      return jsonResponse({ error: "cif, accountId and amount ≥ 0 required" }, 422);
+    }
+    const accounts = accountsFor(cif);
+    const target = accounts.find((a) => a.id === accountId);
+    if (!target) return jsonResponse({ error: `account ${accountId} not found` }, 404);
+    target.balance = Math.max(0, target.balance - amount);
+    target.availableBalance = Math.max(0, target.availableBalance - amount);
+    return jsonResponse(target);
+  }
+
+  const cif = parsed.searchParams.get("cif");
+  if (method === "GET") {
+    if (!cif) return jsonResponse({ error: "cif required" }, 422);
+    return jsonResponse(accountsFor(cif));
+  }
+  return jsonResponse({ error: "unhandled" }, 500);
+}
+
 /** Install the fetch stub — safe to call more than once (no-ops after the first). */
 export function installMockJarsApi(): void {
   if (originalFetch) return; // already installed
@@ -156,11 +207,13 @@ export function installMockJarsApi(): void {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
     if (url.startsWith("/api/jars")) return handleJarsRequest(url, init);
+    if (url.startsWith("/api/accounts")) return handleAccountsRequest(url, init);
     return originalFetch!(input as RequestInfo, init);
   }) as typeof fetch;
 }
 
-/** Reset the in-memory jar set — call in `beforeEach`. */
+/** Reset the in-memory jar set + accounts — call in `beforeEach`. */
 export function resetMockJarsApi(): void {
   store = freshConfig();
+  accountsStore = {};
 }
