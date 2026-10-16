@@ -31,6 +31,19 @@ const SEED_BENEFICIARIES = [
   { id: "b_w_hoa", cif: "CIF_0003", name: "Lê Thị Hoa", accountNumber: "0071000998877", bankName: "Vietcombank" },
 ];
 
+// The "Cá nhân" 6-jar template (src/domain/models/jar-defaults.ts) — duplicated
+// here rather than imported, same reasoning as SEED_BENEFICIARIES above (this
+// is a plain .mjs script, no TS loader configured).
+const SEED_JARS = [
+  { id: "essentials", label: "Thiết yếu", categoryIds: ["housing", "utilities", "insurance", "subscriptions"], budgetLimit: 8_000_000 },
+  { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], budgetLimit: 4_000_000 },
+  { id: "transport", label: "Di chuyển", categoryIds: ["transport"], budgetLimit: 1_500_000 },
+  { id: "lifestyle", label: "Hưởng thụ", categoryIds: ["entertainment", "shopping"], budgetLimit: 2_500_000 },
+  { id: "health", label: "Sức khỏe", categoryIds: ["health"], budgetLimit: 1_000_000 },
+  { id: "savings", label: "Tiết kiệm", categoryIds: [], budgetLimit: undefined },
+];
+const CIFS = ["CIF_0001", "CIF_0002", "CIF_0003"];
+
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
 db.exec(readFileSync(SCHEMA_PATH, "utf8"));
@@ -46,4 +59,31 @@ const insertAll = db.transaction((rows) => {
 insertAll(SEED_BENEFICIARIES);
 
 console.log(`Seeded ${SEED_BENEFICIARIES.length} beneficiaries into ${DB_PATH}`);
+
+db.exec("DELETE FROM jars");
+const insertJar = db.prepare(
+  `INSERT INTO jars (id, cif, label, category_ids, budget_limit, actual_amount, color, icon, sort_order)
+   VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @actualAmount, NULL, NULL, @sortOrder)`,
+);
+const insertAllJars = db.transaction(() => {
+  for (const cif of CIFS) {
+    SEED_JARS.forEach((jar, index) => {
+      insertJar.run({
+        id: jar.id,
+        cif,
+        label: jar.label,
+        categoryIds: JSON.stringify(jar.categoryIds),
+        budgetLimit: jar.budgetLimit ?? null,
+        actualAmount: jar.budgetLimit ?? null, // backfilled at seed time too
+        sortOrder: index,
+      });
+    });
+  }
+});
+insertAllJars();
+console.log(`Seeded ${SEED_JARS.length} jars × ${CIFS.length} personas into ${DB_PATH}`);
+
+// WAL mode buffers writes in a separate -wal file; checkpoint before closing
+// so the committed .sqlite3 file itself reflects this run's data.
+db.pragma("wal_checkpoint(TRUNCATE)");
 db.close();
