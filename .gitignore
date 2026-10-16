@@ -23,6 +23,9 @@
 # local design reference (MSB app screenshots — not part of the codebase)
 /ref-ui-msb/
 
+# local competitor benchmark reference (BIDV/TIMO screenshots — not part of the codebase)
+/ref/
+
 # local planning workspace (not part of the codebase)
 /plans/
 
