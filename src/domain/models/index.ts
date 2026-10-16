@@ -160,6 +160,37 @@ export interface Budget {
   period: "monthly";
 }
 
+/**
+ * A spending jar's allocation. `percent` is a share of resolved income (may be
+ * unknown → engine reports it unknown, never 0); `amount` is a fixed VND cap.
+ */
+export type JarAllocation =
+  | { mode: "percent"; value: number }
+  | { mode: "amount"; value: number };
+
+/**
+ * A user-defined spending jar wrapping one or more real expense categories.
+ * No colour/icon here — presentation assigns a palette by index (UI concern).
+ */
+export interface Jar {
+  id: string;
+  label: string;
+  /** Real expense category IDs this jar covers (spend-only — see AD1). */
+  categoryIds: string[];
+  allocation: JarAllocation;
+}
+
+/**
+ * Persisted jar configuration (user state, threaded into the engine — never
+ * provider RawData). `incomeBasis`: `"auto"` detects salary; a number is a
+ * manual override for percent-mode allocations.
+ */
+export interface JarConfig {
+  version: 1;
+  jars: Jar[];
+  incomeBasis: "auto" | number;
+}
+
 export interface Goal {
   id: string;
   name: string;

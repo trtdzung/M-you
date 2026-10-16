@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { JarConfig } from "@/domain/models";
 import { getProviders, type PersonaId } from "@/providers";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
 import {
@@ -6,7 +7,9 @@ import {
   calculateNetWorth,
   detectRecurring,
   evaluateBudget,
+  evaluateJars,
   monthPeriodFromKey,
+  resolveIncomeBasis,
   spendingByCategory,
   upcomingObligations,
 } from "..";
@@ -65,5 +68,31 @@ describe("computeFinancials", () => {
     expect(empty.cashflow.income).toBe(0);
     expect(empty.cashflow.expense).toBe(0);
     expect(empty.categorySpend).toEqual([]);
+  });
+
+  it("yields no jar lines when no jarConfig is supplied (default empty config)", async () => {
+    const raw = await loadRaw("stable");
+    const f = computeFinancials(raw, MONTH);
+    expect(f.jarLines).toEqual([]);
+  });
+
+  it("threads a supplied jarConfig through to jarLines + jarIncomeBasis", async () => {
+    const raw = await loadRaw("stable");
+    const jarConfig: JarConfig = {
+      version: 1,
+      jars: [
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], allocation: { mode: "amount", value: 5_000_000 } },
+      ],
+      incomeBasis: "auto",
+    };
+    const f = computeFinancials(raw, MONTH, { jarConfig });
+
+    const period = monthPeriodFromKey(MONTH);
+    const recurring = detectRecurring(raw.transactions);
+    const basis = resolveIncomeBasis(jarConfig, { transactions: raw.transactions }, recurring);
+
+    expect(f.jarLines).toEqual(evaluateJars(jarConfig, raw.transactions, period, DEMO_NOW, basis));
+    expect(f.jarLines.length).toBeGreaterThan(0);
+    expect(f.jarIncomeBasis).toEqual({ value: basis.value, source: basis.source });
   });
 });

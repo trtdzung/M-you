@@ -6,9 +6,10 @@
 import type { Budget, Transaction } from "@/domain/models";
 import { CATEGORY_BY_ID } from "@/domain/models";
 import { netExpenseByCategory } from "./cashflow";
+import { daysLeftIn, statusOf, type PressureStatus } from "./pressure";
 import type { Period } from "./types";
 
-export type BudgetStatus = "ok" | "near" | "over";
+export type BudgetStatus = PressureStatus;
 
 export interface BudgetLine {
   categoryId: string;
@@ -20,22 +21,6 @@ export interface BudgetLine {
   /** Whole days remaining in the period from `now` (>= 0). */
   daysLeft: number;
   status: BudgetStatus;
-}
-
-const NEAR_THRESHOLD = 0.8;
-
-function statusOf(used: number, limit: number): BudgetStatus {
-  if (limit <= 0) return "ok";
-  if (used > limit) return "over";
-  if (used / limit >= NEAR_THRESHOLD) return "near";
-  return "ok";
-}
-
-function daysLeftIn(period: Period, now: Date): number {
-  const end = new Date(period.to).getTime();
-  const diff = end - now.getTime();
-  if (diff <= 0) return 0;
-  return Math.ceil(diff / 86_400_000);
 }
 
 export function evaluateBudget(

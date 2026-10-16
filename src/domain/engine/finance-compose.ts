@@ -11,7 +11,9 @@ import type {
   Account,
   Asset,
   Budget,
+  DataSource,
   Goal,
+  JarConfig,
   Liability,
   MockProduct,
   MonthlySnapshot,
@@ -22,12 +24,15 @@ import {
   calculateNetWorth,
   detectRecurring,
   evaluateBudget,
+  evaluateJars,
   monthPeriodFromKey,
+  resolveIncomeBasis,
   spendingByCategory,
   upcomingObligations,
   type BudgetLine,
   type CashflowResult,
   type CategorySpend,
+  type JarLine,
   type NetWorthResult,
   type Obligation,
   type RecurringSeries,
@@ -56,6 +61,10 @@ export interface Financials {
   categorySpend: CategorySpend[];
   recurring: RecurringSeries[];
   obligations: Obligation[];
+  /** Spending-jar lines (empty when no jar config supplied). */
+  jarLines: JarLine[];
+  /** Income basis feeding percent-mode jars — unknown until salary/override. */
+  jarIncomeBasis: { value: number | "unknown"; source: DataSource };
 }
 
 export interface ComposeOptions {
@@ -66,6 +75,12 @@ export interface ComposeOptions {
    * hook passes correction-applied transactions here; the server passes none.
    */
   transactions?: Transaction[];
+  /**
+   * User jar configuration (Phase 02 supplies the provider-backed value). Absent
+   * → no jars are evaluated and `jarLines` is empty. Kept out of `RawData` so the
+   * compose stays pure and testable (config is user state, not provider data).
+   */
+  jarConfig?: JarConfig;
 }
 
 /**
@@ -83,6 +98,12 @@ export function computeFinancials(
   const prevPeriod = monthPeriodFromKey(prevMonthKey(month));
   const recurring = detectRecurring(txns);
 
+  const jarConfig: JarConfig = options.jarConfig ?? { version: 1, jars: [], incomeBasis: "auto" };
+  // Resolve income from the same (correction-applied) txns `recurring` was
+  // detected from — not `raw.transactions` — so salary provenance stays in sync.
+  const jarIncome = resolveIncomeBasis(jarConfig, { transactions: txns }, recurring);
+  const jarLines = evaluateJars(jarConfig, txns, period, now, jarIncome);
+
   return {
     monthKey: month,
     cashflow: aggregateCashflow(txns, period),
@@ -92,5 +113,7 @@ export function computeFinancials(
     categorySpend: spendingByCategory(txns, period),
     recurring,
     obligations: upcomingObligations(recurring, raw.liabilities, { now, horizonDays: 30 }),
+    jarLines,
+    jarIncomeBasis: { value: jarIncome.value, source: jarIncome.source },
   };
 }
