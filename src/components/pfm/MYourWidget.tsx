@@ -1,44 +1,109 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Send, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Loading, ErrorState } from "@/components/states";
+import { usePersona } from "@/providers/context";
+import { getChatHistory, sendChatMessage, deleteChatHistory, type HistoryMessage } from "@/lib/agent-api";
 
 interface ChatBubble {
   id: string;
   role: "user" | "agent";
   text: string;
+  error?: boolean;
 }
 
 const GREETING = "Xin chào 👋 Mình là M-Your. Bạn cần hỏi gì về tài chính của mình?";
-const PLACEHOLDER_REPLY = "Cảm ơn bạn đã nhắn tin! M-Your đang được hoàn thiện, câu trả lời thật sẽ sớm có mặt.";
+const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
+const DELETE_LOCK_MS = 30_000;
+
+function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
+  return messages.map((m, i) => ({
+    id: `h${i}`,
+    role: m.role === "user" ? "user" : "agent",
+    text: m.content,
+  }));
+}
 
 /**
  * Floating "M-Your" chat button + full-screen overlay for `/pfm/*`, mounted via
  * the `PhoneShell` `fab` slot so it stays visible above the bottom nav on every
- * PFM tab without overlapping the center ＋ FAB. UI-only mock for now — no AI
- * backend wired — so sending a message appends a static placeholder reply.
- * `messages`/`open` are owned here (not remounted on tab switches) so "xoá hội
- * thoại" has something to clear across the session.
+ * PFM tab without overlapping the center ＋ FAB. Wired to the real agent
+ * (`src/lib/agent-api.ts`, proxied through `src/app/api/agent/chat` so the
+ * client never sees `AGENT_API_KEY`) — `cif` is the active persona's CIF.
+ * Opening the overlay always reloads real history from the agent (it has its
+ * own server-side memory now, not just a local mock) and gates the composer
+ * until that finishes loading.
  */
 export function MYourWidget() {
+  const { persona } = usePersona();
+  const cif = persona.cif;
+
   const [open, setOpen] = useState(false);
+  const [historyStatus, setHistoryStatus] = useState<"loading" | "ready" | "error">("loading");
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [locked, setLocked] = useState(false);
   const idRef = useRef(0);
   const titleId = useId();
+  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function send() {
+  const loadHistory = useCallback(() => {
+    setHistoryStatus("loading");
+    getChatHistory(cif)
+      .then((res) => {
+        setMessages(fromHistory(res.messages));
+        setHistoryStatus("ready");
+      })
+      .catch(() => setHistoryStatus("error"));
+  }, [cif]);
+
+  useEffect(() => {
+    if (open) loadHistory();
+  }, [open, loadHistory]);
+
+  useEffect(() => {
+    return () => {
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+    };
+  }, []);
+
+  const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
+
+  async function send() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || composerDisabled) return;
     const userId = `m${++idRef.current}`;
     const replyId = `m${++idRef.current}`;
-    setMessages((prev) => [
-      ...prev,
-      { id: userId, role: "user", text },
-      { id: replyId, role: "agent", text: PLACEHOLDER_REPLY },
-    ]);
+    setMessages((prev) => [...prev, { id: userId, role: "user", text }]);
     setInput("");
+    setSending(true);
+    try {
+      const res = await sendChatMessage(text, cif);
+      setMessages((prev) => [...prev, { id: replyId, role: "agent", text: res.answer }]);
+    } catch {
+      setMessages((prev) => [...prev, { id: replyId, role: "agent", text: SEND_ERROR, error: true }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (deleting || locked) return;
+    setDeleting(true);
+    try {
+      await deleteChatHistory(cif);
+      setMessages([]);
+      setLocked(true);
+      lockTimerRef.current = setTimeout(() => setLocked(false), DELETE_LOCK_MS);
+    } catch {
+      // Nothing was actually deleted server-side — leave the transcript as is.
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function handleKey(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -57,8 +122,10 @@ export function MYourWidget() {
           aria-label="Mở trợ lý M-Your"
           className="pointer-events-auto flex h-[68px] w-[68px] items-center justify-center overflow-hidden rounded-full bg-surface shadow-nav ring-2 ring-white/80 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2"
         >
+          {/* width/height reserve the box before CSS loads — avoids a flash at
+              the source image's native 1254×1254 size on a cold page load. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon_agent.png" alt="" className="h-full w-full object-cover" />
+          <img src="/icon_agent.png" alt="" width={68} height={68} className="h-full w-full object-cover" />
         </button>
       </div>
 
@@ -72,12 +139,10 @@ export function MYourWidget() {
           <header className="shadow-card flex shrink-0 items-center gap-2.5 px-4 py-3">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icon_agent.png" alt="" className="h-full w-full object-cover" />
+              <img src="/icon_agent.png" alt="" width={36} height={36} className="h-full w-full object-cover" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-xs text-muted">
-                Trợ lý Tài chính của bạn
-              </p>
+              <p className="truncate text-xs text-muted">Trợ lý Tài chính của bạn</p>
               <h2 id={titleId} className="text-base font-bold tracking-tight text-text">
                 M-Your
               </h2>
@@ -85,9 +150,10 @@ export function MYourWidget() {
             <div className="ml-auto flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setMessages([])}
+                onClick={handleDelete}
+                disabled={deleting || locked}
                 aria-label="Xóa hội thoại"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40"
               >
                 <Trash2 size={19} strokeWidth={1.8} />
               </button>
@@ -103,27 +169,55 @@ export function MYourWidget() {
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-            <div className="flex flex-col gap-3">
-              {messages.length === 0 && (
-                <div className={cn("shadow-card max-w-[85%] rounded-2xl rounded-bl-sm bg-surface-muted px-3.5 py-2.5 text-sm text-text")}>
-                  {GREETING}
-                </div>
-              )}
-              {messages.map((m) => (
-                <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
-                      m.role === "user"
-                        ? "brand-gradient rounded-br-sm text-white"
-                        : "shadow-card rounded-bl-sm bg-surface-muted text-text",
-                    )}
+            {historyStatus === "loading" && <Loading label="Đang tải hội thoại…" />}
+
+            {historyStatus === "error" && (
+              <ErrorState
+                description="Không tải được hội thoại với M-Your. Vui lòng thử lại."
+                action={
+                  <button
+                    type="button"
+                    onClick={loadHistory}
+                    className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-fg"
                   >
-                    {m.text}
+                    Thử lại
+                  </button>
+                }
+              />
+            )}
+
+            {historyStatus === "ready" && (
+              <div className="flex flex-col gap-3">
+                {messages.length === 0 && (
+                  <div className="shadow-card max-w-[85%] rounded-2xl rounded-bl-sm bg-surface-muted px-3.5 py-2.5 text-sm text-text">
+                    {GREETING}
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+                {messages.map((m) => (
+                  <div key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
+                        m.role === "user"
+                          ? "brand-gradient rounded-br-sm text-white"
+                          : m.error
+                            ? "shadow-card rounded-bl-sm bg-negative-soft text-negative"
+                            : "shadow-card rounded-bl-sm bg-surface-muted text-text",
+                      )}
+                    >
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                {sending && (
+                  <div className="flex justify-start">
+                    <div className="shadow-card rounded-2xl rounded-bl-sm bg-surface-muted px-3.5 py-2.5 text-sm text-muted">
+                      Đang trả lời…
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="shadow-nav shrink-0 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+var(--safe-area-bottom))]">
@@ -133,13 +227,14 @@ export function MYourWidget() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 rows={1}
+                disabled={composerDisabled}
                 placeholder="Nhắn tin cho M-Your…"
-                className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface-muted px-3.5 py-2.5 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface"
+                className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface-muted px-3.5 py-2.5 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={send}
-                disabled={!input.trim()}
+                disabled={composerDisabled || !input.trim()}
                 aria-label="Gửi"
                 className="brand-gradient flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
               >
