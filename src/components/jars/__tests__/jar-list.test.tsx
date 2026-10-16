@@ -50,11 +50,10 @@ describe("JarList (snapshot partition)", () => {
     expect(screen.getByText("Thiết lập hũ")).toBeInTheDocument();
   });
 
-  it("renders chia + đã tiêu and the trust line for a normal jar", () => {
+  it("renders chia + đã tiêu with the period caption for a normal jar", () => {
     render(<JarList partition={partition([jarLine({}), residual()])} periodLabel="Tháng 6/2026" />);
     expect(screen.getByText("Ăn uống")).toBeInTheDocument();
-    expect(screen.getByText(/tiền vẫn nằm nguyên trong tài khoản/)).toBeInTheDocument();
-    expect(screen.getByText(/Phần chia theo số dư hiện tại/)).toBeInTheDocument();
+    expect(screen.getByText(/Đã tiêu tính trong Tháng 6\/2026/)).toBeInTheDocument();
   });
 
   it("explains an over-allocation against the current share (non-blocking)", () => {

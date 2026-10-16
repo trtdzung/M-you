@@ -37,10 +37,10 @@ export function JarSetup() {
   return (
     <div className="flex flex-col gap-6">
       <p role="status" className="rounded-2xl bg-positive-soft/60 px-3 py-2 text-xs text-text">
-        Thay đổi được lưu tự động. Khi đã xong, chọn Xong để đóng.
+        Thay đổi được lưu tự động.
       </p>
       <section>
-        <SectionHeader title="Mẫu hũ" subtitle="Chọn mẫu phù hợp — sẽ thay toàn bộ hũ hiện tại" />
+        <SectionHeader title="Mẫu hũ" subtitle="Chọn mẫu sẽ thay toàn bộ hũ hiện tại" />
         <div className="grid grid-cols-3 gap-2">
           {JAR_TEMPLATE_LIST.map((t) => (
             <button

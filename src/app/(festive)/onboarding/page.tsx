@@ -56,7 +56,7 @@ export default function OnboardingPage() {
           <ArrowRight size={18} />
         </Link>
         <p className="mt-3 text-center text-xs text-muted">
-          Bản mẫu dùng dữ liệu giả lập (demo). Không kết nối tài khoản thật.
+          Dùng dữ liệu minh hoạ, không kết nối tài khoản thật.
         </p>
       </div>
     </div>

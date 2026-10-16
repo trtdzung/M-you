@@ -17,7 +17,7 @@ export function AllocationMeter({ partition }: { partition: JarPartitionResult }
   if (partition.status !== "ok" || partition.primaryBalance === null) {
     return (
       <div className="rounded-2xl bg-surface-muted/40 p-3 text-sm text-muted">
-        Số dư tài khoản chính chưa xác định — chưa thể chia hũ.
+        Chưa xác định số dư tài khoản chính nên chưa thể chia hũ.
       </div>
     );
   }
@@ -73,7 +73,7 @@ export function AllocationMeter({ partition }: { partition: JarPartitionResult }
       {overAllocated && (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-negative">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          Đã chia vượt số dư <Money amount={-residualEarmark} className="font-medium text-negative" /> — giảm bớt một hũ.
+          Đã chia vượt số dư <Money amount={-residualEarmark} className="font-medium text-negative" />, giảm bớt một hũ nhé.
         </p>
       )}
     </div>

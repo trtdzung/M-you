@@ -76,7 +76,6 @@ describe("CashflowChartView", () => {
     expect(await screen.findByText("Thu vào")).toBeInTheDocument();
     expect(screen.getByText("Chi ra")).toBeInTheDocument();
     expect(screen.getByText("Chênh lệch")).toBeInTheDocument();
-    expect(screen.getByText(/không thay đổi theo bộ lọc hũ/)).toBeInTheDocument();
   });
 
   it("renders drillable category rows that push to /transactions?category=", async () => {

@@ -85,7 +85,7 @@ export function WealthManager() {
         <Link href="/pfm?tab=overview" aria-label="Về Tổng quan" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
           <ArrowLeft size={18} aria-hidden="true" />
         </Link>
-        <SectionHeader title="Tài sản & Nợ" subtitle="Khai báo thủ công — bạn tự cập nhật" className="mb-0" />
+        <SectionHeader title="Tài sản & Nợ" subtitle="Bạn tự khai và cập nhật" className="mb-0" />
       </div>
 
       {dropped > 0 && (
@@ -145,7 +145,7 @@ export function WealthManager() {
 
           {(seed.assets.length > 0 || seed.liabilities.length > 0) && (
             <section className="flex flex-col gap-2">
-              <SectionHeader title="Dữ liệu sẵn có" subtitle="Từ MSB / hồ sơ — không chỉnh sửa tại đây" className="mb-0" />
+              <SectionHeader title="Dữ liệu sẵn có" subtitle="Từ MSB, không sửa ở đây" className="mb-0" />
               {seed.assets.length > 0 && <AllocationList items={seed.assets} />}
               {seed.liabilities.length > 0 && <AllocationList items={seed.liabilities} />}
             </section>

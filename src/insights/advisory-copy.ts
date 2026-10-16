@@ -29,7 +29,7 @@ type CopyByBand = Record<BriefBand, AdvisoryCopy>;
 const ADVISORY: Record<string, CopyByBand> = {
   spending_spike: {
     low: {
-      meaning: "Một nhóm chi tăng nhẹ so với tháng trước — chưa đáng ngại nhưng nên để ý.",
+      meaning: "Một nhóm chi tăng nhẹ so với tháng trước, chưa đáng ngại nhưng nên để ý.",
       action: "Xem lại giao dịch nhóm này",
       intentId: "open-transactions",
     },
@@ -39,7 +39,7 @@ const ADVISORY: Record<string, CopyByBand> = {
       intentId: "open-transactions",
     },
     high: {
-      meaning: "Một nhóm chi tăng đột biến so với tháng trước — đây là nguyên nhân chính khiến chi tiêu tăng.",
+      meaning: "Một nhóm chi tăng đột biến so với tháng trước, đây là nguyên nhân chính khiến chi tiêu tăng.",
       action: "Kiểm tra các giao dịch lớn trong nhóm này",
       intentId: "open-transactions",
     },
@@ -51,12 +51,12 @@ const ADVISORY: Record<string, CopyByBand> = {
       intentId: "open-hu",
     },
     medium: {
-      meaning: "Một hũ đã vượt phần chia — bạn đang tiêu nhiều hơn dự kiến ở nhóm này.",
+      meaning: "Một hũ đã vượt phần chia, bạn đang tiêu nhiều hơn dự kiến ở nhóm này.",
       action: "Điều chỉnh lại các hũ cho cân đối",
       intentId: "open-hu",
     },
     high: {
-      meaning: "Bạn đã chia hoặc chi vượt số dư đáng kể — cần cân lại để không âm quỹ.",
+      meaning: "Bạn đã chia hoặc chi vượt số dư đáng kể, cần cân lại để không âm quỹ.",
       action: "Cân lại các hũ ngay",
       intentId: "open-hu",
     },
@@ -85,7 +85,7 @@ const ADVISORY: Record<string, CopyByBand> = {
       intentId: "open-hu",
     },
     medium: {
-      meaning: "Một khoản đáng kể sắp đến hạn — hãy đảm bảo đủ số dư.",
+      meaning: "Một khoản đáng kể sắp đến hạn, hãy đảm bảo đủ số dư.",
       action: "Cân lại các hũ để chuẩn bị chi trả",
       intentId: "open-hu",
     },
@@ -102,7 +102,7 @@ const ADVISORY: Record<string, CopyByBand> = {
       intentId: "open-hu",
     },
     medium: {
-      meaning: "Thu nhập giảm khá rõ — dòng tiền tháng này eo hẹp hơn.",
+      meaning: "Thu nhập giảm khá rõ, dòng tiền tháng này eo hẹp hơn.",
       action: "Cân đối lại các hũ cho tháng",
       intentId: "open-hu",
     },

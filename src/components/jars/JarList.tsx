@@ -56,9 +56,9 @@ export function JarList({
   return (
     <div className="flex flex-col gap-3">
       <AllocationMeter partition={partition} />
-      <p className="text-xs text-muted">
-        Phần chia theo số dư hiện tại{periodLabel ? ` · “đã tiêu” tính trong ${periodLabel}` : ""}.
-      </p>
+      {periodLabel && (
+        <p className="text-xs text-muted">Đã tiêu tính trong {periodLabel}.</p>
+      )}
       <ul className="flex flex-col gap-2.5">
         {explicit.map((line, i) => (
           <li key={line.jarId}>
@@ -66,9 +66,6 @@ export function JarList({
           </li>
         ))}
       </ul>
-      <p className="text-[11px] text-muted">
-        Hũ chỉ để bạn nhìn tiền rõ hơn — tiền vẫn nằm nguyên trong tài khoản của bạn.
-      </p>
     </div>
   );
 }

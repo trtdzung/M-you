@@ -28,6 +28,15 @@ const FULL_LABEL: Record<Source, string> = {
   mock: "Dữ liệu demo",
 };
 
+/**
+ * Set to true to show the provenance pills again. They are hidden app-wide at the
+ * product owner's request: in an all-mock demo the source pills (DEMO / TỰ KHAI /
+ * ƯỚC TÍNH / MSB) sat on nearly every value and read as debug annotations. The
+ * provenance data model is untouched — the engine still tracks `source` on every
+ * aggregate (invariant #5's data requirement); only the visible chip is hidden.
+ */
+const SHOW_SOURCE_BADGE: boolean = false;
+
 /** Small accessible pill indicating the provenance of a value. */
 export function SourceBadge({
   source,
@@ -36,6 +45,7 @@ export function SourceBadge({
   source: Source;
   className?: string;
 }) {
+  if (!SHOW_SOURCE_BADGE) return null;
   const meta = SOURCE_META[source];
   return (
     <span

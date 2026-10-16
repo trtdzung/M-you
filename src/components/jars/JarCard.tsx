@@ -65,7 +65,6 @@ export function JarCard({
         <div className="rounded-2xl bg-surface-muted p-3">
           <p className="text-xs text-muted">Phần chia hiện tại</p>
           <Money amount={line.earmark} className="mt-1 block text-base font-bold text-text" />
-          <p className="mt-0.5 text-xs text-muted">theo số dư hiện tại</p>
         </div>
         <div className="rounded-2xl bg-surface-muted p-3">
           <p className="text-xs text-muted">{periodText}</p>
@@ -76,7 +75,7 @@ export function JarCard({
 
       <div className="mt-3" aria-label={"Đã chi so với phần chia hiện tại của " + line.label}>
         <div className="flex items-center justify-between gap-2 text-xs text-muted">
-          <span>Đối chiếu với phần chia hiện tại</span>
+          <span>So với phần chia</span>
           <span className="tabular-nums font-medium text-text">{Math.round(progress)}%</span>
         </div>
         <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-muted">

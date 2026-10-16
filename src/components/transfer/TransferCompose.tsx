@@ -71,7 +71,7 @@ export function TransferCompose() {
     <div className="flex flex-col gap-4">
       <Card className="flex items-start gap-2 bg-primary-soft/40">
         <ShieldAlert size={16} className="mt-0.5 shrink-0 text-primary" />
-        <p className="text-[11px] leading-snug text-muted">Bản demo chỉ tạo bản nháp để bạn tự kiểm tra và xác nhận. Không có tiền thật được chuyển.</p>
+        <p className="text-[11px] leading-snug text-muted">Bước này chỉ tạo bản nháp để bạn tự kiểm tra và xác nhận.</p>
       </Card>
       <Card><RecipientPicker beneficiaries={beneficiaries} transactions={transactions} onChange={setRecipient} /></Card>
       <Card><AmountMemoFields amount={amount} memo={memo} accounts={accounts} sourceAccountId={sourceAccountId} onAmountChange={setAmount} onMemoChange={setMemo} onSourceChange={setSourceAccountId} /></Card>
@@ -83,7 +83,7 @@ export function TransferCompose() {
       <button type="button" disabled={!canContinue} onClick={continueToConfirm} className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45">
         Tiếp tục <ArrowRight size={16} />
       </button>
-      <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted"><SourceBadge source="mock" /> Chỉ mô phỏng</div>
+      <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted"><SourceBadge source="mock" /></div>
     </div>
   );
 }

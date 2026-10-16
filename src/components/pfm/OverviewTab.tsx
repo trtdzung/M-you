@@ -59,15 +59,6 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
   const { cashflow, prevCashflow, networth, obligations, endOfMonth, runway, health } = financials;
   const nextObligation = obligations[0];
 
-  // Worst-case combined provenance across every tile (not just cashflow).
-  const footerSource = lowestTrustSource([
-    ...networth.meta.sourceCoverage.sources,
-    ...cashflow.meta.sourceCoverage.sources,
-    financials.networthSeriesMeta.source,
-    endOfMonth.meta.source,
-    runway.meta.source,
-    nextObligation?.source,
-  ]);
   const footerFreshness = oldestFreshness([
     cashflow.meta.freshness,
     networth.meta.freshness,
@@ -131,7 +122,6 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
               `${health.runwayMonths.value.toFixed(1)} tháng`
             )
           }
-          sub="Số tháng theo mức chi hiện tại"
           badge={<SourceBadge source={health.runwayMonths.source} />}
           onTap={() => setDetail("runway")}
         />
@@ -147,11 +137,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 px-1 pt-1 text-xs text-muted">
-        <span className="flex items-center gap-1.5">
-          Nguồn tổng hợp
-          {footerSource && <SourceBadge source={footerSource} />}
-        </span>
+      <div className="flex items-center justify-end gap-2 px-1 pt-1 text-xs text-muted">
         <Freshness at={footerFreshness} />
       </div>
 
@@ -173,7 +159,7 @@ function OverviewDetail({
     return (
       <Sheet
         title="Dự kiến cuối tháng"
-        description={`${currentMonthLabel()} · số liệu ước tính theo nhịp chi hiện tại`}
+        description={`${currentMonthLabel()} · ước tính theo nhịp chi hiện tại`}
         onClose={onClose}
       >
         <div className="flex flex-col gap-4">
@@ -183,7 +169,7 @@ function OverviewDetail({
             <SourceBadge source={financials.endOfMonth.meta.source} className="mt-2" />
           </div>
           <p className="text-sm leading-6 text-muted">
-            Ước tính này kết hợp số dư hiện tại, thu nhập định kỳ dự kiến, khoản sắp phải trả và nhịp chi tiêu đã ghi nhận trong tháng.
+            Gồm số dư hiện tại, thu nhập định kỳ, các khoản sắp phải trả và nhịp chi trong tháng.
           </p>
         </div>
       </Sheet>
@@ -209,7 +195,7 @@ function OverviewDetail({
             <SourceBadge source={financials.health.runwayMonths.source} className="mt-2" />
           </div>
           <p className="text-sm leading-6 text-muted">
-            Chỉ số dùng số dư thanh khoản và chi phí trung bình của kỳ đang xem. Đây là chỉ báo tham khảo, không phải số tiền có thể chi ngay.
+            Số dư hiện tại đủ chi trong bao lâu theo mức chi trung bình. Chỉ để tham khảo, không phải số tiền dùng được ngay.
           </p>
         </div>
       </Sheet>

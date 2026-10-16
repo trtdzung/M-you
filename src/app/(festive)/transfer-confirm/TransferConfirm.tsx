@@ -47,7 +47,7 @@ export function TransferConfirm() {
     if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
-    if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (mô phỏng, ≥ 4 chữ số).");
+    if (otp.trim().length < 4) return setError("Vui lòng nhập mã OTP (ít nhất 4 chữ số).");
     setError(null);
     // Mock-only: no real money moves, no API call, no facade involvement.
     setDone({
@@ -71,15 +71,12 @@ export function TransferConfirm() {
         />
         <Card className="mt-6 flex flex-col items-center gap-2 text-center">
           <CheckCircle2 size={40} className="text-positive" />
-          <p className="text-lg font-semibold text-text">Đã ghi nhận (mô phỏng)</p>
+          <p className="text-lg font-semibold text-text">Đã ghi nhận</p>
           <p className="text-2xl font-bold tabular-nums text-primary">{formatVnd(done.amount)}</p>
           <p className="text-sm text-muted">
             {done.recipientName} · {done.recipientAccountMasked}
           </p>
           <SourceBadge source="mock" className="mt-1" />
-          <p className="mt-1 text-[11px] text-muted">
-            Đây là giao dịch giả lập trong bản demo, không có tiền thật được chuyển.
-          </p>
         </Card>
         <button
           type="button"
@@ -115,7 +112,7 @@ export function TransferConfirm() {
       <Card className="bg-primary-soft/40">
         <p className="flex items-start gap-2 text-xs text-text">
           <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
-          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận và nhập OTP — trợ lý không thực hiện bước này.
+          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận và nhập OTP, trợ lý không làm bước này.
         </p>
       </Card>
 
@@ -143,7 +140,7 @@ export function TransferConfirm() {
       </Card>
 
       <Card className="flex flex-col gap-2">
-        <Labeled label="Mã OTP (mô phỏng)">
+        <Labeled label="Mã OTP">
           <div className="flex items-center gap-2">
             <Lock size={15} className="text-muted" />
             <input
@@ -155,7 +152,7 @@ export function TransferConfirm() {
             />
           </div>
         </Labeled>
-        <p className="text-[11px] text-muted">Bản demo: OTP do bạn tự nhập, không gửi đi đâu.</p>
+        <p className="text-[11px] text-muted">OTP do bạn tự nhập, không gửi đi đâu.</p>
       </Card>
 
       {error && <p className="text-sm text-negative">{error}</p>}
@@ -165,7 +162,7 @@ export function TransferConfirm() {
         onClick={confirm}
         className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90"
       >
-        Xác nhận chuyển tiền (mô phỏng)
+        Xác nhận chuyển tiền
       </button>
     </div>
   );

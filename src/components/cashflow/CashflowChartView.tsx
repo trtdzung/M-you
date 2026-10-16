@@ -91,7 +91,6 @@ export function CashflowChartView() {
       <CashflowSummary financials={financials} />
 
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-[0.08em] text-muted">Phân tích chi tiêu theo hũ</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc theo hũ">
         {chips.map((chip) => {
           const selected = chip.jarId === selectedJar;
@@ -116,7 +115,7 @@ export function CashflowChartView() {
       </div>
 
       <section>
-        <SectionHeader title="Chi tiêu theo danh mục" subtitle="Tỉ trọng chi trong kỳ (100% chi)" />
+        <SectionHeader title="Chi tiêu theo danh mục" />
         <Card>
           {visible.length > 0 ? (
             <>
@@ -249,10 +248,7 @@ function CashflowSummary({
   const { cashflow } = financials;
   return (
     <section aria-label="Tóm tắt dòng tiền">
-      <SectionHeader
-        title={monthKeyLabel(financials.monthKey)}
-        subtitle="Tổng toàn kỳ · không thay đổi theo bộ lọc hũ"
-      />
+      <SectionHeader title={monthKeyLabel(financials.monthKey)} />
       <Card className="grid grid-cols-3 gap-2" role="region">
         <SummaryCell label="Thu vào" amount={cashflow.income} tone="text-positive" />
         <SummaryCell label="Chi ra" amount={cashflow.expense} tone="text-text" />
@@ -264,7 +260,7 @@ function CashflowSummary({
       </Card>
       {cashflow.pendingExpense > 0 && (
         <p className="mt-2 rounded-xl bg-warning-soft/70 px-3 py-2 text-xs text-text">
-          Đang chờ ghi nhận: <Money amount={cashflow.pendingExpense} className="font-semibold" /> chi tiêu. Con số này chưa nằm trong tổng đã ghi nhận.
+          Đang chờ ghi nhận: <Money amount={cashflow.pendingExpense} className="font-semibold" />, chưa tính vào tổng.
         </p>
       )}
     </section>

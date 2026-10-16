@@ -11,7 +11,7 @@ export default function TransferConfirmPage() {
     <div>
       <header className="mb-4">
         <h1 className="text-lg font-semibold text-text">Xác nhận chuyển tiền</h1>
-        <p className="text-xs text-muted">Bạn kiểm tra, chỉnh sửa và tự xác nhận — bản mô phỏng</p>
+        <p className="text-xs text-muted">Bạn kiểm tra, chỉnh sửa và tự xác nhận.</p>
       </header>
       <Suspense fallback={<p className="text-sm text-muted">Đang tải…</p>}>
         <TransferConfirm />

@@ -83,8 +83,8 @@ export default function SettingsPage() {
           <Card className="flex items-start gap-3">
             <Info size={18} className="mt-0.5 shrink-0 text-muted" />
             <p className="text-sm text-muted">
-              MSB Financial Copilot — bản mẫu (demo) dùng dữ liệu giả lập. Không kết nối tài
-              khoản thật, không thực hiện giao dịch.
+              MSB Financial Copilot dùng dữ liệu minh hoạ, không kết nối tài khoản thật và
+              không thực hiện giao dịch.
             </p>
           </Card>
         </section>

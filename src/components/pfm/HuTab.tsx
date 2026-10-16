@@ -66,14 +66,10 @@ export function HuTab() {
             className="font-semibold text-text"
           />
         </div>
-        <p className="text-xs leading-5 text-muted">
-          Hũ là cách nhìn số dư hiện tại theo nhóm chi tiêu. Tiền vẫn nằm nguyên trong tài khoản của bạn.
-        </p>
       </Card>
 
       <SectionHeader
         title="Hũ chi tiêu"
-        subtitle="Chia số dư hiện tại theo hạng mục"
         action={
           <button
             type="button"

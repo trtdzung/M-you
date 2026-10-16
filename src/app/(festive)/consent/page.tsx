@@ -2,23 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
-import { Card, SectionHeader, SourceBadge } from "@/components/primitives";
+import { Card, SectionHeader } from "@/components/primitives";
 import { PersonaSwitcher } from "@/components/persona/PersonaSwitcher";
 import { setConsent } from "@/lib/consent";
-import type { Source } from "@/components/primitives";
 
 const SCOPES: { title: string; purpose: string }[] = [
   { title: "Giao dịch", purpose: "Tổng hợp thu – chi, phân loại và phát hiện chi tiêu định kỳ." },
   { title: "Tài sản", purpose: "Tính giá trị ròng và bức tranh tài sản của bạn." },
   { title: "Khoản nợ", purpose: "Theo dõi dư nợ và các khoản thanh toán sắp tới." },
-  { title: "Trợ lý AI", purpose: "Giải thích số liệu (chỉ đọc) — không thực hiện giao dịch." },
-];
-
-const SOURCE_LEGEND: { source: Source; desc: string }[] = [
-  { source: "msb", desc: "Dữ liệu đồng bộ từ hệ thống MSB." },
-  { source: "self_reported", desc: "Bạn tự khai báo (ví dụ tài sản, nợ)." },
-  { source: "estimated", desc: "Giá trị ước tính, không phải xác thực." },
-  { source: "mock", desc: "Dữ liệu demo trong bản mẫu này." },
+  { title: "Trợ lý AI", purpose: "Giải thích số liệu (chỉ đọc), không thực hiện giao dịch." },
 ];
 
 export default function ConsentPage() {
@@ -43,18 +35,6 @@ export default function ConsentPage() {
             </span>
           </Card>
         ))}
-      </div>
-
-      <div className="mt-6">
-        <SectionHeader title="Ký hiệu nguồn dữ liệu" subtitle="Mọi con số đều gắn nguồn gốc" />
-        <Card className="flex flex-col gap-3">
-          {SOURCE_LEGEND.map(({ source, desc }) => (
-            <div key={source} className="flex items-center gap-3">
-              <SourceBadge source={source} />
-              <span className="text-xs text-muted">{desc}</span>
-            </div>
-          ))}
-        </Card>
       </div>
 
       <div className="mt-6">
