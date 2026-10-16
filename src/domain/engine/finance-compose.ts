@@ -21,7 +21,9 @@ import type {
 import {
   aggregateCashflow,
   calculateNetWorth,
+  casaBalance,
   cashRunwayMonths,
+  computeUnallocatedPool,
   dateToMonthKey,
   detectRecurring,
   estimateEndOfMonth,
@@ -45,6 +47,7 @@ import {
   type NetWorthTrendMeta,
   type Obligation,
   type RecurringSeries,
+  type UnallocatedPool,
 } from "./index";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
 
@@ -97,6 +100,14 @@ export interface Financials {
    * account balances — never the stored `actualAmount` (invariant #1, RT-1/2).
    */
   jarEnvelope: JarEnvelopeResult;
+  /**
+   * The virtual "Chưa phân bổ" pool = casaBalance(current) − Σ jar.actualAmount.
+   * Derived (never stored), so every screen showing jar totals / CASA can read
+   * one truth — including `overAllocated` ("Vượt phân bổ"), which must surface on
+   * every such surface, not just the transfer sheet (Red Team #13). Negative
+   * `amount` is kept as-is (invariant #6); the UI presents available as 0.
+   */
+  unallocatedPool: UnallocatedPool;
   /**
    * Financial-health indicators (runway, surplus, essential coverage, asset
    * concentration). Composed ONCE here so Tổng quan + Kế hoạch read one object
@@ -188,6 +199,13 @@ export function computeFinancials(
   const jarBudget = evaluateJarBudget(jarConfig, txns, period, prevPeriod, now);
   const spentByJar = new Map(jarBudget.lines.map((l) => [l.huId, l.spent]));
   const jarEnvelope = evaluateJarEnvelope(jarConfig, raw.accounts, spentByJar, period);
+  // Unallocated pool: CASA (current-only, via the shared selector so it never
+  // swallows savings/credit — RT#9) minus what jars actually claim. Derived here
+  // once so every screen reads the same `overAllocated` (RT#13).
+  const unallocatedPool = computeUnallocatedPool({
+    casaBalance: casaBalance(raw.accounts),
+    jars: jarConfig.jars,
+  });
 
   return {
     monthKey: month,
@@ -206,6 +224,7 @@ export function computeFinancials(
     networthSeriesMeta: trend.meta,
     jarBudget,
     jarEnvelope,
+    unallocatedPool,
     health: financialHealth(cashflow, raw.accounts, networth),
     goals: [...raw.goals, ...(options.userGoals ?? [])],
   };

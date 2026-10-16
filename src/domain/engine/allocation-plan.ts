@@ -37,3 +37,23 @@ export function fitsCasaCap(jars: Jar[], casaPool: Amount, drafts: Record<string
   }
   return sum <= casaPool ? { ok: true } : { ok: false, overBy: sum - casaPool };
 }
+
+/**
+ * The SPENDABLE cap for reallocation (top-up): Σ `actualAmount` of the resulting
+ * jar set must never exceed the CASA pool — otherwise jars would claim more real
+ * money than the account holds (the "money vaporises" failure, RT#7). Also fails
+ * on any negative `actualAmount` (RT#6 — a decrement gone negative must be
+ * REJECTED, never silently swallowed). `casaPool === "unknown"` → block
+ * (invariant #6: no denominator to validate against). Pure; enforced server-side.
+ */
+export function fitsActualCap(jars: Jar[], casaPool: Amount): CasaCapResult {
+  if (casaPool === UNKNOWN) return { ok: false };
+  let sum = 0;
+  for (const jar of jars) {
+    const value = jar.actualAmount;
+    if (value === undefined) continue;
+    if (!Number.isFinite(value) || value < 0) return { ok: false };
+    sum += value;
+  }
+  return sum <= casaPool ? { ok: true } : { ok: false, overBy: sum - casaPool };
+}
