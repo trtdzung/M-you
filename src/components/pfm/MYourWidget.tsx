@@ -4,7 +4,6 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, Trash2, X } from "lucide-react";
 import { useBatchSpeech } from "@/lib/use-batch-speech";
-import { takeVoiceAssistantDraft } from "@/lib/voice-assistant-handoff";
 import { cn } from "@/lib/cn";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
@@ -51,8 +50,8 @@ function composeVoiceDraft(prefix: string, transcript: string) {
  * the `PhoneShell` `fab` slot so it stays visible above the bottom nav on every
  * PFM tab without overlapping the center mic FAB (`VoiceFab`, in the bottom
  * nav — a different `PhoneShell` slot, not in this component's own tree).
- * `VoiceFab` opens this overlay via `?assistant=1` only after STT produced a
- * non-empty draft. A plain tap leaves the compact voice panel open. Wired to the
+ * `VoiceFab` opens this overlay via `?assistant=1` (both a plain tap and a
+ * press-and-hold do — same idiom as `HuCategoryTab`'s `?hu=`). Wired to the
  * real agent (`src/lib/agent-api.ts`, proxied through `src/app/api/agent/chat`
  * so the client never sees `AGENT_API_KEY`) — `cif` is the active persona's
  * CIF. Opening the overlay always reloads real history from the agent (it has
@@ -112,12 +111,6 @@ export function MYourWidget() {
   useEffect(() => {
     if (isOpen) loadHistory();
   }, [isOpen, loadHistory]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const voiceDraft = takeVoiceAssistantDraft();
-    if (voiceDraft) setInput(voiceDraft);
-  }, [isOpen]);
 
   function close() {
     cancelVoice();
