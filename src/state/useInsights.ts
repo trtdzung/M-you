@@ -36,7 +36,7 @@ export interface InsightState {
   markHelpful: (id: string) => void;
 }
 
-export function useInsightState(): InsightState {
+function useInsightState(): InsightState {
   const [statuses, setStatuses] = useState<Record<string, UserStatus>>({});
 
   useEffect(() => {

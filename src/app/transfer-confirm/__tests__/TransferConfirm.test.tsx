@@ -44,6 +44,15 @@ const h = vi.hoisted(() => {
     },
     // Derived financials (jarBudget.lines). Set per test via `h.financials = linesFrom(...)`.
     financials: null as ReturnType<typeof linesFrom> | null,
+    // The shared auto-fund unit is mocked (its own logic is tested against the engine
+    // separately). `assess` returns this verdict; `commit` returns these rebalance ids.
+    assessment: { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: null, source: "mock" } as Record<string, unknown>,
+    createdIds: [] as string[],
+    casaBalance: 100_000_000,
+    commit: vi.fn(),
+    // Awaited leg writes (H14): resolves with `createdIds` unless a test rejects it.
+    commitPersisted: vi.fn(async (..._args: unknown[]): Promise<string[]> => []),
+    assess: vi.fn(),
     draft: null as Record<string, unknown> | null,
     used: {} as Record<string, boolean>,
     query: "draftId=d1",
@@ -52,7 +61,7 @@ const h = vi.hoisted(() => {
         { id: "acc1", type: "current" },
       ],
     ),
-    applyAccountDebit: vi.fn(async () => {}),
+    applyAccountDebit: vi.fn(async (_accountId: string, _amount: number, _record?: unknown) => {}),
     push: vi.fn(),
     add: vi.fn((input: { categoryId: string; type: string; amount: number; merchantName: string }) => {
       const id = `manual-test-${state.store.length + 1}`;
@@ -63,6 +72,10 @@ const h = vi.hoisted(() => {
       if (!state.store.some((t) => t.id === id)) return false;
       state.store = state.store.map((t) => (t.id === id ? { ...t, ...patch } : t));
       return true;
+    }),
+    // The primary txn is stored by the debit endpoint and only ADOPTED locally.
+    adopt: vi.fn((txn: MockTxn & { postedAt?: string }) => {
+      state.store = [{ ...txn, source: "self_reported" }, ...state.store];
     }),
   };
   return state;
@@ -87,12 +100,48 @@ vi.mock("@/state/jars", () => ({
 }));
 
 vi.mock("@/state/useFinancials", () => ({
-  useFinancials: () => ({ financials: h.financials }),
+  useFinancials: () => ({ financials: h.financials, transactions: [], raw: { accounts: [] } }),
 }));
 
-vi.mock("@/state/manual-txns", () => ({
-  MANUAL_ACCOUNT_ID: "self-reported",
-  useManualTxns: () => ({ manualTxns: h.store, add: h.add, update: h.update, remove: () => {} }),
+vi.mock("@/state/manual-txns", async () => {
+  const actual = await vi.importActual<typeof import("@/state/manual-txns")>("@/state/manual-txns");
+  return {
+    MANUAL_ACCOUNT_ID: "self-reported",
+    buildManualTxn: actual.buildManualTxn, // the real record builder
+    useManualTxns: () => ({
+      manualTxns: h.store,
+      add: h.add,
+      addPersisted: async (input: Parameters<typeof h.add>[0]) => h.add(input),
+      adopt: h.adopt,
+      update: h.update,
+      remove: () => {},
+      removeByTrigger: () => [],
+    }),
+  };
+});
+
+// The shared auto-fund unit is exercised against the engine elsewhere; here it is a
+// controllable stub so the confirm screen's OWN responsibilities (assess-then-commit
+// ordering, single primary txn, latch, error) are tested in isolation.
+vi.mock("@/state/use-auto-fund", () => ({
+  useAutoFund: () => ({
+    assess: (p: unknown) => {
+      h.assess(p);
+      return { assessment: h.assessment, snapshot: { spendables: [], casaBalance: h.casaBalance, lines: [], month: "2026-09" } };
+    },
+    commit: (...args: unknown[]) => {
+      h.commit(...args);
+      return h.createdIds;
+    },
+    commitPersisted: h.commitPersisted,
+    reconcile: () => null,
+    undo: () => ({ status: "undone" }),
+    changeSource: () => ({ status: "nothing", ids: [], shortfall: 0 }),
+    swapOptions: () => ({ shortfall: 0, options: [] }),
+    fundJar: () => ({ status: "covered", donors: [], goalDonors: [], shortfall: 0, createdIds: [], targetJarId: null, targetLabel: "", postedAt: "" }),
+    removeByTrigger: () => [],
+    jarConfig: h.jarConfig,
+  }),
 }));
 
 vi.mock("@/lib/transfer-draft-store", () => ({
@@ -138,7 +187,18 @@ beforeEach(() => {
   h.listAccounts.mockImplementation(async () => [{ id: "acc1", type: "current" }]);
   h.applyAccountDebit.mockClear();
   h.add.mockClear();
+  h.adopt.mockClear();
   h.update.mockClear();
+  h.commit.mockClear();
+  h.assess.mockClear();
+  h.casaBalance = 100_000_000;
+  h.commitPersisted.mockReset();
+  h.commitPersisted.mockImplementation(async (...args: unknown[]) => {
+    h.commit(...args);
+    return h.createdIds;
+  });
+  h.assessment = { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: null, source: "mock" };
+  h.createdIds = [];
   h.update.mockImplementation((id: string, patch: Partial<MockTxn>) => {
     if (!h.store.some((t) => t.id === id)) return false;
     h.store = h.store.map((t) => (t.id === id ? { ...t, ...patch } : t));
@@ -155,8 +215,8 @@ describe("TransferConfirm — always create + categorize", () => {
     // A jar source books the spend into its first category (drops derived remaining);
     // jar money lives in the CASA account → the account is debited too (legacy
     // fallback: no sourceAccountId, so the single current account is used).
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
+    expect(h.adopt).toHaveBeenCalledTimes(1);
     expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: AMOUNT });
 
     fireEvent.click(screen.getByRole("button", { name: "Ăn uống" }));
@@ -168,7 +228,7 @@ describe("TransferConfirm — always create + categorize", () => {
     // via the category→jar map): only the txn's category changes.
     fireEvent.click(within(dialog).getByRole("button", { name: "Nhu yếu phẩm" }));
     expect(h.store[0]).toMatchObject({ categoryId: "groceries", type: "expense" });
-    expect(h.add).toHaveBeenCalledTimes(1); // still one txn total
+    expect(h.adopt).toHaveBeenCalledTimes(1); // still one txn total
   });
 
   it("account-sourced: defaults to transfer, then re-category changes only the txn category (F#5)", async () => {
@@ -178,7 +238,7 @@ describe("TransferConfirm — always create + categorize", () => {
 
     // Account-sourced debits the real account (uses the draft's explicit
     // sourceAccountId — no current-account lookup needed) and books a transfer txn.
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT);
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
     expect(h.listAccounts).not.toHaveBeenCalled();
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
 
@@ -191,7 +251,7 @@ describe("TransferConfirm — always create + categorize", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mua sắm" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Không phân loại" }));
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("0-category jar records type:transfer (no phantom expense, F#1)", async () => {
@@ -209,21 +269,21 @@ describe("TransferConfirm — always create + categorize", () => {
     fireEvent.click(btn);
     fireEvent.click(btn);
     await screen.findByText("Chuyển tiền thành công");
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("reload after completion does not resubmit — shows completed state (F#2)", async () => {
     h.draft = jarDraft();
     const view = render(<TransferConfirm />);
     await completeTransfer();
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
 
     // Remount with the same draftId — draft consumed, marked used.
     view.unmount();
     render(<TransferConfirm />);
     expect(screen.getByText("Giao dịch đã hoàn tất")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Xác nhận chuyển tiền" })).not.toBeInTheDocument();
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("a provider failure surfaces an error and stays retryable (no permanent lock)", async () => {
@@ -234,12 +294,12 @@ describe("TransferConfirm — always create + categorize", () => {
 
     fireEvent.click(btn);
     await screen.findByText(/Không hoàn tất được giao dịch/);
-    expect(h.add).not.toHaveBeenCalled(); // async failed before any local write
+    expect(h.adopt).not.toHaveBeenCalled(); // async failed before any local write
 
     // Retry now succeeds — the latch was released.
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
     await screen.findByText("Chuyển tiền thành công");
-    expect(h.add).toHaveBeenCalledTimes(1);
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("shows an error and does not change category when update fails (F#8)", async () => {
@@ -257,127 +317,146 @@ describe("TransferConfirm — always create + categorize", () => {
 });
 
 /**
- * Funding top-up path (unallocated pool / donor chain). `confirm()` re-runs
- * `evaluateFunding` on the FRESHEST accounts/derived-spendable right before
- * touching money. On an accepted top-up (Approach A — spread-as-spend) it charges
- * each JAR contributor its portion as a self-reported expense (source portion +
- * each donor's take); the pool portion needs no txn (the account debit shrinks
- * the derived pool). It aborts on "insufficient" (no debit, no txn) and, for an
- * `overspend` draft, keeps the single-txn behavior so the jar goes over-budget.
+ * Auto-fund path (plan 260918-1120, Phase 04) — the confirm screen ASSESSES first
+ * (C3), resolves insufficient/goal BEFORE any spend is booked, then books the FULL
+ * amount into the source jar's real category and delegates inter-jar coverage to the
+ * shared unit's `commit` (one `dieu-chinh-hu` rebalance per donor). Spread-as-spend
+ * is gone: the primary is never split into per-donor expense charges.
  */
-describe("TransferConfirm — funding top-up (Approach A: spread-as-spend)", () => {
-  it("accepted top-up covered by the pool: one source-portion txn (min(amount, spendable)), debit is the full amount", async () => {
-    // CASA=10tr; food(src)=2tr, shop=1tr → claimed=3tr, pool=7tr.
-    // amount=2.5tr → shortfall from food = 0.5tr, fully covered by the pool (no jar donor).
-    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
-    h.draft = {
-      id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: 2_500_000, memo: null,
-      sourceLabel: "Hũ Ăn uống", sourceJarId: "food", sourceAccountId: "acc1", plannedReallocation: true,
-    };
-    render(<TransferConfirm />);
-    await completeTransfer();
-
-    // The account debit is the full transfer; the source jar is charged only its
-    // own portion (min(2.5tr, spendable 2tr) = 2tr → remaining lands at its limit).
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 2_500_000);
-    expect(h.add).toHaveBeenCalledTimes(1); // pool portion needs NO txn
-    expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: 2_000_000 });
-
-    // The debit is applied before the charge txns.
-    expect(h.applyAccountDebit.mock.invocationCallOrder[0]).toBeLessThan(h.add.mock.invocationCallOrder[0]);
-  });
-
-  it("accepted top-up with a jar donor: source portion + donor take charged, pool portion txn-free", async () => {
-    // CASA=10tr; food(src)=2tr, shop=1tr → claimed=3tr, pool=7tr.
-    // amount=9.5tr → shortfall from food = 7.5tr. pool 7tr, then shop (disc) 0.5tr.
-    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
-    h.draft = {
-      id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: 9_500_000, memo: null,
-      sourceLabel: "Hũ Ăn uống", sourceJarId: "food", sourceAccountId: "acc1", plannedReallocation: true,
-    };
-    render(<TransferConfirm />);
-    await completeTransfer();
-
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 9_500_000);
-    // Two charges: source food portion (2tr into dining) + donor shop take (0.5tr into
-    // shopping). The pool's 7tr needs no txn (the account debit shrinks the pool).
-    expect(h.add).toHaveBeenCalledTimes(2);
-    expect(txnByCategory("dining")).toMatchObject({ amount: 2_000_000, type: "expense" });
-    expect(txnByCategory("shopping")).toMatchObject({ amount: 500_000, type: "expense" });
-  });
-
-  it("POOL-sourced accepted top-up with a jar donor: full-amount transfer txn PLUS each donor take (asymmetric — primary not reduced by Σtakes)", async () => {
-    // No sourceJarId → the POOL is the source. CASA=5tr; food=2tr, shop=1tr →
-    // claimed=3tr, pool=2tr. amount=2.5tr → pool short by 0.5tr; the largest
-    // discretionary jar (food, 2tr) donates 0.5tr. This is the ONE branch where the
-    // charge total structurally exceeds the transfer amount: the primary is a
-    // FULL-amount type:transfer txn (excluded from spend) and each JAR donor's take
-    // is booked as a separate expense — the primary is never reduced by Σtakes.
-    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 5_000_000 }]);
-    h.draft = {
-      id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: 2_500_000, memo: null,
-      sourceLabel: "Tài khoản MSB", sourceAccountId: "acc1", plannedReallocation: true,
-    };
-    render(<TransferConfirm />);
-    await completeTransfer();
-
-    // The account debit is the full amount (never inflated by the donor take).
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 2_500_000);
-    // 1 primary + donors.length (1) = 2 txns; the pool portion itself needs no txn.
-    expect(h.add).toHaveBeenCalledTimes(2);
-    // Primary stays the FULL amount as a transfer (not reduced by the 0.5tr take).
-    expect(txnByCategory("transfer")).toMatchObject({ amount: 2_500_000, type: "transfer" });
-    // The food donor is charged its take (0.5tr) into its first category.
-    expect(txnByCategory("dining")).toMatchObject({ amount: 500_000, type: "expense" });
-    // No pool txn: only the transfer + the single donor were written.
-    expect(h.store).toHaveLength(2);
-  });
-
-  it("re-validation returns insufficient: no debit, no txn — error shown", async () => {
-    // CASA=1tr < amount(2.5tr) → hard block regardless of the jar/donor chain.
-    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 1_000_000 }]);
-    h.draft = {
-      id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: 2_500_000, memo: null,
-      sourceLabel: "Hũ Ăn uống", sourceJarId: "food", sourceAccountId: "acc1", plannedReallocation: true,
-    };
+describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
+  it("insufficient blocks: no debit, no txn, error shown (C3)", async () => {
+    h.assessment = { tier: "insufficient", shortfall: 500_000, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: "food", source: "mock" };
+    h.draft = jarDraft();
     render(<TransferConfirm />);
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
 
     await screen.findByText(/Số dư không đủ để hoàn tất giao dịch/);
     expect(h.applyAccountDebit).not.toHaveBeenCalled();
-    expect(h.add).not.toHaveBeenCalled();
+    expect(h.adopt).not.toHaveBeenCalled();
   });
 
-  it("overspend flag, feasible fresh state (ok tier): single full-amount txn, debit happens", async () => {
-    // food spendable=2tr already covers amount=1.5tr → tier resolves "ok".
-    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
-    h.draft = {
-      id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: 1_500_000, memo: null,
-      sourceLabel: "Hũ Ăn uống", sourceJarId: "food", sourceAccountId: "acc1", overspend: true,
+  it("topup: books the FULL amount into the jar category, then commits the rebalance", async () => {
+    h.assessment = {
+      tier: "topup", shortfall: 1_000_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 1_000_000 }],
     };
+    h.createdIds = ["reb-1"];
+    h.draft = jarDraft();
     render(<TransferConfirm />);
     await completeTransfer();
 
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 1_500_000);
-    expect(h.add).toHaveBeenCalledTimes(1);
-    expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: 1_500_000 });
+    // Real spend keeps its real category at its FULL amount — NOT split per donor.
+    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
+    expect(h.adopt).toHaveBeenCalledTimes(1);
+    expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: AMOUNT });
+    // Coverage is delegated to the shared unit (one rebalance per donor), not booked here.
+    expect(h.commit).toHaveBeenCalledTimes(1);
+    // The post-fund toast surfaces the donor + Hoàn tác / Đổi nguồn.
+    expect(await screen.findByText(/Đã bù/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Hoàn tác/ })).toBeInTheDocument();
   });
 
-  it("REGRESSION: overspend flag with fresh tier==topup keeps the SINGLE full-amount txn (jar goes over)", async () => {
-    // food(src)=2tr, amount=3tr → shortfall 1tr; pool covers → fresh tier "topup".
-    // "Bỏ qua, vượt hũ" (overspend) DECLINED the top-up: the source jar is charged
-    // the FULL amount (3tr into dining) so its remaining goes negative — never
-    // converted into a spread-as-spend top-up. No donor charges.
-    h.listAccounts.mockResolvedValueOnce([{ id: "acc1", type: "current", availableBalance: 10_000_000 }]);
-    h.draft = {
-      id: "d1", name: "Nguyen Van A", accountMasked: "****1234", amount: 3_000_000, memo: null,
-      sourceLabel: "Hũ Ăn uống", sourceJarId: "food", sourceAccountId: "acc1", overspend: true,
+  it("requiresManualGoal: prompts BEFORE booking, and confirm proceeds (no silent goal raid)", async () => {
+    h.assessment = {
+      tier: "insufficient", shortfall: 1_000_000, requiresManualGoal: true, targetJarId: "food", source: "mock",
+      donors: [], goalDonors: [{ jarId: "goalJar", label: "Hũ Mục tiêu", take: 1_000_000 }],
     };
+    h.createdIds = ["reb-goal"];
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+
+    // First tap surfaces the goal-confirm — nothing booked yet (C3).
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    expect(await screen.findByText(/Cần rút từ hũ Mục tiêu/)).toBeInTheDocument();
+    expect(h.applyAccountDebit).not.toHaveBeenCalled();
+    expect(h.adopt).not.toHaveBeenCalled();
+
+    // Explicit confirm proceeds: books the primary + commits the goal chain.
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận rút" }));
+    await screen.findByText("Chuyển tiền thành công");
+    expect(h.adopt).toHaveBeenCalledTimes(1);
+    expect(h.commit).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Edge fixes (plan 260919-1915): H14/U1 atomic debit + record, S10/U7 one clock,
+ * H11/U16 no empty donor list when the amount exceeds CASA.
+ */
+describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
+  it("H14/U1: a failed debit+record write shows an error — no success screen, no local txn, draft kept", async () => {
+    h.draft = jarDraft();
+    h.applyAccountDebit.mockRejectedValueOnce(new Error("manual-transactions 500"));
+    render(<TransferConfirm />);
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+
+    await screen.findByText(/Không hoàn tất được giao dịch/);
+    expect(screen.queryByText("Chuyển tiền thành công")).not.toBeInTheDocument();
+    expect(h.adopt).not.toHaveBeenCalled();
+    expect(h.store).toHaveLength(0);
+    expect(h.used.d1).toBeUndefined(); // draft NOT consumed — the user can retry
+    // The record travels WITH the debit (one server transaction), never separately.
+    const [, , record] = h.applyAccountDebit.mock.calls[0];
+    expect(record).toMatchObject({ amount: AMOUNT, direction: "debit", categoryId: "dining" });
+
+    // Retry of the SAME transfer reuses the record id (server-side replay guard).
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    await screen.findByText("Chuyển tiền thành công");
+    const retryRecord = h.applyAccountDebit.mock.calls[1][2] as { id: string };
+    expect(retryRecord.id).toBe((record as { id: string }).id);
+    expect(h.adopt).toHaveBeenCalledWith(expect.objectContaining({ id: retryRecord.id }));
+  });
+
+  it("H14/U1: a failed rebalance leg after the debit is surfaced on the receipt, never 'Đã bù'", async () => {
+    h.assessment = {
+      tier: "topup", shortfall: 200_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 200_000 }],
+    };
+    h.commitPersisted.mockRejectedValueOnce(new Error("leg 500"));
+    h.draft = jarDraft();
     render(<TransferConfirm />);
     await completeTransfer();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Chưa bù được 200\.000.*hũ Ăn uống.*cần bù thủ công/);
+    expect(screen.queryByText(/Đã bù/)).not.toBeInTheDocument();
+  });
 
-    expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", 3_000_000);
-    expect(h.add).toHaveBeenCalledTimes(1);
-    expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: 3_000_000 });
+  it("S10/U7: assessment + posted date use the demo clock even when the real clock is in another month", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T03:00:00.000Z"));
+    try {
+      h.draft = jarDraft();
+      render(<TransferConfirm />);
+      await completeTransfer();
+      const assessedAt = h.assess.mock.calls.map((c) => (c[0] as { postedAt: string }).postedAt);
+      expect(assessedAt.length).toBeGreaterThan(0);
+      expect(assessedAt.every((d) => d.startsWith("2026-09-15"))).toBe(true);
+      const record = h.applyAccountDebit.mock.calls[0][2] as { postedAt: string };
+      expect(record.postedAt).toBe("2026-09-15T03:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("H11/U16: amount above CASA shows the plain 'Số dư không đủ' state — never an empty donor list", async () => {
+    h.casaBalance = 680_000;
+    h.assessment = { tier: "insufficient", shortfall: 820_000, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: "food", source: "mock" };
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+    fireEvent.change(screen.getByDisplayValue(String(AMOUNT)), { target: { value: "1500000" } });
+
+    expect(await screen.findByRole("alert", { name: "Số dư không đủ" })).toHaveTextContent(/680\.000/);
+    expect(screen.queryByRole("region", { name: "Dự kiến bù hũ" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/rót từ/)).not.toBeInTheDocument();
+  });
+
+  it("H11: a topup with donors still lists them (list only when there are donors)", async () => {
+    h.assessment = {
+      tier: "topup", shortfall: 300_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 300_000 }],
+    };
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+    const region = await screen.findByRole("region", { name: "Dự kiến bù hũ" });
+    expect(within(region).getByText("Hũ Mua sắm")).toBeInTheDocument();
   });
 });

@@ -11,8 +11,8 @@
  */
 
 import type { Transaction } from "@/domain/models";
-import { FIXED_CATEGORY_IDS } from "@/domain/models";
-import { coverageOf, type AggregateMeta, type Period } from "./types";
+import { FIXED_CATEGORY_IDS, isRebalanceCategory } from "@/domain/models";
+import { coverageOf, isoInPeriod, type AggregateMeta, type Period } from "./types";
 
 export interface CategoryAmount {
   categoryId: string;
@@ -37,9 +37,13 @@ export interface CashflowResult {
 
 const EXPENSE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee"]);
 
-/** True when `txn.postedAt` falls within `period` (inclusive bounds). */
+/**
+ * True when `txn.postedAt` falls within `period` (inclusive bounds). Compares real
+ * instants (never ISO strings lexically), so a `+07:00`-suffixed timestamp lands in
+ * its true VN month; an unparseable `postedAt` is in no period.
+ */
 export function inPeriod(txn: Transaction, period: Period): boolean {
-  return txn.postedAt >= period.from && txn.postedAt <= period.to;
+  return isoInPeriod(txn.postedAt, period);
 }
 
 /** Net expense per category for posted transactions (gross − refunds). */
@@ -47,6 +51,10 @@ export function netExpenseByCategory(txns: Transaction[], period: Period): Map<s
   const byCat = new Map<string, number>();
   for (const t of txns) {
     if (t.status !== "posted" || !inPeriod(t, period)) continue;
+    // Inter-jar rebalance txns are a bookkeeping move, NOT spend — excluded from
+    // spend-by-category + jar `spent` + cashflow expense exactly like a transfer
+    // (invariant #6). The engine folds them into `remaining` via `rebalanceNetByJar`.
+    if (isRebalanceCategory(t.categoryId)) continue;
     if (EXPENSE_TYPES.has(t.type)) {
       byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amount);
     } else if (t.type === "refund") {

@@ -93,3 +93,18 @@ describe("budgetsFromJars (hũ IS the budget)", () => {
     expect(budgets.reduce((sum, b) => sum + b.limit, 0)).toBe(1_000_000);
   });
 });
+
+describe("budgetsFromJars — whole-VND + corrupt-limit guards (B13/N11b)", () => {
+  it("B13: a fractional limit splits into INTEGER VND (rounded limit, floor splits, remainder first)", () => {
+    const jars: Jar[] = [{ id: "x", label: "X", categoryIds: ["a", "b", "c"], budgetLimit: 10.5 }];
+    const limits = budgetsFromJars(jars).map((b) => b.limit);
+    expect(limits).toEqual([5, 3, 3]); // round(10.5) = 11 → 3 r2
+    expect(limits.every(Number.isInteger)).toBe(true);
+    expect(limits.reduce((s, n) => s + n, 0)).toBe(11);
+  });
+
+  it.each([NaN, Infinity, -1])("N11b: budgetLimit=%s is treated as unset — contributes nothing", (budgetLimit) => {
+    const jars: Jar[] = [{ id: "x", label: "X", categoryIds: ["a", "b"], budgetLimit }];
+    expect(budgetsFromJars(jars)).toEqual([]);
+  });
+});

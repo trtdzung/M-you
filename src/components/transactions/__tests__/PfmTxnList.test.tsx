@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
+import { mockStoredCorrections } from "@/test-utils/mock-corrections-fetch";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
@@ -178,10 +179,9 @@ describe("PfmTxnList", () => {
 
     // The correction persisted to storage (the corrections seam, never a
     // provider mutation — invariant #4).
-    const raw = window.localStorage.getItem("msb-pfm.corrections.CIF_0001");
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw as string) as Record<string, { categoryId?: string }>;
-    expect(Object.values(parsed).some((c) => c.categoryId === "health")).toBe(true);
+    await waitFor(() =>
+      expect(Object.values(mockStoredCorrections("CIF_0001")).some((c) => c.categoryId === "health")).toBe(true),
+    );
 
     // Close the sheet — the underlying row now reflects the override (pencil
     // "Đã sửa danh mục" mark), proving the change flows back into the list.

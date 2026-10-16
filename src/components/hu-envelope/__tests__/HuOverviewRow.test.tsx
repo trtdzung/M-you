@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { Financials } from "@/domain/engine/finance-compose";
 import type { JarEnvelopeResult, JarEnvelopeLine } from "@/domain/engine/jar-envelope";
@@ -16,11 +16,20 @@ const config: JarConfig = {
   ],
 };
 // The sheet (opened by "Chia ngay") reads config + the batch `updateJars` writer.
-vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config, updateJars: vi.fn().mockResolvedValue(undefined) }) }));
+// `jarError` mirrors `useJarConfig().error` (non-null when GET /api/jars failed, U10).
+let jarError: string | null = null;
+vi.mock("@/state/jars", () => ({
+  useJarConfig: () => ({ config, error: jarError, updateJars: vi.fn().mockResolvedValue(undefined) }),
+}));
 // The labeling sheet reads the corrections hooks — stub them so the row is pure.
 vi.mock("@/state/corrections", () => ({
   useConfirmCategory: () => vi.fn(),
   useCorrections: () => ({ unsaved: false }),
+}));
+// The labeling sheet also consults auto-fund on label; stub to a no-op "covered"
+// so this row test needs no PersonaProvider/financials wiring.
+vi.mock("@/state/use-auto-fund", () => ({
+  useAutoFund: () => ({ reconcile: () => ({ status: "covered", donors: [], targetLabel: "hũ" }) }),
 }));
 
 import { HuOverviewRow } from "../HuOverviewRow";
@@ -36,7 +45,7 @@ const meta = { period: JUNE, sourceCoverage: { sources: ["mock" as const], known
 
 function envelope(over: Partial<JarEnvelopeResult>): JarEnvelopeResult {
   return {
-    pending: { amount: 5_000_000, pool: 5_000_000, allocated: 0, meta },
+    pending: { amount: 5_000_000, overAllocated: false, pool: 5_000_000, allocated: 0, meta },
     jars: [line({})],
     meta,
     ...over,
@@ -51,6 +60,31 @@ function withEnvelope(env: JarEnvelopeResult, overAllocated = false): Financials
 }
 
 describe("HuOverviewRow", () => {
+  afterEach(() => {
+    jarError = null;
+  });
+
+  it("U10: a failed jar load renders an error state — no jar/pending cards, no 'all CASA unallocated'", () => {
+    jarError = "Failed to load jars";
+    render(<HuOverviewRow financials={withEnvelope(envelope({ jars: [] }))} />);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Không tải được hũ chi tiêu")).toBeInTheDocument();
+    expect(screen.queryByText("Chờ phân bổ")).not.toBeInTheDocument();
+  });
+
+  it("D26/U14: hides the pending card when the unallocated pool is negative (over-allocated)", () => {
+    const env = envelope({ pending: { amount: -2_000_000, overAllocated: true, pool: 5_000_000, allocated: 7_000_000, meta } });
+    render(<HuOverviewRow financials={withEnvelope(env, true)} />);
+    expect(screen.queryByText("Chờ phân bổ")).not.toBeInTheDocument();
+    expect(screen.getByText("Vượt phân bổ")).toBeInTheDocument();
+  });
+
+  it("D26/U14: the pending card shows the unallocated pool (CASA − Σ spendable) with the shared wording", () => {
+    const env = envelope({ pending: { amount: 5_500_000, overAllocated: false, pool: 8_000_000, allocated: 3_000_000, meta } });
+    render(<HuOverviewRow financials={withEnvelope(env)} />);
+    expect(screen.getByText("5,5 tr")).toBeInTheDocument();
+    expect(screen.getByText("số dư chưa thuộc hũ nào")).toBeInTheDocument();
+  });
   it("renders the 'Chờ phân bổ' card with the pending amount", () => {
     render(<HuOverviewRow financials={withEnvelope(envelope({}))} />);
     expect(screen.getByText("Chờ phân bổ")).toBeInTheDocument();
@@ -114,13 +148,13 @@ describe("HuOverviewRow", () => {
   });
 
   it("hides the pending card once everything is allocated (known amount, 0 outstanding)", () => {
-    const env = envelope({ pending: { amount: 0, pool: 5_000_000, allocated: 5_000_000, meta } });
+    const env = envelope({ pending: { amount: 0, overAllocated: false, pool: 5_000_000, allocated: 5_000_000, meta } });
     render(<HuOverviewRow financials={withEnvelope(env)} />);
     expect(screen.queryByText("Chờ phân bổ")).not.toBeInTheDocument();
   });
 
   it("shows the pending card when the pool is unknown (no CASA account)", () => {
-    const env = envelope({ pending: { amount: "unknown", pool: "unknown", allocated: 0, meta } });
+    const env = envelope({ pending: { amount: "unknown", overAllocated: false, pool: "unknown", allocated: 0, meta } });
     render(<HuOverviewRow financials={withEnvelope(env)} />);
     expect(screen.getByText("Chờ phân bổ")).toBeInTheDocument();
   });

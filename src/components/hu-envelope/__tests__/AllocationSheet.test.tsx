@@ -21,7 +21,7 @@ const META = { period: monthPeriod(2026, 8), sourceCoverage: { sources: ["msb" a
 
 function envelope(pool: number | "unknown"): JarEnvelopeResult {
   return {
-    pending: { amount: pool === "unknown" ? "unknown" : Math.max(0, pool - 13_000_000), pool, allocated: 13_000_000, meta: META },
+    pending: { amount: pool === "unknown" ? "unknown" : Math.max(0, pool - 13_000_000), overAllocated: false, pool, allocated: 13_000_000, meta: META },
     jars: [],
     meta: META,
   };

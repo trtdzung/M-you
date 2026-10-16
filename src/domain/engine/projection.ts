@@ -13,7 +13,7 @@
 import type { Account, DataSource } from "@/domain/models";
 import type { CashflowResult } from "./cashflow";
 import type { Obligation } from "./obligations";
-import { isKnown, type Amount } from "./types";
+import { isKnown, VN_UTC_OFFSET_MS, type Amount } from "./types";
 
 /** Lightweight provenance for a derived projection. */
 export interface ProjectionMeta {
@@ -42,14 +42,21 @@ function oldest(values: (string | null | undefined)[]): string | null {
   return min;
 }
 
-/** Last calendar day of `now`'s UTC month. */
-function daysInMonth(now: Date): number {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+/** `now` shifted to VN wall-clock, read via getUTC* (business time, fixed UTC+7). */
+function vnWallClock(now: Date): Date {
+  return new Date(now.getTime() + VN_UTC_OFFSET_MS);
 }
 
-/** End-of-month boundary (last moment of `now`'s UTC month) as ms. */
+/** Last calendar day of `now`'s VN month. */
+function daysInMonth(now: Date): number {
+  const vn = vnWallClock(now);
+  return new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
+/** End-of-month boundary (last moment of `now`'s VN month) as ms. */
 function endOfMonthMs(now: Date): number {
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999);
+  const vn = vnWallClock(now);
+  return Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth() + 1, 1) - VN_UTC_OFFSET_MS - 1;
 }
 
 export interface EndOfMonthEstimate {
@@ -96,7 +103,7 @@ export function estimateEndOfMonth(
   }
 
   // Pro-rated discretionary run-rate for the rest of the month.
-  const daysElapsed = now.getUTCDate();
+  const daysElapsed = vnWallClock(now).getUTCDate();
   const daysRemaining = daysInMonth(now) - daysElapsed;
   const projDiscretionary =
     daysElapsed > 0 ? (cashflow.discretionary / daysElapsed) * daysRemaining : 0;

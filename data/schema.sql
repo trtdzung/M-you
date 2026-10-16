@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS jars (
   label TEXT NOT NULL,
   category_ids TEXT NOT NULL,      -- JSON array of category id strings
   budget_limit REAL,               -- NULL = "chưa đặt" (Đã set), never 0
+  role TEXT,                       -- donor-waterfall role (buffer/spending/essential/goal); NULL → treated as spending
   color TEXT,
   icon TEXT,
   sort_order INTEGER NOT NULL,     -- display order (a jar added later sorts last)
@@ -74,6 +75,49 @@ CREATE TABLE IF NOT EXISTS manual_transactions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_manual_txns_cif ON manual_transactions (cif);
+
+-- Bank-provided transaction history per persona (`cif`) — the "provider" txns
+-- (`source: 'mock'`, standing in for MSB core-banking). Previously generated in
+-- browser memory on every load; now a real table, seeded lazily per persona from
+-- the same deterministic generator (`fixtures/generate.ts`) on first read. Same
+-- JSON-in-column pattern as `manual_transactions`; `posted_at` is a column for
+-- period filtering + newest-first order. Self-reported records stay in
+-- `manual_transactions` so provenance never mixes (invariant #5).
+CREATE TABLE IF NOT EXISTS transactions (
+  cif TEXT NOT NULL,
+  id TEXT NOT NULL,
+  posted_at TEXT NOT NULL,          -- ISO 8601
+  payload TEXT NOT NULL,            -- full JSON Transaction (source: mock)
+  PRIMARY KEY (cif, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_cif_posted ON transactions (cif, posted_at);
+
+-- The spending/transfer category taxonomy ("categories are data", invariant #7).
+-- Seeded lazily from `src/domain/models/categories.ts` (INSERT OR IGNORE, so a
+-- category added in code appears and an edited row is never clobbered). Sentinels
+-- (`unclassified`, `income`, `dieu-chinh-hu`) are NOT categories and never stored.
+CREATE TABLE IF NOT EXISTS categories (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,              -- Vietnamese display label
+  kind TEXT NOT NULL CHECK (kind IN ('expense', 'transfer')),
+  fixed INTEGER NOT NULL,           -- 1 = fixed/recurring spend, 0 = discretionary
+  sort_order INTEGER NOT NULL
+);
+
+-- Per-transaction category overlay per persona (`cif`): user corrections AND
+-- AI/memory/heuristic assignments, plus the `hidden` flag. An overlay, never a
+-- mutation of the bank row in `transactions` (invariant #4), so the original
+-- category and the label's provenance (origin/confidence/status — #5) survive.
+-- Previously browser localStorage only; now a real table so labels persist
+-- across devices. `payload` is the normalized `Correction` JSON.
+CREATE TABLE IF NOT EXISTS transaction_corrections (
+  cif TEXT NOT NULL,
+  txn_id TEXT NOT NULL,
+  payload TEXT NOT NULL,            -- JSON Correction {categoryId?, hidden?, origin, confidence?, status?}
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (cif, txn_id)
+);
 
 -- NOTE: the legacy `jar_allocations` table was retired with the single-number
 -- ("một con số") jar model — a jar's `budget_limit` IS its allocation now, so

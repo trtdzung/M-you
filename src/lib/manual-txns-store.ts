@@ -65,6 +65,12 @@ export type ManualTxnPatch = {
   type?: Transaction["type"];
   transferPurpose?: string | null;
   note?: string | null;
+  /** Inter-jar rebalance meta (Phase 03). `null` over the wire ⇒ CLEAR the field. */
+  rebalance?: Transaction["rebalance"] | null;
+  /** Refund/reversal of a trigger txn (RT-fix H3) — non-clearable. */
+  status?: Transaction["status"];
+  /** Amount edit of a trigger txn (RT-fix H5) — non-clearable. */
+  amount?: number;
 };
 
 export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): Transaction | null {
@@ -86,10 +92,36 @@ export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): 
     else if (patch.transferPurpose !== undefined) next.transferPurpose = patch.transferPurpose;
     if (patch.note === null) delete next.note;
     else if (patch.note !== undefined) next.note = patch.note;
+    if (patch.rebalance === null) delete next.rebalance;
+    else if (patch.rebalance !== undefined) next.rebalance = patch.rebalance;
+    if (patch.status !== undefined) next.status = patch.status;
+    if (patch.amount !== undefined) next.amount = Math.abs(patch.amount);
     upsertManualTxn(cif, next);
     return next;
   });
   return run();
+}
+
+/** WHERE clause matching a rebalance leg whose donor OR target is `@jarId`. */
+const LEG_OF_JAR = `cif = @cif AND (
+  json_extract(payload, '$.rebalance.fromJarId') = @jarId OR
+  json_extract(payload, '$.rebalance.toJarId') = @jarId)`;
+
+/** How many rebalance legs of `cif` reference `jarId` (from or to) — the UI's pre-delete warning. */
+export function countRebalanceLegsForJar(cif: string, jarId: string): number {
+  const row = getDb()
+    .prepare(`SELECT COUNT(*) AS n FROM manual_transactions WHERE ${LEG_OF_JAR}`)
+    .get({ cif, jarId }) as { n: number };
+  return row.n;
+}
+
+/**
+ * Delete every rebalance leg of `cif` referencing `jarId` (S8): a leg pointing at
+ * a jar that no longer exists would move money "from nowhere". Returns the number
+ * removed. Callers wrap it in the same transaction as the jar delete.
+ */
+export function deleteRebalanceLegsForJar(cif: string, jarId: string): number {
+  return getDb().prepare(`DELETE FROM manual_transactions WHERE ${LEG_OF_JAR}`).run({ cif, jarId }).changes;
 }
 
 /** Delete one self-reported txn (no-op if absent). */

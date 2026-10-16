@@ -7,6 +7,7 @@ import { categoryToJarMap, KHAC_JAR_ID, KHAC_JAR_LABEL } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
 import { Sheet } from "@/components/primitives";
 import { categoryColor } from "@/lib/category-colors";
+import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
  * Quản lý danh mục chi tiêu. Mỗi danh mục thuộc đúng một hũ (exactly-one) — đổi
@@ -24,6 +25,9 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet title="Quản lý danh mục" description="Danh mục mặc định được khoá" onClose={onClose}>
+      <div className="mb-3">
+        <JarMutationErrorNotice />
+      </div>
       <ul className="flex flex-col gap-2">
         {rows.map((c) => {
           const jarId = catToJar.get(c.id) ?? KHAC_JAR_ID;

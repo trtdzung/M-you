@@ -2,68 +2,48 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Home, Share2, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/primitives";
-import { formatDateTime } from "@/lib/format";
-import { avatarColor, initialOf } from "@/lib/avatar";
-import { findBank, findBankByName } from "@/lib/transfer-banks";
-import { BankLogo } from "@/components/transfer/BankLogo";
-import { TransferCategorizeSection } from "@/components/transfer/TransferCategorizeSection";
 import { usePersona, useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
-import { useManualTxns } from "@/state/manual-txns";
+import { buildManualTxn, useManualTxns, type ManualTxnInput } from "@/state/manual-txns";
 import { useFinancials } from "@/state/useFinancials";
-import { casaBalance, evaluateFunding, jarSpendable, POOL_DONOR_ID, type JarSpendable } from "@/domain/engine";
+import { useAutoFund, type FundResult } from "@/state/use-auto-fund";
+import { formatVnd } from "@/lib/format";
+import { transferNow } from "@/lib/demo-clock";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
-import { CATEGORY, CURRENCY_VND, type DataSource } from "@/domain/models";
+import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
+import type { FundingAssessment } from "@/domain/engine";
+import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
+import { TransferFundingPreview } from "./TransferFundingPreview";
 
 /**
  * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field
- * and explicitly confirms (no OTP step — dropped from this prototype).
- * "Executing" here only builds a local `source: "mock"` record; no facade/API
- * is ever called and the assistant never reaches this code. Cancel returns
- * control with no effect.
+ * and explicitly confirms (no OTP step — dropped from this prototype). The
+ * assistant never reaches this code. Cancel returns control with no effect.
+ *
+ * Write path (H14/U1): the debit and the primary txn are ONE server transaction
+ * (`applyAccountDebit(..., record)`); only when it resolves is the txn adopted
+ * locally and the receipt shown. Rebalance legs are then AWAITED — a failed leg
+ * is surfaced on the receipt, never claimed as "Đã bù".
+ *
+ * Clock (S10/U7): the preview, the confirm-time assessment and the posted txn
+ * all use `transferNow()` — the same clock Compose assessed with.
  */
 
-interface MockExecutedTransfer {
-  recipientName: string;
-  recipientAccountMasked: string;
-  recipientAccountNumber: string | null;
-  recipientBankName: string | null;
-  senderName: string;
-  amount: number;
-  currency: string;
-  memo: string | null;
-  executedAt: string;
-  transactionCode: string;
-  referenceCode: string;
-  source: DataSource; // always "mock" — never presented as a real MSB transfer
-}
-
-/** Comma-grouped, "VND" suffix — matches the real MSB receipt screen exactly (the rest of the app uses "₫"/period-grouping; this one screen deliberately doesn't). */
-function formatVndComma(amount: number): string {
-  return new Intl.NumberFormat("en-US").format(amount);
-}
-
-/** Uppercase, diacritics-stripped — matches the real app's auto-generated memo style (e.g. "NGUYEN VIET DUNG chuyen tien"). */
-function toPlainUpper(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toUpperCase();
-}
+/** Label for a pool-source lift target (the derived "Chưa phân bổ" pool). */
+const POOL_TARGET_LABEL = "Chưa phân bổ";
 
 export function TransferConfirm() {
   const router = useRouter();
   const params = useSearchParams();
   const providers = useProviders();
   const { config: jarConfig } = useJarConfig();
-  const { add: addManualTxn } = useManualTxns();
+  const { adopt: adoptManualTxn, addPersisted } = useManualTxns();
   const { financials } = useFinancials();
+  const autoFund = useAutoFund();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
   const draftIdParam = params.get("draftId") ?? "";
@@ -79,15 +59,24 @@ export function TransferConfirm() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<MockExecutedTransfer | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [recipientSaved, setRecipientSaved] = useState(false);
   // Categorization (phase 04): the txn recorded on confirm and its source jar.
   const [createdTxnId, setCreatedTxnId] = useState<string | null>(null);
   const [createdSourceJarId, setCreatedSourceJarId] = useState<string | null>(null);
+  // The auto-fund result (drives the success-card toast: donors + Hoàn tác/Đổi nguồn).
+  const [fundResult, setFundResult] = useState<FundResult | null>(null);
+  // A rebalance write that failed AFTER the debit (shown on the receipt, H14).
+  const [fundError, setFundError] = useState<string | null>(null);
+  // A goal-only shortfall needs an explicit confirm (requiresManualGoal) BEFORE any
+  // spend is booked (C3) — never a silent goal raid. Holds the pending assessment.
+  const [goalPrompt, setGoalPrompt] = useState<FundingAssessment | null>(null);
   // Latches true the moment a txn is committed. A `useState` flag can't stop a
   // synchronous double-tap (both handlers read the same stale state) — the ref
   // does (Red Team F#3). Set only after validation so a failed attempt can retry.
   const committedRef = useRef(false);
+  // The primary record of the last attempt — reused on a retry of the SAME
+  // transfer so the server's id-idempotency never double-debits a lost response.
+  const attemptRef = useRef<Transaction | null>(null);
   const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
 
   function saveRecipient() {
@@ -102,294 +91,157 @@ export function TransferConfirm() {
       .catch(() => {});
   }
 
-  async function confirm() {
+  // The source's funding shape (draft-derived). A jar/pool source can be short and
+  // gets auto-funded; an account source is a plain balance check (no jar model).
+  const sourceJarId = draft?.sourceJarId ?? null;
+  const sourceKind = draft?.sourceKind ?? (sourceJarId ? "jar" : "account");
+  const fundable = sourceKind === "jar" || sourceKind === "pool";
+  // A jar source funds ITS jar; a pool source lifts the derived "pool" (targetJarId null).
+  const targetJarId = sourceKind === "jar" ? sourceJarId : null;
+
+  // RT-fix (H6): the anticipated donor chain on the posted-month snapshot, so the
+  // user reviews donor(s) + amount BEFORE confirming. Recomputed fresh at confirm.
+  const preview = useMemo(() => {
+    if (!fundable || !financials || !(amount > 0)) return null;
+    const { assessment, snapshot } = autoFund.assess({ postedAt: transferNow().toISOString(), sourceJarId: targetJarId, amount });
+    return assessment.tier === "ok" && amount <= snapshot.casaBalance ? null : { assessment, casaBalance: snapshot.casaBalance };
+  }, [fundable, financials, amount, targetJarId, autoFund]);
+
+  /** The primary record for this attempt (same id on a retry of the same transfer). */
+  function primaryRecord(input: ManualTxnInput): Transaction {
+    const prev = attemptRef.current;
+    const fresh = buildManualTxn(input);
+    const same = prev && prev.amount === fresh.amount && prev.merchantName === fresh.merchantName;
+    const txn = same ? { ...fresh, id: prev.id } : fresh;
+    attemptRef.current = txn;
+    return txn;
+  }
+
+  async function runConfirm(goalOk: boolean) {
     // In-flight / already-done guard: a double-tap or re-entry must never create
-    // a second txn or debit twice (Red Team F#3).
+    // a second txn or debit twice (Red Team F#3, RT-fix H1 idempotency).
     if (committedRef.current || submitting || done) return;
     if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
     setError(null);
+
+    const postedAt = transferNow().toISOString();
+    // RT-fix (C3) — ASSESS-THEN-COMMIT: resolve insufficient / goal FIRST, on the
+    // pre-commit snapshot, and only debit + write once coverage is guaranteed.
+    let assessment: FundingAssessment | null = null;
+    if (fundable) {
+      const assessed = autoFund.assess({ postedAt, sourceJarId: targetJarId, amount });
+      assessment = assessed.assessment;
+      const overCasa = amount > assessed.snapshot.casaBalance;
+      if (overCasa || (assessment.tier === "insufficient" && !assessment.requiresManualGoal)) {
+        return setError("Số dư không đủ để hoàn tất giao dịch. Vui lòng kiểm tra lại.");
+      }
+      if (assessment.requiresManualGoal && !goalOk) {
+        // Only a protected `goal` jar can close the gap — explicit confirm BEFORE
+        // any spend is booked. Re-enters via the prompt's "Xác nhận rút".
+        setGoalPrompt(assessment);
+        return;
+      }
+    }
+    setGoalPrompt(null);
+    const includeGoal = Boolean(assessment?.requiresManualGoal && goalOk);
+
     committedRef.current = true; // latch before any await — blocks a synchronous re-entry
     setSubmitting(true);
+    // Book the primary spend at its FULL amount into its REAL category: jar source →
+    // the jar's first category; pool/account → the agent category or "Chuyển khoản".
+    const sourceJar = targetJarId ? jarConfig.jars.find((j) => j.id === targetJarId) : undefined;
+    const primaryCategory = targetJarId ? sourceJar?.categoryIds[0] ?? CATEGORY.transfer : draft?.categoryId ?? CATEGORY.transfer;
+    const input: ManualTxnInput = {
+      amount,
+      direction: "debit",
+      categoryId: primaryCategory,
+      type: typeForCategory(primaryCategory), // derived from kind, never hardcoded
+      merchantName: name.trim(),
+      postedAt,
+      ...(draft?.memo ? { note: draft.memo } : {}),
+    };
+    let primaryTxnId: string;
     try {
-      // Mock-only: no real money moves, no API call, no facade involvement.
-      // Every transfer debits the real source account AND records self-reported
-      // txn(s), so the balance shown everywhere (transfer picker, Tổng quan, net
-      // worth) actually drops — the money leaves the account for real
-      // (envelope-label model: hũ are labels on the CASA account). There is NO
-      // stored jar balance any more: a jar's spendable = max(0, remaining) is
-      // DERIVED from txn history (invariant #1), so the ONLY thing a jar-sourced
-      // transfer does is book its spend into the jar's first category (which drops
-      // that jar's derived `remaining`). Account/pool-sourced spend books into
-      // "Chuyển khoản" (type:transfer, excluded from spend so it doesn't inflate
-      // expense — invariant #6); the account debit alone shrinks the derived pool.
-      //
-      // Accepted top-up ("gợi ý rót", Approach A — spread-as-spend): charge each
-      // JAR contributor its funding portion as a self-reported expense (source
-      // jar's own portion + each donor's `take`), never mutating `budgetLimit`
-      // (invariant #5). The pool portion needs NO txn — the account debit already
-      // shrinks the derived pool by exactly `poolTake`.
-      //
-      // Do the fail-prone async work (re-validate → debit) BEFORE any local ledger
-      // write, so a provider failure leaves nothing partially applied and the retry
-      // (after the catch releases the latch) can't double-debit. Fetch accounts
-      // ONLY when needed — a top-up/overspend re-check (needs casaBalance) or the
-      // legacy source-account fallback.
-      const sourceJarId = draft?.sourceJarId ?? null;
-      const needsAccounts = Boolean(draft?.plannedReallocation || draft?.overspend || !draft?.sourceAccountId);
+      // A jar's money physically sits in CASA, so every source debits CASA.
+      const needsAccounts = fundable || !draft?.sourceAccountId;
       const accounts = needsAccounts ? await providers.listAccounts() : [];
-
-      // Derived per-jar spendable from the SAME jarBudget.lines every screen reads
-      // (invariant #1) — the input to the fresh funding re-check and the top-up
-      // charge plan below. No stored balance is consulted.
-      const spendables: JarSpendable[] = (financials?.jarBudget.lines ?? []).map((line) => ({
-        id: line.huId,
-        label: line.label,
-        categoryIds: line.categoryIds,
-        spendable: jarSpendable(line.remaining),
-      }));
-      const spendableById = new Map(spendables.map((s) => [s.id, s.spendable]));
-
-      // Top-up / overspend drafts assumed a shortfall computed at popup time. Re-run
-      // the engine on the FRESHEST state (RT#2) so a drifted state can't let a stale
-      // plan push charges past what CASA holds. The freshly-computed donor chain
-      // (never the stale draft one) drives the charge plan (RT#1/#3/#4).
-      let donorCharges: { categoryId: string; amount: number }[] = [];
-      let acceptedTopup = false;
-      if (draft?.plannedReallocation || draft?.overspend) {
-        const assessment = evaluateFunding({
-          amount,
-          sourceJarId,
-          casaBalance: casaBalance(accounts),
-          jars: spendables,
-        });
-        if (assessment.tier === "insufficient") {
-          committedRef.current = false;
-          setSubmitting(false);
-          return setError("Số dư không đủ để hoàn tất giao dịch. Vui lòng kiểm tra lại.");
-        }
-        // Apply the top-up ONLY when the user accepted it (`plannedReallocation`)
-        // and the fresh assessment still needs one. "Bỏ qua, vượt hũ" (`overspend`)
-        // explicitly DECLINED it — it falls through to the single-txn path so the
-        // jar goes over-budget (remaining negative) and the pool absorbs the
-        // shortfall. tier "ok" → state improved, no top-up needed either way.
-        if (draft?.plannedReallocation && assessment.tier === "topup") {
-          acceptedTopup = true;
-          // Each JAR donor is charged its `take` into its first category (the pool
-          // donor produces NO txn — the account debit already shrinks the pool).
-          // Donors always have a category (category-less jars are excluded upstream).
-          donorCharges = assessment.donors
-            .filter((d) => d.jarId !== POOL_DONOR_ID)
-            .map((d) => {
-              const donorJar = jarConfig.jars.find((j) => j.id === d.jarId);
-              return { categoryId: donorJar?.categoryIds[0] ?? CATEGORY.transfer, amount: d.take };
-            });
-        }
-      }
-
-      let accountToDebit = draft?.sourceAccountId ?? null;
-      if (!accountToDebit) {
-        // Legacy draft without an explicit source account → the single current account.
-        accountToDebit = accounts.find((a) => a.type === "current")?.id ?? null;
-      }
-      if (accountToDebit) await providers.applyAccountDebit(accountToDebit, amount);
-
-      // Build the charge list. The FIRST charge is the categorizable ("primary")
-      // txn shown on the success card:
-      //  - jar source: its own portion into its first category. On an accepted
-      //    top-up that portion is min(amount, spendable) so `remaining` lands
-      //    exactly at the limit (not over); ok/overspend charge the full amount.
-      //  - pool/account source: the full amount into "Chuyển khoản" (type:transfer,
-      //    excluded from spend); donor jar takes follow as expense txns.
-      const sourceJar = sourceJarId ? jarConfig.jars.find((j) => j.id === sourceJarId) : undefined;
-      const charges: { categoryId: string; amount: number }[] = [];
-      if (sourceJarId) {
-        const spendableSource = spendableById.get(sourceJarId) ?? 0;
-        const primaryAmount = acceptedTopup ? Math.min(amount, spendableSource) : amount;
-        charges.push({ categoryId: sourceJar?.categoryIds[0] ?? CATEGORY.transfer, amount: primaryAmount });
+      const accountToDebit = draft?.sourceAccountId ?? accounts.find((a) => a.type === "current")?.id ?? null;
+      if (accountToDebit) {
+        const record = primaryRecord(input);
+        await providers.applyAccountDebit(accountToDebit, amount, record); // atomic debit + insert
+        adoptManualTxn(record);
+        primaryTxnId = record.id;
       } else {
-        // An agent-proposed transfer (Feature 3) carries its own category
-        // pick straight through instead of the "Chuyển khoản" default.
-        charges.push({ categoryId: draft?.categoryId ?? CATEGORY.transfer, amount });
+        primaryTxnId = await addPersisted(input); // nothing to debit — still awaited
       }
-      charges.push(...donorCharges);
-
-      let primaryTxnId: string | null = null;
-      for (const charge of charges) {
-        if (charge.amount <= 0) continue; // a source already at its limit contributes 0
-        const id = addManualTxn({
-          amount: charge.amount,
-          direction: "debit",
-          categoryId: charge.categoryId,
-          type: typeForCategory(charge.categoryId), // derived from kind, never hardcoded
-          merchantName: name.trim(),
-          postedAt: new Date().toISOString(),
-          // Keep the memo as a signal for AI purpose suggestion (data, not a command).
-          ...(draft?.memo ? { note: draft.memo } : {}),
-        });
-        if (primaryTxnId === null) primaryTxnId = id;
-      }
-      setCreatedTxnId(primaryTxnId);
-      // Seeds the categorize section's allowed-category picker (constrained to the
-      // source jar's categories); null for a pool/account source.
-      setCreatedSourceJarId(sourceJarId);
-      // Consume the draft immediately so a reload/replay can't resubmit (F#2).
-      if (draftIdParam) deleteTransferDraft(draftIdParam);
-
-      const stamp = Date.now().toString();
-      setDone({
-        recipientName: name.trim(),
-        recipientAccountMasked: acct,
-        recipientAccountNumber: draft?.accountNumber ?? null,
-        recipientBankName: draft?.recipientBankName ?? null,
-        senderName,
-        amount,
-        currency: CURRENCY_VND,
-        memo: memo.trim() || null,
-        executedAt: new Date().toISOString(),
-        transactionCode: `FT${stamp.slice(-9)}`,
-        referenceCode: `MSB${stamp.slice(-6)}`,
-        source: "mock",
-      });
     } catch {
-      // A provider/store failure must not permanently lock the flow: release the
-      // latch so the user can retry, and surface the error.
+      // Nothing was debited or stored (atomic) → release the latch so the user can
+      // retry; NO success screen and NO local txn.
       committedRef.current = false;
-      setError("Không hoàn tất được giao dịch. Vui lòng thử lại.");
-    } finally {
       setSubmitting(false);
+      setError("Không hoàn tất được giao dịch. Vui lòng thử lại.");
+      return;
     }
+
+    // The money moved — from here on the receipt is true. Consume the draft now so
+    // a reload/replay can't resubmit (F#2).
+    if (draftIdParam) deleteTransferDraft(draftIdParam);
+    setCreatedTxnId(primaryTxnId);
+    setCreatedSourceJarId(targetJarId); // seeds the categorize picker; null for pool/account
+
+    // Auto-fund the resulting shortfall from the SAME assessment, awaiting every leg.
+    const targetLabel = sourceJar?.label ?? POOL_TARGET_LABEL;
+    if (assessment && assessment.tier !== "ok") {
+      try {
+        const createdIds = await autoFund.commitPersisted({
+          assessment,
+          targetJarId,
+          triggerTxnId: primaryTxnId,
+          postedAt,
+          origin: includeGoal ? "manual" : "auto",
+          includeGoal,
+        });
+        if (createdIds.length > 0) {
+          const donors = includeGoal ? [...assessment.donors, ...assessment.goalDonors] : assessment.donors;
+          setFundResult({ status: "funded", donors, goalDonors: assessment.goalDonors, shortfall: assessment.shortfall, createdIds, targetJarId, targetLabel, postedAt });
+        }
+      } catch {
+        const where = targetJarId ? `hũ ${targetLabel}` : targetLabel;
+        setFundError(`Chưa bù được ${formatVnd(assessment.shortfall)} cho ${where} (lỗi lưu dữ liệu). Hũ đang vượt hạn mức — cần bù thủ công.`);
+      }
+    }
+
+    const stamp = Date.now().toString();
+    setDone({
+      recipientName: name.trim(),
+      recipientAccountMasked: acct,
+      recipientAccountNumber: draft?.accountNumber ?? null,
+      recipientBankName: draft?.recipientBankName ?? null,
+      senderName,
+      amount,
+      currency: CURRENCY_VND,
+      memo: memo.trim() || null,
+      executedAt: postedAt,
+      transactionCode: `FT${stamp.slice(-9)}`,
+      referenceCode: `MSB${stamp.slice(-6)}`,
+      source: "mock",
+    });
+    setSubmitting(false);
   }
 
   if (done) {
-    const recipientBank = findBankByName(done.recipientBankName ?? undefined);
-    const senderBank = findBank("msb");
-    const memoText = done.memo ?? `${toPlainUpper(done.senderName)} chuyen tien`;
     return (
-      <div className="flex h-full flex-col">
-        <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-[calc(var(--safe-area-top)+0.25rem)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/msb-logo.png" alt="MSB" className="h-7 w-auto" />
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            aria-label="Về trang chủ"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80"
-          >
-            <Home size={20} strokeWidth={2} />
-          </button>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-          <Card className="flex flex-col" padding="none">
-            <div className="flex items-start gap-3 px-5 pt-5 pb-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icon_success.png" alt="" aria-hidden className="mt-0.5 h-10 w-10 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-positive">Chuyển tiền thành công</p>
-                <p className="mt-1 tabular-nums text-text">
-                  <span className="text-2xl font-bold">{formatVndComma(done.amount)}</span>{" "}
-                  <span className="text-base text-muted">{done.currency}</span>
-                </p>
-                <p className="mt-0.5 text-xs text-muted">{formatDateTime(done.executedAt)}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col divide-y divide-border border-t border-border">
-              <Row label="Người nhận">
-                <div className="flex items-center gap-2.5">
-                  {recipientBank ? (
-                    <BankLogo bank={recipientBank} />
-                  ) : (
-                    <span
-                      aria-hidden
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-                      style={{ background: avatarColor(done.recipientName) }}
-                    >
-                      {initialOf(done.recipientName)}
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-bold text-text">{toPlainUpper(done.recipientName)}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted">
-                      {done.recipientBankName && <span>{done.recipientBankName} · </span>}
-                      <span className="tabular-nums">{done.recipientAccountNumber ?? done.recipientAccountMasked}</span>
-                    </p>
-                  </div>
-                </div>
-              </Row>
-              <Row label="Người chuyển">
-                <div className="flex items-center gap-2.5">
-                  {senderBank && <BankLogo bank={senderBank} />}
-                  <p className="truncate text-[15px] font-bold text-text">{toPlainUpper(done.senderName)}</p>
-                </div>
-              </Row>
-              <Row label="Nội dung">
-                <p className="text-sm text-text">{memoText}</p>
-              </Row>
-              <Row label="Phí (bao gồm VAT)">
-                <p className="text-sm text-text">Miễn phí</p>
-              </Row>
-            </div>
-
-            {createdTxnId && (
-              <TransferCategorizeSection txnId={createdTxnId} sourceJarId={createdSourceJarId} amount={done.amount} />
-            )}
-
-            <button
-              type="button"
-              onClick={() => setShowDetails((v) => !v)}
-              className="flex items-center justify-center gap-1 border-b border-border py-3 text-sm font-semibold text-primary"
-            >
-              {showDetails ? "Ẩn chi tiết" : "Chi tiết giao dịch"}
-              {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-
-            {showDetails && (
-              <div className="flex flex-col divide-y divide-border border-b border-border">
-                <Row label="Hình thức">
-                  <p className="text-sm text-text">Chuyển nhanh 24/7</p>
-                </Row>
-                <Row label="Mã giao dịch">
-                  <p className="text-sm tabular-nums text-text">{done.transactionCode}</p>
-                </Row>
-                <Row label="Mã tham chiếu">
-                  <p className="text-sm tabular-nums text-text">{done.referenceCode}</p>
-                </Row>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 px-5 py-4">
-              <button
-                type="button"
-                onClick={() => {}}
-                className="flex flex-col items-center gap-1.5 text-primary"
-              >
-                <Share2 size={20} strokeWidth={1.8} />
-                <span className="text-xs font-medium text-text">Chia sẻ</span>
-              </button>
-              <button
-                type="button"
-                onClick={saveRecipient}
-                disabled={recipientSaved}
-                className="flex flex-col items-center gap-1.5 text-primary disabled:text-positive"
-              >
-                <UserPlus size={20} strokeWidth={1.8} />
-                <span className="text-xs font-medium text-text">{recipientSaved ? "Đã lưu" : "Lưu người nhận"}</span>
-              </button>
-            </div>
-          </Card>
-
-          <button
-            type="button"
-            onClick={() => router.push("/transfer")}
-            className="mt-4 flex h-13 w-full items-center justify-center rounded-full bg-primary text-base font-bold text-primary-fg"
-          >
-            Giao dịch khác
-          </button>
-        </div>
-      </div>
+      <TransferSuccess
+        done={done}
+        fundResult={fundResult}
+        fundError={fundError}
+        createdTxnId={createdTxnId}
+        createdSourceJarId={createdSourceJarId}
+        recipientSaved={recipientSaved}
+        onSaveRecipient={saveRecipient}
+      />
     );
   }
 
@@ -468,11 +320,46 @@ export function TransferConfirm() {
         </Labeled>
       </Card>
 
+      {/* RT-fix (H6): review the anticipated auto-fund BEFORE confirming (H11: never an empty donor list). */}
+      {preview && (
+        <TransferFundingPreview
+          assessment={preview.assessment}
+          amount={amount}
+          casaBalance={preview.casaBalance}
+          poolSource={sourceKind === "pool"}
+        />
+      )}
+
       {error && <p className="text-sm text-negative">{error}</p>}
+
+      {goalPrompt && (
+        <Card className="bg-warning-soft" role="alertdialog" aria-label="Xác nhận rút hũ Mục tiêu">
+          <p className="text-sm font-semibold text-warning">Cần rút từ hũ Mục tiêu</p>
+          <p className="mt-1 text-xs text-warning">
+            Chỉ còn hũ Mục tiêu đủ để bù {formatVnd(goalPrompt.shortfall)} cho giao dịch này. Bạn xác nhận rút?
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => runConfirm(true)}
+              className="flex-1 rounded-full bg-primary px-3 py-2 text-sm font-semibold text-white"
+            >
+              Xác nhận rút
+            </button>
+            <button
+              type="button"
+              onClick={() => setGoalPrompt(null)}
+              className="flex-1 rounded-full border border-border bg-surface px-3 py-2 text-sm font-semibold text-text"
+            >
+              Để sau
+            </button>
+          </div>
+        </Card>
+      )}
 
       <button
         type="button"
-        onClick={confirm}
+        onClick={() => runConfirm(false)}
         disabled={submitting}
         className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
       >
@@ -488,15 +375,6 @@ function ConfirmHeader() {
       <h1 className="text-lg font-semibold text-text">Xác nhận chuyển tiền</h1>
       <p className="text-xs text-muted">Bạn kiểm tra, chỉnh sửa và tự xác nhận.</p>
     </header>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1 px-4 py-3">
-      <span className="text-xs text-muted">{label}</span>
-      {children}
-    </div>
   );
 }
 

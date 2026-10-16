@@ -28,7 +28,7 @@ import { usePersona } from "@/providers/context";
 
 const STORAGE_PREFIX = "msb-pfm.manual-txns";
 const API_PATH = "/api/manual-transactions";
-export const MANUAL_ACCOUNT_ID = "self-reported";
+const MANUAL_ACCOUNT_ID = "self-reported";
 
 /** The fields a user supplies in the Add-transaction form. */
 export interface ManualTxnInput {
@@ -41,9 +41,22 @@ export interface ManualTxnInput {
   type?: Transaction["type"];
   /** Optional free-text memo ("Nội dung"); kept as a purpose-suggestion signal. */
   note?: string;
+  /**
+   * Inter-jar rebalance meta (Phase 03). Set ONLY when recording a rebalance txn
+   * (`categoryId: REBALANCE_CATEGORY`, `type: "transfer"`). `buildManualTxn` carries
+   * it onto the built Transaction so it survives the POST round-trip — WITHOUT this
+   * passthrough the client would silently drop the meta before it ever reached the API.
+   */
+  rebalance?: Transaction["rebalance"];
 }
 
-type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note">>;
+/**
+ * `status` is on the whitelist (RT-fix H3): a refund/reversal of a trigger txn
+ * (or a partial refund that lowers its effective spend) is recorded by patching
+ * `status`, which the auto-fund reconciler reacts to — shrinking/growing/removing
+ * the linked `dieu-chinh-hu` rebalance rather than blanket-deleting it.
+ */
+type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note" | "rebalance" | "status" | "amount">>;
 
 interface ManualTxnsContextValue {
   manualTxns: Transaction[];
@@ -56,6 +69,27 @@ interface ManualTxnsContextValue {
    */
   update: (id: string, patch: ManualTxnPatch) => boolean;
   remove: (id: string) => void;
+  /**
+   * Record a self-reported txn and AWAIT its persistence (H14/U1): the local
+   * state updates optimistically, but a failed POST rolls the record back and
+   * rejects — so a caller (e.g. the transfer confirm's rebalance legs) can never
+   * report a write as done when the server never stored it.
+   */
+  addPersisted: (input: ManualTxnInput) => Promise<string>;
+  /**
+   * Add an ALREADY-PERSISTED txn to local state without re-posting it — used
+   * after `/api/accounts/debit` stored the transfer's primary txn atomically
+   * with the debit (the server is the one that wrote it).
+   */
+  adopt: (txn: Transaction) => void;
+  /**
+   * Remove every rebalance txn triggered by `triggerTxnId` (SC1: rebalances are
+   * `dieu-chinh-hu`-tagged txns keyed by `rebalance.triggerTxnId`). Returns the
+   * removed ids. The single unwind point for undo (C4), re-categorize/re-amount
+   * (H5) and refund reconciliation (H3) — so a changed trigger never stacks two
+   * rebalances.
+   */
+  removeByTrigger: (triggerTxnId: string) => string[];
 }
 
 const ManualTxnsContext = createContext<ManualTxnsContextValue | null>(null);
@@ -94,7 +128,7 @@ function newId(): string {
 }
 
 /** Build a full, valid Transaction from user input — self-reported, posted. */
-function toTransaction(input: ManualTxnInput): Transaction {
+export function buildManualTxn(input: ManualTxnInput): Transaction {
   return {
     id: newId(),
     accountId: MANUAL_ACCOUNT_ID,
@@ -111,6 +145,7 @@ function toTransaction(input: ManualTxnInput): Transaction {
     isRecurring: false,
     userEdited: true,
     ...(input.note ? { note: input.note } : {}),
+    ...(input.rebalance ? { rebalance: input.rebalance } : {}),
   };
 }
 
@@ -140,6 +175,12 @@ async function apiPatch(cif: string, id: string, patch: ManualTxnPatch): Promise
   if ("type" in patch) wire.type = patch.type ?? null;
   if ("transferPurpose" in patch) wire.transferPurpose = patch.transferPurpose ?? null;
   if ("note" in patch) wire.note = patch.note ?? null;
+  // Rebalance meta is an object; `null` over the wire ⇒ CLEAR (Phase 05 unwind).
+  if ("rebalance" in patch) wire.rebalance = patch.rebalance ?? null;
+  // `status`/`amount` are non-clearable — only sent when a concrete value is set
+  // (refund/reversal or amount edit of a trigger txn, H3/H5).
+  if (patch.status !== undefined) wire.status = patch.status;
+  if (patch.amount !== undefined) wire.amount = patch.amount;
   const res = await fetch(API_PATH, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -225,12 +266,35 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
 
   const add = useCallback(
     (input: ManualTxnInput): string => {
-      const txn = toTransaction(input);
+      const txn = buildManualTxn(input);
       apply([txn, ...txnsRef.current]); // optimistic
       apiCreate(cif, txn).catch(logWriteError);
       return txn.id;
     },
     [cif, apply],
+  );
+
+  const addPersisted = useCallback(
+    async (input: ManualTxnInput): Promise<string> => {
+      const txn = buildManualTxn(input);
+      apply([txn, ...txnsRef.current]); // optimistic, rolled back on failure
+      try {
+        await apiCreate(cif, txn);
+      } catch (err) {
+        apply(txnsRef.current.filter((t) => t.id !== txn.id));
+        throw err;
+      }
+      return txn.id;
+    },
+    [cif, apply],
+  );
+
+  const adopt = useCallback(
+    (txn: Transaction) => {
+      if (txnsRef.current.some((t) => t.id === txn.id)) return; // idempotent
+      apply([{ ...txn, source: "self_reported" }, ...txnsRef.current]);
+    },
+    [apply],
   );
 
   const update = useCallback(
@@ -251,7 +315,21 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
     [cif, apply],
   );
 
-  const value = useMemo(() => ({ manualTxns, add, update, remove }), [manualTxns, add, update, remove]);
+  const removeByTrigger = useCallback(
+    (triggerTxnId: string): string[] => {
+      const victims = txnsRef.current.filter((t) => t.rebalance?.triggerTxnId === triggerTxnId);
+      if (victims.length === 0) return [];
+      apply(txnsRef.current.filter((t) => t.rebalance?.triggerTxnId !== triggerTxnId)); // optimistic
+      victims.forEach((t) => apiRemove(cif, t.id).catch(logWriteError));
+      return victims.map((t) => t.id);
+    },
+    [cif, apply],
+  );
+
+  const value = useMemo(
+    () => ({ manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger }),
+    [manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger],
+  );
   return <ManualTxnsContext.Provider value={value}>{children}</ManualTxnsContext.Provider>;
 }
 

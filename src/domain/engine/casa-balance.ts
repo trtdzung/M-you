@@ -17,6 +17,7 @@
  */
 
 import type { Account } from "@/domain/models";
+import { UNKNOWN, type Amount } from "./types";
 
 /** Σ `availableBalance` of `type === "current"` accounts (0 when none). */
 export function casaBalance(accounts: Account[]): number {
@@ -24,4 +25,12 @@ export function casaBalance(accounts: Account[]): number {
     (sum, account) => (account.type === "current" ? sum + account.availableBalance : sum),
     0,
   );
+}
+
+/**
+ * Same Σ, but "unknown" when the persona has NO `current` account — the input the
+ * unallocated pool needs so a missing CASA never becomes a fabricated 0 (D27).
+ */
+export function casaBalanceOrUnknown(accounts: Account[]): Amount {
+  return accounts.some((a) => a.type === "current") ? casaBalance(accounts) : UNKNOWN;
 }

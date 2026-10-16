@@ -27,26 +27,10 @@ vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));
 import { GET, PATCH } from "../route";
 import { PATCH as patchJar } from "../[id]/route";
 import { writeJarConfig } from "@/lib/jars-store";
+import { ACCOUNTS_DDL, JARS_DDL, MANUAL_TXNS_DDL } from "./jar-route-test-ddl";
 
 const CIF = "CIF_0001";
 const CASA = 18_000_000;
-
-const JARS_DDL = `CREATE TABLE jars (
-  id TEXT NOT NULL, cif TEXT NOT NULL, label TEXT NOT NULL, category_ids TEXT NOT NULL,
-  budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL,
-  PRIMARY KEY (cif, id)
-);`;
-
-// CASA is DB-backed now: `casaPoolForCif` reads the `accounts` table (lazily
-// seeding CIF_0001's 18tr `current` account on first read → CASA stays 18tr,
-// the value this suite asserts against). The handlers need the table to exist.
-const ACCOUNTS_DDL = `CREATE TABLE accounts (
-  cif TEXT NOT NULL, id TEXT NOT NULL, type TEXT NOT NULL, institution TEXT NOT NULL,
-  currency TEXT NOT NULL, balance REAL NOT NULL, available_balance REAL NOT NULL,
-  last_synced_at TEXT NOT NULL, source TEXT NOT NULL, tier TEXT,
-  masked_number TEXT NOT NULL, account_number TEXT NOT NULL, sort_order INTEGER NOT NULL,
-  PRIMARY KEY (cif, id)
-);`;
 
 /** Seed a controlled jar set (bypasses the cap on purpose — writeJarConfig never caps). */
 function seed(jars: Jar[]): void {
@@ -77,6 +61,7 @@ beforeEach(() => {
   holder.db = new Database(":memory:");
   holder.db.exec(JARS_DDL);
   holder.db.exec(ACCOUNTS_DDL);
+  holder.db.exec(MANUAL_TXNS_DDL);
 });
 
 describe("PATCH /api/jars (batch cap door)", () => {

@@ -12,6 +12,13 @@ export type { Insight, InsightFact, InsightSeverity };
 /** A detector inspects the period's financials and optionally emits one insight. */
 export type Detector = (f: Financials) => Insight | null;
 
+/**
+ * A per-jar detector emits an array (or `null` when nothing fires) — e.g.
+ * `jar-overspend-covered`, which reports one insight per covered/unfunded jar.
+ * `run.ts` flattens either shape into the ranked list.
+ */
+export type MultiDetector = (f: Financials) => Insight[] | null;
+
 export const SEVERITY_RANK: Record<InsightSeverity, number> = {
   urgent: 0,
   attention: 1,

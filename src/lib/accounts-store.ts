@@ -13,10 +13,11 @@ import "server-only";
  * so a fresh/unseeded DB still works (mirrors how `jars` self-heal).
  */
 
-import type { Account } from "@/domain/models";
+import type { Account, Transaction } from "@/domain/models";
 import { PERSONA_LIST } from "@/providers/mock/personas";
 import { buildPersonaAccounts } from "@/providers/mock/fixtures/generate";
 import { getDb } from "./db";
+import { upsertManualTxn } from "./manual-txns-store";
 
 interface AccountRow {
   cif: string;
@@ -99,17 +100,39 @@ export function readAccounts(cif: string): Account[] {
   return rows.map(toAccount);
 }
 
+/** Thrown when the debit targets an account the persona doesn't have (route → 404). */
+export class AccountNotFoundError extends Error {
+  constructor(accountId: string) {
+    super(`account ${accountId} not found`);
+    this.name = "AccountNotFoundError";
+  }
+}
+
 /**
  * Debit a real amount from an account (both `balance` and `available_balance`),
  * floored at 0 so a display value never goes negative (the transfer UI already
  * blocks an over-balance send; this is a defensive backstop). A non-positive or
  * non-finite amount is ignored. Returns the persona's accounts as they now read
  * back (the stored truth), so the caller renders the debited balance directly.
+ *
+ * H14/U1 — when `record` (the transfer's self-reported primary txn) is given,
+ * the debit and the txn insert run in ONE SQLite transaction: either both land
+ * or neither does, so a debited transfer can never lose its spend record. It is
+ * also idempotent on the record id: a replay whose txn already exists (e.g. a
+ * retry after a lost response) re-debits NOTHING. Throws `AccountNotFoundError`
+ * (rolling back) when the account doesn't exist, rather than storing a txn
+ * against no debit.
  */
-export function debitAccount(cif: string, accountId: string, amount: number): Account[] {
-  if (Number.isFinite(amount) && amount > 0) {
-    seedIfEmpty(cif);
-    getDb()
+export function debitAccount(cif: string, accountId: string, amount: number, record?: Transaction): Account[] {
+  if (!Number.isFinite(amount) || amount <= 0) return readAccounts(cif);
+  seedIfEmpty(cif);
+  const db = getDb();
+  const run = db.transaction(() => {
+    if (record) {
+      const exists = db.prepare("SELECT 1 FROM manual_transactions WHERE cif = ? AND id = ?").get(cif, record.id);
+      if (exists) return; // replay — already debited + recorded together
+    }
+    const { changes } = db
       .prepare(
         `UPDATE accounts
             SET balance = MAX(0, balance - @amount),
@@ -117,6 +140,9 @@ export function debitAccount(cif: string, accountId: string, amount: number): Ac
           WHERE cif = @cif AND id = @id`,
       )
       .run({ cif, id: accountId, amount });
-  }
+    if (changes === 0) throw new AccountNotFoundError(accountId);
+    if (record) upsertManualTxn(cif, record);
+  });
+  run();
   return readAccounts(cif);
 }

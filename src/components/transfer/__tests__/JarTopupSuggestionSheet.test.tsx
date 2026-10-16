@@ -17,13 +17,14 @@ const assessment: FundingAssessment = {
     { jarId: "pool", label: "Chưa phân bổ", take: 300_000 },
     { jarId: "lifestyle", label: "Hũ Hưởng thụ", take: 200_000 },
   ],
+  goalDonors: [],
+  requiresManualGoal: false,
   targetJarId: "food",
   source: "mock",
 };
 
 function renderSheet(overrides: Partial<Parameters<typeof JarTopupSuggestionSheet>[0]> = {}) {
   const onAccept = vi.fn();
-  const onOverspend = vi.fn();
   const onChooseAnother = vi.fn();
   const onClose = vi.fn();
   render(
@@ -31,13 +32,12 @@ function renderSheet(overrides: Partial<Parameters<typeof JarTopupSuggestionShee
       assessment={assessment}
       targetLabel="Hũ Ăn uống"
       onAccept={onAccept}
-      onOverspend={onOverspend}
       onChooseAnother={onChooseAnother}
       onClose={onClose}
       {...overrides}
     />,
   );
-  return { onAccept, onOverspend, onChooseAnother, onClose };
+  return { onAccept, onChooseAnother, onClose };
 }
 
 describe("JarTopupSuggestionSheet", () => {
@@ -49,11 +49,10 @@ describe("JarTopupSuggestionSheet", () => {
   });
 
   it("calls onAccept when 'Đồng ý rót' is tapped", () => {
-    const { onAccept, onChooseAnother, onOverspend } = renderSheet();
+    const { onAccept, onChooseAnother } = renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /Đồng ý rót/ }));
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(onChooseAnother).not.toHaveBeenCalled();
-    expect(onOverspend).not.toHaveBeenCalled();
   });
 
   it("calls onChooseAnother when 'Chọn nguồn khác' is tapped", () => {
@@ -62,17 +61,15 @@ describe("JarTopupSuggestionSheet", () => {
     expect(onChooseAnother).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onOverspend when 'Bỏ qua, vượt hũ' is tapped", () => {
-    const { onOverspend } = renderSheet();
-    fireEvent.click(screen.getByRole("button", { name: "Bỏ qua, vượt hũ" }));
-    expect(onOverspend).toHaveBeenCalledTimes(1);
+  it("offers NO 'vượt hũ' escape hatch (plan 260918-1120)", () => {
+    renderSheet();
+    expect(screen.queryByRole("button", { name: /vượt hũ/i })).not.toBeInTheDocument();
   });
 
-  it("double-tap guard: a second synchronous tap on the same button does not fire twice, and all three buttons disable", () => {
+  it("double-tap guard: a second synchronous tap on the same button does not fire twice, and both buttons disable", () => {
     const { onAccept } = renderSheet();
     const acceptBtn = screen.getByRole("button", { name: /Đồng ý rót/ });
     const chooseBtn = screen.getByRole("button", { name: "Chọn nguồn khác" });
-    const overspendBtn = screen.getByRole("button", { name: "Bỏ qua, vượt hũ" });
 
     fireEvent.click(acceptBtn);
     fireEvent.click(acceptBtn);
@@ -80,18 +77,29 @@ describe("JarTopupSuggestionSheet", () => {
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(acceptBtn).toBeDisabled();
     expect(chooseBtn).toBeDisabled();
-    expect(overspendBtn).toBeDisabled();
   });
 
   it("double-tap guard also blocks a second tap on a DIFFERENT button once latched", () => {
-    const { onAccept, onOverspend } = renderSheet();
+    const { onAccept, onChooseAnother } = renderSheet();
     const acceptBtn = screen.getByRole("button", { name: /Đồng ý rót/ });
-    const overspendBtn = screen.getByRole("button", { name: "Bỏ qua, vượt hũ" });
+    const chooseBtn = screen.getByRole("button", { name: "Chọn nguồn khác" });
 
     fireEvent.click(acceptBtn);
-    fireEvent.click(overspendBtn);
+    fireEvent.click(chooseBtn);
 
     expect(onAccept).toHaveBeenCalledTimes(1);
-    expect(onOverspend).not.toHaveBeenCalled();
+    expect(onChooseAnother).not.toHaveBeenCalled();
+  });
+
+  it("H17/U17: a pool source is not presented as a jar ('Tiền chưa phân bổ không đủ', no 'Hũ chưa đủ tiền')", () => {
+    renderSheet({
+      assessment: { ...assessment, targetJarId: null, shortfall: 100_000, donors: [{ jarId: "food", label: "Hũ Ăn uống", take: 100_000 }] },
+      targetLabel: "Chưa phân bổ",
+    });
+    expect(screen.getByText("Tiền chưa phân bổ không đủ")).toBeInTheDocument();
+    expect(screen.getByText(/Còn thiếu 100\.000.*lấy thêm từ hũ/)).toBeInTheDocument();
+    expect(screen.queryByText("Hũ chưa đủ tiền")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Chưa phân bổ còn thiếu/)).not.toBeInTheDocument();
+    expect(screen.getByText("Hũ Ăn uống")).toBeInTheDocument();
   });
 });

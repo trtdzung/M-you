@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Account } from "@/domain/models";
-import { casaBalance } from "../casa-balance";
+import { casaBalance, casaBalanceOrUnknown } from "../casa-balance";
 import { computeUnallocatedPool } from "../unallocated-pool";
 
 const IN = "2026-09-10T00:00:00.000Z";
@@ -75,5 +75,22 @@ describe("computeUnallocatedPool", () => {
 
   it("spendableTotal 0 (no jar claims anything) → whole CASA is unallocated", () => {
     expect(computeUnallocatedPool({ casaBalance: 18_000_000, spendableTotal: 0 }).amount).toBe(18_000_000);
+  });
+
+  it("D27: unknown CASA (no current account) → 'unknown', never a fabricated negative / overAllocated", () => {
+    const pool = computeUnallocatedPool({ casaBalance: casaBalanceOrUnknown([]), spendableTotal: 500_000 });
+    expect(pool).toEqual({ amount: "unknown", overAllocated: false, source: "mock" });
+  });
+});
+
+describe("casaBalanceOrUnknown", () => {
+  it("no current account → 'unknown' (a savings-only persona is not a 0 CASA)", () => {
+    expect(casaBalanceOrUnknown([])).toBe("unknown");
+    expect(casaBalanceOrUnknown([account("sav", 45_000_000, { type: "savings" })])).toBe("unknown");
+  });
+
+  it("with a current account → the same Σ as casaBalance (0 is a real, known 0)", () => {
+    expect(casaBalanceOrUnknown([account("cur", 0)])).toBe(0);
+    expect(casaBalanceOrUnknown([account("cur", 3_000_000), account("sav", 9_000_000, { type: "savings" })])).toBe(3_000_000);
   });
 });

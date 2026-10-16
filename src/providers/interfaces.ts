@@ -110,6 +110,11 @@ export interface Providers
    * come back with an empty `jars` array — the server's healing step
    * synthesizes a single catch-all "Khác" jar in that case (see
    * `src/lib/jars-store.ts`'s `readJarConfig`).
+   *
+   * Every jar method REJECTS with a `JarApiError` (`./jar-api-error`) on a
+   * non-ok response — a failed load is never disguised as an empty config
+   * (invariant #6), and a refused write carries the server's reason (e.g. 422
+   * over the CASA cap with `overBy`).
    */
   getJarConfig(): Promise<JarConfig>;
   /** Create a new jar. Returns the full updated config. */
@@ -123,7 +128,10 @@ export interface Providers
    * budgetLimit would exceed CASA. Returns the full updated config.
    */
   updateJars(patches: Record<string, Partial<Omit<Jar, "id">>>): Promise<JarConfig>;
-  /** Remove a jar (its categories move to "Khác"). Returns the full updated config. */
+  /**
+   * Remove a jar (its categories move to "Khác"; the server also deletes every
+   * "điều chỉnh hũ" rebalance leg from/to it). Returns the full updated config.
+   */
   removeJar(id: string): Promise<JarConfig>;
   /** Move `categoryId` into `jarId`, removing it from every other jar first. Returns the full updated config. */
   assignCategory(categoryId: string, jarId: string): Promise<JarConfig>;
@@ -136,6 +144,10 @@ export interface Providers
    * Chuyển tiền flow (invariant #3); the resulting balance flows back through
    * `listAccounts()`. Idempotency/replay is guarded by the caller (the draft is
    * consumed on confirm), not here.
+   *
+   * `record` (H14/U1): the transfer's self-reported primary txn. When given, the
+   * debit and the txn insert are atomic server-side — a rejection means NOTHING
+   * was debited or stored, so the caller must not show success.
    */
-  applyAccountDebit(accountId: string, amount: number): Promise<void>;
+  applyAccountDebit(accountId: string, amount: number, record?: Transaction): Promise<void>;
 }

@@ -12,9 +12,16 @@ import "server-only";
  * order-preserving code path instead of six bespoke UPDATE statements.
  */
 
-import type { Jar, JarConfig } from "@/domain/models";
+import type { Jar, JarConfig, JarRole } from "@/domain/models";
 import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
 import { getDb } from "./db";
+
+/** The four donor-waterfall roles (plan 260918-1120, Phase 04 persistence). */
+const JAR_ROLES: ReadonlySet<string> = new Set(["buffer", "spending", "essential", "goal"]);
+
+function asRole(value: unknown): JarRole | undefined {
+  return typeof value === "string" && JAR_ROLES.has(value) ? (value as JarRole) : undefined;
+}
 
 interface JarRow {
   id: string;
@@ -22,6 +29,7 @@ interface JarRow {
   label: string;
   category_ids: string;
   budget_limit: number | null;
+  role: string | null;
   color: string | null;
   icon: string | null;
   sort_order: number;
@@ -46,21 +54,24 @@ function parseCategoryIds(raw: string): string[] {
 function toJar(row: JarRow): Jar {
   const jar: Jar = { id: row.id, label: row.label, categoryIds: parseCategoryIds(row.category_ids) };
   if (row.budget_limit !== null) jar.budgetLimit = row.budget_limit;
+  const role = asRole(row.role);
+  if (role) jar.role = role;
   if (row.color !== null) jar.color = row.color;
   if (row.icon !== null) jar.icon = row.icon;
   return jar;
 }
 
-/** A finite, non-negative amount, or `undefined` for anything else. */
-function amount(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+/** A whole-VND, non-negative, safe-integer limit (S15/A24/A25/A09). */
+function isValidLimit(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 /**
  * Guard for a jar coming off the wire (the old provider-boundary `isValidJar`,
  * moved server-side): `id`/`label`/`categoryIds` are required, `budgetLimit`
- * must be finite and non-negative or absent, and unknown fields are dropped —
- * so a malformed body can never write a NaN/negative/garbage row.
+ * must be a non-negative safe integer or absent/null (anything else REJECTS the
+ * jar — never silently dropped), and unknown fields are dropped — so a
+ * malformed body can never write a NaN/negative/fractional/garbage row.
  */
 export function sanitizeJar(input: unknown): Jar | null {
   if (typeof input !== "object" || input === null) return null;
@@ -70,8 +81,12 @@ export function sanitizeJar(input: unknown): Jar | null {
   if (!Array.isArray(categoryIds) || !categoryIds.every((c) => typeof c === "string")) return null;
 
   const jar: Jar = { id: j.id, label: j.label, categoryIds: categoryIds as string[] };
-  const budgetLimit = amount(j.budgetLimit);
-  if (budgetLimit !== undefined) jar.budgetLimit = budgetLimit;
+  if (j.budgetLimit !== undefined && j.budgetLimit !== null) {
+    if (!isValidLimit(j.budgetLimit)) return null;
+    jar.budgetLimit = j.budgetLimit;
+  }
+  const role = asRole(j.role);
+  if (role) jar.role = role;
   if (typeof j.color === "string") jar.color = j.color;
   if (typeof j.icon === "string") jar.icon = j.icon;
   return jar;
@@ -84,8 +99,10 @@ export function sanitizeJar(input: unknown): Jar | null {
  * `null` means CLEAR — "Hạn mức: để trống" must be able to put `budgetLimit`
  * back to "chưa đặt", and `undefined` cannot survive `JSON.stringify`, so the
  * client sends `null` and it comes back out as an explicitly-present
- * `undefined` here (which the caller's spread merge then clears). A non-null but
- * invalid value (NaN, negative, wrong type) is ignored rather than written.
+ * `undefined` here (which the caller's spread merge then clears). A non-null
+ * `budgetLimit` that is not a non-negative safe integer (negative, fractional,
+ * string, boolean, object) REJECTS the whole patch (`null` → 422): a swallowed bad
+ * value would leave the client believing the write applied.
  */
 export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | null {
   if (typeof input !== "object" || input === null) return null;
@@ -97,14 +114,17 @@ export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | nul
     patch.categoryIds = p.categoryIds as string[];
   }
   if ("budgetLimit" in p) {
-    if (p.budgetLimit === null) patch.budgetLimit = undefined;
+    if (p.budgetLimit === null || p.budgetLimit === undefined) patch.budgetLimit = undefined;
+    else if (isValidLimit(p.budgetLimit)) patch.budgetLimit = p.budgetLimit;
+    else return null;
+  }
+  if ("role" in p) {
+    // `null` clears back to "unset" (engine treats it as `spending`); a valid role
+    // string is honoured; anything else is ignored (never writes a garbage role).
+    if (p.role === null) patch.role = undefined;
     else {
-      // A present numeric value that is negative (or non-finite) must be REJECTED,
-      // not silently dropped: a swallowed bad value would leave Σ inconsistent
-      // while the client believes the write applied.
-      if (typeof p.budgetLimit === "number" && (!Number.isFinite(p.budgetLimit) || p.budgetLimit < 0)) return null;
-      const value = amount(p.budgetLimit);
-      if (value !== undefined) patch.budgetLimit = value;
+      const role = asRole(p.role);
+      if (role) patch.role = role;
     }
   }
   for (const key of ["color", "icon"] as const) {
@@ -154,8 +174,8 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
   const db = getDb();
   const del = db.prepare("DELETE FROM jars WHERE cif = ?");
   const insert = db.prepare(
-    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, color, icon, sort_order)
-     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @color, @icon, @sortOrder)`,
+    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, role, color, icon, sort_order)
+     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @role, @color, @icon, @sortOrder)`,
   );
   const replaceAll = db.transaction((jars: Jar[]) => {
     del.run(cif);
@@ -168,6 +188,7 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
         // `undefined` is not a bindable value in better-sqlite3 — an unset
         // limit is stored as NULL, which reads back as `undefined` again.
         budgetLimit: jar.budgetLimit ?? null,
+        role: jar.role ?? null,
         color: jar.color ?? null,
         icon: jar.icon ?? null,
         sortOrder: index,

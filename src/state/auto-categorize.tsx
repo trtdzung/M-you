@@ -31,7 +31,21 @@ import { createRemoteClassify } from "@/ai/categorize/remote-classifier";
 import { isAutoCategorizeEnabled } from "@/ai/categorize/config";
 import { useFinancials } from "./useFinancials";
 import { useCorrections } from "./corrections";
+import { isUserOrigin, type Assignment, type Corrections } from "./corrections-core";
 import { useCategoryMemory } from "./category-memory";
+import { useAutoFundWith } from "./use-auto-fund";
+
+/**
+ * S7/I06/U4: the labels from a run that ACTUALLY change a txn's effective
+ * category — `applied` (a `pending` guess never moves a number, invariant #6) and
+ * not blocked by a user-authored record (the same race guard `mergeAssignments`
+ * applies). These are the triggers whose jars must be reconciled.
+ */
+function labelsToReconcile(assignments: Assignment[], corrections: Corrections): { txnId: string; categoryId: string }[] {
+  return assignments
+    .filter((a) => a.status === "applied" && !isUserOrigin(corrections[a.txnId]))
+    .map((a) => ({ txnId: a.txnId, categoryId: a.categoryId }));
+}
 
 export interface CategorizeSummary {
   /** Applied straight from the user's memory (no model). */
@@ -66,9 +80,17 @@ const AutoCategorizeContext = createContext<AutoCategorizeContextValue | null>(n
 
 export function AutoCategorizeProvider({ children }: { children: React.ReactNode }) {
   const { persona } = usePersona();
-  const { allTransactions, loading, error: dataError } = useFinancials();
-  const { corrections, upsertAssignments } = useCorrections();
+  const { allTransactions, transactions, raw, loading, error: dataError } = useFinancials();
+  const { corrections, loaded, upsertAssignments } = useCorrections();
   const { memory, forget } = useCategoryMemory();
+  // Reuses THIS provider's txn view (no second data fetch). Read through refs after
+  // the async classify so the reconcile runs on the LATEST txns/corrections, not
+  // the snapshot captured when the run started.
+  const autoFund = useAutoFundWith({ transactions, raw });
+  const autoFundRef = useRef(autoFund);
+  autoFundRef.current = autoFund;
+  const correctionsRef = useRef(corrections);
+  correctionsRef.current = corrections;
 
   const [summary, setSummary] = useState<CategorizeSummary | null>(null);
   const [running, setRunning] = useState(false);
@@ -145,7 +167,18 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
 
       // mergeAssignments (inside upsert) drops any txn the user has since
       // confirmed — the re-filter race guard (Red Team #6).
+      const labels = labelsToReconcile(assignments, correctionsRef.current);
       upsertAssignments(assignments);
+      // S7/I06/U4: the new labels can push jars over budget — fund them now, in ONE
+      // batch (each fund sees the legs written before it → no double-funding).
+      // A reconcile failure must not lose the labels themselves.
+      if (labels.length > 0) {
+        try {
+          autoFundRef.current.reconcileLabels(labels);
+        } catch (err) {
+          console.error("Auto-fund after auto-categorize failed", err);
+        }
+      }
       deadMemoryKeys.forEach(forget);
       const next: CategorizeSummary = {
         memoryApplied,
@@ -170,10 +203,12 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
   const runRef = useRef(run);
   runRef.current = run;
   useEffect(() => {
-    if (loading || todoKey === "") return;
+    // Wait for the stored overlay: backfilling before it loads would re-label
+    // (and re-send) txns the server already has labels for.
+    if (loading || !loaded || todoKey === "") return;
     const timer = setTimeout(() => void runRef.current(), 500);
     return () => clearTimeout(timer);
-  }, [todoKey, aiConsent, loading]);
+  }, [todoKey, aiConsent, loading, loaded]);
 
   const status: AutoCategorizeStatus = running
     ? "loading"

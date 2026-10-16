@@ -19,7 +19,34 @@
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
-import { KHAC_JAR_ID, KHAC_JAR_LABEL, orphanExpenseCategoryIds } from "@/domain/engine/category-jars";
+import { REBALANCE_CATEGORY, UNCLASSIFIED } from "@/domain/models";
+import {
+  EXPENSE_CATEGORY_IDS,
+  KHAC_JAR_ID,
+  KHAC_JAR_LABEL,
+  orphanExpenseCategoryIds,
+} from "@/domain/engine/category-jars";
+import { POOL_DONOR_ID } from "@/domain/engine/jar-funding";
+
+/**
+ * Ids a user jar may never take (S9): the pool donor sentinel, the unclassified
+ * group and the rebalance system category would collide with engine sentinels.
+ * "Khác" is reserved on CREATE only — it is the system heal jar, so a full-set
+ * replace (PUT) must be able to round-trip it.
+ */
+const ALWAYS_RESERVED_JAR_IDS: ReadonlySet<string> = new Set([POOL_DONOR_ID, UNCLASSIFIED, REBALANCE_CATEGORY]);
+
+/** True when `id` is a sentinel a user jar cannot use (`creating` also reserves "khac"). */
+export function isReservedJarId(id: string, creating: boolean): boolean {
+  return ALWAYS_RESERVED_JAR_IDS.has(id) || (creating && id === KHAC_JAR_ID);
+}
+
+const EXPENSE_IDS: ReadonlySet<string> = new Set(EXPENSE_CATEGORY_IDS);
+
+/** Ids in `catIds` that are not an expense category of the taxonomy (A11/A49). */
+export function invalidExpenseCategoryIds(catIds: readonly string[]): string[] {
+  return catIds.filter((c) => !EXPENSE_IDS.has(c));
+}
 
 /** Remove `catIds` from every jar except `exceptId` (keeps categories unique). */
 export function stripCategories(jars: Jar[], catIds: string[], exceptId?: string): Jar[] {

@@ -29,6 +29,17 @@ interface MockTxn {
   note?: string;
 }
 
+type MockDonor = { jarId: string; label: string; take: number };
+// Loose shape of what `useAutoFund().reconcile` returns, widened across every
+// status this suite drives (default "covered", plus the H1 latch test's
+// "needs-goal" → "funded" sequence) so `mockImplementationOnce` type-checks.
+type MockReconcileResult = {
+  status: "covered" | "needs-goal" | "funded" | "insufficient";
+  donors: MockDonor[];
+  goalDonors?: MockDonor[];
+  targetLabel: string;
+};
+
 const h = vi.hoisted(() => {
   const state = {
     store: [] as MockTxn[],
@@ -50,6 +61,9 @@ const h = vi.hoisted(() => {
       state.notify();
       return true;
     }),
+    // Overridable per-test (default mirrors the original static "covered" stub).
+    // RT-fix H1 test reconfigures this to a vi.fn that can re-enter synchronously.
+    reconcile: vi.fn((): MockReconcileResult => ({ status: "covered", donors: [], targetLabel: "hũ" })),
   };
   return state;
 });
@@ -60,6 +74,17 @@ vi.mock("@/providers/context", () => ({
 
 vi.mock("@/state/jars", () => ({
   useJarConfig: () => ({ config: h.jarConfig }),
+}));
+
+// The auto-fund unit is exercised in its own suites (Phase 04/05). Here we stub it
+// so a category pick's reconcile step is a no-op ("covered") by default, and this
+// suite stays focused on the pending-suggestion + label-mutation contract. The H1
+// latch test below reconfigures `h.reconcile` to exercise the component's own
+// re-entrancy guard.
+vi.mock("@/state/use-auto-fund", () => ({
+  useAutoFund: () => ({
+    reconcile: h.reconcile,
+  }),
 }));
 
 vi.mock("@/state/manual-txns", async () => {
@@ -98,6 +123,8 @@ beforeEach(() => {
     h.notify();
     return true;
   });
+  h.reconcile.mockReset();
+  h.reconcile.mockImplementation(() => ({ status: "covered" as const, donors: [], targetLabel: "hũ" }));
 });
 
 describe("TransferCategorizeSection — pending suggestion never mutates on its own", () => {
@@ -201,5 +228,45 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
 
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
     expect(h.store[0].transferPurpose).toBeUndefined(); // stale purpose cleared, not lingering
+  });
+
+  // RT-fix H1: the `inFlight` ref latch (TransferCategorizeSection.tsx `applyCategory`)
+  // must drop a re-entrant tap that arrives WHILE the first confirm is still
+  // executing (i.e. before the `finally` resets the latch) — never double-commit a
+  // rebalance for the same label. Modeled by having the mocked `autoFund.reconcile`
+  // itself fire a second "Xác nhận rút" click synchronously mid-call, simulating a
+  // real double-tap landing inside the first commit's synchronous execution window.
+  it("H1: a re-entrant 'Xác nhận rút' tap while the first confirm is still in-flight is dropped by the latch", async () => {
+    h.store = [seedTxn({ note: "tien nha" })]; // rent → housing (spending)
+    h.reconcile
+      .mockImplementationOnce(() => ({
+        status: "needs-goal" as const,
+        donors: [],
+        goalDonors: [{ jarId: "goal", label: "Hũ Mục tiêu", take: 500_000 }],
+        targetLabel: "Nhà ở",
+      }))
+      .mockImplementationOnce(() => {
+        // A second tap arrives while this (first legitimate) confirm call is still
+        // on the stack — `inFlight.current` is still true (the `finally` in the
+        // outer `applyCategory` call hasn't run yet).
+        fireEvent.click(screen.getByRole("button", { name: "Xác nhận rút" }));
+        return {
+          status: "funded" as const,
+          donors: [{ jarId: "goal", label: "Hũ Mục tiêu", take: 500_000 }],
+          targetLabel: "Nhà ở",
+        };
+      });
+
+    render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
+    await screen.findByText("Tiền nhà");
+    fireEvent.click(screen.getByRole("button", { name: "Đồng ý" })); // 1st reconcile call → needs-goal
+
+    const confirmBtn = await screen.findByRole("button", { name: "Xác nhận rút" });
+    fireEvent.click(confirmBtn); // 2nd reconcile call (legitimate) → the re-entrant tap fires from inside it
+
+    // Exactly 2 calls total: the initial needs-goal assessment + the ONE legitimate
+    // confirm. The re-entrant tap never reaches a 3rd `reconcile` call — the latch
+    // dropped it before it could double-commit a second rebalance for "housing".
+    expect(h.reconcile).toHaveBeenCalledTimes(2);
   });
 });

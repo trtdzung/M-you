@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { healOrphanCategories, stripCategories } from "@/domain/jar-rules";
-import { fitsCasaCap } from "@/domain/engine";
+import { getDb } from "@/lib/db";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
-import { casaPoolForCif } from "@/lib/casa-pool";
+import { deleteRebalanceLegsForJar } from "@/lib/manual-txns-store";
+import { capViolation, categoryViolation } from "../jar-write-guards";
 
 /**
  * One jar of one persona. `cif` travels in the QUERY STRING on every `:id`
@@ -24,6 +25,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const body = await req.json().catch(() => null);
   const patch = sanitizeJarPatch(body?.patch);
   if (!patch) return NextResponse.json({ error: "patch is invalid" }, { status: 422 });
+  const badCategories = patch.categoryIds ? categoryViolation(patch.categoryIds) : null;
+  if (badCategories) return badCategories;
 
   const current = readJarConfig(cif);
   const prev = current.jars.find((j) => j.id === id);
@@ -34,21 +37,22 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   let jars = current.jars.map((j) => (j.id === id ? { ...prev, ...patch } : j));
   if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds, id);
 
-  // Cap only when this patch SETS a numeric budgetLimit (the only way to raise Σ);
-  // clearing a limit or editing label/color/category can never exceed CASA, and
-  // must stay editable even if a legacy config is already over.
-  if (typeof patch.budgetLimit === "number") {
-    const cap = fitsCasaCap(jars, casaPoolForCif(cif) ?? "unknown", {});
-    if (!cap.ok) {
-      return NextResponse.json({ error: "over CASA cap", overBy: cap.overBy ?? null }, { status: 422 });
-    }
-  }
+  // Only a write that RAISES Σ budgetLimit past CASA is rejected: clearing,
+  // lowering, re-saving or editing label/color/category always passes, even if a
+  // legacy config (or a CASA drop after a transfer) left it over cap.
+  const overCap = capViolation(cif, jars, current.jars);
+  if (overCap) return overCap;
   return NextResponse.json(writeJarConfig(cif, { version: 3, jars }));
 }
 
 /**
  * DELETE /api/jars/:id?cif= — remove one jar. Its categories are force-moved to
- * "Khác" first, so no expense category is ever orphaned (invariant #6).
+ * "Khác" first, so no expense category is ever orphaned (invariant #6). Every
+ * rebalance leg (`dieu-chinh-hu` manual txn) whose `rebalance.fromJarId` or
+ * `toJarId` is this jar is deleted in the SAME DB transaction (S8) — a leg
+ * pointing at a vanished jar would move money "from nowhere". Response: the
+ * resulting `JarConfig` (unchanged contract); the number of legs removed is in
+ * the `X-Rebalance-Legs-Deleted` header.
  */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const cif = req.nextUrl.searchParams.get("cif");
@@ -61,7 +65,10 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
 
   const remaining = { version: 3 as const, jars: current.jars.filter((j) => j.id !== id) };
   const next = target.categoryIds.length > 0 ? healOrphanCategories(remaining) : remaining;
-  // The jar's categories heal into "Khác" above; there is no allocation ledger to
-  // repoint any more (single-number model — budgetLimit lives on the jar itself).
-  return NextResponse.json(writeJarConfig(cif, next));
+  const removeJarAndLegs = getDb().transaction(() => {
+    const legsDeleted = deleteRebalanceLegsForJar(cif, id);
+    return { config: writeJarConfig(cif, next), legsDeleted };
+  });
+  const { config, legsDeleted } = removeJarAndLegs();
+  return NextResponse.json(config, { headers: { "X-Rebalance-Legs-Deleted": String(legsDeleted) } });
 }

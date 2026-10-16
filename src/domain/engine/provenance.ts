@@ -8,7 +8,7 @@
 import type { DataSource } from "@/domain/models";
 
 /** Trust ranking — a lower rank is less verified, so it wins a "lowest-trust" fold. */
-export const TRUST_RANK: Record<DataSource, number> = {
+const TRUST_RANK: Record<DataSource, number> = {
   estimated: 0,
   mock: 1,
   self_reported: 2,

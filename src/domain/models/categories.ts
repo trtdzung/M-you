@@ -53,11 +53,25 @@ export const UNCLASSIFIED_LABEL = "Chưa phân loại";
  * the UNCLASSIFIED "unenriched expense" bucket.
  */
 export const INCOME = "income" as const;
-export const INCOME_LABEL = "Tiền vào";
+const INCOME_LABEL = "Tiền vào";
 
-/** True for the unclassified sentinel (not a real taxonomy id). */
-export function isUnclassifiedCategory(id: string): boolean {
-  return id === UNCLASSIFIED;
+/**
+ * System category tagging an inter-jar REBALANCE transaction (plan 260918-1120,
+ * Phase 03). A rebalance is ONE `Transaction` with this `categoryId` carrying
+ * `rebalance` meta `{ fromJarId, toJarId, triggerTxnId, origin }`; the engine reads
+ * the meta to move `−amount` off the donor jar's remaining and `+amount` onto the
+ * target jar's remaining. Like `UNCLASSIFIED`/`INCOME` it is deliberately kept OUT
+ * of `CATEGORIES`/`CATEGORY_BY_ID`: it belongs to no jar and is never an AI
+ * suggestion target. It is EXCLUDED from thu/chi + spend-by-category exactly like a
+ * `type:"transfer"` txn (see `netExpenseByCategory`), so a rebalance never inflates
+ * spend for the very envelope it protects (invariants #5/#6).
+ */
+export const REBALANCE_CATEGORY = "dieu-chinh-hu" as const;
+export const REBALANCE_CATEGORY_LABEL = "Điều chỉnh hũ";
+
+/** True for the inter-jar rebalance system category (not a real spend category). */
+export function isRebalanceCategory(id: string): boolean {
+  return id === REBALANCE_CATEGORY;
 }
 
 /**
@@ -68,6 +82,7 @@ export function isUnclassifiedCategory(id: string): boolean {
 export function categoryLabel(id: string): string {
   if (id === UNCLASSIFIED) return UNCLASSIFIED_LABEL;
   if (id === INCOME) return INCOME_LABEL;
+  if (id === REBALANCE_CATEGORY) return REBALANCE_CATEGORY_LABEL;
   return CATEGORY_BY_ID[id]?.label ?? id;
 }
 

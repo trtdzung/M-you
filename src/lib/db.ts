@@ -26,6 +26,16 @@ export function getDb(): Database.Database {
   // by design — the rows were disposable mock display-partitions, no real value.
   db.exec("DROP TABLE IF EXISTS jar_allocations");
   db.exec(readFileSync(schemaPath, "utf8"));
+  // Migration: `jars.role` (donor-waterfall role, plan 260918-1120 Phase 04) is a
+  // new column. CREATE TABLE IF NOT EXISTS won't add it to a pre-existing DB, so
+  // add it defensively — `ADD COLUMN` throws "duplicate column" once present,
+  // which we swallow (idempotent). Existing rows read back NULL → treated as
+  // `spending` by the engine, never a crash.
+  try {
+    db.exec("ALTER TABLE jars ADD COLUMN role TEXT");
+  } catch {
+    // column already exists — nothing to do
+  }
   instance = db;
   return db;
 }

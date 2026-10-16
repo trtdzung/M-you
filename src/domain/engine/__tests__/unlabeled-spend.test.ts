@@ -53,8 +53,9 @@ describe("selectUnlabeledSpend", () => {
   });
 
   it("excludes out-of-period transactions", () => {
-    const before = txn({ id: "b", categoryId: UNCLASSIFIED, amount: 100_000, postedAt: "2026-05-31T23:00:00.000Z" });
-    const after = txn({ id: "a", categoryId: UNCLASSIFIED, amount: 100_000, postedAt: "2026-07-01T00:30:00.000Z" });
+    // VN business time (UTC+7): 31/05 23:00 VN is May; 01/07 00:30 VN is July.
+    const before = txn({ id: "b", categoryId: UNCLASSIFIED, amount: 100_000, postedAt: "2026-05-31T16:00:00.000Z" });
+    const after = txn({ id: "a", categoryId: UNCLASSIFIED, amount: 100_000, postedAt: "2026-06-30T17:30:00.000Z" });
     const res = selectUnlabeledSpend([before, after], PERIOD);
     expect(res.count).toBe(0);
   });

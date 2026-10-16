@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { JarConfigProvider } from "@/state/jars";
+import { ManualTxnsProvider } from "@/state/manual-txns";
 
 const replace = vi.fn();
 let query = "";
@@ -16,7 +17,9 @@ import { HuCategoryTab } from "../HuCategoryTab";
 function wrapper({ children }: { children: ReactNode }) {
   return (
     <PersonaProvider>
-      <JarConfigProvider>{children}</JarConfigProvider>
+      <ManualTxnsProvider>
+        <JarConfigProvider>{children}</JarConfigProvider>
+      </ManualTxnsProvider>
     </PersonaProvider>
   );
 }

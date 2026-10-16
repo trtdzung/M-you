@@ -5,6 +5,7 @@
  */
 
 import type { Transaction, TransactionDirection } from "@/domain/models";
+import { dateToMonthKey } from "./types";
 
 export interface RecurringSeries {
   merchantNormalizedName: string;
@@ -21,8 +22,10 @@ export interface RecurringSeries {
 
 const MIN_MONTHS = 3;
 
+/** VN-calendar "YYYY-MM" of an ISO instant (never a raw string slice); invalid → "invalid". */
 function monthKey(iso: string): string {
-  return iso.slice(0, 7); // YYYY-MM
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "invalid" : dateToMonthKey(d);
 }
 
 export function detectRecurring(txns: Transaction[]): RecurringSeries[] {

@@ -35,8 +35,8 @@ export const KHAC_JAR_LABEL = "Khác";
  * catch-all jar — it stays visible as "cần gắn nhãn" (invariant #6). Pinned
  * after "Khác" in the ordering below.
  */
-export const UNCLASSIFIED_JAR_ID = UNCLASSIFIED;
-export const UNCLASSIFIED_JAR_LABEL = UNCLASSIFIED_LABEL;
+const UNCLASSIFIED_JAR_ID = UNCLASSIFIED;
+const UNCLASSIFIED_JAR_LABEL = UNCLASSIFIED_LABEL;
 
 /** One jar's slice of the period's spend, with its categories broken out. */
 export interface JarSpendGroup {
