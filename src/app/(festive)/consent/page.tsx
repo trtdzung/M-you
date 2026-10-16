@@ -58,7 +58,7 @@ export default function ConsentPage() {
       </div>
 
       <div className="mt-6">
-        <SectionHeader title="Hồ sơ demo" subtitle="Chọn một hồ sơ để xem dữ liệu mẫu" />
+        <SectionHeader title="Hồ sơ" />
         <Card>
           <PersonaSwitcher />
         </Card>

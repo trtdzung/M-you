@@ -71,7 +71,7 @@ export default function SettingsPage() {
         </section>
 
         <section>
-          <SectionHeader title="Hồ sơ demo" subtitle="Chọn hồ sơ để xem dữ liệu mẫu" />
+          <SectionHeader title="Hồ sơ" />
           <Card className="flex items-start gap-3">
             <UserCircle2 size={20} className="mt-1 shrink-0 text-primary" />
             <PersonaSwitcher className="flex-1" />

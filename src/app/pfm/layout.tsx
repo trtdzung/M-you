@@ -33,8 +33,9 @@ export default function PfmLayout({
     <PhoneShell
       background={<CalmBg />}
       fab={<AssistantFab />}
-      className="shell-calm"
+      className="shell-calm lg:shadow-[0_24px_70px_-24px_rgba(31,42,68,0.45)] lg:ring-1 lg:ring-black/[0.06]"
       mainClassName="shell-main--pfm"
+      stageClassName="lg:bg-stone-200"
     >
       <div className="pfm-shell flex h-full flex-col">
         <PfmHeader />

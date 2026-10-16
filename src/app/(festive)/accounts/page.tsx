@@ -15,7 +15,7 @@ export default function AccountsPage() {
 
   return (
     <div>
-      <ScreenHeader title="Tài khoản" subtitle="Số dư & giao dịch của bạn" />
+      <ScreenHeader title="Tài khoản" />
 
       {loading && (
         <SkeletonScreen>
