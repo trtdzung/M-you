@@ -20,6 +20,9 @@
 # local design reference (MSB app screenshots — not part of the codebase)
 /ref-ui-msb/
 
+# local planning workspace (not part of the codebase)
+/plans/
+
 # debug logs
 npm-debug.log*
 yarn-debug.log*
