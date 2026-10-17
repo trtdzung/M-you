@@ -24,13 +24,16 @@ const speech = vi.hoisted(() => ({
   stop: vi.fn(),
   cancel: vi.fn(),
   options: {} as SpeechSessionOptions,
+  state: "idle",
+  partial: "",
 }));
 vi.mock("@/lib/use-streaming-speech", () => ({
   useStreamingSpeech: (callback: typeof speech.callback, options: SpeechSessionOptions) => {
     speech.callback = callback;
     speech.options = options;
     return {
-      state: "idle",
+      state: speech.state,
+      partial: speech.partial,
       error: "",
       start: speech.start,
       stop: speech.stop,
@@ -41,6 +44,8 @@ vi.mock("@/lib/use-streaming-speech", () => ({
 
 describe("VoiceFab refined transcript hand-off", () => {
   beforeEach(() => {
+    speech.state = "idle";
+    speech.partial = "";
     speech.start.mockClear();
     speech.stop.mockClear();
     speech.cancel.mockClear();
@@ -66,6 +71,51 @@ describe("VoiceFab refined transcript hand-off", () => {
       "Chuyển 500.000 VND cho Nguyễn Văn An",
       "CIF_0001",
     ));
+  });
+
+  it("starts once per hold and flushes once despite duplicate browser release events", () => {
+    render(<VoiceFab />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    expect(speech.start).toHaveBeenCalledTimes(1);
+    fireEvent.pointerUp(window);
+    fireEvent.mouseUp(window);
+    expect(speech.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports a keyboard hold even when opening the section replaces the button", () => {
+    render(<VoiceFab />);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }), { key: " " });
+    expect(speech.start).toHaveBeenCalledTimes(1);
+    fireEvent.keyUp(window, { key: " " });
+    expect(speech.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not restart STT while the final transcript is still being prepared", () => {
+    speech.state = "finishing";
+    render(<VoiceFab />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    expect(speech.start).not.toHaveBeenCalled();
+  });
+
+  it("shows a temporary caption without populating or sending the input", async () => {
+    const { rerender } = render(<VoiceFab />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    speech.state = "recording";
+    speech.partial = "chi tiêu tháng này";
+    rerender(<VoiceFab />);
+    expect(screen.getByLabelText("Nội dung nghe được tạm thời")).toHaveTextContent("chi tiêu tháng này");
+    expect(screen.getByPlaceholderText("Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây")).toHaveValue("");
+    expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
+  });
+
+  it("cancels when the section closes and ignores the subsequent release", () => {
+    render(<VoiceFab />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
+    expect(speech.cancel).toHaveBeenCalledTimes(1);
+    fireEvent.pointerUp(window);
+    expect(speech.stop).not.toHaveBeenCalled();
   });
 
   it("asks for missing transfer details instead of auto-sending", async () => {
