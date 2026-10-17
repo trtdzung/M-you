@@ -1,0 +1,145 @@
+{
+  "version": "1.0.0",
+  "as_of": "2026-09-23",
+  "features": [
+    {
+      "feature_id": "jar_limit_vnd", "description": "Monthly limit set on a spending jar; null means unset.",
+      "source_fields": ["jars.budget_limit", "Jar.budgetLimit"], "source_module_or_api": "GET /api/jars -> readJarConfig -> useJarConfig",
+      "formula": "identity; undefined/null maps to unknown, never 0", "data_type": "integer|null", "unit": "VND",
+      "freshness": "on jar config read/write; no row updated_at exists", "timezone_or_cycle_assumption": "VN calendar month; config applies across months",
+      "null_policy": "suppress limit-dependent rules", "status": "AVAILABLE", "evidence_ref": ["data/schema.sql:23", "src/lib/jars-store.ts:38", "src/domain/models/index.ts:238"]
+    },
+    {
+      "feature_id": "jar_spent_vnd", "description": "Posted net expense in the jar's owned categories for the month.",
+      "source_fields": ["transactions.payload.amount", "transactions.payload.postedAt", "transactions.payload.categoryId", "transactions.payload.type", "transactions.payload.status", "jars.category_ids"],
+      "source_module_or_api": "GET /api/transactions + GET /api/manual-transactions + corrections -> computeFinancials -> evaluateJarBudget",
+      "formula": "sum(posted expense+fee) - sum(posted refund) for first-owner jar categories; exclude transfer, card payment, rebalance, reversed and hidden rows",
+      "data_type": "integer", "unit": "VND", "freshness": "recompute on transaction, correction or jar config change; line.freshness is latest contributing postedAt",
+      "timezone_or_cycle_assumption": "monthPeriodFromKey uses Asia/Ho_Chi_Minh UTC+7 month bounds", "null_policy": "transaction load failure suppresses; no posted matching rows yields 0",
+      "status": "DERIVABLE", "evidence_ref": ["data/schema.sql:74", "src/domain/engine/jar-budget.ts:144", "src/domain/engine/cashflow.ts:67", "src/state/useFinancials.ts:107"]
+    },
+    {
+      "feature_id": "jar_remaining_vnd", "description": "Signed derived balance; distinct from the plan limit.",
+      "source_fields": ["Jar.budgetLimit", "jar_spent_vnd", "Transaction.rebalance.fromJarId", "Transaction.rebalance.toJarId", "Transaction.amount"],
+      "source_module_or_api": "computeFinancials -> rebalanceNetByJar -> evaluateJarBudget; GET /api/jar-summary exposes remaining",
+      "formula": "limit - spent + (sum received rebalance - sum given rebalance)", "data_type": "integer|null", "unit": "VND",
+      "freshness": "same recompute as jar_spent; rebalance rows are transaction-backed, except client session topups",
+      "timezone_or_cycle_assumption": "same VN month as jar_spent", "null_policy": "null if limit unset; negative is retained for rules, displayed spendable is max(0, remaining)",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/jar-budget.ts:187", "src/domain/engine/jar-rebalance.ts", "src/app/api/jar-summary/route.ts:55", "src/components/hu-envelope/JarEnvelopeCard.tsx:36"]
+    },
+    {
+      "feature_id": "jar_utilization", "description": "Plan usage independent of rebalance coverage.",
+      "source_fields": ["jar_spent_vnd", "jar_limit_vnd"], "source_module_or_api": "evaluateJarBudget -> JarBudgetLine.pct/status",
+      "formula": "spent / limit when limit > 0; limit=0 uses engine's finite 1 if over else 0", "data_type": "number|null", "unit": "ratio",
+      "freshness": "recompute with jar_spent", "timezone_or_cycle_assumption": "VN month", "null_policy": "null when unset; do not divide by zero",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/jar-budget.ts:113", "src/domain/engine/jar-budget.ts:195", "src/domain/engine/pressure.ts:10"]
+    },
+    {
+      "feature_id": "days_left_in_jar_cycle", "description": "Whole days until end of monthly jar cycle.",
+      "source_fields": ["Financials.monthKey", "JarBudgetSummary.daysLeft", "DEMO_NOW"], "source_module_or_api": "monthPeriodFromKey -> daysLeftIn -> evaluateJarBudget",
+      "formula": "max(0, ceil((period.to - injected now)/86400000))", "data_type": "integer", "unit": "days",
+      "freshness": "daily or on clock change", "timezone_or_cycle_assumption": "Asia/Ho_Chi_Minh UTC+7; current build uses fixed DEMO_NOW=2026-09-15T00:00:00Z",
+      "null_policy": "invalid month or clock suppresses time-based rules", "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/types.ts:39", "src/domain/engine/pressure.ts:26", "src/lib/demo-clock.ts:10"]
+    },
+    {
+      "feature_id": "jar_recent_daily_burn_vnd", "description": "Candidate run rate for early depletion; not in current Financials output.",
+      "source_fields": ["Transaction.postedAt", "Transaction.amount", "Transaction.type", "Transaction.status", "Transaction.categoryId", "Jar.categoryIds"],
+      "source_module_or_api": "proposed pure selector over the same correction-applied transactions passed to computeFinancials",
+      "formula": "proposed: 0.6 * net jar spend in last 7 VN days / 7 + 0.4 * net jar spend in last 30 VN days / 30; require >=3 distinct active spending days and nonnegative finite run rate",
+      "data_type": "number|null", "unit": "VND/day", "freshness": "daily and on posted transaction/correction change",
+      "timezone_or_cycle_assumption": "VN day windows; do not infer older-than-cycle spending without explicit rule version", "null_policy": "suppress forecast when history incomplete, stale or rate <=0",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/models/index.ts:78", "src/state/useFinancials.ts:107", "src/domain/engine/cashflow.ts:67", "docs/INSIGHT_FEATURE_ARCHIVE.md:22"]
+    },
+    {
+      "feature_id": "jar_days_to_empty", "description": "Estimated remaining days at the candidate daily run rate.",
+      "source_fields": ["jar_remaining_vnd", "jar_recent_daily_burn_vnd"], "source_module_or_api": "proposed depletion feature engine",
+      "formula": "floor(max(0, remaining)/daily_burn) when daily_burn>0", "data_type": "integer|null", "unit": "days",
+      "freshness": "with run rate and jar balance", "timezone_or_cycle_assumption": "VN day and monthly cycle", "null_policy": "null for missing/zero rate or unset limit",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/jar-budget.ts:187", "src/domain/models/index.ts:78"]
+    },
+    {
+      "feature_id": "jar_safe_daily_spend_vnd", "description": "Maximum daily spend that would use the current jar balance evenly through the rest of the cycle.",
+      "source_fields": ["jar_remaining_vnd", "days_left_in_jar_cycle"], "source_module_or_api": "proposed pure depletion feature engine over existing JarBudgetLine and JarBudgetSummary",
+      "formula": "floor(max(0, remaining)/days_left) when days_left>0", "data_type": "integer|null", "unit": "VND/day",
+      "freshness": "daily and on jar balance change", "timezone_or_cycle_assumption": "Vietnam UTC+7 monthly cycle", "null_policy": "null for unset limit or days_left<=0; negative remaining is handled by needs_cover, not a safe-spend quote",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/jar-budget.ts:187", "src/domain/engine/pressure.ts:26"]
+    },
+    {
+      "feature_id": "jar_projected_shortfall_vnd", "description": "Estimated amount by which recent burn exceeds current spendable jar balance before cycle end.",
+      "source_fields": ["jar_remaining_vnd", "jar_recent_daily_burn_vnd", "days_left_in_jar_cycle"], "source_module_or_api": "proposed pure depletion feature engine",
+      "formula": "max(0, daily_burn*days_left-max(0,remaining)) when inputs are valid", "data_type": "integer|null", "unit": "VND",
+      "freshness": "with burn rate and jar balance", "timezone_or_cycle_assumption": "Vietnam UTC+7 monthly cycle", "null_policy": "null for unknown/insufficient burn history or unset limit; never call a projection a known loss",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/jar-budget.ts:187", "src/domain/models/index.ts:78"]
+    },
+    {
+      "feature_id": "casa_available_vnd", "description": "Sum of available balances of current accounts only.",
+      "source_fields": ["accounts.type", "accounts.available_balance", "accounts.last_synced_at"], "source_module_or_api": "GET /api/accounts -> readAccounts; casaBalanceOrUnknown; GET /api/jar-summary.casaBalance",
+      "formula": "sum(availableBalance where type=current); unknown if no current account", "data_type": "integer|null", "unit": "VND",
+      "freshness": "last_synced_at; freshness SLA still to define", "timezone_or_cycle_assumption": "instant, not monthly", "null_policy": "no current account => unknown; suppress liquidity/surplus rules",
+      "status": "DERIVABLE", "evidence_ref": ["data/schema.sql:42", "src/lib/accounts-store.ts:48", "src/domain/engine/casa-balance.ts", "src/app/api/jar-summary/route.ts:77"]
+    },
+    {
+      "feature_id": "known_obligation_vnd_due_at", "description": "Known liability minimum payment and due date; recurring estimates are separate provenance.",
+      "source_fields": ["Liability.minimumPayment", "Liability.dueDate", "Liability.source", "Liability.lastUpdatedAt"],
+      "source_module_or_api": "mock provider listLiabilities + client userLiabilities -> computeFinancials -> upcomingObligations",
+      "formula": "retain only finite positive minimumPayment with parseable dueDate within horizon; do not label recurring prediction as contractual due amount",
+      "data_type": "object|null", "unit": "VND and ISO timestamp", "freshness": "liability.lastUpdatedAt; seed may be mock/self_reported",
+      "timezone_or_cycle_assumption": "Liability fixtures use YYYY-MM-DD; reminder compares Vietnam UTC+7 calendar days. Payment cutoff/settlement policy remains unconfirmed for liquidity-shortfall claims", "null_policy": "null amount/date suppresses P0; never coerce to zero",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/models/index.ts:201", "src/domain/engine/obligations.ts:39", "src/providers/mock/mock-provider.ts:138", "src/domain/engine/finance-compose.ts:221"]
+    },
+    {
+      "feature_id": "category_spend_delta_vnd", "description": "Current versus previous month spend by category.",
+      "source_fields": ["Financials.cashflow.byCategory", "Financials.prevCashflow.byCategory"], "source_module_or_api": "aggregateCashflow -> spendingSpike detector",
+      "formula": "current - previous; percent only when previous>0", "data_type": "integer", "unit": "VND",
+      "freshness": "transaction/correction change", "timezone_or_cycle_assumption": "adjacent VN calendar months", "null_policy": "previous<=0 suppresses percent spike rule",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/finance-compose.ts:262", "src/insights/detectors/spending-spike.ts:8"]
+    },
+    {
+      "feature_id": "goal_gap_vnd", "description": "Remaining amount to target, without a contribution schedule.",
+      "source_fields": ["Goal.targetAmount", "Goal.currentAmount", "Goal.targetDate", "Goal.source"], "source_module_or_api": "provider listGoals + client userGoals -> Financials.goals",
+      "formula": "max(0, targetAmount-currentAmount); on-track prediction needs additional schedule/baseline", "data_type": "integer|null", "unit": "VND",
+      "freshness": "on goal change; no server revision for client-authored goal", "timezone_or_cycle_assumption": "targetDate nullable; date-only policy unconfirmed", "null_policy": "missing target/current/date suppresses deviation prediction",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/models/index.ts:262", "src/domain/engine/finance-compose.ts:284", "src/state/goals.tsx"]
+    },
+    {
+      "feature_id": "recurring_series_estimate", "description": "Inferred monthly recurring spend, not a contractual bill or proof of leakage.",
+      "source_fields": ["Transaction.merchantNormalizedName", "Transaction.direction", "Transaction.amount", "Transaction.postedAt", "Transaction.status"],
+      "source_module_or_api": "detectRecurring -> Financials.recurring", "formula": "group posted non-transfer transactions by normalized merchant+direction; require >=3 distinct VN months; average amount/day",
+      "data_type": "object[]", "unit": "VND per expected month", "freshness": "lastPostedAt per series",
+      "timezone_or_cycle_assumption": "distinct VN calendar months; next occurrence is inferred", "null_policy": "insufficient history => no series, not proof of no subscriptions",
+      "status": "DERIVABLE", "evidence_ref": ["src/domain/engine/recurring.ts:10", "src/domain/engine/finance-compose.ts:220"]
+    },
+    {
+      "feature_id": "goal_contribution_schedule", "description": "Approved dated savings contribution schedule needed to judge on-track state.",
+      "source_fields": [], "source_module_or_api": "not found as canonical dated contribution history",
+      "formula": "policy/product-defined", "data_type": "object|null", "unit": "VND and date", "freshness": "unknown",
+      "timezone_or_cycle_assumption": "goal target date policy missing", "null_policy": "suppress P3 trajectory/deviation claim", "status": "MISSING", "evidence_ref": ["src/domain/models/index.ts:262", "src/state/goals.tsx"]
+    },
+    {
+      "feature_id": "obligation_coverage", "description": "Completeness and paid/unpaid status of all mandatory near-term obligations.",
+      "source_fields": [], "source_module_or_api": "not found in current PFM contract",
+      "formula": "source adapter completeness/watermark plus payment reconciliation required", "data_type": "object|null", "unit": "none",
+      "freshness": "unknown", "timezone_or_cycle_assumption": "policy horizon missing", "null_policy": "suppress P0 liquidity-shortfall and P4 safe-surplus claims",
+      "status": "MISSING", "evidence_ref": ["src/domain/engine/obligations.ts", "src/domain/models/index.ts:201"]
+    },
+    {
+      "feature_id": "risk_scan_completeness", "description": "Proof all P0/P1 risk sources were evaluated with fresh data.",
+      "source_fields": [], "source_module_or_api": "not found; proposed snapshot composer output",
+      "formula": "all required P0/P1 source loads, freshness checks and rule evaluations complete", "data_type": "boolean|null", "unit": "none",
+      "freshness": "per snapshot", "timezone_or_cycle_assumption": "VN current cycle", "null_policy": "suppress P5 when unknown/false",
+      "status": "MISSING", "evidence_ref": ["src/state/useFinancials.ts:76", "src/insights/run.ts:28"]
+    },
+    {
+      "feature_id": "mandatory_reserve_requirement_vnd", "description": "Approved safety buffer and complete mandatory obligation coverage needed for safe surplus.",
+      "source_fields": [], "source_module_or_api": "not found in current PFM contract",
+      "formula": "policy-defined; cannot infer from CASA or unallocated pool", "data_type": "integer|null", "unit": "VND",
+      "freshness": "unknown", "timezone_or_cycle_assumption": "policy horizon missing", "null_policy": "suppress P4", "status": "MISSING", "evidence_ref": ["src/domain/engine/surplus.ts", "docs/INSIGHT_FEATURE_ARCHIVE.md:73"]
+    },
+    {
+      "feature_id": "product_eligibility", "description": "Server-authoritative customer/product eligibility and approved action.",
+      "source_fields": [], "source_module_or_api": "not found; mock product list is presentation data",
+      "formula": "policy engine output required", "data_type": "object|null", "unit": "none", "freshness": "unknown",
+      "timezone_or_cycle_assumption": "as-of policy decision", "null_policy": "no product recommendation", "status": "MISSING", "evidence_ref": ["src/providers/mock/mock-provider.ts:182", "docs/INSIGHT_FEATURE_ARCHIVE.md:73"]
+    }
+  ]
+}

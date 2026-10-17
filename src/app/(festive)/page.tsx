@@ -6,6 +6,7 @@ import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
+import { HomeInsightWidget } from "@/components/home/HomeInsightWidget";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
 import { useFinancials } from "@/state/useFinancials";
 
@@ -36,6 +37,8 @@ export default function HomePage() {
 
       {!loading && !error && (
         <div className="flex flex-col gap-4">
+          <HomeInsightWidget />
+
           {primary ? (
             <AccountSummaryCard
               tier={primary.tier ?? "MSB"}
@@ -48,6 +51,8 @@ export default function HomePage() {
               <Empty title="Chưa có tài khoản" description="Chưa có tài khoản nào để hiển thị." />
             </div>
           )}
+
+
 
           <HomeQuickGrid />
 

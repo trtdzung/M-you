@@ -134,3 +134,41 @@ CREATE TABLE IF NOT EXISTS transaction_corrections (
 -- NOTE: the legacy `jar_allocations` table was retired with the single-number
 -- ("một con số") jar model — a jar's `budget_limit` IS its allocation now, so
 -- there is no separate earmark ledger. `db.ts` drops the old table on connect.
+
+-- Proactive insights per persona (`cif`). Stores the history and state of
+-- generated insights and their copies to avoid duplicate notifications.
+CREATE TABLE IF NOT EXISTS proactive_insights (
+  cif TEXT NOT NULL,
+  insight_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  insight_type TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('active', 'resolved', 'superseded', 'dismissed', 'expired')),
+  fingerprint TEXT NOT NULL,
+  semantic_signature TEXT NOT NULL,
+  candidate_json TEXT NOT NULL,
+  copy_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (cif, insight_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_proactive_insights_active ON proactive_insights (cif, status);
+
+-- User interaction events for proactive insights (e.g. displayed, dismissed).
+CREATE TABLE IF NOT EXISTS proactive_insight_events (
+  cif TEXT NOT NULL,
+  insight_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('displayed', 'dismissed')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (cif, insight_id, version, event_type)
+);
+
+-- Temporary verified financial profile per persona (`cif`) synced from the browser.
+CREATE TABLE IF NOT EXISTS proactive_financial_profiles (
+  cif TEXT PRIMARY KEY,
+  liabilities_json TEXT NOT NULL,
+  goals_json TEXT NOT NULL,
+  sync_token TEXT NOT NULL,
+  verified_at TEXT NOT NULL
+);

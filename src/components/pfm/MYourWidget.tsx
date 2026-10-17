@@ -135,7 +135,9 @@ export function MYourWidget() {
     // Partial captions stay separate from the draft. Only the server's final
     // after refinement/fallback may update the composer.
     if (!final) return;
-    setInput(composeVoiceDraft(voicePrefix.current, text.trim()));
+    const nextText = composeVoiceDraft(voicePrefix.current, text.trim());
+    setInput(nextText);
+    setInputVisible(nextText);
     const interpretation = metadata?.interpretation;
     setVoiceGuidance(
       interpretation?.intent === "transfer_between_jars" && !interpretation.actionable

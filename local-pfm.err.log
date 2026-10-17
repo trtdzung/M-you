@@ -1,0 +1,43 @@
+=http://127.0.0.1:8000 : The term '=http://127.0.0.1:8000' is not recognized as the name of a cmdlet, function, script 
+file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct 
+and try again.
+At line:1 char:1
++ ='http://127.0.0.1:8000'; ='local-stream-check'; ='http://localhost:3 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=http://127.0.0.1:8000:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=local-stream-check : The term '=local-stream-check' is not recognized as the name of a cmdlet, function, script file, 
+or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and 
+try again.
+At line:1 char:27
++ ='http://127.0.0.1:8000'; ='local-stream-check'; ='http://localhost:3 ...
++                           ~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=local-stream-check:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=http://localhost:3000 : The term '=http://localhost:3000' is not recognized as the name of a cmdlet, function, script 
+file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct 
+and try again.
+At line:1 char:50
++ ... .0.0.1:8000'; ='local-stream-check'; ='http://localhost:3000'; ='3000 ...
++                                          ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=http://localhost:3000:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=3000 : The term '=3000' is not recognized as the name of a cmdlet, function, script file, or operable program. Check 
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:76
++ ... 00'; ='local-stream-check'; ='http://localhost:3000'; ='3000'; ='127. ...
++                                                           ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=3000:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=127.0.0.1 : The term '=127.0.0.1' is not recognized as the name of a cmdlet, function, script file, or operable 
+program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:85
++ ... tream-check'; ='http://localhost:3000'; ='3000'; ='127.0.0.1'; Set-Lo ...
++                                                      ~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=127.0.0.1:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
