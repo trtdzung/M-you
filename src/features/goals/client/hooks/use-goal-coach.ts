@@ -118,6 +118,7 @@ export function useGoalCoach() {
     requestId: state.response?.request_id ?? null,
     messageCode: state.response?.message_code ?? null,
     start,
+    retry: () => { if (state.phase === "failed") void call(state, state.answers.length ? "answering" : "asking"); },
     answer,
     reset,
   };

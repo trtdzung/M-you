@@ -5,11 +5,11 @@ import { hint, primaryButton, secondaryButton } from "../styles";
 export function CoachFallback({
   request,
   onManual,
-  onRestart,
+  onRetry,
 }: {
   request: string;
   onManual: () => void;
-  onRestart: () => void;
+  onRetry: () => void;
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -18,8 +18,8 @@ export function CoachFallback({
       <button type="button" onClick={onManual} className={primaryButton}>
         {GOALS_COPY.coach.manual}
       </button>
-      <button type="button" onClick={onRestart} className={secondaryButton}>
-        {GOALS_COPY.coach.restart}
+      <button type="button" onClick={onRetry} className={secondaryButton}>
+        {GOALS_COPY.retry}
       </button>
     </div>
   );

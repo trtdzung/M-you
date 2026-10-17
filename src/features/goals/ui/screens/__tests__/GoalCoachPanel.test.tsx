@@ -29,3 +29,10 @@ it("hides the menu before a conversation begins", () => {
   render(<GoalCoachPanel onCreated={vi.fn()} />);
   expect(screen.queryByRole("button", { name: "Tùy chọn trò chuyện" })).not.toBeInTheDocument();
 });
+
+it.each(["out_of_scope", "failed"])("keeps restart in the menu in %s state", phase => {
+  coach.phase = phase;
+  render(<GoalCoachPanel onCreated={vi.fn()} />);
+  expect(screen.queryByRole("button", { name: "Bắt đầu lại" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Tùy chọn trò chuyện" })).toBeInTheDocument();
+});
