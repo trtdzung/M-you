@@ -54,6 +54,16 @@ describe("GET /api/transactions", () => {
     expect(rowCount()).toBe(expected.length);
   });
 
+  it("still seeds when only self_reported rows exist, and never returns them (one table, #5)", async () => {
+    holder.db!
+      .prepare("INSERT INTO transactions (cif, id, source, posted_at, payload) VALUES (?, 'manual-1', 'self_reported', ?, '{}')")
+      .run(CIF, "2026-09-15T00:00:00.000Z");
+    const expected = generateDataset(PERSONAS.stable).transactions;
+    const txns = (await (await get(`?cif=${CIF}`)).json()) as Transaction[];
+    expect(txns).toHaveLength(expected.length);
+    expect(txns.some((t) => t.id === "manual-1")).toBe(false);
+  });
+
   it("does not re-seed or duplicate on later reads", async () => {
     await get(`?cif=${CIF}`);
     const first = rowCount();

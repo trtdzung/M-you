@@ -59,39 +59,31 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 CREATE INDEX IF NOT EXISTS idx_accounts_cif ON accounts (cif);
 
--- Self-reported transactions per persona (`cif`) — the records a user enters via
--- the ＋ FAB or that a confirmed transfer writes on the success card. NOT money
--- movement (invariant #3): every row is `source: 'self_reported'`, never
--- bank-verified (#5). Previously localStorage-only; now a real table so they
--- persist across reloads/dev-server restarts/devices. The rich, evolving
--- `Transaction` shape is stored as a JSON `payload` (same JSON-in-column pattern
--- as `jars.category_ids`); `posted_at` is a column purely for newest-first order.
-CREATE TABLE IF NOT EXISTS manual_transactions (
-  cif TEXT NOT NULL,
-  id TEXT NOT NULL,
-  posted_at TEXT NOT NULL,          -- ISO 8601; ordering only (newest first)
-  payload TEXT NOT NULL,            -- full JSON Transaction (source: self_reported)
-  PRIMARY KEY (cif, id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_manual_txns_cif ON manual_transactions (cif);
-
--- Bank-provided transaction history per persona (`cif`) — the "provider" txns
--- (`source: 'mock'`, standing in for MSB core-banking). Previously generated in
--- browser memory on every load; now a real table, seeded lazily per persona from
--- the same deterministic generator (`fixtures/generate.ts`) on first read. Same
--- JSON-in-column pattern as `manual_transactions`; `posted_at` is a column for
--- period filtering + newest-first order. Self-reported records stay in
--- `manual_transactions` so provenance never mixes (invariant #5).
+-- ALL transactions per persona (`cif`) in ONE table, told apart by `source`:
+--  - `mock` / `msb` — bank-provided history (standing in for MSB core-banking),
+--    seeded lazily per persona from the deterministic generator
+--    (`fixtures/generate.ts`) on first read. Read-only for the app.
+--  - `self_reported` — records a user enters via the ＋ FAB, the transfer record a
+--    confirmed transfer writes, and the `dieu-chinh-hu` rebalance legs. NOT money
+--    movement (invariant #3), never bank-verified (#5).
+-- Provenance never mixes (#5): every app write/delete is scoped to
+-- `source = 'self_reported'` and can never touch a bank row; bank reads/seeding
+-- are scoped to `source <> 'self_reported'`. The rich `Transaction` shape is a
+-- JSON `payload` (same JSON-in-column pattern as `jars.category_ids`);
+-- `posted_at` is a column for period filtering + newest-first order.
+-- (Replaces the former separate `manual_transactions` table — `db.ts` migrates it.)
 CREATE TABLE IF NOT EXISTS transactions (
   cif TEXT NOT NULL,
   id TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'mock'
+    CHECK (source IN ('mock', 'msb', 'self_reported')),
   posted_at TEXT NOT NULL,          -- ISO 8601
-  payload TEXT NOT NULL,            -- full JSON Transaction (source: mock)
+  payload TEXT NOT NULL,            -- full JSON Transaction
   PRIMARY KEY (cif, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_transactions_cif_posted ON transactions (cif, posted_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_cif_source ON transactions (cif, source, posted_at);
 
 -- The spending/transfer category taxonomy ("categories are data", invariant #7).
 -- Seeded lazily from `src/domain/models/categories.ts` (INSERT OR IGNORE, so a

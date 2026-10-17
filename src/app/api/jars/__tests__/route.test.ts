@@ -27,7 +27,7 @@ vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));
 import { GET, PATCH } from "../route";
 import { PATCH as patchJar } from "../[id]/route";
 import { writeJarConfig } from "@/lib/jars-store";
-import { ACCOUNTS_DDL, JARS_DDL, MANUAL_TXNS_DDL } from "./jar-route-test-ddl";
+import { ACCOUNTS_DDL, JARS_DDL, TRANSACTIONS_DDL } from "./jar-route-test-ddl";
 
 const CIF = "CIF_0001";
 const CASA = 18_000_000;
@@ -61,7 +61,7 @@ beforeEach(() => {
   holder.db = new Database(":memory:");
   holder.db.exec(JARS_DDL);
   holder.db.exec(ACCOUNTS_DDL);
-  holder.db.exec(MANUAL_TXNS_DDL);
+  holder.db.exec(TRANSACTIONS_DDL);
 });
 
 describe("PATCH /api/jars (batch cap door)", () => {

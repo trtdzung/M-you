@@ -57,22 +57,35 @@ re-seeded by `accounts-store.ts` if a persona has no rows yet.
 
 ## `transactions`
 
-One row per **bank-provided** transaction (the provider history, standing in for
-MSB core-banking), scoped by `cif`. Served read-only by `GET /api/transactions`
-(`?cif=&from=&to=`, newest first); `mock-provider.ts` is the only caller and
-throws on a failed load so the UI shows its error state rather than an empty
-(silently-zero) history (invariant #6). Seeded lazily per persona by
-`transactions-store.ts` from the deterministic generator (`generateDataset` in
-`fixtures/generate.ts`) on first read; `npm run db:seed` clears the table so the
-next read re-seeds it. Self-reported records never land here — they stay in
-`manual_transactions` so provenance never mixes (invariant #5).
+ALL transactions, scoped by `cif`, in ONE table told apart by `source`:
+
+- **Bank-provided** rows (`source` = `mock` / `msb`) — the provider history,
+  standing in for MSB core-banking. Served read-only by `GET /api/transactions`
+  (`?cif=&from=&to=`, newest first); `mock-provider.ts` is the only caller and
+  throws on a failed load so the UI shows its error state rather than an empty
+  (silently-zero) history (invariant #6). Seeded lazily per persona by
+  `transactions-store.ts` from the deterministic generator (`generateDataset` in
+  `fixtures/generate.ts`) on first read; `npm run db:seed` deletes only these
+  rows so the next read re-seeds them.
+- **Self-reported** rows (`source = 'self_reported'`) — see
+  [Self-reported rows](#transactions--self-reported-rows) below.
+
+Provenance never mixes (invariant #5): every bank read/seed is scoped to
+`source <> 'self_reported'`, every app write/delete to `source = 'self_reported'`.
+A self-reported write whose id already belongs to a bank row is refused (409) —
+the bank row is never overwritten.
 
 | column | type | notes |
 |---|---|---|
 | `cif` | TEXT PK¹ | owner |
-| `id` | TEXT PK¹ | `tx_<personaId>_<seq>` |
+| `id` | TEXT PK¹ | `tx_<personaId>_<seq>` (bank) / `manual-<uuid>` (self-reported) |
+| `source` | TEXT | `mock` \| `msb` \| `self_reported` (default `mock`); indexed with `cif, posted_at` |
 | `posted_at` | TEXT | ISO 8601; indexed with `cif` for period filtering + ordering |
-| `payload` | TEXT | full JSON `Transaction` (`source: "mock"`) |
+| `payload` | TEXT | full JSON `Transaction` |
+
+Older DB files had a separate `manual_transactions` table: `src/lib/db.ts` (and
+`scripts/seed-db.mjs`) add the `source` column, move those rows in as
+`self_reported`, and drop the old table on connect.
 
 Category labels are never written back to this table — they live in the
 `transaction_corrections` overlay below.
@@ -115,9 +128,9 @@ migrated up once on load. `npm run db:seed` clears this table with `transactions
 | `payload` | TEXT | JSON `Correction` (`categoryId?`, `hidden?`, `origin`, `status`, `confidence?`) |
 | `updated_at` | TEXT | ISO 8601 of the last write |
 
-## `manual_transactions`
+## `transactions` — self-reported rows
 
-One row per **self-reported** transaction, scoped by `cif` — the records a user
+The `source = 'self_reported'` rows of `transactions`, scoped by `cif` — the records a user
 enters via the ＋ FAB or that a confirmed transfer writes on its success card.
 NOT money movement (invariant #3): every row is `source: "self_reported"`, forced
 server-side so it can never look bank-verified (#5). Previously localStorage-only;
@@ -126,20 +139,18 @@ Reached only through `/api/manual-transactions` (`src/lib/manual-txns-store.ts`)
 the client hook (`src/state/manual-txns.tsx`) writes optimistically and persists
 in the background, and imports any legacy localStorage rows once on first load.
 
-| column | type | notes |
-|---|---|---|
-| `cif` | TEXT PK¹ | owner |
-| `id` | TEXT PK¹ | client-generated `manual-<uuid>` |
-| `posted_at` | TEXT | ISO timestamp; ordering only (list is newest-first) |
-| `payload` | TEXT | full JSON `Transaction` (same JSON-in-column pattern as `jars.category_ids`), letting the rich/evolving shape persist without schema churn |
+Columns are those of `transactions` above; `id` is a client-generated
+`manual-<uuid>`, and `payload` holds the full JSON `Transaction` (same
+JSON-in-column pattern as `jars.category_ids`), letting the rich/evolving shape
+persist without schema churn.
 
-¹ Composite primary key `(cif, id)`. Writes are `INSERT OR REPLACE` (idempotent on
-a replayed create); PATCH is a read-modify-write over a whitelist
+Writes are an upsert guarded by `source = 'self_reported'` (idempotent on a
+replayed create; an id owned by a bank row → 409); PATCH is a read-modify-write over a whitelist
 (`categoryId` / `type` / `transferPurpose` / `note` / `rebalance`), where a `null`
 value CLEARS an optional field. No seed — a persona starts with zero self-reported
 rows.
 
-**Inter-jar rebalance txns (plan 260918-1120, Phase 03)** live in THIS table — no
+**Inter-jar rebalance txns (plan 260918-1120, Phase 03)** are self-reported rows — no
 separate ledger. A rebalance is one row whose `payload` Transaction carries
 `categoryId: "dieu-chinh-hu"` (a system category excluded from thu/chi + spend-by-
 category, like `type:"transfer"`) plus a `rebalance` meta

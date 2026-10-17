@@ -111,7 +111,25 @@ function buildAccountRows(cif) {
 
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
+// One-table transactions migration — same steps as src/lib/db.ts: an older
+// `transactions` gets its `source` column BEFORE the schema (whose source index
+// needs it), then the retired `manual_transactions` rows move in as self_reported.
+const txnCols = db.prepare("PRAGMA table_info(transactions)").all();
+if (txnCols.length > 0 && !txnCols.some((c) => c.name === "source")) {
+  db.exec(
+    "ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'mock' CHECK (source IN ('mock', 'msb', 'self_reported'))",
+  );
+}
 db.exec(readFileSync(SCHEMA_PATH, "utf8"));
+if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'manual_transactions'").get()) {
+  db.transaction(() => {
+    db.exec(
+      `INSERT OR IGNORE INTO transactions (cif, id, source, posted_at, payload)
+       SELECT cif, id, 'self_reported', posted_at, payload FROM manual_transactions ORDER BY rowid`,
+    );
+    db.exec("DROP TABLE manual_transactions");
+  })();
+}
 
 db.exec("DELETE FROM beneficiaries");
 const insert = db.prepare(
@@ -187,7 +205,8 @@ console.log(`Seeded 3 accounts × ${CIFS.length} personas into ${DB_PATH}`);
 // its first read, so history always matches the freshly seeded accounts.
 // Labels key on those transaction ids, so they reset together. The category
 // taxonomy (`categories`) is left alone — it is seeded lazily from code.
-db.exec("DELETE FROM transactions");
+// Only bank history is cleared — self-reported rows share the table and survive.
+db.exec("DELETE FROM transactions WHERE source <> 'self_reported'");
 db.exec("DELETE FROM transaction_corrections");
 console.log(`Cleared transactions + labels (re-seeded per persona on first read) in ${DB_PATH}`);
 

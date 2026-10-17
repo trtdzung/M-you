@@ -129,7 +129,9 @@ export function debitAccount(cif: string, accountId: string, amount: number, rec
   const db = getDb();
   const run = db.transaction(() => {
     if (record) {
-      const exists = db.prepare("SELECT 1 FROM manual_transactions WHERE cif = ? AND id = ?").get(cif, record.id);
+      const exists = db
+        .prepare("SELECT 1 FROM transactions WHERE cif = ? AND id = ? AND source = 'self_reported'")
+        .get(cif, record.id);
       if (exists) return; // replay — already debited + recorded together
     }
     const { changes } = db

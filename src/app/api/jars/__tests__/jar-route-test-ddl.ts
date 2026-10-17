@@ -1,6 +1,6 @@
 /**
  * In-memory SQLite DDL shared by the `/api/jars` route suites — the minimal
- * `jars` / `accounts` / `manual_transactions` tables the handlers touch (jar
+ * `jars` / `accounts` / `transactions` tables the handlers touch (jar
  * writes, the CASA cap's `casaPoolForCif`, and DELETE's rebalance-leg cleanup).
  */
 
@@ -20,7 +20,10 @@ export const ACCOUNTS_DDL = `CREATE TABLE accounts (
   PRIMARY KEY (cif, id)
 );`;
 
-export const MANUAL_TXNS_DDL = `CREATE TABLE manual_transactions (
-  cif TEXT NOT NULL, id TEXT NOT NULL, posted_at TEXT NOT NULL, payload TEXT NOT NULL,
+// The one-table `transactions` (bank + self_reported rows, told apart by `source`).
+export const TRANSACTIONS_DDL = `CREATE TABLE transactions (
+  cif TEXT NOT NULL, id TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'mock' CHECK (source IN ('mock', 'msb', 'self_reported')),
+  posted_at TEXT NOT NULL, payload TEXT NOT NULL,
   PRIMARY KEY (cif, id)
 );`;

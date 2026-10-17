@@ -7,6 +7,7 @@ import {
   deleteManualTxn,
   countRebalanceLegsForJar,
   type ManualTxnPatch,
+  ManualTxnIdConflictError,
 } from "@/lib/manual-txns-store";
 
 /**
@@ -100,7 +101,12 @@ export async function POST(req: NextRequest) {
   if (txn.rebalance !== undefined && !isValidRebalanceTxn(txn)) {
     return NextResponse.json({ error: "rebalance is invalid" }, { status: 422 });
   }
-  upsertManualTxn(cif, txn);
+  try {
+    upsertManualTxn(cif, txn);
+  } catch (err) {
+    if (err instanceof ManualTxnIdConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
+    throw err;
+  }
   return NextResponse.json({ ok: true }, { status: 201 });
 }
 

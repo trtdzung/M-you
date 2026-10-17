@@ -22,7 +22,7 @@ import { DELETE as deleteJar, PATCH as patchJar } from "../[id]/route";
 import { POST as moveCategory } from "../[id]/categories/route";
 import { writeJarConfig, readJarConfig } from "@/lib/jars-store";
 import { casaPoolForCif } from "@/lib/casa-pool";
-import { ACCOUNTS_DDL, JARS_DDL, MANUAL_TXNS_DDL } from "./jar-route-test-ddl";
+import { ACCOUNTS_DDL, JARS_DDL, TRANSACTIONS_DDL } from "./jar-route-test-ddl";
 
 const CIF = "CIF_0001";
 const BASE = "http://localhost/api/jars";
@@ -48,7 +48,7 @@ beforeEach(() => {
   holder.db = new Database(":memory:");
   holder.db.exec(JARS_DDL);
   holder.db.exec(ACCOUNTS_DDL);
-  holder.db.exec(MANUAL_TXNS_DDL);
+  holder.db.exec(TRANSACTIONS_DDL);
 });
 
 describe("POST /api/jars", () => {
@@ -212,14 +212,24 @@ describe("POST /api/jars/:id/categories", () => {
 });
 
 describe("DELETE /api/jars/:id — removes the jar's rebalance legs (S8)", () => {
-  function insertTxn(id: string, rebalance?: Record<string, string>, cif = CIF): void {
+  function insertTxn(id: string, rebalance?: Record<string, string>, cif = CIF, source = "self_reported"): void {
     const payload = { id, postedAt: "2026-09-16T10:00:00.000Z", amount: 500_000, categoryId: "dieu-chinh-hu", rebalance };
     holder.db!
-      .prepare("INSERT INTO manual_transactions (cif, id, posted_at, payload) VALUES (?, ?, ?, ?)")
-      .run(cif, id, payload.postedAt, JSON.stringify(payload));
+      .prepare("INSERT INTO transactions (cif, id, source, posted_at, payload) VALUES (?, ?, ?, ?, ?)")
+      .run(cif, id, source, payload.postedAt, JSON.stringify(payload));
   }
   const ids = (cif = CIF) =>
-    (holder.db!.prepare("SELECT id FROM manual_transactions WHERE cif = ? ORDER BY id").all(cif) as { id: string }[]).map((r) => r.id);
+    (holder.db!.prepare("SELECT id FROM transactions WHERE cif = ? ORDER BY id").all(cif) as { id: string }[]).map((r) => r.id);
+
+  it("never deletes a bank row, even one whose payload looks like a leg of the jar (#5)", async () => {
+    seed([{ id: "savings", label: "S", categoryIds: [] }]);
+    const leg = { fromJarId: "savings", toJarId: "food", triggerTxnId: "t", origin: "manual" };
+    insertTxn("bank-row", leg, CIF, "mock");
+    insertTxn("self-leg", leg);
+    const res = await deleteJar(req(`${BASE}/savings?cif=${CIF}`, "DELETE"), ctx("savings"));
+    expect(res.headers.get("X-Rebalance-Legs-Deleted")).toBe("1");
+    expect(ids()).toEqual(["bank-row"]);
+  });
 
   it("deletes legs from/to the jar in the same write, keeps the rest", async () => {
     seed([

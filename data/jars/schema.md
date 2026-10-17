@@ -39,7 +39,7 @@ Primary key `(cif, id)`.
 through the engine onto `JarBudgetLine`/`JarSpendable` (Phase 03). Its DB `role`
 column + seed lands in **Phase 04** (write path); until then a stored jar without one
 is treated as `spending` by the engine. Inter-jar rebalances are NOT stored here —
-they ride the `manual_transactions` table as `dieu-chinh-hu`-tagged txns (see
+they ride the `transactions` table as `self_reported`, `dieu-chinh-hu`-tagged txns (see
 `data/schema.md`).
 
 ## Endpoints

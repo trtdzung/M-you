@@ -25,7 +25,9 @@ export function getDb(): Database.Database {
   // schema below (which no longer defines it) leaves a clean database. Irreversible
   // by design — the rows were disposable mock display-partitions, no real value.
   db.exec("DROP TABLE IF EXISTS jar_allocations");
+  addTransactionsSourceColumn(db);
   db.exec(readFileSync(schemaPath, "utf8"));
+  mergeManualTransactions(db);
   // Migration: `jars.role` (donor-waterfall role, plan 260918-1120 Phase 04) is a
   // new column. CREATE TABLE IF NOT EXISTS won't add it to a pre-existing DB, so
   // add it defensively — `ADD COLUMN` throws "duplicate column" once present,
@@ -38,4 +40,41 @@ export function getDb(): Database.Database {
   }
   instance = db;
   return db;
+}
+
+/**
+ * Migration (one-table transactions): an older DB's `transactions` has no
+ * `source` column. Add it BEFORE `schema.sql` runs — the schema's
+ * `(cif, source, posted_at)` index would otherwise fail on the old table.
+ * Existing rows are bank history → default `mock`. No-op on a fresh DB (the
+ * table doesn't exist yet) or once the column is present.
+ */
+export function addTransactionsSourceColumn(db: Database.Database): void {
+  const cols = db.prepare("PRAGMA table_info(transactions)").all() as { name: string }[];
+  if (cols.length === 0 || cols.some((c) => c.name === "source")) return;
+  db.exec(
+    "ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'mock' CHECK (source IN ('mock', 'msb', 'self_reported'))",
+  );
+}
+
+/**
+ * Migration (one-table transactions): move rows of the retired
+ * `manual_transactions` table into `transactions` as `self_reported`, then drop
+ * it — atomically. A row whose id collides with a bank row is skipped (the bank
+ * row is never overwritten, #5) and reported.
+ */
+export function mergeManualTransactions(db: Database.Database): void {
+  const legacy = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'manual_transactions'").get();
+  if (!legacy) return;
+  db.transaction(() => {
+    const { n } = db.prepare("SELECT COUNT(*) AS n FROM manual_transactions").get() as { n: number };
+    const { changes } = db
+      .prepare(
+        `INSERT OR IGNORE INTO transactions (cif, id, source, posted_at, payload)
+         SELECT cif, id, 'self_reported', posted_at, payload FROM manual_transactions ORDER BY rowid`,
+      )
+      .run();
+    if (changes < n) console.warn(`manual_transactions merge skipped ${n - changes} row(s) colliding with bank ids`);
+    db.exec("DROP TABLE manual_transactions");
+  })();
 }

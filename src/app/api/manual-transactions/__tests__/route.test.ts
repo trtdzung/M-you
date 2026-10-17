@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import Database from "better-sqlite3";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Transaction } from "@/domain/models";
 
 /**
@@ -25,10 +27,19 @@ import { GET, POST, PATCH, DELETE } from "../route";
 
 const CIF = "CIF_0001";
 
-const DDL = `CREATE TABLE manual_transactions (
-  cif TEXT NOT NULL, id TEXT NOT NULL, posted_at TEXT NOT NULL, payload TEXT NOT NULL,
-  PRIMARY KEY (cif, id)
-);`;
+const SCHEMA = readFileSync(join(process.cwd(), "data", "schema.sql"), "utf8");
+
+/** A bank-provided (`mock`) row sharing the one `transactions` table. */
+function insertBankRow(id: string, cif = CIF): void {
+  const payload = JSON.stringify(txn({ id, source: "mock" as Transaction["source"], merchantName: "BANK" }));
+  holder.db!
+    .prepare("INSERT INTO transactions (cif, id, source, posted_at, payload) VALUES (?, ?, 'mock', ?, ?)")
+    .run(cif, id, "2026-09-01T00:00:00.000Z", payload);
+}
+const bankPayload = (id: string) =>
+  (holder.db!.prepare("SELECT payload FROM transactions WHERE cif = ? AND id = ? AND source = 'mock'").get(CIF, id) as
+    | { payload: string }
+    | undefined)?.payload;
 
 function txn(over: Partial<Transaction> = {}): Transaction {
   return {
@@ -70,7 +81,7 @@ function del(id: string, cif: string | null = CIF): Promise<Response> {
 
 beforeEach(() => {
   holder.db = new Database(":memory:");
-  holder.db.exec(DDL);
+  holder.db.exec(SCHEMA);
 });
 
 describe("/api/manual-transactions", () => {
@@ -182,6 +193,29 @@ describe("/api/manual-transactions", () => {
     await post({ cif: CIF, txn: txn() });
     expect((await del("manual-1")).status).toBe(204);
     expect(((await (await list()).json()) as Transaction[]).length).toBe(0);
+  });
+
+  describe("shares the one transactions table with bank rows (#5)", () => {
+    it("never lists a bank row", async () => {
+      insertBankRow("bank-1");
+      await post({ cif: CIF, txn: txn() });
+      expect(((await (await list()).json()) as Transaction[]).map((t) => t.id)).toEqual(["manual-1"]);
+    });
+
+    it("409s a POST whose id belongs to a bank row and leaves that row untouched", async () => {
+      insertBankRow("bank-1");
+      const before = bankPayload("bank-1");
+      expect((await post({ cif: CIF, txn: txn({ id: "bank-1" }) })).status).toBe(409);
+      expect(bankPayload("bank-1")).toBe(before);
+    });
+
+    it("cannot patch or delete a bank row", async () => {
+      insertBankRow("bank-1");
+      const before = bankPayload("bank-1");
+      expect((await patch({ cif: CIF, id: "bank-1", patch: { categoryId: "dining" } })).status).toBe(404);
+      await del("bank-1");
+      expect(bankPayload("bank-1")).toBe(before);
+    });
   });
 
   it("isolates rows per cif", async () => {

@@ -1,7 +1,8 @@
 import "server-only";
 
 /**
- * Read/write access to the `manual_transactions` table (see `data/schema.md`).
+ * Read/write access to the SELF-REPORTED rows of the `transactions` table
+ * (`source = 'self_reported'`, see `data/schema.md`).
  * Server only — imported by the route handlers under `src/app/api/manual-
  * transactions/`, never by client code (architectural invariant #4: the browser
  * reaches this data only through the API route, never the storage layer).
@@ -10,10 +11,23 @@ import "server-only";
  * money movement (#3). The store never fabricates one: it persists exactly the
  * `Transaction` the client built (client owns id + shape), forcing only
  * `source: "self_reported"` so a row can never masquerade as bank-verified (#5).
+ * Every query here is scoped to `source = 'self_reported'`: this store can never
+ * read, overwrite or delete a bank-provided row sharing the table.
  */
 
 import type { Transaction } from "@/domain/models";
 import { getDb } from "./db";
+
+/** SQL predicate scoping a query to the app-owned rows (never bank history). */
+const SELF = "source = 'self_reported'";
+
+/** A self-reported write whose id already belongs to a bank-provided row. */
+export class ManualTxnIdConflictError extends Error {
+  constructor(id: string) {
+    super(`transaction id ${id} belongs to a bank-provided record`);
+    this.name = "ManualTxnIdConflictError";
+  }
+}
 
 interface ManualTxnRow {
   payload: string;
@@ -33,7 +47,7 @@ function toTransaction(row: ManualTxnRow): Transaction | null {
 /** The persona's self-reported txns, newest first (matches the localStorage order). */
 export function readManualTxns(cif: string): Transaction[] {
   const rows = getDb()
-    .prepare("SELECT payload FROM manual_transactions WHERE cif = ? ORDER BY posted_at DESC, rowid DESC")
+    .prepare(`SELECT payload FROM transactions WHERE cif = ? AND ${SELF} ORDER BY posted_at DESC, rowid DESC`)
     .all(cif) as ManualTxnRow[];
   return rows.map(toTransaction).filter((t): t is Transaction => t !== null);
 }
@@ -42,15 +56,20 @@ export function readManualTxns(cif: string): Transaction[] {
  * Insert (or replace) one self-reported txn. `source` is forced server-side so
  * the client can never store a record as anything but self-reported (#5). Idempotent
  * on (cif, id) — a replayed create is a harmless overwrite, never a duplicate.
+ * Throws `ManualTxnIdConflictError` when the id is taken by a bank row (never
+ * overwritten, #5).
  */
 export function upsertManualTxn(cif: string, txn: Transaction): void {
   const record: Transaction = { ...txn, source: "self_reported" };
-  getDb()
+  const { changes } = getDb()
     .prepare(
-      `INSERT OR REPLACE INTO manual_transactions (cif, id, posted_at, payload)
-       VALUES (@cif, @id, @postedAt, @payload)`,
+      `INSERT INTO transactions (cif, id, source, posted_at, payload)
+       VALUES (@cif, @id, 'self_reported', @postedAt, @payload)
+       ON CONFLICT (cif, id) DO UPDATE SET posted_at = excluded.posted_at, payload = excluded.payload
+       WHERE transactions.${SELF}`,
     )
     .run({ cif, id: record.id, postedAt: record.postedAt, payload: JSON.stringify(record) });
+  if (changes === 0) throw new ManualTxnIdConflictError(record.id);
 }
 
 /**
@@ -77,7 +96,7 @@ export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): 
   const db = getDb();
   const run = db.transaction((): Transaction | null => {
     const row = db
-      .prepare("SELECT payload FROM manual_transactions WHERE cif = ? AND id = ?")
+      .prepare(`SELECT payload FROM transactions WHERE cif = ? AND id = ? AND ${SELF}`)
       .get(cif, id) as ManualTxnRow | undefined;
     if (!row) return null;
     const current = toTransaction(row);
@@ -103,14 +122,14 @@ export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): 
 }
 
 /** WHERE clause matching a rebalance leg whose donor OR target is `@jarId`. */
-const LEG_OF_JAR = `cif = @cif AND (
+const LEG_OF_JAR = `cif = @cif AND ${SELF} AND (
   json_extract(payload, '$.rebalance.fromJarId') = @jarId OR
   json_extract(payload, '$.rebalance.toJarId') = @jarId)`;
 
 /** How many rebalance legs of `cif` reference `jarId` (from or to) — the UI's pre-delete warning. */
 export function countRebalanceLegsForJar(cif: string, jarId: string): number {
   const row = getDb()
-    .prepare(`SELECT COUNT(*) AS n FROM manual_transactions WHERE ${LEG_OF_JAR}`)
+    .prepare(`SELECT COUNT(*) AS n FROM transactions WHERE ${LEG_OF_JAR}`)
     .get({ cif, jarId }) as { n: number };
   return row.n;
 }
@@ -121,10 +140,10 @@ export function countRebalanceLegsForJar(cif: string, jarId: string): number {
  * removed. Callers wrap it in the same transaction as the jar delete.
  */
 export function deleteRebalanceLegsForJar(cif: string, jarId: string): number {
-  return getDb().prepare(`DELETE FROM manual_transactions WHERE ${LEG_OF_JAR}`).run({ cif, jarId }).changes;
+  return getDb().prepare(`DELETE FROM transactions WHERE ${LEG_OF_JAR}`).run({ cif, jarId }).changes;
 }
 
-/** Delete one self-reported txn (no-op if absent). */
+/** Delete one self-reported txn (no-op if absent or if the id is a bank row). */
 export function deleteManualTxn(cif: string, id: string): void {
-  getDb().prepare("DELETE FROM manual_transactions WHERE cif = ? AND id = ?").run(cif, id);
+  getDb().prepare(`DELETE FROM transactions WHERE cif = ? AND id = ? AND ${SELF}`).run(cif, id);
 }

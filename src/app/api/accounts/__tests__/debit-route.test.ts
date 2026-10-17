@@ -50,7 +50,7 @@ function debit(body: unknown): Promise<Response> {
 }
 
 function storedTxnIds(): string[] {
-  return (holder.db!.prepare("SELECT id FROM manual_transactions WHERE cif = ?").all(CIF) as { id: string }[]).map((r) => r.id);
+  return (holder.db!.prepare("SELECT id FROM transactions WHERE cif = ? AND source = 'self_reported'").all(CIF) as { id: string }[]).map((r) => r.id);
 }
 
 let casa: Account;
@@ -85,11 +85,24 @@ describe("POST /api/accounts/debit — H14/U1 atomic debit + record", () => {
   });
 
   it("a failed record insert rolls the debit back (500, balance untouched)", async () => {
-    holder.db!.exec("DROP TABLE manual_transactions");
-    holder.db!.exec("CREATE TABLE manual_transactions (cif TEXT, id TEXT, posted_at TEXT NOT NULL CHECK (0), payload TEXT)");
+    holder.db!.exec(
+      "CREATE TRIGGER fail_record BEFORE INSERT ON transactions WHEN NEW.source = 'self_reported' BEGIN SELECT RAISE(ABORT, 'boom'); END",
+    );
     const res = await debit({ cif: CIF, accountId: casa.id, amount: 500_000, txn: record() });
     expect(res.status).toBe(500);
     expect(readAccounts(CIF).find((a) => a.id === casa.id)?.availableBalance).toBe(casa.availableBalance);
+  });
+
+  it("a record id owned by a bank row is a 409: no debit, bank row untouched (#5)", async () => {
+    holder.db!
+      .prepare("INSERT INTO transactions (cif, id, source, posted_at, payload) VALUES (?, 'xfer-1', 'mock', ?, '{}')")
+      .run(CIF, "2026-09-01T00:00:00.000Z");
+    const res = await debit({ cif: CIF, accountId: casa.id, amount: 500_000, txn: record() });
+    expect(res.status).toBe(409);
+    expect(readAccounts(CIF).find((a) => a.id === casa.id)?.availableBalance).toBe(casa.availableBalance);
+    expect(storedTxnIds()).toEqual([]);
+    const bank = holder.db!.prepare("SELECT payload FROM transactions WHERE cif = ? AND id = 'xfer-1'").get(CIF) as { payload: string };
+    expect(bank.payload).toBe("{}");
   });
 
   it("rejects a record whose amount does not match the debit (422, nothing moves)", async () => {

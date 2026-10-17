@@ -9,7 +9,9 @@ import "server-only";
  * Rows are seeded per persona from the same deterministic generator the
  * accounts come from (`generateDataset`), lazily on first read of a persona
  * that has none — so a fresh/unseeded DB still works (mirrors `accounts-store`).
- * Self-reported records live in `manual_transactions`, never here (#5).
+ * The table also holds self-reported rows (`source = 'self_reported'`, owned by
+ * `manual-txns-store.ts`); every query here is scoped to `source <> 'self_reported'`
+ * so bank history and self-reported records never mix (#5).
  */
 
 import type { Transaction } from "@/domain/models";
@@ -38,12 +40,12 @@ function toTransaction(row: TxnRow): Transaction | null {
  */
 function seedIfEmpty(cif: string): void {
   const db = getDb();
-  const { n } = db.prepare("SELECT COUNT(*) AS n FROM transactions WHERE cif = ?").get(cif) as { n: number };
+  const { n } = db.prepare("SELECT COUNT(*) AS n FROM transactions WHERE cif = ? AND source <> 'self_reported'").get(cif) as { n: number };
   if (n > 0) return;
   const persona = PERSONA_LIST.find((p) => p.cif === cif);
   if (!persona) return;
   const insert = db.prepare(
-    "INSERT OR IGNORE INTO transactions (cif, id, posted_at, payload) VALUES (@cif, @id, @postedAt, @payload)",
+    "INSERT OR IGNORE INTO transactions (cif, id, source, posted_at, payload) VALUES (@cif, @id, 'mock', @postedAt, @payload)",
   );
   const seed = db.transaction((txns: Transaction[]) => {
     for (const txn of txns) insert.run({ cif, id: txn.id, postedAt: txn.postedAt, payload: JSON.stringify(txn) });
@@ -60,7 +62,7 @@ export function readTransactions(cif: string, range: { from?: string; to?: strin
   const rows = getDb()
     .prepare(
       `SELECT payload FROM transactions
-        WHERE cif = @cif
+        WHERE cif = @cif AND source <> 'self_reported'
           AND (@from IS NULL OR posted_at >= @from)
           AND (@to IS NULL OR posted_at <= @to)
         ORDER BY posted_at DESC, id DESC`,
