@@ -25,7 +25,12 @@ describe("GoalFormSheet", () => {
     expect(await screen.findByRole("dialog", { name: "Tạo mục tiêu" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Tên mục tiêu"), { target: { value: "Mua nhà" } });
     fireEvent.change(screen.getByLabelText("Số tiền mục tiêu"), { target: { value: "600000000" } });
-    fireEvent.change(screen.getByLabelText("Ngày hoàn thành"), { target: { value: "2029-09-15" } });
+    fireEvent.click(screen.getByLabelText("Ngày hoàn thành"));
+    fireEvent.click(await screen.findByRole("button", { name: "Chọn năm" }));
+    fireEvent.click(screen.getByRole("button", { name: "2029" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tháng 9" }));
+    fireEvent.click(screen.getByRole("button", { name: "15/09/2029" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chọn ngày này" }));
     fireEvent.click(screen.getByRole("button", { name: "Lưu" }));
     expect(onSubmit).toHaveBeenCalledWith({
       name: "Mua nhà",
@@ -42,7 +47,7 @@ describe("GoalFormSheet", () => {
     fireEvent.change(screen.getByLabelText("Tên mục tiêu"), { target: { value: "Mua xe" } });
     fireEvent.change(screen.getByLabelText("Số tiền mục tiêu"), { target: { value: "600000000" } });
     expect(screen.getByLabelText("Số tiền mục tiêu")).toHaveValue("600,000,000");
-    expect(screen.getByRole("heading", { name: "Thông tin bổ sung" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Kế hoạch tích lũy" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Thông tin bổ sung" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Số đã có sẵn"), { target: { value: "1000000" } });
     fireEvent.click(screen.getByLabelText("Ngày hoàn thành"));

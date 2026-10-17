@@ -1,5 +1,7 @@
 "use client";
 
+import type { SavingsGoalView } from "../../model/types";
+import { LedgerPreview } from "./LedgerPreview";
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { GOALS_COPY } from "../copy";
@@ -8,12 +10,14 @@ import { errorBox, primaryButton } from "../styles";
 import { parseAmount } from "./parse-amount";
 
 export function ContributeSheet({
+  goal,
   pending,
   error,
   formError,
   onSubmit,
   onClose,
 }: {
+  goal?: SavingsGoalView;
   pending: boolean;
   /** Server error for the amount field. */
   error?: string;
@@ -27,7 +31,8 @@ export function ContributeSheet({
   const c = GOALS_COPY.ledger;
   return (
     <Sheet title={c.contributeTitle} onClose={onClose}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
+        {goal && <LedgerPreview goal={goal} amount={value} kind="deposit" />}
         <MoneyField label={c.amount} value={raw} onChange={setRaw} error={parseError ?? error} />
         {formError != null && (
           <p role="alert" className={`${errorBox} text-sm text-negative`}>
@@ -40,7 +45,7 @@ export function ContributeSheet({
           onClick={() => value !== undefined && onSubmit(value)}
           className={primaryButton}
         >
-          {c.submitDeposit}
+          {pending ? "Đang ghi nhận…" : c.submitDeposit}
         </button>
       </div>
     </Sheet>

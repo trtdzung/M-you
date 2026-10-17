@@ -28,6 +28,7 @@ export function LedgerFlow({
   }
 
   const common = {
+    goal,
     pending,
     error: errors?.amount,
     formError: errors && !errors.amount ? (errors._form ?? "") : null,

@@ -1,5 +1,7 @@
 "use client";
 
+import type { SavingsGoalView } from "../../model/types";
+import { LedgerPreview } from "./LedgerPreview";
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { GOALS_COPY } from "../copy";
@@ -13,6 +15,7 @@ export function WithdrawSheet({
   goalName,
   currentAmount,
   monthlyPace,
+  goal,
   pending,
   error,
   formError,
@@ -22,6 +25,7 @@ export function WithdrawSheet({
   goalName: string;
   currentAmount: number;
   monthlyPace: number | null;
+  goal?: SavingsGoalView;
   pending: boolean;
   error?: string;
   formError?: string | null;
@@ -38,7 +42,8 @@ export function WithdrawSheet({
   const c = GOALS_COPY.ledger;
   return (
     <Sheet title={c.withdrawTitle} onClose={onClose}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
+        {goal && <LedgerPreview goal={goal} amount={value} kind="withdraw" />}
         <MoneyField
           label={c.amount}
           value={raw}
@@ -58,7 +63,7 @@ export function WithdrawSheet({
           onClick={() => valid && onSubmit({ amount: value, note: phrase })}
           className={primaryButton}
         >
-          {c.submitWithdraw}
+          {pending ? "Đang ghi nhận…" : c.submitWithdraw}
         </button>
       </div>
     </Sheet>

@@ -20,6 +20,7 @@ export function GoalsListScreen() {
   const { data, loading, error, refresh } = useGoalsList();
   const [activeTab, setActiveTab] = useState<"manual" | "chat">("manual");
   const [formKey, setFormKey] = useState(0);
+  const [feedback, setFeedback] = useState("");
   const [creating, setCreating] = useState(false);
   const summary = summarizeGoals(data ?? []);
   const compactMoney = (amount: number) => formatVndCompact(amount).replace(/\s*₫$/, "");
@@ -27,6 +28,7 @@ export function GoalsListScreen() {
   const [frame, setFrame] = useState<HTMLElement | null>(null);
   useEffect(() => { setFrame(document.getElementById("device-canvas") ?? document.body); }, []);
   const created = () => {
+    setFeedback("Đã tạo mục tiêu. Bắt đầu ghi nhận khoản tích lũy đầu tiên nhé.");
     refresh();
     setFormKey((key) => key + 1);
     setCreating(false);
@@ -64,6 +66,8 @@ export function GoalsListScreen() {
   if (hasGoals && !creating) return (
     <section className="flex flex-col gap-4 pb-24">
       <GoalsHeader />
+      {feedback && <p role="status" className="rounded-xl bg-primary/10 p-3 text-[14px] text-text">{feedback}</p>}
+      {summary.active === 0 && <p className="rounded-2xl border border-border bg-surface p-4 text-[14px] leading-6 text-muted">Chưa có mục tiêu đang tích lũy. Bạn có thể tiếp tục một mục tiêu đã tạm dừng hoặc bấm + để tạo kế hoạch mới.</p>}
       <div className="rounded-3xl border border-primary/10 bg-surface-tint p-5">
         <div className="flex items-center gap-2 text-[14px] font-medium text-muted"><Target size={18} className="text-primary" aria-hidden="true" />Tổng đã tích lũy</div>
         <p className="mt-3 flex flex-wrap items-baseline gap-2 tabular-nums"><span className="text-[32px] font-semibold leading-10 tracking-tight text-text">{compactMoney(summary.saved)}</span><span className="text-[14px] text-muted">VND</span></p>

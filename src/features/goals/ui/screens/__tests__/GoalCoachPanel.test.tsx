@@ -1,13 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
+import type { CoachDraft } from "../../../coach/contracts";
 import { GoalCoachPanel } from "../GoalCoachPanel";
 
-const coach = vi.hoisted(() => ({ reset: vi.fn(), start: vi.fn(), phase: "need_info" }));
+const coach = vi.hoisted(() => ({ reset: vi.fn(), start: vi.fn(), phase: "need_info", draft: null as CoachDraft | null }));
 vi.mock("../../../client/hooks/use-goal-coach", () => ({ useGoalCoach: () => ({
-  ...coach, turns: [{ role: "customer", text: "Mua xe" }], question: null, draft: null,
+  ...coach, turns: [{ role: "customer", text: "Mua xe" }], question: null,
   answers: [], answer: vi.fn(),
 }) }));
-beforeEach(() => { coach.reset.mockReset(); coach.start.mockReset(); coach.phase = "need_info"; });
+beforeEach(() => { coach.reset.mockReset(); coach.start.mockReset(); coach.phase = "need_info"; coach.draft = null; });
 
 it("requires confirmation before resetting the conversation from the menu", async () => {
   render(<GoalCoachPanel onCreated={vi.fn()} />);
@@ -46,4 +47,15 @@ it.each(["out_of_scope", "failed"])("allows a new goal message in %s state", pha
   fireEvent.change(input, { target: { value: "Mua xe 600 triệu trong 3 năm" } });
   fireEvent.click(screen.getByRole("button", { name: "Gửi mục tiêu" }));
   expect(coach.start).toHaveBeenCalledWith("Mua xe 600 triệu trong 3 năm");
+});
+
+it("shows a review card before opening the prefilled goal form", async () => {
+  coach.phase = "draft";
+  coach.draft = { name: "Mua xe", target_amount: 600000000, opening_amount: 0, flexibility: "flexible", horizon: { months: 36 } } as CoachDraft;
+  render(<GoalCoachPanel onCreated={vi.fn()} />);
+  expect(screen.getByText("600,000,000")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Kiểm tra và tạo mục tiêu" }));
+  expect(await screen.findByRole("dialog", { name: "Tạo mục tiêu" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Tên mục tiêu")).toHaveValue("Mua xe");
 });

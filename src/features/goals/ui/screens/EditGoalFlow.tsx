@@ -1,5 +1,8 @@
 "use client";
 
+import { assessFeasibility } from "../../engine/feasibility";
+import { parseVndInput } from "@/components/settings/parse-vnd-input";
+import { transferNow } from "@/lib/demo-clock";
 import { useState } from "react";
 import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
 import type { GoalUpdateInput, SavingsGoalView } from "../../model/types";
@@ -33,9 +36,13 @@ export function EditGoalFlow({
     else setFormError(res.error ?? "");
   }
 
+  const parsed = parseVndInput(form.values.targetAmount);
+  const preview = parsed.kind === "ok" && parsed.value > 0 && /^\d{4}-\d{2}-\d{2}$/.test(form.values.targetDate)
+    ? assessFeasibility({ targetAmount: parsed.value, currentAmount: goal.currentAmount, targetDate: form.values.targetDate, now: transferNow(), surplus: "unknown" }) : null;
   return (
     <GoalFormSheet
       form={form}
+      slot={preview && <div className="rounded-2xl bg-surface-tint p-4"><h3 className="text-[16px] font-semibold">Kế hoạch sau thay đổi</h3><p className="mt-2 text-[14px] leading-6">Cần góp khoảng <strong>{preview.requiredMonthly.toLocaleString("en-US")} VND/tháng</strong> trong {preview.monthsLeft} tháng.</p><p className="mt-2 text-[12px] leading-5 text-muted">Ước tính từ số đã tích lũy hiện tại, chưa tính lãi. Lịch sử góp/rút được giữ nguyên.</p></div>}
       pending={pending}
       formError={formError}
       onSubmit={submit}

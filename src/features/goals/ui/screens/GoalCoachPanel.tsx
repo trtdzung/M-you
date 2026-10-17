@@ -18,6 +18,7 @@ import { CreateGoalFlow } from "./CreateGoalFlow";
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
 export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => void; active?: boolean }) {
   const coach = useGoalCoach();
+  const [reviewing, setReviewing] = useState(false);
   const [manual, setManual] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
@@ -25,6 +26,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const menuButton = useRef<HTMLButtonElement>(null);
   const busy = coach.phase === "asking" || coach.phase === "answering";
   const restart = () => {
+    setReviewing(false);
     setManual(false);
     setMenuOpen(false);
     setConfirmNew(false);
@@ -41,7 +43,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
     body = (
       <div className="flex flex-col gap-3">
         <CoachTranscript turns={coach.turns} />
-        {busy && <p className="text-sm text-muted">{GOALS_COPY.coach.thinking}</p>}
+        {busy && <p role="status" className="flex items-center gap-2 rounded-2xl bg-surface p-4 text-sm text-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden="true" />{GOALS_COPY.coach.thinking}</p>}
         {coach.question && (
           <CoachQuestion
             hideTextInput
@@ -98,12 +100,20 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           <button type="button" onClick={() => setConfirmNew(false)} className={secondaryButton}>Tiếp tục trò chuyện</button>
         </div>
       </Sheet>}
-      {coach.draft && (
+      {coach.draft && !reviewing && <section className="rounded-2xl border border-border bg-surface p-5">
+        <h3 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h3>
+        <p className="mt-3 break-words text-[16px] font-medium">{coach.draft.name}</p>
+        <p className="mt-2 text-[24px] font-semibold tabular-nums">{coach.draft.target_amount.toLocaleString("en-US")} <span className="text-[13px] font-normal text-muted">VND</span></p>
+        <p className="mt-2 text-[14px] text-muted">Hạn dự kiến: {draftToForm(coach.draft, transferNow()).targetDate.split("-").reverse().join("/") || "Cần bổ sung"}</p>
+        <p className="mt-3 text-[13px] leading-5 text-muted">M-You đã điền thông tin từ cuộc trò chuyện. Bạn kiểm tra và chỉnh sửa trước khi lưu.</p>
+        <button type="button" className={`${primaryButton} mt-4 w-full`} onClick={() => setReviewing(true)}>Kiểm tra và tạo mục tiêu</button>
+      </section>}
+      {coach.draft && reviewing && (
         <CreateGoalFlow
           prefill={draftToForm(coach.draft, transferNow())}
           requestKey={coach.requestId ? `coach:${coach.requestId}` : undefined}
           onCreated={done}
-          onClose={restart}
+          onClose={() => setReviewing(false)}
         />
       )}
       {manual && (

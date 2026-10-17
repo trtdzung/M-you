@@ -41,7 +41,7 @@ export function GoalFormSheet({
           </p>
         )}
         <div className={inline ? "sticky bottom-0 z-10 -mx-4 border-t border-border/60 bg-surface/95 px-4 py-3 backdrop-blur" : ""}>
-        <button type="button" onClick={submit} disabled={pending} className={`${primaryButton} w-full ${inline ? "h-12 text-[16px]" : ""}`}>
+        <button type="button" onClick={submit} disabled={pending} className={`${primaryButton} min-h-12 w-full ${inline ? "h-12 text-[16px]" : ""}`}>
           {pending ? GOALS_COPY.saving : inline ? GOALS_COPY.create : GOALS_COPY.save}
         </button>
         </div>
