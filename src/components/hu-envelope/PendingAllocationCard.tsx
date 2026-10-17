@@ -3,12 +3,14 @@ import { formatVndCompact } from "@/lib/format";
 import type { Amount } from "@/domain/engine";
 
 /**
- * "Chờ phân bổ" card: the CASA money no jar currently holds — the ONE unallocated
- * definition `CASA − Σ spendable(jar)` (D26/S12/U14), the SAME number the transfer
- * picker shows as "Chưa phân bổ" — plus a "Chia ngay →" CTA that opens the
- * allocation sheet. The amount comes from `Financials.jarEnvelope.pending`
- * (engine-derived); an "unknown" amount (no CASA account) renders "—", never 0₫
- * (invariant #6).
+ * "Chờ phân bổ" card: the CASA money no jar's hạn mức claims yet
+ * (`CASA − Σ budgetLimit`) — the LIMIT lens, so this number is exactly the
+ * "Còn lại để chia" the "Chia ngay →" CTA opens onto (`AllocationSheet`) and
+ * exactly what the cap accepts (`fitsCasaCap`). It is deliberately NOT the
+ * transfer picker's "Chưa phân bổ" (`CASA − Σ spendable`), which frees đã-chi
+ * money back into the pool and would promise headroom the sheet rejects.
+ * The amount comes from `Financials.jarEnvelope.pending` (engine-derived); an
+ * "unknown" amount (no CASA account) renders "—", never 0₫ (invariant #6).
  */
 export function PendingAllocationCard({
   amount,
@@ -24,7 +26,7 @@ export function PendingAllocationCard({
         <div className="text-[13px] font-semibold text-text">Chờ phân bổ</div>
         <div className="mt-1 text-[18px] font-bold text-text">{known ? formatVndCompact(amount) : "—"}</div>
         <div className="text-[11px] text-muted">
-          {known ? "số dư chưa thuộc hũ nào" : "chưa có số dư tài khoản"}
+          {known ? "số dư chưa đặt vào hũ nào" : "chưa có số dư tài khoản"}
         </div>
       </div>
 

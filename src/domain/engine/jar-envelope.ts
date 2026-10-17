@@ -11,8 +11,19 @@
  * `budgetLimit`. Two outputs, scoped to one period (OverviewTab pins the current
  * month for `spent`; the pool is a running stock, not a per-period flow):
  *
- *  1. "Chờ phân bổ" — the CASA money no jar's spendable claims, the ONE
- *     unallocated definition `CASA − Σ spendable` (`computeUnallocatedPool`).
+ *  1. "Chờ phân bổ" — the CASA money no jar's **hạn mức** claims yet:
+ *     `CASA − Σ budgetLimit`. This is the ALLOCATION-LIMIT lens: the exact
+ *     headroom the allocation sheet lets the user hand out ("Còn lại để chia",
+ *     `AllocationSheet`) and the exact quantity the write-path cap validates
+ *     (`fitsCasaCap`: Σ hạn mức ≤ CASA). Deliberately NOT the same as the
+ *     transfer picker's "Chưa phân bổ" (`Financials.unallocatedPool` =
+ *     `CASA − Σ spendable`, the SPENDABLE lens — see below).
+ *
+ *     The two lenses differ by Σ đã chi kỳ này: the spendable lens frees spent
+ *     money back into the pool (it is no longer claimed), the limit lens does
+ *     not (the hạn mức still stands). The card is the CTA into the sheet, so it
+ *     must promise the headroom the sheet can actually accept — otherwise it
+ *     invites the user to split money the cap will reject (422).
  *  2. Per-jar "còn lại trong hũ" = `budgetLimit − spent`. `spent` reuses the
  *     jar-budget net expense (DRY, invariant #2). `overLimit = spent > budgetLimit`.
  *
@@ -25,8 +36,6 @@
 
 import type { Account, DataSource, JarConfig } from "@/domain/models";
 import { validBudgetLimit } from "./jar-budget";
-import { jarSpendable } from "./jar-spendable";
-import { computeUnallocatedPool } from "./unallocated-pool";
 import { coverageOf, UNKNOWN, type AggregateMeta, type Amount, type Period } from "./types";
 
 /** CASA pool = tổng `availableBalance` các tài khoản `current`. Không có → unknown. */
@@ -46,12 +55,13 @@ export function casaPool(accounts: Account[]): { amount: Amount; sources: DataSo
 
 export interface PendingAllocation {
   /**
-   * "Chờ phân bổ" = the ONE unallocated definition (`computeUnallocatedPool`):
-   * `CASA − Σ spendable(jar)`. May be negative (see `overAllocated`) — the UI
-   * decides how to present it; "unknown" khi không có tài khoản current.
+   * "Chờ phân bổ" = `pool − allocated` (`CASA − Σ budgetLimit`) — the allocation
+   * headroom, identical to the allocation sheet's opening "Còn lại để chia".
+   * May be negative (see `overAllocated`) — the UI decides how to present it;
+   * "unknown" khi không có tài khoản current (invariant #6, D27).
    */
   amount: Amount;
-  /** True when jars claim more spendable money than CASA holds. */
+  /** True when Σ hạn mức exceeds CASA (the `fitsCasaCap` cap is already breached). */
   overAllocated: boolean;
   /** Tổng pool CASA (Σ availableBalance các tài khoản current); "unknown" khi không có. */
   pool: Amount;
@@ -135,8 +145,9 @@ export function jarEnvelopeLines(
 /**
  * Compose the full envelope result for `period`. Deterministic. `spentByJar` is
  * jar-budget's per-jar net expense (huId → spent); `accounts` supplies the CASA
- * pool. "Chờ phân bổ" delegates to `computeUnallocatedPool` (`CASA − Σ spendable`)
- * so the overview and the transfer picker show the SAME number (D26/S12).
+ * pool. "Chờ phân bổ" is the LIMIT lens (`CASA − Σ budgetLimit`) so the overview
+ * card and the allocation sheet it opens agree; the transfer picker's separate
+ * "Chưa phân bổ" (`Financials.unallocatedPool`) stays on the spendable lens.
  */
 export function evaluateJarEnvelope(
   config: JarConfig,
@@ -149,8 +160,9 @@ export function evaluateJarEnvelope(
   const jars = jarEnvelopeLines(config, spentByJar, rebalanceNetByJar);
   const allocated = jars.reduce((s, l) => s + (l.budgetLimit ?? 0), 0);
   const { amount: pool, sources, freshness } = casaPool(accounts);
-  const spendableTotal = jars.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
-  const unallocated = computeUnallocatedPool({ casaBalance: pool, spendableTotal });
+  // Limit lens: no CASA account → genuinely unknown, never a fabricated 0 that
+  // would read as a negative headroom (invariant #6, D27).
+  const amount: Amount = pool === UNKNOWN ? UNKNOWN : pool - allocated;
 
   const meta: AggregateMeta = {
     period,
@@ -158,8 +170,8 @@ export function evaluateJarEnvelope(
     freshness,
   };
   const pending: PendingAllocation = {
-    amount: unallocated.amount,
-    overAllocated: unallocated.overAllocated,
+    amount,
+    overAllocated: amount !== UNKNOWN && amount < 0,
     pool,
     allocated,
     meta,

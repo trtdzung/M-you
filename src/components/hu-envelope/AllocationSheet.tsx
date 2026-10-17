@@ -44,6 +44,9 @@ export function AllocationSheet({
   const poolKnown = pending.pool !== "unknown";
   const pool = poolKnown ? (pending.pool as number) : 0;
   const allocated = useMemo(() => Object.values(draft).reduce((s, n) => s + (n || 0), 0), [draft]);
+  // Live headroom as the user edits. At open (draft = current limits) this equals
+  // `pending.amount` by construction — the "Chờ phân bổ" card the CTA came from
+  // shows the same number, so "Chia ngay 13tr" can't land on "còn 200k".
   const leftToSplit = pool - allocated;
   const changed = useMemo(
     () => jars.some((j) => (draft[j.id] ?? 0) !== (j.budgetLimit ?? 0)),
