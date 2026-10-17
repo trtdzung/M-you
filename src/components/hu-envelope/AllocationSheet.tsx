@@ -68,6 +68,9 @@ export function AllocationSheet({
 
   const poolKnown = pending.pool !== "unknown";
   const pool = poolKnown ? (pending.pool as number) : 0;
+  // "Chờ phân bổ" (`CASA − Σ số dư hũ`), NOT `pool`: `pool` is the whole CASA balance. The
+  // agent is asked to split exactly what is unallocated right now — never the CASA total.
+  const unallocated = pending.amount === "unknown" ? 0 : Math.max(0, pending.amount);
   // Each jar's current running `balance` from the engine — a null (no limit) or
   // overspent jar contributes 0 spendable. BALANCE LENS: leftToSplit = CASA − Σ new
   // spendable, where adding Δ to a jar makes its spendable `max(0, balance + Δ)`.
@@ -90,9 +93,9 @@ export function AllocationSheet({
   const canSubmit = poolKnown && leftToSplit >= 0 && added > 0 && !saving;
 
   async function askAgent() {
-    if (!cif || suggest.status === "loading" || pool <= 0) return;
+    if (!cif || suggest.status === "loading" || unallocated <= 0) return;
     setSuggest({ status: "loading" });
-    const answer = await askAgentToDistribute({ cif, amount: pool, jarIds: jars.map((j) => j.id) });
+    const answer = await askAgentToDistribute({ cif, amount: unallocated, jarIds: jars.map((j) => j.id) });
     if (answer.kind === "plan") {
       // Pre-fill only: every other jar goes back to 0 so the draft is exactly the proposal.
       setDraft(Object.fromEntries(jars.map((j) => [j.id, answer.additions[j.id] ?? 0])));
@@ -130,7 +133,7 @@ export function AllocationSheet({
             </span>
           </div>
 
-          {cif && pool > 0 && (
+          {cif && unallocated > 0 && (
             <div className="mb-2 flex flex-col gap-1.5">
               <button
                 type="button"
