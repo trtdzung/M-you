@@ -143,7 +143,8 @@ export function TransferAmountStep({
           <div className="flex h-14 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5">
             <input
               id="xfer-amount"
-              value={amount}
+              // State holds raw digits; only the display is grouped "1.000.000".
+              value={groupThousands(amount)}
               onChange={(event) => onAmountChange(event.target.value.replace(/\D/g, ""))}
               inputMode="numeric"
               placeholder="Nhập số tiền"
@@ -314,4 +315,9 @@ export function TransferAmountStep({
       )}
     </div>
   );
+}
+
+/** "1000000" → "1.000.000" (vi-VN grouping). String-based, so no precision loss on long input. */
+function groupThousands(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }

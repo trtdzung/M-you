@@ -53,6 +53,14 @@ describe("TransferAmountStep", () => {
     expect(onChangeRecipient).toHaveBeenCalledTimes(1);
   });
 
+  it("displays the amount grouped as 1.000.000 but reports raw digits upward", () => {
+    const { onAmountChange } = renderStep({ amount: "11111111111111" });
+    const input = screen.getByLabelText(/Số tiền/);
+    expect(input).toHaveValue("11.111.111.111.111");
+    fireEvent.change(input, { target: { value: "1.000.0005" } });
+    expect(onAmountChange).toHaveBeenCalledWith("10000005");
+  });
+
   it("shows the recipient's real bank logo and bank name when known and distinct from the display name", () => {
     renderStep();
     expect(document.querySelector('img[src="/logos/MSB.png"]')).toBeInTheDocument();
