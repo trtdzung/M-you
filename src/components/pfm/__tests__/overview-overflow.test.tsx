@@ -49,7 +49,7 @@ function renderOverview() {
             <AssetLiabilityProvider>
                 <GoalProvider>
                   <PeriodProvider>
-                    <OverviewTab onNavigate={() => {}} />
+                    <OverviewTab />
                   </PeriodProvider>
                 </GoalProvider>
               </AssetLiabilityProvider>

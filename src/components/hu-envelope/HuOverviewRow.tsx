@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import type { Financials } from "@/domain/engine/finance-compose";
+import { useEffect, useState } from "react";
+import type { Financials, RawData } from "@/domain/engine/finance-compose";
 import type { Transaction } from "@/domain/models";
 import { useJarConfig } from "@/state/jars";
 import { ErrorState } from "@/components/states";
 import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
 import { currentMonthKey } from "@/lib/demo-clock";
-import type { PfmTabId } from "@/components/pfm/PfmTabs";
 import { PendingAllocationCard } from "./PendingAllocationCard";
 import { UnlabeledSpendCard } from "./UnlabeledSpendCard";
 import { UnlabeledSpendSheet } from "./UnlabeledSpendSheet";
 import { JarEnvelopeCard } from "./JarEnvelopeCard";
 import { AllocationSheet } from "./AllocationSheet";
+import { JarTransferSheet, type JarTransferSummary } from "./JarTransferSheet";
+import { formatVnd } from "@/lib/format";
 
 /**
  * Tổng quan "hũ (phong bì)" row: a horizontally-scrolling strip of a "Chờ phân
@@ -23,13 +24,16 @@ import { AllocationSheet } from "./AllocationSheet";
  * allocation sheet. The pool is a CURRENT stock, so "Chờ phân bổ" and the sheet
  * render only when `financials.monthKey` is the current month (Red Team #2).
  *
- * Tapping a jar card jumps to the real jar view (the Ngân sách tab) via
- * `onNavigate` — the overview cards are a summary, the management lives there.
+ * Tapping a jar card (current month only) opens `JarTransferSheet` with that jar
+ * as the source — moving SỐ DƯ between jars / the pool, never a limit. A past
+ * month's cards are view-only. A finished transfer shows a `role="status"`
+ * banner for 4s.
  */
 export function HuOverviewRow({
   financials,
   unlabeledItems = [],
-  onNavigate,
+  transactions = [],
+  raw = null,
 }: {
   financials: Financials;
   /**
@@ -39,12 +43,21 @@ export function HuOverviewRow({
    * omit it stay valid.
    */
   unlabeledItems?: Transaction[];
-  /** Jump to another PFM tab (a tapped jar card opens Ngân sách). */
-  onNavigate?: (tab: PfmTabId) => void;
+  /** The merged txn view + raw data the overview already loaded — fed to the transfer sheet (no second fetch). */
+  transactions?: Transaction[];
+  raw?: RawData | null;
 }) {
   const { config, error: jarError } = useJarConfig();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
+  const [transferFromId, setTransferFromId] = useState<string | null>(null);
+  const [transferDone, setTransferDone] = useState<JarTransferSummary | null>(null);
+
+  useEffect(() => {
+    if (!transferDone) return;
+    const timer = window.setTimeout(() => setTransferDone(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [transferDone]);
   const { pending, jars } = financials.jarEnvelope;
   const overAllocated = financials.unallocatedPool.overAllocated;
 
@@ -115,10 +128,29 @@ export function HuOverviewRow({
             spent={line.spent}
             limit={line.limit}
             Icon={iconOf(line.jarId)}
-            onOpen={onNavigate ? () => onNavigate("budget") : undefined}
+            onOpen={isCurrentMonth ? () => setTransferFromId(line.jarId) : undefined}
           />
         ))}
       </div>
+
+      {transferDone && (
+        <p role="status" className="rounded-xl bg-positive-soft px-3 py-2 text-sm text-positive">
+          Đã chuyển {formatVnd(transferDone.amount)} từ {transferDone.fromLabel} sang {transferDone.toLabel}
+        </p>
+      )}
+
+      {transferFromId && isCurrentMonth && (
+        <JarTransferSheet
+          initialFromId={transferFromId}
+          transactions={transactions}
+          raw={raw}
+          onClose={() => setTransferFromId(null)}
+          onDone={(summary) => {
+            setTransferFromId(null);
+            setTransferDone(summary);
+          }}
+        />
+      )}
 
       {sheetOpen && isCurrentMonth && (
         <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setSheetOpen(false)} />

@@ -32,18 +32,6 @@ export function PfmTabHost() {
 
   const [active, setActive] = useState<PfmTabId>(() => resolve(tabParam));
 
-  const selectTab = useCallback(
-    (next: PfmTabId) => {
-      setActive(next);
-      const nextParams = new URLSearchParams(params?.toString());
-      nextParams.set("tab", next);
-      nextParams.delete("dock");
-      nextParams.delete("setup");
-      router.replace(`/pfm?${nextParams.toString()}`, { scroll: false });
-    },
-    [params, router],
-  );
-
   // Re-sync on same-route jumps (bottom nav, copilot deep link): `useState` seeds
   // only at mount, so a `?tab=` change while already on `/pfm` must update here.
   // A resolved legacy id is also normalized back into the URL so the address bar
@@ -70,7 +58,7 @@ export function PfmTabHost() {
               hidden={!shown}
               className="h-full min-h-0 overflow-y-auto scroll-pb-6 pb-6"
             >
-              {shown && node(selectTab)}
+              {shown && node()}
             </div>
           );
         })}
@@ -79,8 +67,8 @@ export function PfmTabHost() {
   );
 }
 
-const PFM_PANELS: { id: PfmTabId; node: (nav: (t: PfmTabId) => void) => React.ReactNode }[] = [
-  { id: "overview", node: (nav) => <OverviewTab onNavigate={nav} /> },
+const PFM_PANELS: { id: PfmTabId; node: () => React.ReactNode }[] = [
+  { id: "overview", node: () => <OverviewTab /> },
   { id: "transactions", node: () => <PfmTxnList /> },
   { id: "budget", node: () => <BudgetTab /> },
   { id: "settings", node: () => <HuCategoryTab /> },

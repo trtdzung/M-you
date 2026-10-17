@@ -10,7 +10,7 @@ import { formatVndCompact } from "@/lib/format";
  *  - HẠN MỨC gauge — "Đã chi Y / Z hạn mức" for the month (limit `null` →
  *    "Chưa đặt hạn mức", no bar).
  * All numbers come from `Financials.jarEnvelope`; this card never computes.
- * Tapping the card opens the real jar view (Ngân sách) via `onOpen`.
+ * Tapping the card opens the jar-to-jar balance transfer via `onOpen` (current month only).
  */
 export function JarEnvelopeCard({
   label,
@@ -30,7 +30,7 @@ export function JarEnvelopeCard({
   /** Hạn mức tháng; `null` = chưa đặt. */
   limit: number | null;
   Icon: LucideIcon;
-  /** Open the real jar view (Ngân sách tab). Card is a button when provided. */
+  /** Open the balance transfer sheet with this jar as the source. Card is a button when provided. */
   onOpen?: () => void;
 }) {
   // Bar width only (display); the verdict itself is the engine's `overLimit`.
@@ -79,7 +79,7 @@ export function JarEnvelopeCard({
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`Hũ ${label} — mở Ngân sách`}
+        aria-label={`Hũ ${label} — chuyển số dư`}
         className={`${className} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
         style={{ backgroundColor: accent }}
       >

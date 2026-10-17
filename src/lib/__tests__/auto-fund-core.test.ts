@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Account, JarConfig, Transaction } from "@/domain/models";
 import { REBALANCE_CATEGORY } from "@/domain/models";
-import { evaluateFunding, POOL_DONOR_ID, type DonorProposal } from "@/domain/engine";
+import {
+  computeUnallocatedPool,
+  evaluateFunding,
+  jarBalances,
+  jarEnvelopeLines,
+  jarSpendable,
+  monthPeriodFromKey,
+  POOL_DONOR_ID,
+  type DonorProposal,
+} from "@/domain/engine";
 import { monthAnchor, openingDeposit, withSeedDeposits } from "@/test-utils/jar-ledger-fixtures";
 import {
   jarIdForCategory,
@@ -391,5 +400,89 @@ describe("jarIdForCategory", () => {
   it("returns null for an unmapped category (e.g. transfer/rebalance) — never a fabricated jar", () => {
     expect(jarIdForCategory(JAR_CONFIG, "transfer")).toBeNull();
     expect(jarIdForCategory(JAR_CONFIG, REBALANCE_CATEGORY)).toBeNull();
+  });
+});
+
+describe("jar-to-jar balance transfer — effect on the engine snapshot (plan 260923-jar-to-jar-transfer-sheet)", () => {
+  const anchor = monthAnchor("2026-09");
+  const spendableTotal = (lines: ReturnType<typeof snapshotForDate>["lines"]) =>
+    lines.reduce((sum, l) => sum + (jarSpendable(l.balance) ?? 0), 0);
+
+  it("a jar→pool leg raises the unallocated pool by the amount and leaves `spent` unchanged", () => {
+    const config = withSeedDeposits(
+      {
+        version: 3,
+        jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 }],
+      },
+      anchor,
+    );
+    const deps: AutoFundDeps = {
+      transactions: [],
+      accounts: [account("cur", 4_000_000)], // == food's opening balance → pool starts at 0
+      jarConfig: config,
+      now: new Date("2026-09-15T00:00:00.000Z"),
+    };
+    const postedAt = "2026-09-10T08:00:00.000Z";
+
+    const before = snapshotForDate(deps, postedAt);
+    const poolBefore = computeUnallocatedPool({ casaBalance: before.casaBalance, spendableTotal: spendableTotal(before.lines) }).amount;
+    expect(poolBefore).toBe(0);
+
+    const [leg] = rebalanceInputsFor([{ jarId: "food", label: "Ăn uống", take: 1_000_000 }], null, "jar-transfer-1", postedAt, "manual");
+    const after = snapshotForDate({ ...deps, transactions: [txn({ id: "leg", ...leg })] }, postedAt);
+    const poolAfter = computeUnallocatedPool({ casaBalance: after.casaBalance, spendableTotal: spendableTotal(after.lines) }).amount;
+
+    expect(poolAfter).toBe(poolBefore + 1_000_000);
+
+    const foodBefore = before.lines.find((l) => l.huId === "food")!;
+    const foodAfter = after.lines.find((l) => l.huId === "food")!;
+    expect(foodAfter.balance).toBe((foodBefore.balance ?? 0) - 1_000_000); // donor debited
+    expect(foodAfter.spent).toBe(foodBefore.spent); // the spend/limit axis is untouched by a balance move
+  });
+
+  it("covering a jar's negative balance does NOT change its status/overLimit (limit axis independent of balance axis)", () => {
+    const config: JarConfig = {
+      version: 3,
+      jars: [
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 500_000, createdAt: anchor },
+        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 1_000_000, createdAt: anchor },
+      ],
+      ledger: [openingDeposit("food", 500_000, anchor), openingDeposit("buf", 1_000_000, anchor)],
+    };
+    const overspend = txn({ id: "trig2", amount: 900_000, postedAt: "2026-09-05T10:00:00.000Z", categoryId: "dining" });
+    const deps: AutoFundDeps = {
+      transactions: [overspend],
+      accounts: [account("cur", 1_500_000)],
+      jarConfig: config,
+      now: new Date("2026-09-15T00:00:00.000Z"),
+    };
+    const period = monthPeriodFromKey("2026-09");
+
+    const before = snapshotForDate(deps, overspend.postedAt);
+    const foodBefore = before.lines.find((l) => l.huId === "food")!;
+    expect(foodBefore.status).toBe("over"); // 900k spent > 500k limit
+    expect(foodBefore.balance).toBe(-400_000); // 500k − 900k
+    const envelopeBefore = jarEnvelopeLines(
+      config,
+      new Map(before.lines.map((l) => [l.huId, l.spent])),
+      jarBalances(config, deps.transactions, overspend.postedAt, period.to),
+    );
+    expect(envelopeBefore.find((l) => l.jarId === "food")?.overLimit).toBe(true);
+
+    const [leg] = rebalanceInputsFor([{ jarId: "buf", label: "Dự phòng", take: 400_000 }], "food", "trig2", overspend.postedAt, "manual");
+    const afterTxns = [overspend, txn({ id: "cover-leg", ...leg })];
+    const after = snapshotForDate({ ...deps, transactions: afterTxns }, overspend.postedAt);
+    const foodAfter = after.lines.find((l) => l.huId === "food")!;
+
+    expect(foodAfter.balance).toBe(0); // fully covered
+    expect(foodAfter.spent).toBe(foodBefore.spent); // spend itself never changes
+    expect(foodAfter.status).toBe("over"); // still over its OWN limit — the cover moved balance, not the plan
+
+    const envelopeAfter = jarEnvelopeLines(
+      config,
+      new Map(after.lines.map((l) => [l.huId, l.spent])),
+      jarBalances(config, afterTxns, overspend.postedAt, period.to),
+    );
+    expect(envelopeAfter.find((l) => l.jarId === "food")?.overLimit).toBe(true); // unchanged by the balance cover
   });
 });

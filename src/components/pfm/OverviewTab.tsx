@@ -10,7 +10,6 @@ import { HuOverviewRow } from "@/components/hu-envelope/HuOverviewRow";
 import { SpendingCalendar } from "@/components/pfm/SpendingCalendar";
 import type { JarDonutDatum } from "@/components/report/SpendingDonut";
 import { cashflowTrend, monthPeriodFromKey, selectUnlabeledSpend } from "@/domain/engine";
-import type { PfmTabId } from "./PfmTabs";
 import { useInsights } from "@/state/useInsights";
 import { currentMonthKey } from "@/lib/demo-clock";
 
@@ -22,9 +21,9 @@ import { currentMonthKey } from "@/lib/demo-clock";
  * "—", never 0 (#6). Money-in is a single aggregate (no income categories).
  * Wealth/net-worth lives on its own tab.
  */
-export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => void }) {
+export function OverviewTab() {
   // Always the current month, independent of any month picked on other tabs.
-  const { loading, error, financials, transactions } = useInsights(currentMonthKey());
+  const { loading, error, financials, transactions, raw } = useInsights(currentMonthKey());
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMonthKey, setReportMonthKey] = useState<string | null>(null);
 
@@ -69,7 +68,7 @@ export function OverviewTab({ onNavigate }: { onNavigate: (tab: PfmTabId) => voi
     <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
       <CashflowOverviewCard cashflow={cashflow} prevCashflow={prevCashflow} />
 
-      <HuOverviewRow financials={financials} unlabeledItems={unlabeledItems} onNavigate={onNavigate} />
+      <HuOverviewRow financials={financials} unlabeledItems={unlabeledItems} transactions={transactions} raw={raw} />
 
       <SpendingSection
         expense={expenseSide}

@@ -79,12 +79,12 @@ function useInsightState(): InsightState {
  * cockpit passes the current month — Red Team C2).
  */
 export function useInsights(monthOverride?: string) {
-  const { financials, loading, error, transactions } = useFinancials(monthOverride);
+  const { financials, loading, error, transactions, raw } = useFinancials(monthOverride);
   const state = useInsightState();
 
   const base = useMemo<Insight[]>(() => (financials ? runDetectors(financials) : []), [financials]);
   const insights = useMemo(() => state.decorate(base), [state, base]);
   const visible = useMemo(() => state.visibleOf(base), [state, base]);
 
-  return { loading, error, financials, transactions, insights, visible, dismiss: state.dismiss, snooze: state.snooze, markHelpful: state.markHelpful };
+  return { loading, error, financials, transactions, raw, insights, visible, dismiss: state.dismiss, snooze: state.snooze, markHelpful: state.markHelpful };
 }

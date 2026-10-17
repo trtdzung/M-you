@@ -2,10 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type RenderOptions, render as rtlRender, screen, fireEvent } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
-import type { Financials } from "@/domain/engine/finance-compose";
+import type { Financials, RawData } from "@/domain/engine/finance-compose";
 import type { JarEnvelopeResult, JarEnvelopeLine } from "@/domain/engine/jar-envelope";
 import type { JarConfig } from "@/domain/models";
 import { monthPeriod } from "@/domain/engine/types";
+import { jarSpendable, type JarBudgetLine, type TransferSnapshot } from "@/domain/engine";
 import { currentMonthKey } from "@/lib/demo-clock";
 
 const JUNE = monthPeriod(2026, 5);
@@ -30,9 +31,29 @@ vi.mock("@/state/corrections", () => ({
   useCorrections: () => ({ unsaved: false }),
 }));
 // The labeling sheet also consults auto-fund on label; stub to a no-op "covered"
-// so this row test needs no PersonaProvider/financials wiring.
+// so this row test needs no PersonaProvider/financials wiring. The balance
+// transfer sheet (opened by tapping a jar card) reads `useAutoFundWith` for its
+// snapshot/commit — stubbed with a deterministic 2-jar snapshot so the sheet
+// renders its real "Từ hũ"/"Đến hũ" content instead of the loading state.
+function jarLine(huId: string, label: string, balance: number | null): JarBudgetLine {
+  return {
+    huId, label, categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null,
+    limit: null, limitState: "unset", rebalanceNet: 0, balance, pct: null, status: null,
+    thresholdHit: false, source: "mock", freshness: null,
+  };
+}
+let transferSnapshot: TransferSnapshot | null = (() => {
+  const lines = [jarLine("food", "Ăn uống & Đi chợ", 2_000_000), jarLine("home", "Nhà cửa & Tiện ích", 1_000_000)];
+  return {
+    casaBalance: 5_000_000,
+    lines,
+    spendables: lines.map((l) => ({ id: l.huId, label: l.label, categoryIds: [], spendable: jarSpendable(l.balance) })),
+  };
+})();
+const commitPersisted = vi.fn().mockResolvedValue(["tx-1"]);
 vi.mock("@/state/use-auto-fund", () => ({
   useAutoFund: () => ({ reconcile: () => ({ status: "covered", donors: [], targetLabel: "hũ" }) }),
+  useAutoFundWith: () => ({ snapshotAt: () => transferSnapshot, commitPersisted }),
 }));
 // The labeling sheet flips a transfer's type via the manual-txn store; stub it so
 // the row stays free of the ManualTxnsProvider.
@@ -191,11 +212,18 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("Đã chi 500K / 3 tr hạn mức")).toBeInTheDocument();
   });
 
-  it("opens the real jar view (Ngân sách) when a jar card is tapped", () => {
-    const onNavigate = vi.fn();
-    render(<HuOverviewRow financials={withEnvelope(envelope({}))} onNavigate={onNavigate} />);
-    fireEvent.click(screen.getByRole("button", { name: /Hũ Ăn uống & Đi chợ/ }));
-    expect(onNavigate).toHaveBeenCalledWith("budget");
+  it("tapping a jar card (current month) opens the balance transfer sheet with that jar as the source", () => {
+    render(<HuOverviewRow financials={withEnvelope(envelope({}))} transactions={[]} raw={{} as unknown as RawData} />);
+    fireEvent.click(screen.getByRole("button", { name: "Hũ Ăn uống & Đi chợ — chuyển số dư" }));
+    // The sheet (real component, not stubbed) opens with the tapped jar as "Từ hũ".
+    expect(screen.getByText("Chuyển giữa các hũ")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hũ chuyển: Ăn uống & Đi chợ — đổi" })).toBeInTheDocument();
+  });
+
+  it("a past month's jar card is view-only — not a button, no transfer sheet on tap", () => {
+    const env = envelope({ jars: [line({})] });
+    render(<HuOverviewRow financials={withEnvelope(env, false, "2026-01")} />);
+    expect(screen.queryByRole("button", { name: /chuyển số dư/ })).not.toBeInTheDocument();
   });
 
   it("hides the pending card once everything is allocated (known amount, 0 outstanding)", () => {
