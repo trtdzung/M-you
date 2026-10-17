@@ -249,8 +249,13 @@ Agent **không gửi `id`** (`pfm` tự sinh). Khi gợi ý phải tôn trọng:
 - **`allocation_amount ≤ allocationHeadroom`** (từ `jar-summary`). `allocationHeadroom`
   ≤ 0 nghĩa là không còn chỗ đặt hạn mức mới → **không gợi ý `create_jar`**, hãy gợi
   ý lấy bớt hạn mức từ hũ khác (`edit_jar` giảm hạn mức) hoặc nói rõ trong `answer`.
-- **1 category chỉ thuộc 1 hũ.** Category đã thuộc hũ khác (xem `categoryIds` từng hũ)
-  sẽ bị **chuyển sang hũ mới** khi tạo — nêu rõ trong `reason` hũ nào sẽ mất chúng.
+- **`category_ids` của `create_jar` chỉ được gồm danh mục "chưa xếp hũ".** Một danh mục là
+  chưa xếp khi **không hũ nào** giữ nó, hoặc chỉ hũ **"Khác"** (`id: "khac"`) giữ nó — suy ra từ
+  `categoryIds` của từng hũ trong `jar-summary` so với danh sách `GET /api/categories?cif=`.
+  Form tạo hũ trên `pfm` **chỉ cho chọn trong các danh mục chưa xếp** và **bỏ** danh mục đang
+  thuộc hũ khác khỏi đề xuất (kèm dòng "… đang thuộc hũ X nên không chọn được"). Muốn lấy danh
+  mục từ hũ khác: tạo hũ trước (không kèm danh mục đó), rồi ở lượt sau trả `edit_jar` cho hũ
+  vừa tạo với `category_ids` đầy đủ (xem "Chuyển danh mục giữa hai hũ" ở B3).
 
 ## B3. `edit_jar` — Form 2: điều chỉnh hũ
 
@@ -385,7 +390,7 @@ tra hình dạng lẫn các quy tắc cứng đối chiếu với `jar-summary` 
 | Khách nói | Kỳ vọng | Kết quả |
 |---|---|---|
 | Tạo hũ Du lịch 800 nghìn, chưa gắn danh mục | `create_jar` `allocation_amount: 800000`, `category_ids: []` (≤ `allocationHeadroom` 1.000.000) | OK |
-| Tạo hũ Giải trí 800 nghìn với danh mục Giải trí | `create_jar` `category_ids: ["entertainment"]`; `reason` nói Giải trí đang thuộc hũ Hưởng thụ sẽ chuyển sang | OK |
+| Tạo hũ Giải trí 800 nghìn với danh mục Giải trí (Giải trí đang thuộc hũ Hưởng thụ) | `create_jar` **không** kèm `entertainment` (danh mục đã xếp hũ); `answer` nói rõ và gợi ý thêm danh mục ở bước sửa hũ | Agent hiện vẫn đưa `entertainment` vào (C2 mục 6) — `pfm` sẽ bỏ nó |
 | Giảm hạn mức hũ Hưởng thụ xuống 2 triệu | `edit_jar` `jar_id: "lifestyle"`, `allocation_amount: 2000000` | OK |
 | Tăng hạn mức hũ Ăn uống lên 4,2 triệu | `edit_jar` `jar_id: "food"` (tăng 200.000đ ≤ headroom 1.000.000) | OK |
 | Tăng hạn mức hũ Ăn uống lên 6 triệu | **không có `ui`** (tăng 2.000.000đ > headroom 1.000.000); `answer` nêu lý do | OK |
@@ -420,3 +425,7 @@ tra hình dạng lẫn các quy tắc cứng đối chiếu với `jar-summary` 
 5. **Thứ tự lấy tiền lệch** (hệ quả của mục 4): định chi 16 triệu, Agent lấy pool 13.044.000 →
    Di chuyển 796.000 (nhỏ hơn) → Hưởng thụ 347.000; theo thứ tự kỳ vọng phải là pool 13.044.000
    → Hưởng thụ 1.143.000 (đủ một mình). Không vi phạm quy tắc cứng nên `pfm` vẫn nhận.
+6. **`create_jar` đưa vào danh mục đã xếp hũ.** Agent còn viết `reason` kiểu "danh mục X đang
+   thuộc hũ Y sẽ chuyển sang hũ mới" và để X trong `category_ids`. Form tạo hũ của `pfm` chỉ cho
+   chọn danh mục chưa xếp nên sẽ bỏ X; kỳ vọng Agent không đưa X vào `create_jar` (skill
+   `spending-jar` cần cập nhật), và nếu khách muốn X thì làm `edit_jar` sau khi tạo hũ.
