@@ -76,7 +76,40 @@ export interface RebalanceJarsUi {
 
 export type JarUi = CreateJarUi | EditJarUi | RebalanceJarsUi;
 
-export type UiPayload = ChartUi | TransferFormUi | JarUi | { type: string } | null;
+/**
+ * "Hỏi lại bằng nút bấm" (cross-cutting, `agent_backend_docs/clarify-options.md`):
+ * the agent could not decide on its own and asks the customer to pick, from 1–4
+ * INDEPENDENT questions in the same turn (like Claude's own `AskUserQuestion` —
+ * several things may genuinely need deciding at once). `answer` is always a short
+ * lead-in ("Bạn hãy trả lời các câu hỏi sau…"), never the question text itself —
+ * that lives in `questions[].question`; a caller renders BOTH. Each option is a
+ * plain string (no id) — picking (or typing) sends it verbatim as a normal
+ * `/chat` message; there is no separate "answer" mechanism. With exactly one
+ * question, a pick is sent immediately. With several, the customer answers every
+ * question first, then ALL picks are joined into ONE message (see `joinClarifyAnswers`).
+ */
+export interface ClarifyQuestion {
+  question: string;
+  options: string[];
+}
+
+export interface ClarifyOptionsUi {
+  type: "clarify_options";
+  questions: ClarifyQuestion[];
+}
+
+/**
+ * Combine one answer per question of a multi-question `clarify_options` turn into
+ * the single `/chat` message the contract requires: each answer followed by `"."`,
+ * joined with a space — `["A", "B"]` → `"A. B."` (`clarify-options.md` §"Nhiều câu hỏi").
+ * Only used when there is more than one question; a single question sends its pick
+ * verbatim, with no added punctuation.
+ */
+export function joinClarifyAnswers(answers: readonly string[]): string {
+  return `${answers.join(". ")}.`;
+}
+
+export type UiPayload = ChartUi | TransferFormUi | JarUi | ClarifyOptionsUi | { type: string } | null;
 
 /**
  * True only for a `ui.type === "chart"` payload that is actually safe to
@@ -205,6 +238,27 @@ export function isRebalanceJarsUi(ui: UiPayload | null | undefined): ui is Rebal
 /** Any of the three jar proposals (create / edit / rebalance). */
 export function isJarUi(ui: UiPayload | null | undefined, expenseIds?: ReadonlySet<string>): ui is JarUi {
   return isCreateJarUi(ui, expenseIds) || isEditJarUi(ui, expenseIds) || isRebalanceJarsUi(ui);
+}
+
+/**
+ * True only for a `ui.type === "clarify_options"` payload with 2–4 options, each
+ * with a non-empty `id` and `label`, neither repeated within the block (contract
+ * "Schema của `ui`"). Same reliability posture as the other guards: never throws;
+ * a malformed payload just falls back to showing `answer` alone. Unlike
+ * `isTransferFormUi`/`isJarUi`, there is nothing here to check against live data —
+ * the doc is explicit that `label` is the agent's own read of the numbers, not a
+ * server-verified figure.
+ */
+export function isClarifyOptionsUi(ui: UiPayload | null | undefined): ui is ClarifyOptionsUi {
+  if (!ui || ui.type !== "clarify_options") return false;
+  const f = ui as Partial<ClarifyOptionsUi>;
+  if (!Array.isArray(f.questions) || f.questions.length < 1 || f.questions.length > 4) return false;
+  return f.questions.every((q) => {
+    if (!q || !nonEmpty(q.question)) return false;
+    if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 4) return false;
+    if (!q.options.every(nonEmpty)) return false;
+    return new Set(q.options).size === q.options.length;
+  });
 }
 
 export interface ChatResponse {

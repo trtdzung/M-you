@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { usePersona } from "@/providers/context";
-import { sendChatMessage, isChartUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
+import { sendChatMessage, isChartUi, isClarifyOptionsUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { jarSpeechContext } from "@/lib/speech-context";
 import type { SpeechFinalMetadata } from "@/lib/speech-types";
@@ -14,6 +14,7 @@ import { useJarConfig } from "@/state/jars";
 import { useCategories } from "@/state/categories";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
+import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
 
@@ -289,6 +290,11 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               ) : isChartUi(reply.ui) ? (
                 <div className="flex w-full flex-col items-start">
                   <AgentChartCard chart={reply.ui} fullWidth />
+                </div>
+              ) : isClarifyOptionsUi(reply.ui) ? (
+                <div className="flex w-full flex-col items-start gap-1">
+                  <VoiceAnswer text={reply.answer} onOpenChat={switchToChat} />
+                  <AgentClarifyOptionsCard ui={reply.ui} disabled={sending} onAnswer={(text) => void handleSend(text)} fullWidth />
                 </div>
               ) : (
                 <VoiceAnswer text={reply.answer} onOpenChat={switchToChat} />

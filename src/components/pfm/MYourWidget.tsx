@@ -16,6 +16,7 @@ import {
   sendChatMessage,
   deleteChatHistory,
   isChartUi,
+  isClarifyOptionsUi,
   isJarUi,
   isTransferFormUi,
   type HistoryMessage,
@@ -23,8 +24,10 @@ import {
 } from "@/lib/agent-api";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
+import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
+import { ClarifyAnswerBubble } from "./ClarifyAnswerBubble";
 
 interface ChatBubble {
   id: string;
@@ -37,6 +40,20 @@ interface ChatBubble {
 const GREETING = "Xin chào 👋 Mình là M-You. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
 const DELETE_LOCK_MS = 30_000;
+
+/**
+ * The `clarify_options` bubble right before `idx` that this one is chained to
+ * (its own PRECEDING bubble in the same unbroken clarify→answer→clarify run) —
+ * `null` when `idx` is the first question of its chain. Lets "← Câu trước" walk
+ * back through however many clarify questions the agent asked in a row.
+ */
+function previousClarifyIndex(messages: ChatBubble[], idx: number): number | null {
+  const prev = idx - 2;
+  if (prev < 0) return null;
+  if (messages[idx - 1]?.role !== "user") return null;
+  if (messages[prev].role !== "agent" || !isClarifyOptionsUi(messages[prev].ui)) return null;
+  return prev;
+}
 
 function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
   return messages.map((m, i) => ({
@@ -180,15 +197,22 @@ export function MYourWidget() {
   }, []);
 
   const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
+  const [expandedClarify, setExpandedClarify] = useState<Set<string>>(new Set());
+  const [reopenedIndex, setReopenedIndex] = useState<number | null>(null);
 
-  async function send() {
-    const text = input.trim();
+  /**
+   * Posts `text` as one customer turn — the composer's own send, and a
+   * `clarify_options` answer (button pick or its "Khác" custom text) alike.
+   * The latter is NOT a different mechanism: the contract is explicit that
+   * picking an option sends its exact `label` through this same `/chat` call
+   * (`agent_backend_docs/clarify-options.md`).
+   */
+  async function postMessage(text: string) {
     if (!text || composerDisabled || voiceBusy) return;
     const userId = `m${++idRef.current}`;
     const replyId = `m${++idRef.current}`;
     setMessages((prev) => [...prev, { id: userId, role: "user", text }]);
-    setInput("");
-    setVoiceGuidance("");
+    setReopenedIndex(null); // answering (even a reopened past question) always resumes at the live latest turn
     setSending(true);
     try {
       const res = await sendChatMessage(text, cif);
@@ -198,6 +222,14 @@ export function MYourWidget() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text) return;
+    setInput("");
+    setVoiceGuidance("");
+    await postMessage(text);
   }
 
   async function handleDelete() {
@@ -286,25 +318,65 @@ export function MYourWidget() {
                     {GREETING}
                   </div>
                 )}
-                {messages.map((m) => (
-                  <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
-                        m.role === "user"
-                          ? "brand-gradient rounded-br-sm text-white"
-                          : m.error
-                            ? "shadow-card rounded-bl-sm bg-negative-soft text-negative"
-                            : "shadow-card rounded-bl-sm bg-surface-muted text-text",
+                {messages.map((m, idx) => {
+                  // A user bubble right after a `clarify_options` question is the answer to
+                  // it — collapse it, whether it just got sent or came back from history.
+                  const isClarifyAnswer = m.role === "user" && isClarifyOptionsUi(messages[idx - 1]?.ui);
+                  if (isClarifyAnswer) {
+                    return (
+                      <div key={m.id} className="flex flex-col items-end">
+                        <ClarifyAnswerBubble
+                          text={m.text}
+                          expanded={expandedClarify.has(m.id)}
+                          onToggle={() =>
+                            setExpandedClarify((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(m.id)) next.delete(m.id);
+                              else next.add(m.id);
+                              return next;
+                            })
+                          }
+                        />
+                      </div>
+                    );
+                  }
+                  const clarify = m.role === "agent" && isClarifyOptionsUi(m.ui) ? m.ui : null;
+                  const isLatestUnanswered = clarify !== null && idx === messages.length - 1;
+                  const isReopened = clarify !== null && reopenedIndex === idx;
+                  return (
+                    <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
+                          m.role === "user"
+                            ? "brand-gradient rounded-br-sm text-white"
+                            : m.error
+                              ? "shadow-card rounded-bl-sm bg-negative-soft text-negative"
+                              : "shadow-card rounded-bl-sm bg-surface-muted text-text",
+                        )}
+                      >
+                        {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
+                      </div>
+                      {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
+                      {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
+                      {m.role === "agent" && isJarUi(m.ui, expenseIds) && <AgentJarUiCard ui={m.ui} />}
+                      {clarify && (isLatestUnanswered || isReopened) && (
+                        <AgentClarifyOptionsCard
+                          ui={clarify}
+                          disabled={sending}
+                          reopened={isReopened}
+                          hasPrevious={previousClarifyIndex(messages, idx) !== null}
+                          onAnswer={(text) => void postMessage(text)}
+                          onBack={() => {
+                            const prev = previousClarifyIndex(messages, idx);
+                            if (prev !== null) setReopenedIndex(prev);
+                          }}
+                          onCancelEdit={() => setReopenedIndex(null)}
+                        />
                       )}
-                    >
-                      {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
                     </div>
-                    {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
-                    {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
-                    {m.role === "agent" && isJarUi(m.ui, expenseIds) && <AgentJarUiCard ui={m.ui} />}
-                  </div>
-                ))}
+                  );
+                })}
                 {sending && (
                   <div className="flex justify-start">
                     <div className="shadow-card rounded-2xl rounded-bl-sm bg-surface-muted px-3.5 py-2.5 text-sm text-muted">
