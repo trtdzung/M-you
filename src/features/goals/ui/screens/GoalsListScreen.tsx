@@ -72,7 +72,7 @@ export function GoalsListScreen() {
                 document.getElementById(`goals-tab-${next}`)?.focus();
               }
             }}
-            className={`min-h-11 rounded-xl px-2 py-3 text-sm font-semibold transition-colors ${activeTab === tab ? "bg-surface text-text shadow-sm" : "text-muted"}`}
+            className={`min-h-11 rounded-xl px-2 py-3 text-[14px] leading-5 font-medium transition-colors ${activeTab === tab ? "bg-surface text-text shadow-sm" : "text-muted"}`}
           >
             {label}
           </button>

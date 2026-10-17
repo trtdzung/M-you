@@ -22,13 +22,13 @@ export function CoachInput({ disabled, onSubmit }: { disabled?: boolean; onSubmi
     >
       <input
         aria-label={GOALS_COPY.coach.inputLabel}
-        className={`${input} w-full`}
+        className={`${input} w-full text-[16px] leading-6`}
         value={text}
         maxLength={MAX}
         placeholder={GOALS_COPY.coach.placeholder}
         onChange={(e) => setText(e.target.value)}
       />
-      <button type="submit" disabled={disabled || !text.trim()} className={primaryButton}>
+      <button type="submit" disabled={disabled || !text.trim()} className={`${primaryButton} text-[15px] leading-5`}>
         {GOALS_COPY.coach.send}
       </button>
     </form>

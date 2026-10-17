@@ -54,7 +54,7 @@ export function GoalCoachPanel({ onCreated }: { onCreated: () => void }) {
   };
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-      <h2 className="text-sm font-semibold text-text">{GOALS_COPY.coach.title}</h2>
+      <h2 className="text-[18px] leading-6 font-semibold text-text">{GOALS_COPY.coach.title}</h2>
       {body}
       {coach.draft && (
         <CreateGoalFlow

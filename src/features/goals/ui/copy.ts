@@ -24,7 +24,7 @@ export const GOALS_COPY = {
 
   coach: {
     title: "Nói mục tiêu của bạn",
-    placeholder: "Ví dụ: mua xe 600 triệu trong 3 năm",
+    placeholder: "Ví dụ: mua xe trong 3 năm",
     inputLabel: "Mục tiêu bạn muốn đạt",
     send: "Gửi",
     thinking: "Đang tìm hiểu mục tiêu của bạn…",
