@@ -8,7 +8,14 @@ import { transferNow } from "@/lib/demo-clock";
 import { usePersona } from "@/providers/context";
 import { useFinancials } from "@/state/useFinancials";
 import { useAutoFundWith } from "@/state/use-auto-fund";
-import { computeUnallocatedPool, POOL_DONOR_ID, POOL_DONOR_LABEL, type FundingAssessment } from "@/domain/engine";
+import {
+  isValidTransferAmount,
+  POOL_DONOR_ID,
+  POOL_DONOR_LABEL,
+  transferCapOf,
+  transferEndpoints,
+  type FundingAssessment,
+} from "@/domain/engine";
 import type { RebalanceJarsUi } from "@/lib/agent-api";
 
 interface Row {
@@ -66,13 +73,7 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
   }
 
   const jars = snapshot.spendables;
-  const pool = Math.max(
-    0,
-    computeUnallocatedPool({
-      casaBalance: snapshot.casaBalance,
-      spendableTotal: jars.reduce((sum, j) => sum + (j.spendable ?? 0), 0),
-    }).amount,
-  );
+  const endpoints = transferEndpoints(snapshot);
   const target = jars.find((j) => j.id === targetId);
   if (!target && !done) {
     return (
@@ -90,7 +91,7 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
   const need = targetId === form.target_jar_id && balance !== null && balance < 0 ? -balance : form.shortfall;
 
   const labelOf = (id: string) => (id === POOL_DONOR_ID ? POOL_DONOR_LABEL : jars.find((j) => j.id === id)?.label ?? id);
-  const capOf = (id: string): number | null => (id === POOL_DONOR_ID ? pool : jars.find((j) => j.id === id)?.spendable ?? null);
+  const capOf = (id: string): number | null => transferCapOf(endpoints, id);
   const total = rows.reduce((sum, r) => sum + (Number.isFinite(r.amount) ? r.amount : 0), 0);
 
   const rowError = (row: Row): string | null => {
@@ -98,7 +99,7 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
     if (rows.some((r) => r.key !== row.key && r.jarId === row.jarId)) return "Nguồn này đã có ở dòng khác.";
     const cap = capOf(row.jarId);
     if (cap === null) return "Hũ này chưa có số dư nên không cho tiền được.";
-    if (!Number.isFinite(row.amount) || row.amount <= 0) return "Nhập số tiền lớn hơn 0.";
+    if (!isValidTransferAmount(row.amount)) return "Nhập số tiền lớn hơn 0.";
     if (row.amount > cap) return `Tối đa ${formatVnd(cap)}.`;
     return null;
   };
