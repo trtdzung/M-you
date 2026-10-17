@@ -5,8 +5,9 @@ import { formatVnd } from "@/lib/format";
  * The durable "Cần bù thủ công" notice on a jar card (RT-fix C5) — a jar whose
  * post-rebalance remaining is still negative. U15: the copy promises an action,
  * so it carries one: "Chia lại hạn mức" opens the allocation sheet where the user
- * moves hạn mức from another jar (or accepts the overspend by closing it). Moves
- * no real money (invariant #3). `onCover` absent → text-only (no dead button).
+ * hands this jar more hạn mức from the leftover pool (or accepts the overspend by
+ * closing it). Moves no real money (invariant #3). `onCover` absent → text-only
+ * (no dead button).
  *
  * `shortfall` is the BALANCE axis (`−remaining`, the part no rebalance covered) —
  * NOT the plan-axis overspend (`spent − limit`, which the "Đã vượt X" badge above
@@ -22,7 +23,7 @@ export function ManualCoverNotice({ shortfall, onCover }: { shortfall: number; o
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold text-warning">Cần bù thủ công</p>
         <p className="text-[11px] text-warning">
-          Hũ đã tiêu quá số dư {formatVnd(shortfall)} chưa được bù. Rót thêm từ hũ khác hoặc chấp nhận vượt.
+          Hũ đã tiêu quá số dư {formatVnd(shortfall)} chưa được bù. Rót thêm từ phần còn lại hoặc chấp nhận vượt.
         </p>
         {onCover && (
           <button

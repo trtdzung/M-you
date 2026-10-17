@@ -15,21 +15,21 @@ import { AllocationJarRow } from "./AllocationJarRow";
  * number that is at once its allocation, its ceiling and its balance. It moves NO
  * real money — a pure display partition of the CASA balance (invariant #3).
  *
- * DIVIDE-FROM-SCRATCH: every input opens at 0 and "Còn lại để chia" opens at the
- * FULL CASA balance, so the sheet always states the same thing it does: you are
- * splitting the whole balance again. It is deliberately NOT prefilled with the
- * current limits — a prefilled sheet left a leftover remainder sitting in "Còn
- * lại để chia" (e.g. 880K) that read as an error rather than as unallocated
- * money. A jar left at 0 therefore ends up "chưa đặt hạn mức", and its previous
- * limit is shown beside the input as reference only.
+ * ADD-TO-JAR: "Còn lại để chia" opens at the residual the overview shows —
+ * `CASA − Σ hạn mức hiện có`, i.e. exactly the "Chờ phân bổ" the "Chia ngay →" CTA
+ * came from (`PendingAllocationCard`, `jarEnvelope.pending`). Every input opens at
+ * 0 and is the amount to ADD to that jar, so the user HANDS OUT the leftover into
+ * jars instead of rewriting each jar's full total (a prefilled total like 8.100.000
+ * read as "edit the whole number", not "top up"). New limit = hạn mức hiện có +
+ * số cộng thêm; the leftover shrinks as it is handed out. This sheet only tops up —
+ * it never lowers or clears a jar's limit.
  *
- * Because an untouched sheet would otherwise wipe every limit, `canSubmit`
- * requires at least one jar to carry a positive amount — opening the sheet and
- * hitting "Lưu hạn mức" straight away can never clear the whole config.
+ * Hitting "Lưu hạn mức" without adding anything is a no-op — `canSubmit` requires
+ * a positive total added, so an untouched sheet changes nothing.
  *
- * Guardrail: Σ (hạn mức mới của mọi hũ) ≤ CASA pool. The server re-checks and
- * rejects 422 if exceeded (client check is UX). Writes atomically via
- * `updateJars` (one transaction, one `setConfig`).
+ * Guardrail: Σ (hạn mức mới của mọi hũ) ≤ CASA pool, i.e. tổng cộng thêm ≤ phần
+ * còn lại. The server re-checks and rejects 422 if exceeded (client check is UX).
+ * Writes atomically via `updateJars` (one transaction, one `setConfig`).
  */
 export function AllocationSheet({
   envelope,
@@ -43,8 +43,9 @@ export function AllocationSheet({
 }) {
   const { updateJars } = useJarConfig();
   const { pending } = envelope;
-  // Every jar opens at 0: this sheet divides the whole balance again rather than
-  // topping up the existing split. A row left at 0 is saved as "chưa đặt hạn mức".
+  // Every jar opens at 0 — the input is the amount to ADD to that jar, not its new
+  // total. New limit = hạn mức hiện có + số cộng thêm (computed on submit), so the
+  // user distributes the leftover rather than rewriting each full total.
   const [draft, setDraft] = useState<Record<string, number>>(() =>
     Object.fromEntries(jars.map((j) => [j.id, 0])),
   );
@@ -53,26 +54,39 @@ export function AllocationSheet({
 
   const poolKnown = pending.pool !== "unknown";
   const pool = poolKnown ? (pending.pool as number) : 0;
-  const allocated = useMemo(() => Object.values(draft).reduce((s, n) => s + (n || 0), 0), [draft]);
-  // Live headroom as the user edits. At open (every row 0) this is the FULL CASA
-  // balance — the sheet divides everything again, so there is never a leftover
-  // remainder carried in from the previous split.
-  const leftToSplit = pool - allocated;
-  // A sheet nobody typed into must not be savable: it would clear every limit.
-  const canSubmit = poolKnown && leftToSplit >= 0 && allocated > 0 && !submitting;
+  // Each jar's current balance (`remaining`) from the engine — a null (no limit) or
+  // overspent jar contributes 0 spendable. BALANCE LENS: leftToSplit = CASA − Σ new
+  // spendable, where adding Δ to a jar makes its spendable `max(0, remaining + Δ)`.
+  const remainingByJar = useMemo(
+    () => new Map(envelope.jars.map((l) => [l.jarId, l.remaining ?? 0])),
+    [envelope.jars],
+  );
+  const added = useMemo(() => Object.values(draft).reduce((s, n) => s + (n || 0), 0), [draft]);
+  // Live leftover as the user hands money out. At open (nothing added) this equals
+  // `pending.amount` (`CASA − Σ spendable`) — the same "Chờ phân bổ" the overview
+  // card shows; it shrinks as balance is added and must never go negative.
+  const newSpendableTotal = useMemo(
+    () =>
+      jars.reduce((s, j) => s + Math.max(0, (remainingByJar.get(j.id) ?? 0) + (draft[j.id] ?? 0)), 0),
+    [jars, draft, remainingByJar],
+  );
+  const leftToSplit = pool - newSpendableTotal;
+  // Only savable once the user has actually added something: an untouched sheet
+  // (nothing added) is a no-op.
+  const canSubmit = poolKnown && leftToSplit >= 0 && added > 0 && !submitting;
 
   async function submit() {
     setError(false);
     setSubmitting(true);
     try {
-      // Only send jars whose limit actually changed — a jar left at 0 that had no
-      // limit is skipped, a jar left at 0 that HAD one is cleared back to "chưa
-      // đặt" (invariant #6: an empty limit is unknown, never a stored 0).
-      const patches: Record<string, { budgetLimit: number | undefined }> = {};
+      // Only send jars the user added to: new limit = hạn mức hiện có + số cộng
+      // thêm. A jar left at 0 is untouched (skipped) — this sheet only tops up, so
+      // it never clears a limit back to "chưa đặt".
+      const patches: Record<string, { budgetLimit: number }> = {};
       for (const jar of jars) {
-        const next = draft[jar.id] ?? 0;
-        if (next === (jar.budgetLimit ?? 0)) continue;
-        patches[jar.id] = { budgetLimit: next > 0 ? next : undefined };
+        const delta = draft[jar.id] ?? 0;
+        if (delta <= 0) continue;
+        patches[jar.id] = { budgetLimit: (jar.budgetLimit ?? 0) + delta };
       }
       await updateJars(patches);
       onClose();
@@ -83,7 +97,7 @@ export function AllocationSheet({
   }
 
   return (
-    <Sheet title="Đặt hạn mức cho hũ" description="Chia lại toàn bộ số dư — hạn mức là số dư hiển thị. Hũ để trống sẽ thành chưa đặt hạn mức. Không chuyển tiền, không cần OTP." onClose={onClose}>
+    <Sheet title="Chia tiền vào hũ" description="Nhập số tiền cộng thêm vào mỗi hũ để chia hết phần đang chờ. Hạn mức là số dư hiển thị của hũ. Không chuyển tiền, không cần OTP." onClose={onClose}>
       {!poolKnown ? (
         <InsufficientData description="Chưa có số dư tài khoản để phân bổ." />
       ) : (

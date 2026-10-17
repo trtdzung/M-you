@@ -19,10 +19,26 @@ import { AllocationSheet } from "../AllocationSheet";
 
 const META = { period: monthPeriod(2026, 8), sourceCoverage: { sources: ["msb" as const], knownCount: 1, unknownCount: 0 }, freshness: null };
 
+/** A jar line with no spend → remaining = budgetLimit (spendable = limit). */
+function line(jarId: string, label: string, budgetLimit: number | null) {
+  return {
+    jarId,
+    label,
+    budgetLimit,
+    spent: 0,
+    remaining: budgetLimit,
+    overLimit: false,
+    inUse: false,
+    source: (budgetLimit === null ? "mock" : "self_reported") as "mock" | "self_reported",
+    freshness: null,
+  };
+}
+
 function envelope(pool: number | "unknown"): JarEnvelopeResult {
+  // No spend → Σ spendable = Σ budgetLimit = 13tr (food 8 + bills 5, savings unset).
   return {
     pending: { amount: pool === "unknown" ? "unknown" : Math.max(0, pool - 13_000_000), overAllocated: false, pool, allocated: 13_000_000, meta: META },
-    jars: [],
+    jars: [line("food", "Ăn uống", 8_000_000), line("bills", "Hóa đơn", 5_000_000), line("savings", "Tiết kiệm", null)],
     meta: META,
   };
 }
@@ -38,43 +54,52 @@ function open(pool: number | "unknown" = 18_000_000) {
   render(<AllocationSheet envelope={envelope(pool)} jars={config.jars} onClose={onClose} />);
 }
 
-describe("AllocationSheet — chia lại toàn bộ số dư", () => {
-  it("mở sheet: mọi ô về 0 và 'Còn lại để chia' là TOÀN BỘ số dư, không còn phần dư lẻ", () => {
+describe("AllocationSheet — cộng thêm vào hũ", () => {
+  it("mở sheet: mọi ô về 0 và 'Còn lại để chia' là PHẦN DƯ chưa gán (không phải toàn bộ)", () => {
     open(18_000_000);
-    // 0 hiển thị là ô trống với placeholder "0" (không phải "8000000" như prefill cũ).
-    for (const label of ["Hạn mức mới cho hũ Ăn uống", "Hạn mức mới cho hũ Hóa đơn"]) {
+    // Mọi ô mở ở 0 (trống, placeholder "0") — người dùng gõ số CỘNG THÊM, không sửa tổng.
+    for (const label of ["Cộng thêm vào hũ Ăn uống", "Cộng thêm vào hũ Hóa đơn", "Cộng thêm vào hũ Tiết kiệm"]) {
       const input = screen.getByLabelText(label) as HTMLInputElement;
       expect(input.value).toBe("");
       expect(input.placeholder).toBe("0");
     }
-    // 18 tr, KHÔNG phải 5 tr (18 − 13) như kiểu prefill cũ.
-    expect(within(screen.getByText("Còn lại để chia").parentElement!).getByText("18 tr")).toBeInTheDocument();
+    // 5 tr = 18 − 13 (phần dư chưa gán), KHÔNG phải toàn bộ 18 tr.
+    expect(within(screen.getByText("Còn lại để chia").parentElement!).getByText("5 tr")).toBeInTheDocument();
   });
 
-  it("hạn mức cũ vẫn hiện bên cạnh làm tham chiếu", () => {
+  it("hạn mức hiện tại vẫn hiện bên cạnh làm tham chiếu", () => {
     open();
     expect(screen.getAllByText(/hạn mức hiện tại/).length).toBeGreaterThan(0);
   });
 
-  it("chia cho một hũ: hũ đó được đặt, hũ từng có hạn mức mà bỏ trống thì về chưa đặt", () => {
+  it("cộng thêm vào hũ đã có hạn mức: hạn mức mới = hiện có + số cộng thêm", () => {
     open();
-    fireEvent.change(screen.getByLabelText("Hạn mức mới cho hũ Ăn uống"), { target: { value: "9000000" } });
+    // food đang 8tr, cộng thêm 1tr → 9tr.
+    fireEvent.change(screen.getByLabelText("Cộng thêm vào hũ Ăn uống"), { target: { value: "1000000" } });
     fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
     expect(updateJars).toHaveBeenCalledTimes(1);
-    // `savings` chưa từng có hạn mức và vẫn 0 → không gửi patch thừa.
-    expect(updateJars).toHaveBeenCalledWith({ food: { budgetLimit: 9_000_000 }, bills: { budgetLimit: undefined } });
+    // Chỉ gửi hũ được cộng; hũ không đụng tới thì bỏ qua.
+    expect(updateJars).toHaveBeenCalledWith({ food: { budgetLimit: 9_000_000 } });
   });
 
-  it("KHÔNG cho lưu khi chưa chia gì — mở rồi bấm Lưu không được phép xoá sạch hạn mức", () => {
+  it("cộng vào hũ chưa đặt hạn mức: hạn mức mới = đúng số cộng thêm", () => {
+    open();
+    fireEvent.change(screen.getByLabelText("Cộng thêm vào hũ Tiết kiệm"), { target: { value: "976000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
+    expect(updateJars).toHaveBeenCalledWith({ savings: { budgetLimit: 976_000 } });
+  });
+
+  it("KHÔNG cho lưu khi chưa cộng gì — mở rồi bấm Lưu là no-op", () => {
     open();
     expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
     expect(updateJars).not.toHaveBeenCalled();
   });
 
-  it("blocks submit when Σ hạn mức exceeds CASA (guardrail) and shows the over message", () => {
+  it("chặn lưu khi cộng quá phần còn lại (Σ mới > CASA) và hiện cảnh báo", () => {
     open(18_000_000);
-    fireEvent.change(screen.getByLabelText("Hạn mức mới cho hũ Ăn uống"), { target: { value: "20000000" } });
+    // Phần dư chỉ 5tr; cộng 6tr vào food → vượt.
+    fireEvent.change(screen.getByLabelText("Cộng thêm vào hũ Ăn uống"), { target: { value: "6000000" } });
     expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
     expect(screen.getByText(/vượt quá số dư/i)).toBeInTheDocument();
     expect(updateJars).not.toHaveBeenCalled();

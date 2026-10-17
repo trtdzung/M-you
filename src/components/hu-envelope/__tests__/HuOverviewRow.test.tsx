@@ -181,7 +181,7 @@ describe("HuOverviewRow", () => {
   it("opens the allocation sheet when 'Chia ngay' is clicked", () => {
     render(<HuOverviewRow financials={withEnvelope(envelope({}))} />);
     fireEvent.click(screen.getByRole("button", { name: /Chia ngay/ }));
-    expect(screen.getByText("Đặt hạn mức cho hũ")).toBeInTheDocument();
+    expect(screen.getByText("Chia tiền vào hũ")).toBeInTheDocument();
   });
 
   it("renders nothing when there are no jars configured", () => {

@@ -171,7 +171,7 @@ describe("BudgetTab", () => {
     render(<BudgetTab />);
     expect(screen.getByText("Cần bù thủ công")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Chia lại hạn mức" }));
-    expect(screen.getByText("Đặt hạn mức cho hũ")).toBeInTheDocument();
+    expect(screen.getByText("Chia tiền vào hũ")).toBeInTheDocument();
   });
 
   it("U22: shows the rebalance adjustment so Hạn mức − Đã tiêu + Điều chỉnh = Vượt", () => {
