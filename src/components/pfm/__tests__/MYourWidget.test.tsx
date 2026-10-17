@@ -23,6 +23,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: nav.replace }),
   useSearchParams: () => new URLSearchParams(nav.search),
 }));
+vi.mock("@/state/jars", () => ({
+  useJarConfig: () => ({ config: { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: [] }] } }),
+}));
 
 /**
  * The M-Your chat overlay lives on every /pfm screen (mounted via the

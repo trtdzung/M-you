@@ -1,21 +1,41 @@
 # Streaming voice input for M-Your
 
 Press the microphone in M-Your, speak Vietnamese, then pause or press stop.
-Partial transcripts replace the current voice draft. The final transcript stays
-editable in the composer; the existing Send button submits it to the agent.
+Partial transcripts stay hidden so unstable words never overwrite the user's
+draft. While recording, the composer shows a short listening/finishing status.
+The final transcript appears only after server-side refinement and stays editable;
+the existing Send button submits it to the agent.
 Closing the chat, switching persona, errors and timeouts stop microphone capture.
 
 ## Architecture
 
-1. Browser requests `POST /api/stt/session` from the Next.js backend.
+1. Browser requests `POST /api/stt/session` from the Next.js backend with a
+   bounded vocabulary, typed entities (`id`, `type`, `label`, `aliases`) built
+   from the user's current jar configuration, and the intents this screen uses.
 2. Backend calls STT `POST /api/v1/stream-sessions` using `STT_SERVICE_API_KEY`.
-3. Browser receives a 60-second, origin-bound ticket (never the service key).
+3. Browser receives a 60-second, origin-bound ticket that also signs the bounded
+   vocabulary, entities and intent allow-list (never the service key).
 4. Browser opens WSS `/api/v1/transcriptions/stream` directly on the STT host.
 5. First message authenticates with `{type: "start", token: "..."}`. Audio starts
    only after `ready`. AudioWorklet resamples to mono PCM16 LE at 16 kHz and sends
    100 ms binary packets. No WebM fragments, uploads or local audio persistence.
-6. Server emits `partial`, then `finishing`, then `final`. Stop flushes the final
-   short audio packet before `{type: "stop"}`. The stream closes after one utterance.
+6. Server emits `partial`, then `finishing`, then `final`. PFM does not render the
+   partial text. Stop flushes the final short audio packet before `{type: "stop"}`;
+   `final` arrives after OpenAI refinement or its safe fallback. The stream closes
+   after one utterance. The final refiner treats signed `hũ <tên hũ>` phrases as
+   protected entities and rejects model output that renames, drops, or swaps
+   their source/destination roles.
+7. The final message also includes a validated `interpretation`. A jar transfer
+   becomes actionable only with an amount, one unambiguous source jar, and one
+   different destination jar. VoiceTab shows `clarification` and does not call
+   the agent when information is missing, ambiguous, negated, or invalid. M-Your
+   keeps the draft editable and shows the same specific follow-up below it.
+
+Jar names are never hard-coded in the speech service. Renaming or adding a jar in
+PFM changes the next microphone session automatically. OpenAI only repairs the
+wording with this signed context; the local intent registry owns slot extraction
+and business validation. New actions can be added as independent intent handlers
+without expanding one global prompt.
 
 This works with the existing Next.js standalone Docker image; it needs no custom
 Next server or additional npm dependencies. The model integration uses repeated
@@ -87,7 +107,10 @@ npm run build
 ```
 
 After both services are deployed, open PFM over HTTPS, grant microphone access,
-and say a short Vietnamese sentence. Check that text appears before you stop,
-pausing stops the microphone and leaves the final text editable, and Send uses
-the existing agent API. Closing the chat during recording must turn off the mic.
+and say a short Vietnamese sentence. Check that the typed draft remains unchanged
+while speaking, a pause stops M-Your but does not stop VoiceTab while the button
+is still held, the refined final text appears and remains editable, and Send uses
+the existing agent API. An incomplete jar transfer must show the specific missing
+field and must not be submitted automatically. Closing the chat during recording
+must turn off the mic.
 For server/gateway verification use `scripts/check_streaming.py` in the STT repo.

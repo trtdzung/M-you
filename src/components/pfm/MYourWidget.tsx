@@ -7,6 +7,9 @@ import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
+import { useJarConfig } from "@/state/jars";
+import { jarSpeechContext } from "@/lib/speech-context";
+import type { SpeechFinalMetadata } from "@/lib/speech-types";
 import { useCategories } from "@/state/categories";
 import {
   getChatHistory,
@@ -32,7 +35,6 @@ interface ChatBubble {
 const GREETING = "Xin chào 👋 Mình là M-Your. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
 const DELETE_LOCK_MS = 30_000;
-const VOICE_WORD_REVEAL_MS = 70;
 
 function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
   return messages.map((m, i) => ({
@@ -45,12 +47,6 @@ function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
 
 function composeVoiceDraft(prefix: string, transcript: string) {
   return [prefix, transcript].filter(Boolean).join(" ");
-}
-
-function sharedWordPrefix(left: string[], right: string[]) {
-  let length = 0;
-  while (length < left.length && length < right.length && left[length] === right[length]) length += 1;
-  return length;
 }
 
 /**
@@ -67,12 +63,17 @@ function sharedWordPrefix(left: string[], right: string[]) {
  */
 export function MYourWidget() {
   const { persona } = usePersona();
+  const { config: jarConfig } = useJarConfig();
   // Whitelist for `isTransferFormUi` — THIS persona's assignable ids, never the
   // bundled presets (which would drop every category the user created). Narrows
   // only; an id outside it simply does not render a card (invariant #2).
   const { assignable } = useCategories();
   const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const cif = persona.cif;
+  const speechContext = useMemo(
+    () => jarSpeechContext(jarConfig.jars.map((jar) => ({ id: jar.id, label: jar.label }))),
+    [jarConfig.jars],
+  );
   const router = useRouter();
   const params = useSearchParams();
   const assistantParam = params?.get("assistant") === "1";
@@ -85,54 +86,30 @@ export function MYourWidget() {
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [voiceGuidance, setVoiceGuidance] = useState("");
   const idRef = useRef(0);
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voicePrefix = useRef("");
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const revealedTranscriptRef = useRef("");
 
-  const clearVoiceReveal = useCallback(() => {
-    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-    revealTimerRef.current = null;
+  const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean, metadata?: SpeechFinalMetadata) => {
+    // Partials are useful to the recognizer but are deliberately hidden from the
+    // composer. The server emits `final` only after OpenAI refinement/fallback.
+    if (!final) return;
+    setInput(composeVoiceDraft(voicePrefix.current, text.trim()));
+    const interpretation = metadata?.interpretation;
+    setVoiceGuidance(
+      interpretation?.intent === "transfer_between_jars" && !interpretation.actionable
+        ? interpretation.clarification || "Mình chưa nghe đủ thông tin chuyển tiền. Bạn có thể bổ sung trước khi gửi."
+        : "",
+    );
   }, []);
 
-  const revealVoiceTranscript = useCallback((text: string, final: boolean) => {
-    clearVoiceReveal();
-    const target = text.trim();
-    if (final) {
-      revealedTranscriptRef.current = target;
-      setInput(composeVoiceDraft(voicePrefix.current, target));
-      return;
-    }
-
-    const visibleWords = revealedTranscriptRef.current.match(/\S+/g) ?? [];
-    const targetWords = target.match(/\S+/g) ?? [];
-    let position = sharedWordPrefix(visibleWords, targetWords);
-
-    // A revised hypothesis can change earlier words. Keep only its stable prefix
-    // before revealing the newer words, so the composer never appends stale text.
-    revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
-    setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
-
-    const revealNext = () => {
-      if (position >= targetWords.length) return;
-      position += 1;
-      revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
-      setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
-      if (position < targetWords.length) revealTimerRef.current = setTimeout(revealNext, VOICE_WORD_REVEAL_MS);
-    };
-    revealNext();
-  }, [clearVoiceReveal]);
-
-  const voice = useStreamingSpeech(revealVoiceTranscript);
+  const voice = useStreamingSpeech(acceptFinalVoiceTranscript, { ...speechContext, endpointing: "silence" });
   const voiceBusy = voice.state !== "idle";
-  const cancelVoice = useCallback(() => {
-    clearVoiceReveal();
-    voice.cancel();
-  }, [clearVoiceReveal, voice.cancel]);
+  const cancelVoice = voice.cancel;
 
   useEffect(() => {
     cancelVoice();
@@ -197,9 +174,8 @@ export function MYourWidget() {
   useEffect(() => {
     return () => {
       if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
-      clearVoiceReveal();
     };
-  }, [clearVoiceReveal]);
+  }, []);
 
   const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
 
@@ -210,6 +186,7 @@ export function MYourWidget() {
     const replyId = `m${++idRef.current}`;
     setMessages((prev) => [...prev, { id: userId, role: "user", text }]);
     setInput("");
+    setVoiceGuidance("");
     setSending(true);
     try {
       const res = await sendChatMessage(text, cif);
@@ -341,7 +318,10 @@ export function MYourWidget() {
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  setVoiceGuidance("");
+                }}
                 onKeyDown={handleKey}
                 rows={1}
                 disabled={composerDisabled || voiceBusy}
@@ -353,9 +333,8 @@ export function MYourWidget() {
                 onClick={() => {
                   if (voiceBusy) voice.stop();
                   else {
-                    clearVoiceReveal();
                     voicePrefix.current = input.trim();
-                    revealedTranscriptRef.current = "";
+                    setVoiceGuidance("");
                     voice.start();
                   }
                 }}
@@ -376,10 +355,21 @@ export function MYourWidget() {
                 <Send size={16} />
               </button>
             </div>
-            {(voiceBusy || voice.error) && (
-              <p role={voice.error ? "alert" : "status"} className={cn("mt-2 text-xs", voice.error ? "text-negative" : "text-muted")}>
-                {voice.error || (voice.state === "connecting" ? "Đang mở micro…" : voice.state === "recording" ? "Đang nghe… Ngừng nói để hoàn tất, hoặc bấm dừng." : "Đang hoàn tất bản chép lời…")}
-              </p>
+            {(voiceBusy || voice.error || voiceGuidance) && (
+              <div
+                role={voice.error ? "alert" : "status"}
+                aria-live="polite"
+                className={cn("mt-2 flex items-center gap-2 text-xs", voice.error ? "text-negative" : "text-muted")}
+              >
+                {!voice.error && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />}
+                <span>
+                  {voice.error || voiceGuidance || (voice.state === "connecting"
+                    ? "Đang chuẩn bị micro…"
+                    : voice.state === "recording"
+                      ? "Mình đang nghe… Bấm dừng khi bạn nói xong."
+                      : "Đang hoàn thiện câu chữ…")}
+                </span>
+              </div>
             )}
           </div>
         </div>

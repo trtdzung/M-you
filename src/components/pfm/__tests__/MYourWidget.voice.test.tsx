@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
+import type { SpeechFinalMetadata, SpeechSessionOptions } from "@/lib/speech-types";
 
 
 /**
@@ -21,14 +22,22 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams("assistant=1"),
 }));
+vi.mock("@/state/jars", () => ({
+  useJarConfig: () => ({ config: { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: [] }] } }),
+}));
 
 const voice = vi.hoisted(() => ({
-  callbacks: null as null | { onState: (state: string) => void; onTranscript: (text: string, final: boolean) => void; onError: (message: string) => void },
-  cancel: vi.fn(), stop: vi.fn(),
+  callbacks: null as null | { onState: (state: string) => void; onTranscript: (text: string, final: boolean, metadata?: SpeechFinalMetadata) => void; onError: (message: string) => void },
+  cancel: vi.fn(), stop: vi.fn(), keyterms: [] as string[],
+  options: {} as SpeechSessionOptions,
 }));
 vi.mock("@/lib/streaming-speech", () => ({
   StreamingSpeech: class {
-    constructor(callbacks: typeof voice.callbacks) { voice.callbacks = callbacks; }
+    constructor(callbacks: typeof voice.callbacks, options: SpeechSessionOptions) {
+      voice.callbacks = callbacks;
+      voice.keyterms = options.keyterms ?? [];
+      voice.options = options;
+    }
     start() { voice.callbacks!.onState("recording"); }
     stop = voice.stop;
     cancel = voice.cancel;
@@ -49,24 +58,20 @@ async function openWidget() {
   await waitFor(() => expect(screen.getByRole("button", { name: "Nhập bằng giọng nói" })).toBeEnabled());
 }
 describe("M-Your voice composer", () => {
-  it("replaces partial hypotheses, preserves typed text and sends only on explicit Send", async () => {
+  it("keeps partial hypotheses hidden, preserves typed text and sends the refined final text", async () => {
     await openWidget();
     const input = screen.getByPlaceholderText("Nhắn tin cho M-Your…");
     fireEvent.change(input, { target: { value: "Cho tôi biết" } });
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
-    vi.useFakeTimers();
+    expect(voice.keyterms).toContain("hũ Ăn uống");
+    expect(voice.options.endpointing).toBe("silence");
     act(() => voice.callbacks!.onTranscript("chi tiêu", false));
-    expect(input).toHaveValue("Cho tôi biết chi");
-    act(() => { vi.advanceTimersByTime(70); });
-    expect(input).toHaveValue("Cho tôi biết chi tiêu");
     act(() => voice.callbacks!.onTranscript("chi tiêu tháng này", false));
-    expect(input).toHaveValue("Cho tôi biết chi tiêu tháng");
-    act(() => { vi.advanceTimersByTime(70); });
-    expect(input).toHaveValue("Cho tôi biết chi tiêu tháng này");
+    expect(input).toHaveValue("Cho tôi biết");
     expect(screen.getByRole("button", { name: "Gửi" })).toBeDisabled();
     expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
     act(() => { voice.callbacks!.onTranscript("chi tiêu tháng này?", true); voice.callbacks!.onState("idle"); });
-    vi.useRealTimers();
+    expect(input).toHaveValue("Cho tôi biết chi tiêu tháng này?");
     expect(input).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
     await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledWith("Cho tôi biết chi tiêu tháng này?", "CIF_0001"));
@@ -88,5 +93,23 @@ describe("M-Your voice composer", () => {
     act(() => { voice.callbacks!.onError("Mất kết nối"); voice.callbacks!.onState("idle"); });
     expect(input).toHaveValue("Bản nháp");
     expect(screen.getByRole("alert")).toHaveTextContent("Mất kết nối");
+  });
+  it("keeps an incomplete command editable and shows the specific follow-up", async () => {
+    await openWidget();
+    fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
+    act(() => {
+      voice.callbacks!.onTranscript("Chuyển 500.000 VND sang hũ Ăn uống", true, {
+        rawText: "Chuyển năm trăm nghìn sang hũ ăn uống",
+        refinementStatus: "fallback",
+        interpretation: {
+          intent: "transfer_between_jars", status: "incomplete", confidence: 0.85,
+          actionable: false, negated: false, slots: [], missing_slots: ["source"],
+          ambiguous_slots: [], clarification: "Bạn muốn chuyển tiền từ hũ nào?",
+        },
+      });
+      voice.callbacks!.onState("idle");
+    });
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toHaveValue("Chuyển 500.000 VND sang hũ Ăn uống");
+    expect(screen.getByRole("status")).toHaveTextContent("Bạn muốn chuyển tiền từ hũ nào?");
   });
 });

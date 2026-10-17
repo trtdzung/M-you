@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, MessageCircle, RotateCcw, Send } from "lucide-react";
@@ -8,6 +8,9 @@ import { cn } from "@/lib/cn";
 import { usePersona } from "@/providers/context";
 import { sendChatMessage, isChartUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
+import { jarSpeechContext } from "@/lib/speech-context";
+import type { SpeechFinalMetadata } from "@/lib/speech-types";
+import { useJarConfig } from "@/state/jars";
 import { useCategories } from "@/state/categories";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
@@ -81,7 +84,12 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const { persona } = usePersona();
+  const { config: jarConfig } = useJarConfig();
   const cif = persona.cif;
+  const speechContext = useMemo(
+    () => jarSpeechContext(jarConfig.jars.map((jar) => ({ id: jar.id, label: jar.label }))),
+    [jarConfig.jars],
+  );
   // The whitelist `isTransferFormUi` validates the agent's `category` against.
   // It must be THIS persona's assignable ids: passing nothing falls back to the
   // bundled presets, which would reject every category the user created. The set
@@ -95,22 +103,37 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const [reply, setReply] = useState<{ answer: string; ui: UiPayload } | null>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
 
-  const autoSendRef = useRef(false);
-  const voice = useStreamingSpeech((text, final) => {
-    setTranscript(text);
-    if (final && text.trim()) {
-      autoSendRef.current = true;
+  const handleSend = useCallback(async (textOverride?: string) => {
+    const text = (textOverride ?? transcript).trim();
+    if (!text || sending) return;
+    setSending(true);
+    setReply(null);
+    try {
+      const res = await sendChatMessage(text, cif);
+      setReply({ answer: res.answer, ui: res.ui ?? null });
+    } catch {
+      setReply({ answer: "Không gửi được, vui lòng thử lại.", ui: null });
+    } finally {
+      setSending(false);
     }
-  });
+  }, [cif, sending, transcript]);
+
+  const voice = useStreamingSpeech((text, final, metadata?: SpeechFinalMetadata) => {
+    if (!final) return;
+    const refinedText = text.trim();
+    setTranscript(refinedText);
+    const interpretation = metadata?.interpretation;
+    if (interpretation?.intent === "transfer_between_jars" && !interpretation.actionable) {
+      setReply({
+        answer: interpretation.clarification || "Mình chưa nghe đủ thông tin chuyển tiền. Bạn vui lòng nói lại rõ hơn nhé.",
+        ui: null,
+      });
+      return;
+    }
+    if (refinedText) void handleSend(refinedText);
+  }, { ...speechContext, endpointing: "manual" });
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
-
-  useEffect(() => {
-    if (autoSendRef.current && transcript && !sending) {
-      autoSendRef.current = false;
-      handleSend();
-    }
-  }, [transcript, sending]);
 
   useEffect(() => {
     setContainer(document.getElementById("device-canvas") ?? document.body);
@@ -162,22 +185,6 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     setReply(null);
     setListening(false);
     voiceRef.current.cancel();
-  }
-
-  async function handleSend() {
-    const text = transcript.trim();
-    if (!text || sending) return;
-    setSending(true);
-    setReply(null);
-    setTranscript("");
-    try {
-      const res = await sendChatMessage(text, cif);
-      setReply({ answer: res.answer, ui: res.ui ?? null });
-    } catch {
-      setReply({ answer: "Không gửi được, vui lòng thử lại.", ui: null });
-    } finally {
-      setSending(false);
-    }
   }
 
   const micButton = (
@@ -236,7 +243,15 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
           </div>
 
           <div className="flex w-full flex-1 flex-col items-center justify-center gap-2 overflow-y-auto rounded-2xl border border-dashed border-border bg-surface-tint p-3">
-            {sending ? (
+            {voice.error ? (
+              <span role="alert" className="text-xs text-negative">{voice.error}</span>
+            ) : voice.state === "connecting" ? (
+              <span role="status" className="text-xs text-muted">Đang chuẩn bị micro…</span>
+            ) : voice.state === "recording" ? (
+              <span role="status" className="text-xs text-muted">Mình đang nghe… Thả tay khi bạn nói xong.</span>
+            ) : voice.state === "finishing" ? (
+              <span role="status" className="text-xs text-muted">Đang hoàn thiện câu chữ…</span>
+            ) : sending ? (
               <span className="text-xs text-muted">Đang phân tích…</span>
             ) : reply ? (
               isTransferFormUi(reply.ui, expenseIds) ? (
@@ -259,7 +274,8 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             type="text"
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder={listening ? "Đang nghe… (gõ tạm vì chưa nối giọng nói thật)" : "Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây"}
+            disabled={voice.state !== "idle" || sending}
+            placeholder="Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây"
             className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           />
 
@@ -277,7 +293,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
 
             <button
               type="button"
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               disabled={!transcript.trim() || sending}
               aria-label="Gửi"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-fg transition-opacity disabled:opacity-40"
