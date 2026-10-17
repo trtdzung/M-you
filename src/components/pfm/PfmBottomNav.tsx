@@ -7,8 +7,9 @@ import { VoiceFab } from "./VoiceFab";
 
 /**
  * BIDV-style wallet bottom nav for `/pfm/*` (plan 260910-1626): 4 destinations —
- * Tổng quan · Giao dịch · (🎤) · Ngân sách · Cài đặt — with a raised center mic
- * FAB (Feature 5) for a quick voice question to M-Your. Pinned to the
+ * Tổng quan · Giao dịch · (M-Your) · Ngân sách · Cài đặt — with a raised center
+ * agent icon (`VoiceFab`, Feature 5; a second copy floats on the main screen).
+ * Pinned to the
  * device-canvas bottom via the PhoneShell `nav` slot (same pattern as the
  * festive `BottomNav`), so it never scrolls with panel content and both navs
  * can coexist without overlap.
@@ -17,7 +18,7 @@ import { VoiceFab } from "./VoiceFab";
  * single-route `PfmTabHost` switches the visible panel client-side with no
  * refetch (`useFinancials` is keyed on persona, not tab). Active state reads the
  * same param, resolving legacy tab ids (`hu`/`cashflow` + `dock=hu`) so old deep
- * links never dead-end (invariant #3). The FAB is split into positions 2|3.
+ * links never dead-end (invariant #3). The center icon is split into positions 2|3.
  */
 export function PfmBottomNav() {
   const router = useRouter();
@@ -49,11 +50,11 @@ export function PfmBottomNav() {
         {left.map((tab) => (
           <NavItem key={tab.id} tab={tab} active={tab.id === active} onSelect={() => go(tab.id)} />
         ))}
-        <div className="flex w-14 shrink-0 items-center justify-center" aria-hidden />
+        <div className="flex w-16 shrink-0 items-center justify-center" aria-hidden />
         {right.map((tab) => (
           <NavItem key={tab.id} tab={tab} active={tab.id === active} onSelect={() => go(tab.id)} />
         ))}
-        <div className="pointer-events-none absolute inset-x-0 -top-5 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 -top-6 flex justify-center">
           <VoiceFab />
         </div>
       </div>

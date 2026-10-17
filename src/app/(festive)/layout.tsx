@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { PhoneShell } from "@/components/shell/PhoneShell";
 import { BottomNav } from "@/components/shell/BottomNav";
+import { VoiceFab } from "@/components/pfm/VoiceFab";
 
 /**
  * Festive shell: the full-screen 2/9 (Quốc khánh) photo background + bottom scrim.
@@ -23,7 +25,9 @@ function FestiveBg() {
 
 /**
  * Chrome for every non-PFM route (Home / accounts / settings / transfer / …):
- * festive photo surface + 3-tab MSB `BottomNav`.
+ * festive photo surface + 3-tab MSB `BottomNav`, plus a floating M-Your agent icon
+ * (`VoiceFab floating`) that opens the voice section. `useSearchParams` inside it
+ * needs a Suspense boundary on these statically-rendered pages.
  */
 export default function FestiveLayout({
   children,
@@ -31,7 +35,15 @@ export default function FestiveLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PhoneShell background={<FestiveBg />} nav={<BottomNav />}>
+    <PhoneShell
+      background={<FestiveBg />}
+      nav={<BottomNav />}
+      fab={
+        <Suspense fallback={null}>
+          <VoiceFab floating />
+        </Suspense>
+      }
+    >
       {children}
     </PhoneShell>
   );

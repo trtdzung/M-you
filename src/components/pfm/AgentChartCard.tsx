@@ -1,6 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { cn } from "@/lib/cn";
 import { ChartFrame } from "@/components/charts/ChartFrame";
 import { formatVndCompact } from "@/lib/format";
 import type { ChartUi } from "@/lib/agent-api";
@@ -44,7 +45,7 @@ function paletteColor(i: number): string {
  * the payload with `isChartUi` (see `agent-api.ts`); this component trusts
  * its `chart` prop is well-formed.
  */
-export function AgentChartCard({ chart }: { chart: ChartUi }) {
+export function AgentChartCard({ chart, fullWidth = false }: { chart: ChartUi; fullWidth?: boolean }) {
   const data = chart.labels.map((label, i) => {
     const row: Record<string, string | number> = { label };
     for (const s of chart.series) row[s.name] = s.data[i];
@@ -52,7 +53,7 @@ export function AgentChartCard({ chart }: { chart: ChartUi }) {
   });
 
   return (
-    <div className="shadow-card mt-2 max-w-[85%] rounded-2xl bg-surface p-3">
+    <div className={cn("shadow-card rounded-2xl bg-surface p-3", fullWidth ? "w-full" : "mt-2 max-w-[85%]")}>
       <p className="mb-2 text-xs font-semibold text-text">{chart.title}</p>
       <ChartFrame height={200} label={chart.title}>
         <ResponsiveContainer width="100%" height="100%">
