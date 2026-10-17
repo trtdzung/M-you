@@ -1,8 +1,20 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { type RenderOptions, act, fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
+
+
+/**
+ * Every render goes through `StubCategoryTaxonomy`: the components below read
+ * the persona's taxonomy via `useCategories()` but own none of it, so they get
+ * an already-loaded preset taxonomy instead of the real fetching provider (the
+ * provider itself is covered by its own tests).
+ */
+const render = (ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) =>
+  rtlRender(ui, { ...options, wrapper: StubCategoryTaxonomy });
 
 // The overlay opens only via `?assistant=1` (VoiceFab's "Chuyển qua Chat"
 // hand-off), so the mocked search params decide whether it is open.

@@ -7,6 +7,7 @@ import { Sheet } from "@/components/primitives";
 import { CategoryOptionGrid } from "@/components/transactions/CategoryPickerSheet";
 import { formatDate, formatVndCompact } from "@/lib/format";
 import { fundOutcomeNote } from "@/components/transfer/fund-outcome-note";
+import { useCategories } from "@/state/categories";
 import { useConfirmCategory, useCorrections } from "@/state/corrections";
 import { useAutoFund } from "@/state/use-auto-fund";
 import { typeForCategory } from "@/lib/category-txn-type";
@@ -32,6 +33,10 @@ export function UnlabeledSpendSheet({
   onClose: () => void;
 }) {
   const confirmCategory = useConfirmCategory();
+  // The txn `type` follows the category's KIND in the PERSONA'S taxonomy — a
+  // category they created is a real expense and must be typed as one, otherwise
+  // the engine would drop that spend as a transfer (invariant #6).
+  const { byId: categoryById } = useCategories();
   const { unsaved } = useCorrections();
   const autoFund = useAutoFund();
   // Which row's picker is open — keyed by `txn.id`, NEVER an array index (RT#7),
@@ -61,7 +66,7 @@ export function UnlabeledSpendSheet({
         postedAt: txn.postedAt,
         origin: "manual",
         includeGoal: goalOk,
-        override: { categoryId, type: typeForCategory(categoryId) },
+        override: { categoryId, type: typeForCategory(categoryId, categoryById) },
       });
       if (!result) return;
       if (result.status === "needs-goal") setGoalPending({ txn, categoryId });

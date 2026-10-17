@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FIXED_CATEGORY_IDS } from "@/domain/models";
 import { aggregateCashflow, netExpenseByCategory } from "../cashflow";
 import { monthPeriod } from "../types";
 import { txn } from "./helpers";
@@ -20,6 +21,7 @@ describe("cashflow — transfer category classification", () => {
         txn({ id: "ex", type: "expense", categoryId: "dining", amount: 200_000 }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     // Only the real expense counts, even though both carry categoryId "dining".
     expect(result.expense).toBe(200_000);

@@ -23,7 +23,8 @@ import {
   type PersonaLocalStorageResource,
 } from "@/lib/persona-storage";
 import type { Providers, UserRecordsResult } from "../interfaces";
-import { jarApiError } from "../jar-api-error";
+import { apiError } from "../api-error";
+import { createCategoryApi } from "./mock-categories";
 import type { PersonaId } from "./personas";
 import type { Dataset } from "./fixtures/generate";
 
@@ -105,6 +106,8 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
   const goalStore = userRecordStore<GoalRecord>("goals", personaId, GOAL_STORE_VERSION, isValidGoalRecord);
 
   return {
+    // The taxonomy endpoints (`/api/categories*`) — see `mock-categories.ts`.
+    ...createCategoryApi(cif),
     async listAccounts() {
       // CASA is DB-backed now (SQLite `accounts`, seeded from the same builder
       // as the fixtures). A real MSB adapter maps this to a balance endpoint
@@ -200,7 +203,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       // A failed load THROWS (U10): an empty `jars: []` would read as "no jars
       // yet" and the UI would offer "Thêm hũ" instead of an error + retry.
       const res = await fetch(`/api/jars?cif=${encodeURIComponent(cif)}`);
-      if (!res.ok) throw await jarApiError("getJarConfig", res);
+      if (!res.ok) throw await apiError("getJarConfig", res);
       return res.json();
     },
     async createJar(jar) {
@@ -209,7 +212,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cif, jar }),
       });
-      if (!res.ok) throw await jarApiError("createJar", res);
+      if (!res.ok) throw await apiError("createJar", res);
       return res.json();
     },
     async updateJar(id, patch) {
@@ -226,7 +229,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patch: wirePatch }),
       });
-      if (!res.ok) throw await jarApiError("updateJar", res);
+      if (!res.ok) throw await apiError("updateJar", res);
       return res.json();
     },
     async updateJars(patches) {
@@ -244,14 +247,14 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cif, patches: wirePatches }),
       });
-      if (!res.ok) throw await jarApiError("updateJars", res);
+      if (!res.ok) throw await apiError("updateJars", res);
       return res.json();
     },
     async removeJar(id) {
       const res = await fetch(`/api/jars/${encodeURIComponent(id)}?cif=${encodeURIComponent(cif)}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw await jarApiError("removeJar", res);
+      if (!res.ok) throw await apiError("removeJar", res);
       return res.json();
     },
     async assignCategory(categoryId, jarId) {
@@ -260,7 +263,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ categoryId }),
       });
-      if (!res.ok) throw await jarApiError("assignCategory", res);
+      if (!res.ok) throw await apiError("assignCategory", res);
       return res.json();
     },
     async replaceJars(jars) {
@@ -269,7 +272,7 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cif, jars }),
       });
-      if (!res.ok) throw await jarApiError("replaceJars", res);
+      if (!res.ok) throw await apiError("replaceJars", res);
       return res.json();
     },
     async applyAccountDebit(accountId, amount, record) {

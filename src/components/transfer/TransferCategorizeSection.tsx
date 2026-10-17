@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronRight, Tag } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { CategoryOptionGrid } from "@/components/transactions/CategoryPickerSheet";
 import { TransferPurposeSuggestionBanner } from "./TransferPurposeSuggestionBanner";
+import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { useManualTxns } from "@/state/manual-txns";
 import { useAutoFund } from "@/state/use-auto-fund";
@@ -13,7 +14,7 @@ import { typeForCategory } from "@/lib/category-txn-type";
 import { fundOutcomeNote } from "./fund-outcome-note";
 import {
   CATEGORY,
-  CATEGORY_BY_ID,
+  categoryLabel,
   TRANSFER_PURPOSES,
   isSpendingPurpose,
   purposeCategoryId,
@@ -49,6 +50,10 @@ export function TransferCategorizeSection({
   amount: number;
 }) {
   const { config: jarConfig } = useJarConfig();
+  // Taxonomy của persona: `byId` để hiện nhãn + suy ra `type`, `assignable` để
+  // chặn gán vào danh mục đã ẩn.
+  const { byId: categoryById, labels, assignable } = useCategories();
+  const assignableIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const { manualTxns, update: updateManualTxn } = useManualTxns();
   const autoFund = useAutoFund();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -73,7 +78,9 @@ export function TransferCategorizeSection({
       ? transferPurposeLabel(currentPurposeId)
       : currentCategoryId === CATEGORY.transfer
         ? "Chưa phân loại"
-        : CATEGORY_BY_ID[currentCategoryId]?.label ?? "Chưa phân loại";
+        : // Một id không có trong taxonomy hiện hành hiện ra dạng thô chứ không
+          // bị gọi là "Chưa phân loại" — giao dịch ĐÃ có nhãn (invariant #5).
+          categoryLabel(currentCategoryId, labels);
   const sourceJar = sourceJarId ? jarConfig.jars.find((j) => j.id === sourceJarId) ?? null : null;
 
   // Pending AI/heuristic purpose guess, shown only while unclassified.
@@ -93,7 +100,7 @@ export function TransferCategorizeSection({
     if (inFlight.current) return; // H1 latch — one label, one rebalance
     inFlight.current = true;
     try {
-      const nextType = typeForCategory(categoryId);
+      const nextType = typeForCategory(categoryId, categoryById);
       // Always send transferPurpose so a plain category pick (purposeId omitted)
       // CLEARS a previously-accepted purpose — otherwise stale metadata lingers,
       // the label stays wrong, and the txn never looks unclassified again.
@@ -147,8 +154,12 @@ export function TransferCategorizeSection({
    */
   function applyPurpose(purposeId: string) {
     const spending = isSpendingPurpose(purposeId);
-    const mapped = spending ? purposeCategoryId(purposeId) : undefined;
-    if (spending && !mapped) {
+    // Mục đích "tính vào chi tiêu" nhưng danh mục đích đã bị ẩn ⇒ KHÔNG gán id
+    // ẩn đó (người dùng sẽ không thấy, không sửa được). Giữ nguyên transfer + ghi
+    // metadata mục đích: không có con số nào bị dịch chuyển lén (invariant #6).
+    const mapped = spending ? purposeCategoryId(purposeId, assignableIds) : undefined;
+    if (spending && !mapped && purposeCategoryId(purposeId) === undefined) {
+      // Dữ liệu hỏng thật: purpose spending mà không khai `mapsToCategoryId`.
       setPickError("Không cập nhật được phân loại. Vui lòng thử lại.");
       return;
     }

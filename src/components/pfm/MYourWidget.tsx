@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, Trash2, X } from "lucide-react";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
+import { useCategories } from "@/state/categories";
 import {
   getChatHistory,
   sendChatMessage,
@@ -66,6 +67,11 @@ function sharedWordPrefix(left: string[], right: string[]) {
  */
 export function MYourWidget() {
   const { persona } = usePersona();
+  // Whitelist for `isTransferFormUi` — THIS persona's assignable ids, never the
+  // bundled presets (which would drop every category the user created). Narrows
+  // only; an id outside it simply does not render a card (invariant #2).
+  const { assignable } = useCategories();
+  const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const cif = persona.cif;
   const router = useRouter();
   const params = useSearchParams();
@@ -316,7 +322,7 @@ export function MYourWidget() {
                       {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
                     </div>
                     {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
-                    {m.role === "agent" && isTransferFormUi(m.ui) && <AgentTransferFormCard form={m.ui} />}
+                    {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
                   </div>
                 ))}
                 {sending && (

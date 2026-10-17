@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { PersonaProvider, usePersona } from "@/providers/context";
 import { JarConfigProvider, useJarConfig } from "@/state/jars";
+import type { JarConfig } from "@/domain/models";
 
 /**
  * JarConfigProvider over the real mock provider + the in-memory `/api/jars`
@@ -117,6 +118,52 @@ describe("JarConfigProvider — ordering (U13/K04, K03)", () => {
     });
     await waitFor(() => expect(hook.result.current.jars.loaded).toBe(true));
     expect(jarById(hook, "food")?.label).toBe(original);
+  });
+});
+
+describe("JarConfigProvider — applyServerConfig (a write on another resource)", () => {
+  it("applies a config handed over by another resource, in queue order", async () => {
+    const hook = await renderLoaded();
+    const handed: JarConfig = {
+      version: 3,
+      jars: [{ id: "khac", label: "Khác", categoryIds: ["dining", "c_hoc-phi"] }],
+    };
+    await act(async () => {
+      await hook.result.current.jars.applyServerConfig(handed);
+    });
+    expect(hook.result.current.jars.config).toEqual(handed);
+  });
+
+  it("DROPS it when a jar response landed after the other write was issued", async () => {
+    const hook = await renderLoaded();
+    // The token says which config the hand-over was derived from.
+    const since = hook.result.current.jars.configToken();
+    await act(async () => {
+      await hook.result.current.jars.updateJar("food", { label: "Ăn uống (mới)" });
+    });
+    const afterJarWrite = hook.result.current.jars.config;
+
+    await act(async () => {
+      await hook.result.current.jars.applyServerConfig({ version: 3, jars: [] }, since);
+    });
+    // The jar response is newer truth; the stale copy never lands (it would have
+    // wiped every jar here — the visible form of the same clobber).
+    expect(hook.result.current.jars.config).toBe(afterJarWrite);
+  });
+
+  it("drops a hand-over that belongs to the previous persona (K03)", async () => {
+    const hook = await renderLoaded();
+    let handed: Promise<void> = Promise.resolve();
+    act(() => {
+      handed = hook.result.current.jars.applyServerConfig({ version: 3, jars: [] });
+      hook.result.current.persona.setPersona("irregular");
+    });
+    await act(async () => {
+      await handed;
+    });
+    await waitFor(() => expect(hook.result.current.jars.loaded).toBe(true));
+    // The new persona's own jars stand; the previous persona's copy never lands.
+    expect(hook.result.current.jars.config.jars.length).toBeGreaterThan(0);
   });
 });
 

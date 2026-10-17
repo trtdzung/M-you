@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { heuristicMatch, localClassify } from "../local-classifier";
+import { createLocalClassify, heuristicMatch } from "../local-classifier";
 import { CATEGORIZE_CONFIDENCE_THRESHOLD } from "../config";
 import type { ClassifyInput } from "../types";
+
+/** Every bundled preset is assignable for this persona. */
+const ASSIGNABLE = new Set(["transport", "dining", "groceries", "shopping", "subscriptions"]);
+const localClassify = createLocalClassify(ASSIGNABLE);
 
 describe("heuristicMatch", () => {
   it("maps known merchant keywords to categories", () => {
@@ -17,7 +21,7 @@ describe("heuristicMatch", () => {
   });
 });
 
-describe("localClassify", () => {
+describe("createLocalClassify", () => {
   const input = (merchant: string): ClassifyInput => ({
     txnId: merchant,
     merchant,

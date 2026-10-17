@@ -17,6 +17,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePersona } from "@/providers/context";
 import { CATEGORY_BY_ID, UNCLASSIFIED } from "@/domain/models";
+import { useOptionalCategories } from "./categories";
 
 export interface MemoryEntry {
   categoryId: string;
@@ -32,24 +33,34 @@ export function normalizeMerchantKey(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
-/** A categoryId is memorable only when it is a real spending category. */
-export function isMemorableCategory(categoryId: string): boolean {
-  return categoryId !== UNCLASSIFIED && CATEGORY_BY_ID[categoryId] !== undefined;
+/**
+ * A categoryId is memorable only when it is a real spending category of THIS
+ * persona. `assignable` is the stored set (`useCategories().assignable` ids); the
+ * bundled presets are the fallback for callers that have no taxonomy in scope.
+ * Passing the stored set is what makes a CUSTOM category rememberable at all —
+ * against the bundled constant the whole learning feature is silently dead for
+ * every category the user created.
+ */
+export function isMemorableCategory(categoryId: string, assignable?: ReadonlySet<string>): boolean {
+  if (categoryId === UNCLASSIFIED) return false;
+  return assignable ? assignable.has(categoryId) : CATEGORY_BY_ID[categoryId] !== undefined;
 }
 
 /**
  * Look a merchant up in a memory snapshot (pure). Returns the mapped category
- * only when it is still valid; a dead id (taxonomy changed) is treated as a miss
- * so the caller re-classifies. `deadKey` reports a stale entry worth forgetting.
+ * only when it is still valid; a dead id (deleted/archived category) is treated
+ * as a miss so the caller re-classifies. `deadKey` reports a stale entry worth
+ * forgetting.
  */
 export function lookupMemory(
   memory: CategoryMemory,
   merchant: string,
+  assignable?: ReadonlySet<string>,
 ): { categoryId?: string; deadKey?: string } {
   const key = normalizeMerchantKey(merchant);
   const entry = memory[key];
   if (!entry) return {};
-  if (!isMemorableCategory(entry.categoryId)) return { deadKey: key };
+  if (!isMemorableCategory(entry.categoryId, assignable)) return { deadKey: key };
   return { categoryId: entry.categoryId };
 }
 
@@ -99,6 +110,14 @@ export function CategoryMemoryProvider({ children }: { children: React.ReactNode
   const [memory, setMemory] = useState<CategoryMemory>({});
   const keyRef = useRef(key);
   keyRef.current = key;
+  // The stored taxonomy when it is an ancestor (the app mounts it above this
+  // provider). `undefined` while it is still loading, or in a tree where memory
+  // sits higher up — then the bundled presets stand in, which is exactly the
+  // pre-Phase-03 behaviour: a preset is still remembered, never something worse.
+  const taxonomy = useOptionalCategories();
+  const assignableRef = useRef<ReadonlySet<string> | undefined>(undefined);
+  assignableRef.current =
+    taxonomy?.loaded === true ? new Set(taxonomy.assignable.map((c) => c.id)) : undefined;
 
   // Reset-before-load on persona switch (no leak across personas).
   useEffect(() => {
@@ -127,7 +146,7 @@ export function CategoryMemoryProvider({ children }: { children: React.ReactNode
 
   const remember = useCallback(
     (merchant: string, categoryId: string) => {
-      if (!isMemorableCategory(categoryId)) return; // validate on write (Red Team #5)
+      if (!isMemorableCategory(categoryId, assignableRef.current)) return; // validate on write (Red Team #5)
       const mk = normalizeMerchantKey(merchant);
       if (!mk) return;
       commit((m) => {
@@ -160,7 +179,7 @@ export function CategoryMemoryProvider({ children }: { children: React.ReactNode
 
   const lookup = useCallback(
     (merchant: string): string | undefined => {
-      const { categoryId, deadKey } = lookupMemory(memory, merchant);
+      const { categoryId, deadKey } = lookupMemory(memory, merchant, assignableRef.current);
       if (deadKey) forget(deadKey);
       return categoryId;
     },

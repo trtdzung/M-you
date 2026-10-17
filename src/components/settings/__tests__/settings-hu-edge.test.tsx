@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { JarConfigProvider } from "@/state/jars";
+import { CategoryTaxonomyProvider } from "@/state/categories";
 import { buildManualTxn, ManualTxnsProvider, useManualTxns } from "@/state/manual-txns";
 import { REBALANCE_CATEGORY, type Account } from "@/domain/models";
 
@@ -28,8 +29,10 @@ function wrapper({ children }: { children: ReactNode }) {
     <PersonaProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
+          <CategoryTaxonomyProvider>  
           {children}
-          <LegProbe />
+            <LegProbe />
+          </CategoryTaxonomyProvider>
         </JarConfigProvider>
       </ManualTxnsProvider>
     </PersonaProvider>

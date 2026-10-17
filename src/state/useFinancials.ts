@@ -12,6 +12,7 @@ import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { useProviders } from "@/providers/context";
 import { useAssetLiabilities } from "./assets";
+import { useCategories } from "./categories";
 import { useCorrections, applyCorrections, isHidden } from "./corrections";
 import { useManualTxns } from "./manual-txns";
 import { useGoals } from "./goals";
@@ -49,6 +50,13 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const { corrections } = useCorrections();
   const { manualTxns } = useManualTxns();
   const { config: jarConfig } = useJarConfig();
+  // The persona's STORED taxonomy — categories are data (invariant #7), so the
+  // engine is told which labels and which `fixed` flags to compose with instead
+  // of reading the bundled seed. Required (not `useOptionalCategories`): every
+  // screen that shows a number sits inside `CategoryTaxonomyProvider`, and
+  // silently composing against an empty taxonomy is exactly the misreport this
+  // phase removes.
+  const { categories } = useCategories();
   const { assets: userAssets, liabilities: userLiabilities } = useAssetLiabilities();
   const { goals: userGoals } = useGoals();
   const { month: selectedMonth } = usePeriod();
@@ -114,9 +122,10 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
             userAssets,
             userLiabilities,
             userGoals,
+            categories,
           })
         : null,
-    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals],
+    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals, categories],
   );
 
   return { loading, error, raw, transactions, allTransactions, financials };

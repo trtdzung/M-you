@@ -8,6 +8,13 @@
  * under the default threshold — a heuristic guess is never trusted enough to
  * auto-apply and change a total. Merchants it does not recognise get no result
  * (the txn stays unclassified — we never fabricate a category).
+ *
+ * `KEYWORD_RULES` stays a merchant→PRESET table: it is hand-authored against the
+ * bundled seed, and guessing that "Trường ABC" means a category the user happens
+ * to have called "Học phí" would be a new, unasked-for inference. What DID change
+ * (Phase 03) is that its output is filtered through the persona's live ASSIGNABLE
+ * set, so a preset that persona archived stops firing and the heuristic can never
+ * assign an id no picker offers.
  */
 
 import type { ClassifyFn, ClassifyResult } from "./types";
@@ -59,21 +66,34 @@ const KEYWORD_MATCHERS: [RegExp, string][] = KEYWORD_RULES.map(([needle, categor
   return [new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:[^\\p{L}\\p{N}]|$)`, "u"), categoryId];
 });
 
-/** Match one normalized merchant to a category id, or `undefined`. */
-export function heuristicMatch(merchant: string): string | undefined {
+/**
+ * Match one normalized merchant to a category id, or `undefined`.
+ *
+ * `assignable` is the persona's live assignable id set. A match outside it is
+ * DROPPED, not substituted: the merchant simply goes unrecognised and the txn
+ * stays unclassified, exactly as for a merchant with no rule at all. Omitting the
+ * set keeps the raw table behaviour and is for rule-level unit tests only —
+ * production callers use `createLocalClassify`.
+ */
+export function heuristicMatch(merchant: string, assignable?: ReadonlySet<string>): string | undefined {
   const m = merchant.toLowerCase();
   for (const [re, categoryId] of KEYWORD_MATCHERS) {
-    if (re.test(m)) return categoryId;
+    if (re.test(m)) return !assignable || assignable.has(categoryId) ? categoryId : undefined;
   }
   return undefined;
 }
 
-/** The heuristic `ClassifyFn`. Deterministic; unknown merchants yield nothing. */
-export const localClassify: ClassifyFn = async (inputs) => {
-  const out: ClassifyResult[] = [];
-  for (const input of inputs) {
-    const categoryId = heuristicMatch(input.merchant);
-    if (categoryId) out.push({ txnId: input.txnId, categoryId, confidence: HEURISTIC_CONFIDENCE });
-  }
-  return out;
-};
+/**
+ * Build the heuristic `ClassifyFn` for one persona's assignable taxonomy.
+ * Deterministic; unknown (or non-assignable) merchants yield nothing.
+ */
+export function createLocalClassify(assignable: ReadonlySet<string>): ClassifyFn {
+  return async (inputs) => {
+    const out: ClassifyResult[] = [];
+    for (const input of inputs) {
+      const categoryId = heuristicMatch(input.merchant, assignable);
+      if (categoryId) out.push({ txnId: input.txnId, categoryId, confidence: HEURISTIC_CONFIDENCE });
+    }
+    return out;
+  };
+}

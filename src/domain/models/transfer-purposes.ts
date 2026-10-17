@@ -47,9 +47,22 @@ export function isSpendingPurpose(id: string): boolean {
   return TRANSFER_PURPOSE_BY_ID[id]?.spending === true;
 }
 
-/** The expense category a spending purpose reclassifies into, if any. */
-export function purposeCategoryId(id: string): string | undefined {
-  return TRANSFER_PURPOSE_BY_ID[id]?.mapsToCategoryId;
+/**
+ * The expense category a spending purpose reclassifies into, if any.
+ *
+ * `assignable` is the persona's live assignable set. The mapping above is
+ * preset-only by design (the purpose taxonomy is system-owned), but a persona can
+ * ARCHIVE the preset it points at — and labelling a transaction with a category
+ * hidden from every picker would leave the user unable to see or change it. With
+ * the set passed, an archived/unknown target resolves to `undefined`, i.e. "leave
+ * it a transfer + keep the purpose metadata": honest, reversible, and it never
+ * moves a number behind the user's back (invariant #6). Omitted, the preset
+ * mapping is returned unfiltered (engine/tests that have no persona in hand).
+ */
+export function purposeCategoryId(id: string, assignable?: ReadonlySet<string>): string | undefined {
+  const mapped = TRANSFER_PURPOSE_BY_ID[id]?.mapsToCategoryId;
+  if (mapped === undefined) return undefined;
+  return !assignable || assignable.has(mapped) ? mapped : undefined;
 }
 
 export function transferPurposeLabel(id: string): string {

@@ -36,6 +36,13 @@ async function loadRaw(personaId: PersonaId): Promise<RawData> {
   return { transactions, accounts, assets, liabilities, budgets, snapshots, goals, products };
 }
 
+/**
+ * `computeFinancials` was called with NO taxonomy here, so its fixed split ran
+ * against an empty set — the comparison calls must use the same one or they are
+ * not comparing the same composition.
+ */
+const NO_FIXED: ReadonlySet<string> = new Set();
+
 const MONTH = "2026-09";
 
 describe("computeFinancials", () => {
@@ -48,8 +55,8 @@ describe("computeFinancials", () => {
     const recurring = detectRecurring(raw.transactions);
 
     expect(f.monthKey).toBe(MONTH);
-    expect(f.cashflow).toEqual(aggregateCashflow(raw.transactions, period));
-    expect(f.prevCashflow).toEqual(aggregateCashflow(raw.transactions, prevPeriod));
+    expect(f.cashflow).toEqual(aggregateCashflow(raw.transactions, period, NO_FIXED));
+    expect(f.prevCashflow).toEqual(aggregateCashflow(raw.transactions, prevPeriod, NO_FIXED));
     expect(f.networth).toEqual(calculateNetWorth(raw.assets, raw.liabilities));
     expect(f.budgetLines).toEqual(evaluateBudget(raw.budgets, raw.transactions, period, DEMO_NOW));
     expect(f.categorySpend).toEqual(spendingByCategory(raw.transactions, period));

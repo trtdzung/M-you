@@ -17,10 +17,23 @@ import type {
   Liability,
   MockProduct,
   MonthlySnapshot,
+  StoredCategory,
   Transaction,
   TransactionQuery,
 } from "@/domain/models";
 import type { GoalRecord } from "@/domain/models/goal-input";
+
+/**
+ * What every category WRITE returns: the persona's whole taxonomy plus its whole
+ * jar set. A category write is really two writes server-side (the row and the jar
+ * membership), so the aggregate comes back together — the client never has to
+ * re-fetch the jars into a race, and can never hold a jar config that claims a
+ * category the taxonomy no longer has (which `evaluateJarBudget` would count).
+ */
+export interface CategoryWriteResult {
+  categories: StoredCategory[];
+  jarConfig: JarConfig;
+}
 
 export interface AccountDataProvider {
   listAccounts(): Promise<Account[]>;
@@ -111,8 +124,8 @@ export interface Providers
    * synthesizes a single catch-all "Khác" jar in that case (see
    * `src/lib/jars-store.ts`'s `readJarConfig`).
    *
-   * Every jar method REJECTS with a `JarApiError` (`./jar-api-error`) on a
-   * non-ok response — a failed load is never disguised as an empty config
+   * Every jar and category method REJECTS with an `ApiError` (`./api-error`) on
+   * a non-ok response — a failed load is never disguised as an empty config
    * (invariant #6), and a refused write carries the server's reason (e.g. 422
    * over the CASA cap with `overBy`).
    */
@@ -137,6 +150,37 @@ export interface Providers
   assignCategory(categoryId: string, jarId: string): Promise<JarConfig>;
   /** Replace the whole jar set (template apply / reset to default). Returns the full updated config. */
   replaceJars(jars: Jar[]): Promise<JarConfig>;
+  /**
+   * The persona's category taxonomy in display order (invariant #7 — categories
+   * are data, not a bundled constant). `includeArchived` adds the hidden rows,
+   * flagged `archived: true`: they are out of every picker but keep their jar
+   * membership, so their labels must still resolve for historical transactions
+   * (invariant #5). REJECTS on a non-ok response — an empty array would read as
+   * "this user has no categories" (invariant #6).
+   */
+  getCategories(opts?: { includeArchived?: boolean }): Promise<StoredCategory[]>;
+  /**
+   * Create one user category. `kind` is always `expense` server-side and the id
+   * is generated there from the label — a client-supplied id is ignored. With
+   * `jarId` the category lands in THAT jar atomically; without it the server's
+   * read-heal puts it in "Khác".
+   */
+  createCategory(input: { label: string; fixed?: boolean; jarId?: string }): Promise<CategoryWriteResult>;
+  /** Rename / re-flag one CUSTOM category (a bundled preset answers 403). */
+  updateCategory(id: string, patch: { label?: string; fixed?: boolean }): Promise<CategoryWriteResult>;
+  /**
+   * Hide (or un-hide) a category. Archiving is the escape hatch for a category
+   * still in use: it leaves the pickers but KEEPS its jar membership, so no past
+   * month's jar total moves.
+   */
+  archiveCategory(id: string, archived: boolean): Promise<CategoryWriteResult>;
+  /**
+   * Hard-delete an UNUSED custom category (stripped from its jar in the same
+   * transaction). Rejects with a 409 `ApiError` carrying `usedBy` when records
+   * still point at it — the remedy is `archiveCategory`, never a silent rewrite
+   * of the user's history (invariants #5, #6).
+   */
+  deleteCategory(id: string): Promise<CategoryWriteResult>;
   /**
    * Debit a confirmed transfer's amount from an account, mutating its real
    * balance in the store (SQLite `accounts` table — CASA is DB-backed now, not a

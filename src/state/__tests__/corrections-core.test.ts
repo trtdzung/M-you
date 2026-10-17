@@ -9,7 +9,7 @@ import {
   type Corrections,
 } from "../corrections-core";
 import { txn } from "@/domain/engine/__tests__/helpers";
-import { UNCLASSIFIED } from "@/domain/models";
+import { categoryLabel, UNCLASSIFIED } from "@/domain/models";
 
 describe("normalize (migration)", () => {
   it("migrates a legacy flat string map to origin:user, status:applied", () => {
@@ -63,11 +63,27 @@ describe("resolveEffective (guarded resolver)", () => {
     expect(out).toBe(t); // untouched reference
   });
 
-  it("falls back to the original category for an ORPHANED id (never drops/throws)", () => {
+  /**
+   * Phase 03 reversed this rule deliberately. The old behaviour checked the id
+   * against the BUNDLED preset map and returned the untouched txn when it missed
+   * — so once the taxonomy became per-persona and writable, a correction the
+   * server had accepted and stored (200) was silently discarded client-side: the
+   * label snapped back, the spend stayed on the bank's category, in the wrong hũ,
+   * with no error anywhere. An unresolvable id must render as itself instead.
+   */
+  it("APPLIES a correction to a custom (non-preset) category id — never silently drops it", () => {
     const t = txn({ id: "a", categoryId: "dining" });
-    const out = resolveEffective(t, { categoryId: "ghost_category", origin: "user", status: "applied" });
-    expect(out.categoryId).toBe("dining");
-    expect(out).toBe(t);
+    const out = resolveEffective(t, { categoryId: "c_hoc-phi", origin: "user", status: "applied" });
+    expect(out.categoryId).toBe("c_hoc-phi");
+    expect(out.userEdited).toBe(true);
+  });
+
+  it("applies an id the taxonomy cannot resolve at all rather than reverting to the bank's category", () => {
+    const t = txn({ id: "a", categoryId: "dining" });
+    const out = resolveEffective(t, { categoryId: "ghost_category", origin: "ai", status: "applied" });
+    expect(out.categoryId).toBe("ghost_category");
+    expect(() => categoryLabel(out.categoryId)).not.toThrow();
+    expect(categoryLabel(out.categoryId)).toBe("ghost_category"); // raw id: ugly, honest
   });
 });
 

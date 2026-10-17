@@ -8,13 +8,13 @@ import "server-only";
  * The overlay never mutates the bank row in `transactions`; it reuses the pure
  * rules from `corrections-core.ts` so client and server agree:
  *  - every record is `normalize`d (legacy shapes, provenance defaults — #5);
- *  - a label must be a category in the stored taxonomy (else the whole write is
- *    rejected — nothing partial lands);
+ *  - a label must be a category in THIS PERSONA's stored taxonomy (else the whole
+ *    write is rejected — nothing partial lands);
  *  - race guard: a non-user record never overwrites a user-authored one.
  */
 
 import { isUserOrigin, normalize, type Correction, type Corrections } from "@/state/corrections-core";
-import { categoryIdSet } from "./categories-store";
+import { knownCategoryIds } from "./categories-store";
 import { getDb } from "./db";
 
 /** Upper bound on records per write — a whole persona's history fits easily. */
@@ -48,7 +48,12 @@ export type ApplyResult = { ok: true; corrections: Corrections } | { ok: false; 
  * it now reads back (the stored truth).
  */
 export function applyCorrectionChanges(cif: string, changes: Record<string, unknown>): ApplyResult {
-  const valid = categoryIdSet();
+  // THIS persona's taxonomy — active ∪ archived, expense ∪ transfer. Per-cif
+  // closes a real cross-persona hole (a global set let persona A's custom id
+  // validate for persona B); archived ids stay valid so a user's historical
+  // label still round-trips; `transfer` stays valid because a correction may
+  // legitimately re-type a txn as a transfer.
+  const valid = knownCategoryIds(cif);
   const planned: Array<[string, Correction | null]> = [];
   const invalid = new Set<string>();
 

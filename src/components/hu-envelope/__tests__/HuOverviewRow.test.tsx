@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { type RenderOptions, render as rtlRender, screen, fireEvent } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 import type { Financials } from "@/domain/engine/finance-compose";
 import type { JarEnvelopeResult, JarEnvelopeLine } from "@/domain/engine/jar-envelope";
 import type { JarConfig } from "@/domain/models";
@@ -33,6 +35,16 @@ vi.mock("@/state/use-auto-fund", () => ({
 }));
 
 import { HuOverviewRow } from "../HuOverviewRow";
+
+
+/**
+ * Every render goes through `StubCategoryTaxonomy`: the components below read
+ * the persona's taxonomy via `useCategories()` but own none of it, so they get
+ * an already-loaded preset taxonomy instead of the real fetching provider (the
+ * provider itself is covered by its own tests).
+ */
+const render = (ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) =>
+  rtlRender(ui, { ...options, wrapper: StubCategoryTaxonomy });
 
 function line(over: Partial<JarEnvelopeLine>): JarEnvelopeLine {
   return {

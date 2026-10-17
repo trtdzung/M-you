@@ -9,6 +9,7 @@
 
 import { Check } from "lucide-react";
 import { categoryLabel } from "@/domain/models";
+import { useCategories } from "@/state/categories";
 import type { Correction } from "@/state/corrections";
 import { CategoryProvenanceBadge } from "./CategoryProvenanceBadge";
 
@@ -20,11 +21,13 @@ export function TxnSuggestionBar({
   /** Confirm the suggested category (writes a user correction + memory). */
   onAccept: (categoryId: string) => void;
 }) {
+  // Hook trước mọi early-return (rules of hooks).
+  const { labels } = useCategories();
   if (correction.status !== "pending" || !correction.categoryId) return null;
   return (
     <div className="mb-1.5 ml-1 flex flex-wrap items-center gap-2">
       <CategoryProvenanceBadge correction={correction} />
-      <span className="text-xs text-text">{categoryLabel(correction.categoryId)}</span>
+      <span className="text-xs text-text">{categoryLabel(correction.categoryId, labels)}</span>
       <button
         type="button"
         onClick={() => onAccept(correction.categoryId as string)}

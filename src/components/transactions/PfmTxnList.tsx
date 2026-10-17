@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { EyeOff } from "lucide-react";
 import type { Transaction } from "@/domain/models";
-import { CATEGORY_BY_ID } from "@/domain/models";
 import { monthPeriodFromKey, categoryToJarMap, isoInPeriod, jarChipList, KHAC_JAR_ID, VN_UTC_OFFSET_MS } from "@/domain/engine";
 import { Card } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonScreen, SkeletonRow } from "@/components/states";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
 import { useFinancials } from "@/state/useFinancials";
+import { useCategories } from "@/state/categories";
 import { useCorrections, useConfirmCategory } from "@/state/corrections";
 import { useJarConfig } from "@/state/jars";
 import { usePeriod } from "@/state/period";
@@ -56,13 +56,21 @@ export function PfmTxnList() {
   const { loading, error, allTransactions } = useFinancials();
   const { corrections } = useCorrections();
   const confirmCategory = useConfirmCategory();
+  const { byId: categoryById, assignable, loaded: categoriesLoaded } = useCategories();
   const { config } = useJarConfig();
   const { month } = usePeriod();
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [jar, setJar] = useState<string>(ALL);
 
   const catToJar = useMemo(() => categoryToJarMap(config), [config]);
-  const chips = useMemo(() => [{ jarId: ALL, label: "Tất cả" }, ...jarChipList(config)], [config]);
+  // Chips are measured against the PERSONA'S assignable set: the trailing "Khác"
+  // chip must appear when a category the user created is in no hũ yet, and must
+  // not appear for a preset that persona has archived.
+  const assignableIds = useMemo(() => assignable.map((c) => c.id), [assignable]);
+  const chips = useMemo(
+    () => [{ jarId: ALL, label: "Tất cả" }, ...jarChipList(config, assignableIds)],
+    [config, assignableIds],
+  );
 
   const groups = useMemo(() => {
     const period = monthPeriodFromKey(month);
@@ -117,7 +125,13 @@ export function PfmTxnList() {
                 {rows.map((t) => {
                   const correction = corrections[t.id];
                   const hidden = correction?.hidden === true;
-                  const uncategorized = !CATEGORY_BY_ID[t.categoryId];
+                  // "Chưa phân loại" is measured against the persona's STORED
+                  // taxonomy: a txn labelled with a category the user created
+                  // is labelled, and highlighting it as unlabelled would be a
+                  // provenance lie (invariant #5). While the taxonomy is still
+                  // loading nothing is flagged — a wrong warning is worse than
+                  // a late one.
+                  const uncategorized = categoriesLoaded && !categoryById.has(t.categoryId);
                   const pending = correction?.status === "pending" && correction.categoryId !== undefined;
                   return (
                     <div

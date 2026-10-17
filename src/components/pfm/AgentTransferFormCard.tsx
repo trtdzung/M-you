@@ -7,11 +7,10 @@ import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBankByName } from "@/lib/transfer-banks";
 import { BankLogo } from "@/components/transfer/BankLogo";
 import { useProviders } from "@/providers/context";
-import { CATEGORIES } from "@/domain/models";
 import type { Beneficiary } from "@/domain/models";
 import type { TransferFormUi } from "@/lib/agent-api";
-
-const EXPENSE_CATEGORIES = CATEGORIES.filter((c) => c.kind === "expense");
+import { useCategories } from "@/state/categories";
+import { CategoryTaxonomyNotice, taxonomyState } from "@/components/common/CategoryTaxonomyNotice";
 
 const fieldClass =
   "w-full min-w-0 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
@@ -48,6 +47,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function AgentTransferFormCard({ form, fullWidth = false }: { form: TransferFormUi; fullWidth?: boolean }) {
   const router = useRouter();
   const providers = useProviders();
+  // The SAME assignable set the caller validated `form.category` against
+  // (`isTransferFormUi`): the agent can only ever propose a category this user
+  // actually has, and the customer can only ever re-pick one of those. An
+  // archived category is offered nowhere (invariant #2 — no widening here).
+  const { assignable, loaded, error, retry } = useCategories();
   const [status, setStatus] = useState<"loading" | "not_found" | "ready">("loading");
   const [beneficiary, setBeneficiary] = useState<Beneficiary | null>(null);
 
@@ -103,6 +107,7 @@ export function AgentTransferFormCard({ form, fullWidth = false }: { form: Trans
     );
   }
 
+  const categoryState = taxonomyState({ loaded, error }, assignable.length);
   const canSubmit = Number.isFinite(amount) && amount > 0;
   const bank = findBankByName(beneficiary.bankName);
 
@@ -140,13 +145,23 @@ export function AgentTransferFormCard({ form, fullWidth = false }: { form: Trans
           />
         </Field>
         <Field label="Danh mục">
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className={fieldClass}>
-            {EXPENSE_CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+          {categoryState === "ready" ? (
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className={fieldClass}>
+              {assignable.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <CategoryTaxonomyNotice
+              state={categoryState}
+              error={error}
+              retry={retry}
+              emptyLabel="Chưa có danh mục chi nào."
+              className="py-1 text-xs"
+            />
+          )}
         </Field>
       </div>
 

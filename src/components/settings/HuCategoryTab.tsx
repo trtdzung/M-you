@@ -139,7 +139,7 @@ export function HuCategoryTab() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-text">Quản lý danh mục</span>
-          <span className="block text-xs text-muted">Danh mục mặc định &amp; hũ tương ứng</span>
+          <span className="block text-xs text-muted">Thêm, đổi tên, ẩn danh mục &amp; xếp hũ</span>
         </span>
         <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden />
       </button>

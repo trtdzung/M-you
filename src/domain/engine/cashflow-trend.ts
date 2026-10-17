@@ -14,6 +14,14 @@ import type { Transaction } from "@/domain/models";
 import { aggregateCashflow } from "./cashflow";
 import { addMonthsToKey, monthPeriodFromKey } from "./types";
 
+/**
+ * The trend exposes only `income` / `expense` per month — the fixed-vs-
+ * discretionary cut is not part of its output, so there is no taxonomy to thread
+ * here and nothing is under-reported by passing an empty set (the split result is
+ * discarded). `income`, `expense` and `hasData` are unaffected by it.
+ */
+const NO_FIXED_SPLIT: ReadonlySet<string> = new Set();
+
 export interface CashflowTrendPoint {
   /** "YYYY-MM". */
   month: string;
@@ -48,7 +56,7 @@ export function cashflowTrend(
 
   for (let i = monthsBack - 1; i >= 0; i--) {
     const monthKey = addMonthsToKey(endMonthKey, -i);
-    const result = aggregateCashflow(txns, monthPeriodFromKey(monthKey));
+    const result = aggregateCashflow(txns, monthPeriodFromKey(monthKey), NO_FIXED_SPLIT);
     const hasData = result.meta.freshness !== null;
     if (hasData && (freshest === null || result.meta.freshness! > freshest)) {
       freshest = result.meta.freshness;

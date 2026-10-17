@@ -1,22 +1,28 @@
 "use client";
 
+import { useState } from "react";
 import { Check } from "lucide-react";
-import { CATEGORY_BY_ID, type JarRole } from "@/domain/models";
+import { type JarRole } from "@/domain/models";
 import { isDuplicateLabel } from "@/domain/engine";
+import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { Sheet } from "@/components/primitives";
-import { categoryColor, JAR_COLOR_OPTIONS, jarAccent } from "@/lib/category-colors";
+import { JAR_COLOR_OPTIONS, jarAccent } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
 import { JAR_ICON_KEYS, jarIcon } from "./jar-visuals";
+import { CategoryCreateSheet } from "./CategoryCreateSheet";
+import { HuCategoryPicker } from "./HuCategoryPicker";
+import { nextCategoryPatch } from "./hu-category-patch";
 import { HuLimitField } from "./HuLimitField";
 import { HuDeleteSection } from "./HuDeleteSection";
 import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
  * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức/tháng (`HuLimitField`), vai
- * trò, màu, icon, danh mục trong hũ (chuyển sang hũ khác — exactly-one), và xoá
- * hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig` — state (theo phản
- * hồi server) là nguồn sự thật; lần ghi bị từ chối hiện ở `JarMutationErrorNotice`.
+ * trò, màu, icon, danh mục trong hũ (`HuCategoryPicker` — chọn/bỏ chọn tại chỗ,
+ * exactly-one), và xoá hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig`
+ * — state (theo phản hồi server) là nguồn sự thật; lần ghi bị từ chối hiện ở
+ * `JarMutationErrorNotice`.
  */
 /**
  * Donor-waterfall roles (plan 260918-1120): the order auto-fund drains jars when
@@ -31,12 +37,15 @@ const ROLE_OPTIONS: { value: JarRole; label: string; hint: string }[] = [
 ];
 
 export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () => void }) {
-  const { config, updateJar, assignCategory } = useJarConfig();
+  const { config, updateJar } = useJarConfig();
+  // Mẫu số của nhãn "(n/total)" là số danh mục chi ĐANG DÙNG của persona — người
+  // dùng thêm/ẩn danh mục thì tổng này đổi theo, không phải hằng số 10 preset.
+  const { assignable } = useCategories();
+  const [adding, setAdding] = useState(false);
   const jar = config.jars.find((j) => j.id === jarId);
 
   if (!jar) return null;
 
-  const otherJars = config.jars.filter((j) => j.id !== jarId);
   const dup = isDuplicateLabel(jar.label, config.jars, jarId);
 
   return (
@@ -129,36 +138,27 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
           </div>
         </Field>
 
-        <Field label={`Danh mục trong hũ (${jar.categoryIds.length})`}>
-          {jar.categoryIds.length === 0 ? (
-            <p className="text-xs text-muted">Hũ này chưa có danh mục nào.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {jar.categoryIds.map((catId) => (
-                <li key={catId} className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryColor(catId) }} />
-                  <span className="flex-1 truncate text-sm text-text">{CATEGORY_BY_ID[catId]?.label ?? catId}</span>
-                  {otherJars.length > 0 && (
-                    <select
-                      aria-label={`Chuyển ${CATEGORY_BY_ID[catId]?.label ?? catId} sang hũ khác`}
-                      value=""
-                      onChange={(e) => e.target.value && assignCategory(catId, e.target.value)}
-                      className="min-h-9 rounded-sm border border-border bg-surface px-2 text-xs text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                    >
-                      <option value="">Chuyển sang…</option>
-                      {otherJars.map((j) => (
-                        <option key={j.id} value={j.id}>{j.label}</option>
-                      ))}
-                    </select>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+        <Field label={`Danh mục trong hũ (${jar.categoryIds.length}/${assignable.length})`}>
+          <HuCategoryPicker
+            jar={jar}
+            jars={config.jars}
+            // Một cửa ghi cho cả thêm lẫn gỡ: PATCH gỡ danh mục khỏi hũ cũ
+            // (`stripCategories`) và heal danh mục mồ côi vào "Khác" cùng lúc.
+            // `nextCategoryPatch` ghim màu hũ khi tập mới sẽ làm accent đổi.
+            onCommit={(categoryIds) => updateJar(jarId, nextCategoryPatch(jar, categoryIds))}
+            onAddCategory={() => setAdding(true)}
+          />
         </Field>
 
         <HuDeleteSection jar={jar} jars={config.jars} onDeleted={onClose} />
       </div>
+
+      {/* MỘT lượt ghi: `POST /api/categories { jarId }` đặt danh mục mới vào
+          đúng hũ này, nên hàng hiện ra đã tick sẵn — không tạo vào "Khác" rồi
+          PATCH chuyển sang (hai lượt ghi, một khoảng danh mục mồ côi). */}
+      {adding && (
+        <CategoryCreateSheet jarId={jar.id} jarLabel={jar.label} onClose={() => setAdding(false)} />
+      )}
     </Sheet>
   );
 }

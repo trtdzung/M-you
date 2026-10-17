@@ -1,4 +1,4 @@
-import { CATEGORY_BY_ID } from "@/domain/models";
+import { categoryLabel } from "@/domain/models";
 import type { Detector } from "../types";
 import { buildInsight, fact, money, pctChange, prevLabel } from "../narrate";
 
@@ -17,7 +17,9 @@ export const spendingSpike: Detector = (f) => {
   }
   if (!best) return null;
 
-  const label = CATEGORY_BY_ID[best.cat]?.label ?? best.cat;
+  // The labels map the composition itself ran with (`Financials.categoryLabels`),
+  // so a custom category is narrated by the user's own label, not a raw id.
+  const label = categoryLabel(best.cat, f.categoryLabels);
   const pct = pctChange(best.cur, best.prev);
   return buildInsight({
     id: `spendingSpike:${f.monthKey}:${best.cat}`,

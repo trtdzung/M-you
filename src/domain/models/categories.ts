@@ -17,6 +17,20 @@ export interface CategoryDef {
   fixed: boolean;
 }
 
+/**
+ * A category as the taxonomy API returns it (`GET /api/categories`): the
+ * `CategoryDef` shape every reader already knows, plus `archived` — present ONLY
+ * on an archived row, so an active category serialises byte-for-byte as it did
+ * before the table became writable.
+ *
+ * It lives HERE rather than next to the store because it is the wire contract
+ * shared by the provider interfaces and the client taxonomy state, and
+ * `src/lib/categories-store.ts` is `server-only` — neither of them can import it.
+ */
+export interface StoredCategory extends CategoryDef {
+  archived?: true;
+}
+
 export const CATEGORIES: CategoryDef[] = [
   { id: "housing", label: "Nhà ở", kind: "expense", fixed: true },
   { id: "utilities", label: "Tiện ích", kind: "expense", fixed: true },
@@ -75,15 +89,25 @@ export function isRebalanceCategory(id: string): boolean {
 }
 
 /**
- * Human label for any category id: taxonomy label, the "Chưa phân loại" /
- * "Tiền vào" labels for the sentinels, else the raw id (defensive — an orphaned
- * id still renders).
+ * Human label for any category id. Resolution order, deliberately defensive:
+ *   1. the sentinels ("Chưa phân loại" / "Tiền vào" / "Điều chỉnh hũ") — system
+ *      concepts a stored taxonomy never owns, so they always win;
+ *   2. `labels` — the PERSONA'S stored taxonomy (`useCategories().labels`), which
+ *      is the only place a custom category's label exists, and also where a
+ *      RENAMED preset's current label lives;
+ *   3. the bundled preset map — so an un-threaded call site still renders the ten
+ *      built-ins correctly instead of regressing to raw ids;
+ *   4. the raw id.
+ *
+ * Every call site should still pass the map. The fallback chain exists so a
+ * missing map costs an ugly-but-honest label, never a wrong NUMBER and never a
+ * throw (invariants #5/#6).
  */
-export function categoryLabel(id: string): string {
+export function categoryLabel(id: string, labels?: ReadonlyMap<string, string>): string {
   if (id === UNCLASSIFIED) return UNCLASSIFIED_LABEL;
   if (id === INCOME) return INCOME_LABEL;
   if (id === REBALANCE_CATEGORY) return REBALANCE_CATEGORY_LABEL;
-  return CATEGORY_BY_ID[id]?.label ?? id;
+  return labels?.get(id) ?? CATEGORY_BY_ID[id]?.label ?? id;
 }
 
 /** Category IDs flagged as fixed (recurring, non-discretionary) spend. */

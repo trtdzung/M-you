@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { healOrphanCategories, stripCategories } from "@/domain/jar-rules";
+import { assignableCategoryIds } from "@/lib/categories-store";
 import { getDb } from "@/lib/db";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
 import { deleteRebalanceLegsForJar } from "@/lib/manual-txns-store";
@@ -25,7 +26,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const body = await req.json().catch(() => null);
   const patch = sanitizeJarPatch(body?.patch);
   if (!patch) return NextResponse.json({ error: "patch is invalid" }, { status: 422 });
-  const badCategories = patch.categoryIds ? categoryViolation(patch.categoryIds) : null;
+  const badCategories = patch.categoryIds ? categoryViolation(cif, patch.categoryIds) : null;
   if (badCategories) return badCategories;
 
   const current = readJarConfig(cif);
@@ -64,7 +65,12 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   if (!target) return NextResponse.json({ error: `jar ${id} not found` }, { status: 404 });
 
   const remaining = { version: 3 as const, jars: current.jars.filter((j) => j.id !== id) };
-  const next = target.categoryIds.length > 0 ? healOrphanCategories(remaining) : remaining;
+  // The deleted jar's categories are re-homed into "Khác" against THIS persona's
+  // assignable taxonomy — including any category the user created.
+  const next =
+    target.categoryIds.length > 0
+      ? healOrphanCategories(remaining, assignableCategoryIds(cif))
+      : remaining;
   const removeJarAndLegs = getDb().transaction(() => {
     const legsDeleted = deleteRebalanceLegsForJar(cif, id);
     return { config: writeJarConfig(cif, next), legsDeleted };

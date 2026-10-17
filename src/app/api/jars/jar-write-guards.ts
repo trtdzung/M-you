@@ -3,6 +3,7 @@ import { invalidExpenseCategoryIds, isReservedJarId } from "@/domain/jar-rules";
 import { fitsCasaCap } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { casaPoolForCif } from "@/lib/casa-pool";
+import { knownExpenseCategoryIds } from "@/lib/categories-store";
 
 /**
  * Shared write-door checks for the `/api/jars` routes. Each returns the 422
@@ -32,9 +33,16 @@ export function reservedIdViolation(ids: string[], creating: boolean): NextRespo
   return reserved === undefined ? null : unprocessable({ error: `jar id ${reserved} is reserved` });
 }
 
-/** Every category id must be an expense category of the taxonomy (A11/A49). */
-export function categoryViolation(catIds: readonly string[]): NextResponse | null {
-  const invalid = invalidExpenseCategoryIds(catIds);
+/**
+ * Every category id must be an expense category of THIS PERSONA's stored
+ * taxonomy (A11/A49) — `knownExpenseCategoryIds`, not the bundled constant, so a
+ * category the user created a moment ago is assignable immediately and persona
+ * A's custom id can never validate for persona B. Archived ids are included: a
+ * jar PATCH sends the jar's full `categoryIds`, so a jar that already holds an
+ * archived category must still be saveable.
+ */
+export function categoryViolation(cif: string, catIds: readonly string[]): NextResponse | null {
+  const invalid = invalidExpenseCategoryIds(catIds, knownExpenseCategoryIds(cif));
   return invalid.length === 0
     ? null
     : unprocessable({ error: "categoryIds must be expense categories", invalid });

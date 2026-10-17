@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { categorize } from "@/ai/categorize/categorize-service";
 import { createRemoteClassify } from "@/ai/categorize/remote-classifier";
-import { localClassify } from "@/ai/categorize/local-classifier";
+import { createLocalClassify } from "@/ai/categorize/local-classifier";
 import { txn } from "@/domain/engine/__tests__/helpers";
-import { UNCLASSIFIED } from "@/domain/models";
+import { CATEGORIES, UNCLASSIFIED } from "@/domain/models";
 
 /**
  * Coverage of the orchestrator's AI -> heuristic fallback wiring
@@ -40,12 +40,21 @@ afterEach(() => {
 
 const un = (over: Parameters<typeof txn>[0] = {}) => txn({ categoryId: UNCLASSIFIED, type: "expense", ...over });
 
+/**
+ * The persona's taxonomy — the bundled presets stand in for it. Both the
+ * heuristic's filter and the service's whitelist read from this ONE list, which
+ * is what the orchestrator does with `useCategories().assignable`.
+ */
+const TAXONOMY = CATEGORIES;
+const ASSIGNABLE = new Set(TAXONOMY.filter((c) => c.kind === "expense").map((c) => c.id));
+const localClassify = createLocalClassify(ASSIGNABLE);
+
 describe("auto-categorize AI -> heuristic fallback contract (src/state/auto-categorize.tsx orchestration)", () => {
   it("remote classify throwing for every chunk yields chunkErrors>0 and NO ai assignments", async () => {
     const txns = [un({ id: "a", merchantNormalizedName: "highlands coffee" })];
     const remote = createRemoteClassify("CIF_0001");
 
-    const out = await categorize({ txns, memory: {}, classify: remote, classifyOrigin: "ai" });
+    const out = await categorize({ txns, memory: {}, categories: TAXONOMY, classify: remote, classifyOrigin: "ai" });
 
     expect(out.chunkErrors).toBe(1);
     expect(out.assignments).toHaveLength(0);
@@ -59,7 +68,7 @@ describe("auto-categorize AI -> heuristic fallback contract (src/state/auto-cate
     const remote = createRemoteClassify("CIF_0001");
 
     // Step 1 — exactly what auto-categorize.tsx's run() does first (aiConsent path).
-    const aiOutcome = await categorize({ txns, memory: {}, classify: remote, classifyOrigin: "ai" });
+    const aiOutcome = await categorize({ txns, memory: {}, categories: TAXONOMY, classify: remote, classifyOrigin: "ai" });
     expect(aiOutcome.chunkErrors).toBeGreaterThan(0);
     const done = new Set(aiOutcome.assignments.map((a) => a.txnId));
     const leftover = txns.filter((t) => !done.has(t.id));
@@ -69,6 +78,7 @@ describe("auto-categorize AI -> heuristic fallback contract (src/state/auto-cate
     const fbOutcome = await categorize({
       txns: leftover,
       memory: {},
+      categories: TAXONOMY,
       classify: localClassify,
       classifyOrigin: "heuristic",
     });

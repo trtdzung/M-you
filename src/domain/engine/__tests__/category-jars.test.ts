@@ -10,7 +10,7 @@ import {
 } from "../category-jars";
 import { spendingByCategory } from "../category";
 import { monthPeriod } from "../types";
-import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
+import { BUILT_IN_EXPENSE_IDS, DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 import { txn } from "./helpers";
 
 const JUNE = monthPeriod(2026, 5);
@@ -23,14 +23,14 @@ describe("orphanExpenseCategoryIds — the exactly-one heal source", () => {
     const partial = cfg([
       { id: "a", label: "A", categoryIds: ["dining", "groceries"] },
     ]);
-    const orphans = orphanExpenseCategoryIds(partial);
+    const orphans = orphanExpenseCategoryIds(partial, BUILT_IN_EXPENSE_IDS);
     expect(orphans).toContain("housing");
     expect(orphans).not.toContain("dining");
     expect(orphans).not.toContain("salary"); // income is not an expense category
   });
 
   it("is empty when every expense category is covered (all templates are)", () => {
-    expect(orphanExpenseCategoryIds(DEFAULT_JAR_CONFIG)).toEqual([]);
+    expect(orphanExpenseCategoryIds(DEFAULT_JAR_CONFIG, BUILT_IN_EXPENSE_IDS)).toEqual([]);
   });
 });
 
@@ -126,7 +126,7 @@ describe("groupSpendingByJar — empty period", () => {
 
 describe("jarChipList", () => {
   it("keeps a zero-spend jar's chip (savings) and adds no Khác for full coverage", () => {
-    const chips = jarChipList(DEFAULT_JAR_CONFIG);
+    const chips = jarChipList(DEFAULT_JAR_CONFIG, BUILT_IN_EXPENSE_IDS);
     expect(chips.some((c) => c.jarId === "savings")).toBe(true); // 0-category jar still chipped
     expect(chips.some((c) => c.jarId === KHAC_JAR_ID)).toBe(false); // template covers all expenses
   });
@@ -135,7 +135,7 @@ describe("jarChipList", () => {
     const config = cfg([
       { id: "a", label: "A", categoryIds: ["dining"] },
     ]);
-    const chips = jarChipList(config);
+    const chips = jarChipList(config, BUILT_IN_EXPENSE_IDS);
     expect(chips[chips.length - 1].jarId).toBe(KHAC_JAR_ID);
   });
 });

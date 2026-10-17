@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FIXED_CATEGORY_IDS } from "@/domain/models";
 import { getProviders } from "@/providers";
 import { aggregateCashflow, calculateNetWorth, monthPeriodFromKey } from "..";
 
@@ -7,7 +8,7 @@ describe("engine + fixtures integration", () => {
   it("computes a sensible June cash flow for the stable persona", async () => {
     const p = getProviders("stable");
     const txns = await p.listTransactions();
-    const cf = aggregateCashflow(txns, monthPeriodFromKey("2026-06"));
+    const cf = aggregateCashflow(txns, monthPeriodFromKey("2026-06"), FIXED_CATEGORY_IDS);
 
     expect(cf.expense).toBeGreaterThan(0);
     // Internal transfers (2,000,000 each month) must not appear as expense.

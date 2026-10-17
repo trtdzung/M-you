@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { usePersona, useProviders } from "@/providers/context";
+import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { buildManualTxn, useManualTxns, type ManualTxnInput } from "@/state/manual-txns";
 import { useFinancials } from "@/state/useFinancials";
@@ -41,6 +42,10 @@ export function TransferConfirm() {
   const params = useSearchParams();
   const providers = useProviders();
   const { config: jarConfig } = useJarConfig();
+  // The persona's taxonomy: `byId` types the recorded txn from the category KIND,
+  // `assignable` keeps an ARCHIVED category from being auto-applied to a brand-new
+  // transaction the user would then be unable to see or re-label.
+  const { byId: categoryById, assignable } = useCategories();
   const { adopt: adoptManualTxn, addPersisted } = useManualTxns();
   const { financials } = useFinancials();
   const autoFund = useAutoFund();
@@ -152,12 +157,18 @@ export function TransferConfirm() {
     // Book the primary spend at its FULL amount into its REAL category: jar source →
     // the jar's first category; pool/account → the agent category or "Chuyển khoản".
     const sourceJar = targetJarId ? jarConfig.jars.find((j) => j.id === targetJarId) : undefined;
-    const primaryCategory = targetJarId ? sourceJar?.categoryIds[0] ?? CATEGORY.transfer : draft?.categoryId ?? CATEGORY.transfer;
+    // A jar KEEPS its archived categories (so their past spend stays put), so the
+    // jar's first id is not necessarily one the user can still see. Pick the first
+    // ASSIGNABLE one; a jar holding only archived categories records as a plain
+    // transfer, which the user can re-label on the success card.
+    const assignableInJar = new Set(assignable.map((c) => c.id));
+    const jarCategory = sourceJar?.categoryIds.find((id) => assignableInJar.has(id));
+    const primaryCategory = targetJarId ? jarCategory ?? CATEGORY.transfer : draft?.categoryId ?? CATEGORY.transfer;
     const input: ManualTxnInput = {
       amount,
       direction: "debit",
       categoryId: primaryCategory,
-      type: typeForCategory(primaryCategory), // derived from kind, never hardcoded
+      type: typeForCategory(primaryCategory, categoryById), // derived from kind, never hardcoded
       merchantName: name.trim(),
       postedAt,
       ...(draft?.memo ? { note: draft.memo } : {}),

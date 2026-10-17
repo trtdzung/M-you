@@ -1,17 +1,29 @@
 "use client";
 
-import { Check, Plus } from "lucide-react";
+import { Check } from "lucide-react";
 import type { CategoryKind } from "@/domain/models";
-import { CATEGORIES } from "@/domain/models";
+import { AddCategoryButton } from "@/components/common/AddCategoryButton";
+import { CategoryTaxonomyNotice, taxonomyState } from "@/components/common/CategoryTaxonomyNotice";
+import { useCategories } from "@/state/categories";
 import { categoryColor } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
 
 /**
  * A select-one category grid — the shared primitive behind the transaction
- * category picker, the Add-transaction form, and (phase 06) the category manager.
- * Under exactly-one, a transaction's category also fixes its hũ, so picking one
- * here is all it takes. `onAddCategory` is an optional affordance wired in phase
- * 06 (create a new category, which forces a hũ choice); omitted, the "＋" hides.
+ * category picker and the Add-transaction form. Under exactly-one, a
+ * transaction's category also fixes its hũ, so picking one here is all it takes.
+ * `onAddCategory` opens `CategoryCreateSheet` with NO `jarId`: from a
+ * transaction the user has not chosen a hũ, so the server heals the new category
+ * into "Khác" and the sheet says so. Omitted, the "＋" hides — surfaces that
+ * cannot own a create flow (the transfer categorize step) simply don't pass it.
+ *
+ * Options come from the PERSONA'S stored taxonomy (`useCategories()`), never from
+ * the bundled constant: a category the user created must be offerable the moment
+ * it exists, and one they archived must disappear from every picker while its
+ * historical labels keep resolving. While the taxonomy is loading — or if its
+ * load FAILED — this renders a state instead of a silently empty grid (U10): an
+ * empty picker would read as "you have no categories", which is a claim about the
+ * user, not about the network (invariant #6).
  */
 export function CategoryOptionGrid({
   selectedId,
@@ -38,14 +50,31 @@ export function CategoryOptionGrid({
    */
   uncategorizedOption?: { id: string; label: string };
 }) {
-  const options = allowedCategoryIds
-    ? CATEGORIES.filter((c) => allowedCategoryIds.includes(c.id))
-    : CATEGORIES.filter((c) => (c.kind === "transfer" ? false : kind === "all" ? true : c.kind === kind));
+  const { categories, loaded, error, retry } = useCategories();
 
-  // Only the jar-restricted path can legitimately be empty (a jar with no
-  // categories); other callers always have options and keep their affordances.
-  if (allowedCategoryIds && options.length === 0 && !uncategorizedOption) {
-    return <p className="py-6 text-center text-sm text-muted">Hũ chưa có danh mục</p>;
+  // Archived is excluded on EVERY path, including the jar-restricted one: a hũ
+  // keeps a hidden category (so its past spend stays put) but the user must not
+  // be able to label a new transaction with it.
+  const active = categories.filter((c) => !c.archived);
+  const options = allowedCategoryIds
+    ? active.filter((c) => allowedCategoryIds.includes(c.id))
+    : active.filter((c) => (c.kind === "transfer" ? false : kind === "all" ? true : c.kind === kind));
+
+  const state = taxonomyState({ loaded, error }, options.length);
+  if (state !== "ready") {
+    // The jar-restricted path can legitimately be empty (a hũ whose categories
+    // are all archived); elsewhere an empty taxonomy is the user's own state. In
+    // both cases the "＋ Thêm danh mục" escape hatch stays available.
+    const emptyLabel = allowedCategoryIds ? "Hũ chưa có danh mục" : "Chưa có danh mục nào.";
+    const notice = <CategoryTaxonomyNotice state={state} error={error} retry={retry} emptyLabel={emptyLabel} />;
+    if (state !== "empty" || !uncategorizedOption) {
+      return (
+        <div>
+          {notice}
+          {state === "empty" && onAddCategory && <AddCategoryButton onClick={onAddCategory} />}
+        </div>
+      );
+    }
   }
 
   return (
@@ -86,15 +115,7 @@ export function CategoryOptionGrid({
           {uncategorizedOption.id === selectedId && <Check size={15} className="shrink-0 text-primary" aria-hidden />}
         </button>
       )}
-      {onAddCategory && (
-        <button
-          type="button"
-          onClick={onAddCategory}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-row border border-dashed border-border px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        >
-          <Plus size={15} aria-hidden /> Thêm danh mục
-        </button>
-      )}
+      {onAddCategory && <AddCategoryButton onClick={onAddCategory} />}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
 import { mockStoredCorrections } from "@/test-utils/mock-corrections-fetch";
+import { CategoryTaxonomyProvider } from "@/state/categories";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
@@ -40,9 +41,10 @@ function renderList() {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
-        <CategoryMemoryProvider>
-          <ManualTxnsProvider>
-            <JarConfigProvider>
+        <ManualTxnsProvider>
+          <JarConfigProvider>
+            <CategoryTaxonomyProvider>
+              <CategoryMemoryProvider>
                 <AssetLiabilityProvider>
                   <GoalProvider>
                     <PeriodProvider>
@@ -52,9 +54,10 @@ function renderList() {
                     </PeriodProvider>
                   </GoalProvider>
                 </AssetLiabilityProvider>
-            </JarConfigProvider>
-          </ManualTxnsProvider>
-        </CategoryMemoryProvider>
+              </CategoryMemoryProvider>
+            </CategoryTaxonomyProvider>
+          </JarConfigProvider>
+        </ManualTxnsProvider>
       </CorrectionsProvider>
     </PersonaProvider>,
   );

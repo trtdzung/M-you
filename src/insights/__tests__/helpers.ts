@@ -130,5 +130,6 @@ export function makeFinancials(over: Partial<Financials> = {}): Financials {
     unlabeled: over.unlabeled ?? { count: 0, amount: 0, source: "mock" },
     health: over.health ?? EMPTY_HEALTH,
     goals: over.goals ?? [],
+    categoryLabels: over.categoryLabels ?? new Map(),
   };
 }

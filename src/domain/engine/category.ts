@@ -16,13 +16,17 @@ export interface CategorySpend {
   share: number;
 }
 
-function toRows(byCat: Map<string, number>, topN?: number): CategorySpend[] {
+function toRows(
+  byCat: Map<string, number>,
+  topN?: number,
+  labels?: ReadonlyMap<string, string>,
+): CategorySpend[] {
   const total = Array.from(byCat.values()).reduce((s, v) => s + Math.max(0, v), 0);
   const rows: CategorySpend[] = Array.from(byCat.entries())
     .filter(([, amount]) => amount > 0)
     .map(([categoryId, amount]) => ({
       categoryId,
-      label: categoryLabel(categoryId),
+      label: categoryLabel(categoryId, labels),
       amount,
       share: total > 0 ? amount / total : 0,
     }))
@@ -30,6 +34,16 @@ function toRows(byCat: Map<string, number>, topN?: number): CategorySpend[] {
   return typeof topN === "number" ? rows.slice(0, topN) : rows;
 }
 
-export function spendingByCategory(txns: Transaction[], period: Period, topN?: number): CategorySpend[] {
-  return toRows(netExpenseByCategory(txns, period), topN);
+/**
+ * `labels` is the persona's stored id→label map (`useCategories().labels`).
+ * Presentation only: it names the rows, never groups or sums them, so an absent
+ * map costs a preset label (built-in fallback) or a raw id — never an amount.
+ */
+export function spendingByCategory(
+  txns: Transaction[],
+  period: Period,
+  topN?: number,
+  labels?: ReadonlyMap<string, string>,
+): CategorySpend[] {
+  return toRows(netExpenseByCategory(txns, period), topN, labels);
 }

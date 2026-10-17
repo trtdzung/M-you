@@ -3,6 +3,7 @@
 import { Pencil } from "lucide-react";
 import type { Transaction, TransactionStatus } from "@/domain/models";
 import { categoryLabel } from "@/domain/models";
+import { useCategories } from "@/state/categories";
 import type { Correction } from "@/state/corrections";
 import { Money, SourceBadge } from "@/components/primitives";
 import { formatRelativeDate } from "@/lib/format";
@@ -17,9 +18,18 @@ const STATUS_META: Record<TransactionStatus, { label: string; className: string 
   reversed: { label: "Đã hủy", className: "bg-negative-soft text-negative" },
 };
 
-/** One transaction row. Tapping opens the category editor. */
+/**
+ * One transaction row. Tapping opens the category editor.
+ *
+ * The label comes from the persona's STORED taxonomy (archived rows included —
+ * a category the user hid must still name the transactions it already labels,
+ * invariant #5). No loading state here: `categoryLabel` falls back to the
+ * built-in presets and finally to the raw id, so a row never renders blank while
+ * the taxonomy is in flight — it just briefly names a custom category by its id.
+ */
 export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: (t: Transaction) => void; correction?: Correction }) {
-  const category = categoryLabel(txn.categoryId);
+  const { labels } = useCategories();
+  const category = categoryLabel(txn.categoryId, labels);
   const status = STATUS_META[txn.status];
   const isCredit = txn.direction === "credit";
 
