@@ -10,6 +10,7 @@ import {
   checkFlex,
   checkName,
   checkOptionalAmount,
+  checkRequestKey,
   checkTarget,
 } from "./validate-fields";
 
@@ -29,6 +30,7 @@ export function validateGoalCreate(
   const flexibility = checkFlex(raw.flexibility, errors);
   const monthly = checkOptionalAmount(raw.monthlyContribution, "monthlyContribution", errors);
   const opening = checkOptionalAmount(raw.openingAmount, "openingAmount", errors);
+  const requestKey = checkRequestKey(raw.requestKey, errors);
   if (
     opening != null &&
     targetAmount !== undefined &&
@@ -48,6 +50,7 @@ export function validateGoalCreate(
       flexibility: flexibility!,
       monthlyContribution: monthly ?? null,
       openingAmount: opening ?? null,
+      ...(requestKey !== undefined ? { requestKey } : {}),
     },
   };
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { transferNow } from "@/lib/demo-clock";
 import { validateGoalCreate } from "../model/validate-goal";
-import { createGoalWithOpening } from "../server/create-goal";
+import { createGoalOnce } from "../server/create-goal";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { loadGoalView } from "../server/goal-view";
 import { badBody, cifOf, invalid, missingCif, readJson } from "./_http";
@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
   const now = transferNow();
   const result = validateGoalCreate(body, now);
   if (!result.ok) return invalid(result.errors);
-  const goal = createGoalWithOpening(cif, result.value, now);
-  return NextResponse.json({ goal: loadGoalView(cif, goal, now, goalCashflowInput(cif, now)) }, { status: 201 });
+  const { goal, created } = createGoalOnce(cif, result.value, now);
+  return NextResponse.json(
+    { goal: loadGoalView(cif, goal, now, goalCashflowInput(cif, now)) },
+    { status: created ? 201 : 200 },
+  );
 }

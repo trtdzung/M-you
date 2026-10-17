@@ -36,6 +36,18 @@ CREATE INDEX IF NOT EXISTS idx_user_goal_ledger_goal ON user_goal_ledger (cif, g
 /** Idempotent: creates the goal tables when missing. */
 export function ensureGoalTables(db: Database.Database): void {
   db.exec(GOAL_TABLES_SQL);
+  const cols = db.prepare("PRAGMA table_info(user_goals)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "request_key")) {
+    try {
+      db.exec("ALTER TABLE user_goals ADD COLUMN request_key TEXT");
+    } catch (e) {
+      if (!String(e).includes("duplicate column")) throw e; // lost a race with another handle
+    }
+  }
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_user_goals_request_key
+       ON user_goals (cif, request_key) WHERE request_key IS NOT NULL`,
+  );
 }
 
 const ready = new WeakSet<Database.Database>();

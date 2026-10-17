@@ -25,6 +25,15 @@ export function checkName(v: unknown, errors: FieldErrors): string | undefined {
   return name;
 }
 
+export function checkRequestKey(v: unknown, errors: FieldErrors): string | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string" || v.length < 1 || v.length > 80) {
+    errors.requestKey = "Mã yêu cầu từ 1 đến 80 ký tự";
+    return undefined;
+  }
+  return v;
+}
+
 export function checkTarget(v: unknown, errors: FieldErrors): number | undefined {
   if (!isInt(v) || v <= 0 || v > MAX_VND) {
     errors.targetAmount = "Số tiền mục tiêu phải là số nguyên dương hợp lệ";

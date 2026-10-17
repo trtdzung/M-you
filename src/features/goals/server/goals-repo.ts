@@ -20,6 +20,7 @@ interface GoalRow {
   jar_id: string | null;
   created_at: string;
   updated_at: string;
+  request_key: string | null;
 }
 
 function toGoal(r: GoalRow): SavingsGoal {
@@ -46,6 +47,14 @@ export function listGoals(cif: string): SavingsGoal[] {
   return rows.map(toGoal);
 }
 
+/** The goal this cif already created with `requestKey`, if any. */
+export function findGoalByRequestKey(cif: string, requestKey: string): SavingsGoal | null {
+  const row = goalsDb()
+    .prepare("SELECT * FROM user_goals WHERE cif = ? AND request_key = ?")
+    .get(cif, requestKey) as GoalRow | undefined;
+  return row ? toGoal(row) : null;
+}
+
 export function getGoal(cif: string, id: string): SavingsGoal | null {
   const row = goalsDb()
     .prepare("SELECT * FROM user_goals WHERE cif = ? AND id = ?")
@@ -60,11 +69,11 @@ export function insertGoal(cif: string, input: GoalCreateInput, now: Date): Savi
   goalsDb()
     .prepare(
       `INSERT INTO user_goals (cif, id, name, target_amount, target_date, flexibility,
-         monthly_contribution, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+         monthly_contribution, status, created_at, updated_at, request_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
     )
     .run(cif, id, input.name, input.targetAmount, input.targetDate, input.flexibility,
-      input.monthlyContribution, ts, ts);
+      input.monthlyContribution, ts, ts, input.requestKey ?? null);
   return getGoal(cif, id)!;
 }
 

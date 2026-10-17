@@ -41,6 +41,8 @@ export interface GoalCreateInput {
   monthlyContribution: number | null;
   /** Amount already saved; recorded as the first deposit. */
   openingAmount: number | null;
+  /** Idempotency key (1-80 chars); a repeated key for the same cif returns the existing goal. */
+  requestKey?: string;
 }
 
 export interface GoalUpdateInput {
