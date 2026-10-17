@@ -4,6 +4,8 @@ import { dangerButton, primaryButton, secondaryButton } from "../styles";
 
 /** Buttons only emit callbacks; a button without a handler is disabled. */
 export function GoalActionBar({
+  section = "all",
+  withdrawDisabled = false,
   status,
   onContribute,
   onWithdraw,
@@ -12,6 +14,8 @@ export function GoalActionBar({
   onArchive,
   onDelete,
 }: {
+  section?: "all" | "actions" | "management";
+  withdrawDisabled?: boolean;
   status: GoalStatus;
   onContribute?: () => void;
   onWithdraw?: () => void;
@@ -24,15 +28,15 @@ export function GoalActionBar({
   const archived = status === "archived";
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3">
+      {section !== "management" && <div className="grid grid-cols-2 gap-3">
       <button type="button" className={primaryButton} onClick={onContribute} disabled={!onContribute || archived}>
         {a.contribute}
       </button>
-      <button type="button" className={secondaryButton} onClick={onWithdraw} disabled={!onWithdraw || archived}>
+      <button type="button" className={secondaryButton} onClick={onWithdraw} disabled={!onWithdraw || archived || withdrawDisabled}>
         {a.withdraw}
       </button>
-      </div>
-      <details className="rounded-2xl border border-border bg-surface p-4">
+      </div>}
+      {section !== "actions" && <details className="rounded-2xl border border-border bg-surface p-4">
       <summary className="cursor-pointer text-[14px] font-medium text-text">Quản lý mục tiêu</summary>
       <div className="mt-3 grid grid-cols-2 gap-2">
       <button type="button" className={secondaryButton} onClick={onEdit}>
@@ -52,7 +56,7 @@ export function GoalActionBar({
         {a.delete}
       </button>
       </div>
-      </details>
+      </details>}
     </div>
   );
 }

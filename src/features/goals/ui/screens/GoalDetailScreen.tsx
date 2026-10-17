@@ -71,9 +71,9 @@ export function GoalDetailScreen({ id }: { id: string }) {
       <Card className="flex flex-col gap-4 rounded-2xl">
         <GoalDetailHeader goal={goal} />
       </Card>
-      <GoalTimeline goal={goal} ledger={ledger} />
-      <Card className="rounded-2xl"><h2 className="mb-2 text-[18px] font-semibold text-text">Kế hoạch của bạn</h2><GoalDetailStats goal={goal} /></Card>
       <GoalActionBar
+        section="actions"
+        withdrawDisabled={goal.currentAmount === 0}
         status={goal.status}
         onContribute={() => setLedgerKind("deposit")}
         onWithdraw={() => setLedgerKind("withdraw")}
@@ -82,9 +82,22 @@ export function GoalDetailScreen({ id }: { id: string }) {
         onArchive={() => setStatus("archived")}
         onDelete={() => setConfirmingDelete(true)}
       />
+      <Card className="rounded-2xl"><GoalDetailStats goal={goal} /></Card>
+      <GoalTimeline goal={goal} ledger={ledger} />
       <Card className="rounded-2xl">
         <LedgerHistory entries={ledger} />
       </Card>
+      <GoalActionBar
+        section="management"
+        withdrawDisabled={goal.currentAmount === 0}
+        status={goal.status}
+        onContribute={() => setLedgerKind("deposit")}
+        onWithdraw={() => setLedgerKind("withdraw")}
+        onEdit={() => setEditing(true)}
+        onTogglePause={() => setStatus(goal.status === "paused" ? "active" : "paused")}
+        onArchive={() => setStatus("archived")}
+        onDelete={() => setConfirmingDelete(true)}
+      />
       {ledgerKind && (
         <LedgerFlow
           goal={goal}
