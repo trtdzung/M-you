@@ -18,6 +18,7 @@ import { CorrectionsProvider } from "@/state/corrections";
 import { CategoryTaxonomyProvider } from "@/state/categories";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { ManualTxnsProvider } from "@/state/manual-txns";
+import { JarTopupProvider } from "@/state/jar-topup";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
@@ -31,21 +32,23 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <LoginGate>
         <CorrectionsProvider>
           <ManualTxnsProvider>
-            <JarConfigProvider>
-              <CategoryTaxonomyProvider>
-                <CategoryMemoryProvider>
-                  <AssetLiabilityProvider>
-                    <GoalProvider>
-                      <PeriodProvider>
-                        <ConsentGate>
-                          <AutoCategorizeProvider>{children}</AutoCategorizeProvider>
-                        </ConsentGate>
-                      </PeriodProvider>
-                    </GoalProvider>
-                  </AssetLiabilityProvider>
-                </CategoryMemoryProvider>
-              </CategoryTaxonomyProvider>
-            </JarConfigProvider>
+            <JarTopupProvider>
+              <JarConfigProvider>
+                <CategoryTaxonomyProvider>
+                  <CategoryMemoryProvider>
+                    <AssetLiabilityProvider>
+                      <GoalProvider>
+                        <PeriodProvider>
+                          <ConsentGate>
+                            <AutoCategorizeProvider>{children}</AutoCategorizeProvider>
+                          </ConsentGate>
+                        </PeriodProvider>
+                      </GoalProvider>
+                    </AssetLiabilityProvider>
+                  </CategoryMemoryProvider>
+                </CategoryTaxonomyProvider>
+              </JarConfigProvider>
+            </JarTopupProvider>
           </ManualTxnsProvider>
         </CorrectionsProvider>
       </LoginGate>

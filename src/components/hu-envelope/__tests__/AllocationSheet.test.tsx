@@ -4,7 +4,7 @@ import type { JarEnvelopeResult } from "@/domain/engine";
 import type { JarConfig } from "@/domain/models";
 import { monthPeriod } from "@/domain/engine/types";
 
-const updateJars = vi.fn().mockResolvedValue(undefined);
+const addTopups = vi.fn();
 const config: JarConfig = {
   version: 3,
   jars: [
@@ -13,7 +13,7 @@ const config: JarConfig = {
     { id: "savings", label: "Tiết kiệm", categoryIds: [] },
   ],
 };
-vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config, updateJars }) }));
+vi.mock("@/state/jar-topup", () => ({ useJarTopup: () => ({ addTopups }) }));
 
 import { AllocationSheet } from "../AllocationSheet";
 
@@ -46,7 +46,7 @@ function envelope(pool: number | "unknown"): JarEnvelopeResult {
 const onClose = vi.fn();
 
 beforeEach(() => {
-  updateJars.mockClear();
+  addTopups.mockClear();
   onClose.mockClear();
 });
 
@@ -67,47 +67,47 @@ describe("AllocationSheet — cộng thêm vào hũ", () => {
     expect(within(screen.getByText("Còn lại để chia").parentElement!).getByText("5 tr")).toBeInTheDocument();
   });
 
-  it("hạn mức hiện tại vẫn hiện bên cạnh làm tham chiếu", () => {
+  it("số dư hiện tại hiện bên cạnh làm tham chiếu", () => {
     open();
-    expect(screen.getAllByText(/hạn mức hiện tại/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/số dư hiện tại/).length).toBeGreaterThan(0);
   });
 
-  it("cộng thêm vào hũ đã có hạn mức: hạn mức mới = hiện có + số cộng thêm", () => {
+  it("cộng thêm vào hũ: chỉ gửi SỐ DƯ cộng thêm (không đụng hạn mức)", () => {
     open();
-    // food đang 8tr, cộng thêm 1tr → 9tr.
+    // food cộng thêm 1tr → chỉ nạp thêm 1tr vào số dư, budgetLimit giữ nguyên.
     fireEvent.change(screen.getByLabelText("Cộng thêm vào hũ Ăn uống"), { target: { value: "1000000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
-    expect(updateJars).toHaveBeenCalledTimes(1);
-    // Chỉ gửi hũ được cộng; hũ không đụng tới thì bỏ qua.
-    expect(updateJars).toHaveBeenCalledWith({ food: { budgetLimit: 9_000_000 } });
+    fireEvent.click(screen.getByRole("button", { name: "Thêm vào số dư" }));
+    expect(addTopups).toHaveBeenCalledTimes(1);
+    // Chỉ gửi hũ được cộng, dưới dạng số tiền cộng thêm; hũ không đụng tới thì bỏ qua.
+    expect(addTopups).toHaveBeenCalledWith({ food: 1_000_000 });
   });
 
-  it("cộng vào hũ chưa đặt hạn mức: hạn mức mới = đúng số cộng thêm", () => {
+  it("cộng vào hũ chưa có số dư: gửi đúng số cộng thêm", () => {
     open();
     fireEvent.change(screen.getByLabelText("Cộng thêm vào hũ Tiết kiệm"), { target: { value: "976000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
-    expect(updateJars).toHaveBeenCalledWith({ savings: { budgetLimit: 976_000 } });
+    fireEvent.click(screen.getByRole("button", { name: "Thêm vào số dư" }));
+    expect(addTopups).toHaveBeenCalledWith({ savings: 976_000 });
   });
 
   it("KHÔNG cho lưu khi chưa cộng gì — mở rồi bấm Lưu là no-op", () => {
     open();
-    expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
-    expect(updateJars).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Thêm vào số dư" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Thêm vào số dư" }));
+    expect(addTopups).not.toHaveBeenCalled();
   });
 
   it("chặn lưu khi cộng quá phần còn lại (Σ mới > CASA) và hiện cảnh báo", () => {
     open(18_000_000);
     // Phần dư chỉ 5tr; cộng 6tr vào food → vượt.
     fireEvent.change(screen.getByLabelText("Cộng thêm vào hũ Ăn uống"), { target: { value: "6000000" } });
-    expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Thêm vào số dư" })).toBeDisabled();
     expect(screen.getByText(/vượt quá số dư/i)).toBeInTheDocument();
-    expect(updateJars).not.toHaveBeenCalled();
+    expect(addTopups).not.toHaveBeenCalled();
   });
 
   it("shows insufficient-data when the CASA pool is unknown", () => {
     open("unknown");
-    expect(screen.queryByRole("button", { name: "Lưu hạn mức" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thêm vào số dư" })).not.toBeInTheDocument();
     expect(screen.getByText(/Chưa có số dư tài khoản/)).toBeInTheDocument();
   });
 });

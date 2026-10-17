@@ -17,6 +17,8 @@ vi.mock("@/components/common/PeriodPicker", () => ({ PeriodPicker: () => <div>pe
 // Jar config state: `error` is non-null when GET /api/jars failed (U10).
 let jarState: { config: { version: 3; jars: [] }; error: string | null; updateJars: () => Promise<void> };
 vi.mock("@/state/jars", () => ({ useJarConfig: () => jarState }));
+// The allocation sheet tops up jar balances via the session store (no DB).
+vi.mock("@/state/jar-topup", () => ({ useJarTopup: () => ({ addTopups: vi.fn() }) }));
 beforeEach(() => {
   jarState = { config: { version: 3, jars: [] }, error: null, updateJars: vi.fn().mockResolvedValue(undefined) };
 });

@@ -5,6 +5,7 @@ import { AssetLiabilityProvider } from "@/state/assets";
 import { GoalProvider } from "@/state/goals";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
+import { JarTopupProvider } from "@/state/jar-topup";
 import { JarConfigProvider } from "@/state/jars";
 import { CategoryTaxonomyProvider } from "@/state/categories";
 import { PeriodProvider } from "@/state/period";
@@ -44,6 +45,7 @@ function renderOverview() {
     <PersonaProvider>
       <CorrectionsProvider>
       <ManualTxnsProvider>
+        <JarTopupProvider>
         <JarConfigProvider>
           <CategoryTaxonomyProvider>  
             <AssetLiabilityProvider>
@@ -55,6 +57,7 @@ function renderOverview() {
               </AssetLiabilityProvider>
           </CategoryTaxonomyProvider>
         </JarConfigProvider>
+        </JarTopupProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>
     </PersonaProvider>,

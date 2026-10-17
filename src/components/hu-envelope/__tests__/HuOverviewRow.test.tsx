@@ -38,6 +38,11 @@ vi.mock("@/state/use-auto-fund", () => ({
 vi.mock("@/state/manual-txns", () => ({
   useManualTxns: () => ({ update: vi.fn(() => true) }),
 }));
+// The allocation sheet ("Chia ngay") tops up jar balances via the session store;
+// stub it so the row needs no JarTopupProvider.
+vi.mock("@/state/jar-topup", () => ({
+  useJarTopup: () => ({ addTopups: vi.fn() }),
+}));
 
 import { HuOverviewRow } from "../HuOverviewRow";
 

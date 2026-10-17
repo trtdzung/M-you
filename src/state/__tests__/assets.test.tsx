@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { PersonaProvider, usePersona } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
+import { JarTopupProvider } from "@/state/jar-topup";
 import { JarConfigProvider } from "@/state/jars";
 import { CategoryTaxonomyProvider } from "@/state/categories";
 import { PeriodProvider } from "@/state/period";
@@ -23,6 +24,7 @@ function wrapper({ children }: { children: ReactNode }) {
     <PersonaProvider>
       <CorrectionsProvider>
       <ManualTxnsProvider>
+        <JarTopupProvider>
         <JarConfigProvider>
           <CategoryTaxonomyProvider>  
             <AssetLiabilityProvider>
@@ -32,6 +34,7 @@ function wrapper({ children }: { children: ReactNode }) {
               </AssetLiabilityProvider>
           </CategoryTaxonomyProvider>
         </JarConfigProvider>
+        </JarTopupProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>
     </PersonaProvider>

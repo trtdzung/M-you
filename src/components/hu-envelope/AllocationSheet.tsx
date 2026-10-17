@@ -7,29 +7,28 @@ import type { JarEnvelopeResult } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { jarAccent } from "@/lib/category-colors";
 import { formatVndCompact } from "@/lib/format";
-import { useJarConfig } from "@/state/jars";
+import { useJarTopup } from "@/state/jar-topup";
 import { AllocationJarRow } from "./AllocationJarRow";
 
 /**
- * "Chia ngay" bottom sheet: set each jar's **hạn mức** (`budgetLimit`) — the one
- * number that is at once its allocation, its ceiling and its balance. It moves NO
- * real money — a pure display partition of the CASA balance (invariant #3).
+ * "Chia ngay" bottom sheet: hand the "Chờ phân bổ" leftover into jars as **SỐ DƯ**
+ * (balance) — it raises each jar's `remaining`, NOT its `budgetLimit` (hạn mức).
+ * A jar already "đã vượt hạn mức" keeps that verdict after being topped up (the
+ * two-axis rule, journal 260920). It moves NO real money — a pure display
+ * partition of the CASA balance (invariant #3).
  *
  * ADD-TO-JAR: "Còn lại để chia" opens at the residual the overview shows —
- * `CASA − Σ hạn mức hiện có`, i.e. exactly the "Chờ phân bổ" the "Chia ngay →" CTA
+ * `CASA − Σ số dư hiện có`, i.e. exactly the "Chờ phân bổ" the "Chia ngay →" CTA
  * came from (`PendingAllocationCard`, `jarEnvelope.pending`). Every input opens at
  * 0 and is the amount to ADD to that jar, so the user HANDS OUT the leftover into
- * jars instead of rewriting each jar's full total (a prefilled total like 8.100.000
- * read as "edit the whole number", not "top up"). New limit = hạn mức hiện có +
- * số cộng thêm; the leftover shrinks as it is handed out. This sheet only tops up —
- * it never lowers or clears a jar's limit.
+ * jars; the leftover shrinks as it is handed out.
  *
- * Hitting "Lưu hạn mức" without adding anything is a no-op — `canSubmit` requires
+ * Hitting the save button without adding anything is a no-op — `canSubmit` requires
  * a positive total added, so an untouched sheet changes nothing.
  *
- * Guardrail: Σ (hạn mức mới của mọi hũ) ≤ CASA pool, i.e. tổng cộng thêm ≤ phần
- * còn lại. The server re-checks and rejects 422 if exceeded (client check is UX).
- * Writes atomically via `updateJars` (one transaction, one `setConfig`).
+ * Guardrail: Σ (số dư mới của mọi hũ) ≤ CASA pool, i.e. tổng cộng thêm ≤ phần còn
+ * lại. Persistence: DISPLAY-ONLY for the current month (`useJarTopup`) — the top-up
+ * is a session pool→jar rebalance, never written to the DB and never a limit change.
  */
 export function AllocationSheet({
   envelope,
@@ -41,16 +40,14 @@ export function AllocationSheet({
   jars: Jar[];
   onClose: () => void;
 }) {
-  const { updateJars } = useJarConfig();
+  const { addTopups } = useJarTopup();
   const { pending } = envelope;
-  // Every jar opens at 0 — the input is the amount to ADD to that jar, not its new
-  // total. New limit = hạn mức hiện có + số cộng thêm (computed on submit), so the
-  // user distributes the leftover rather than rewriting each full total.
+  // Every jar opens at 0 — the input is the amount to ADD to that jar's balance,
+  // not its new total, so the user distributes the leftover rather than rewriting
+  // each full total.
   const [draft, setDraft] = useState<Record<string, number>>(() =>
     Object.fromEntries(jars.map((j) => [j.id, 0])),
   );
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
 
   const poolKnown = pending.pool !== "unknown";
   const pool = poolKnown ? (pending.pool as number) : 0;
@@ -73,31 +70,23 @@ export function AllocationSheet({
   const leftToSplit = pool - newSpendableTotal;
   // Only savable once the user has actually added something: an untouched sheet
   // (nothing added) is a no-op.
-  const canSubmit = poolKnown && leftToSplit >= 0 && added > 0 && !submitting;
+  const canSubmit = poolKnown && leftToSplit >= 0 && added > 0;
 
-  async function submit() {
-    setError(false);
-    setSubmitting(true);
-    try {
-      // Only send jars the user added to: new limit = hạn mức hiện có + số cộng
-      // thêm. A jar left at 0 is untouched (skipped) — this sheet only tops up, so
-      // it never clears a limit back to "chưa đặt".
-      const patches: Record<string, { budgetLimit: number }> = {};
-      for (const jar of jars) {
-        const delta = draft[jar.id] ?? 0;
-        if (delta <= 0) continue;
-        patches[jar.id] = { budgetLimit: (jar.budgetLimit ?? 0) + delta };
-      }
-      await updateJars(patches);
-      onClose();
-    } catch {
-      setError(true); // keep the draft so the user can retry
-      setSubmitting(false);
+  function submit() {
+    // Only the jars the user added to; a jar left at 0 is untouched (skipped). The
+    // top-up raises each jar's SỐ DƯ for the current month (display-only session
+    // pool→jar rebalance) and never touches its `budgetLimit`.
+    const patches: Record<string, number> = {};
+    for (const jar of jars) {
+      const delta = draft[jar.id] ?? 0;
+      if (delta > 0) patches[jar.id] = delta;
     }
+    addTopups(patches);
+    onClose();
   }
 
   return (
-    <Sheet title="Chia tiền vào hũ" description="Nhập số tiền cộng thêm vào mỗi hũ để chia hết phần đang chờ. Hạn mức là số dư hiển thị của hũ. Không chuyển tiền, không cần OTP." onClose={onClose}>
+    <Sheet title="Chia tiền vào hũ" description="Nhập số tiền cộng thêm vào mỗi hũ để chia hết phần đang chờ. Chỉ tăng SỐ DƯ của hũ, không đổi hạn mức. Không chuyển tiền, không cần OTP." onClose={onClose}>
       {!poolKnown ? (
         <InsufficientData description="Chưa có số dư tài khoản để phân bổ." />
       ) : (
@@ -115,7 +104,7 @@ export function AllocationSheet({
                 key={jar.id}
                 label={jar.label}
                 accent={jarAccent(jar)}
-                currentLimit={jar.budgetLimit ?? null}
+                currentBalance={envelope.jars.find((l) => l.jarId === jar.id)?.remaining ?? null}
                 value={draft[jar.id] ?? 0}
                 onChange={(next) => setDraft((d) => ({ ...d, [jar.id]: next }))}
               />
@@ -124,12 +113,7 @@ export function AllocationSheet({
 
           {leftToSplit < 0 && (
             <p role="alert" className="mt-2 text-sm text-negative">
-              Tổng hạn mức vượt quá số dư. Giảm bớt để tổng ≤ số dư.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="mt-2 text-sm text-negative">
-              Lưu hạn mức thất bại. Vui lòng thử lại.
+              Tổng vượt quá số dư khả dụng. Giảm bớt để tổng ≤ số dư.
             </p>
           )}
 
@@ -139,7 +123,7 @@ export function AllocationSheet({
             disabled={!canSubmit}
             className="mt-4 inline-flex h-12 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
-            {submitting ? "Đang lưu…" : "Lưu hạn mức"}
+            Thêm vào số dư
           </button>
         </div>
       )}

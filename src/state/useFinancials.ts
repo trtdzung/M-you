@@ -15,6 +15,7 @@ import { useAssetLiabilities } from "./assets";
 import { useCategories } from "./categories";
 import { useCorrections, applyCorrections, isHidden } from "./corrections";
 import { useManualTxns } from "./manual-txns";
+import { useJarTopup } from "./jar-topup";
 import { useGoals } from "./goals";
 import { useJarConfig } from "./jars";
 import { usePeriod } from "./period";
@@ -27,8 +28,10 @@ export interface UseFinancialsResult {
   error: boolean;
   raw: RawData | null;
   /**
-   * The spend-truth view: provider + manual txns, category corrections applied,
-   * hidden rows EXCLUDED. This feeds the engine and every aggregate.
+   * The spend-truth view: provider + manual txns + session jar top-ups, category
+   * corrections applied, hidden rows EXCLUDED. This feeds the engine and every
+   * aggregate (including jar balance / spendable and the "Chưa phân bổ" pool), so
+   * every screen that derives a jar number agrees.
    */
   transactions: Transaction[];
   /**
@@ -49,6 +52,7 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const providers = useProviders();
   const { corrections } = useCorrections();
   const { manualTxns } = useManualTxns();
+  const { topupTxns } = useJarTopup();
   const { config: jarConfig } = useJarConfig();
   // The persona's STORED taxonomy — categories are data (invariant #7), so the
   // engine is told which labels and which `fixed` flags to compose with instead
@@ -104,11 +108,18 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   );
 
   // Engine view: same array minus rows the user hid from reports (invariant #6 —
-  // excluded like reversed/pending, never deleted).
-  const transactions = useMemo(
-    () => allTransactions.filter((t) => !isHidden(corrections, t.id)),
-    [allTransactions, corrections],
-  );
+  // excluded like reversed/pending, never deleted), PLUS session-only jar top-ups.
+  // A top-up is a pool→jar `REBALANCE_CATEGORY` txn (see `jar-topup`), folded into
+  // each jar's `remaining` (balance) via the engine's rebalance channel WITHOUT
+  // touching `budgetLimit` (hạn mức). It lives in the ENGINE view — so every
+  // consumer that derives jar balance / spendable / the "Chưa phân bổ" pool
+  // (`computeFinancials`, `useAutoFundWith`, the transfer source picker, confirm,
+  // reports) agrees — but NOT in `allTransactions`, so the raw txn history list
+  // stays the persisted truth and never shows a display-only boost as a real row.
+  const transactions = useMemo(() => {
+    const base = allTransactions.filter((t) => !isHidden(corrections, t.id));
+    return topupTxns.length ? [...topupTxns, ...base] : base;
+  }, [allTransactions, corrections, topupTxns]);
 
   // `userAssets`/`userLiabilities` are context state (single source of truth),
   // not part of the one-time `raw` fetch — including them as deps here is what

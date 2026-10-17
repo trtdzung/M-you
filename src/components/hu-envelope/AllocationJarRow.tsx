@@ -2,22 +2,22 @@ import { formatVndCompact } from "@/lib/format";
 
 /**
  * One jar's row inside the "Chia ngay" sheet: colour dot + label + its CURRENT
- * hạn mức as reference text, and a VND input for the amount to ADD to this jar.
- * The input OPENS AT 0 (blank with a "0" placeholder): the user types how much to
- * hand this jar from the leftover, not its full new total. Presentation + a
+ * số dư as reference text, and a VND input for the amount to ADD to this jar's
+ * balance. The input OPENS AT 0 (blank with a "0" placeholder): the user types how
+ * much to hand this jar from the leftover, not its full new total. Presentation + a
  * controlled input only; the cap/guardrail logic lives in `AllocationSheet`.
  */
 export function AllocationJarRow({
   label,
   accent,
-  currentLimit,
+  currentBalance,
   value,
   onChange,
 }: {
   label: string;
   accent: string;
-  /** The jar's current hạn mức (`budgetLimit`); `null` = chưa đặt. */
-  currentLimit: number | null;
+  /** The jar's current SỐ DƯ (`remaining`); `null` = chưa có số dư. */
+  currentBalance: number | null;
   value: number;
   onChange: (next: number) => void;
 }) {
@@ -27,7 +27,7 @@ export function AllocationJarRow({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-text">{label}</div>
         <div className="text-[11px] text-muted">
-          {currentLimit === null ? "chưa đặt hạn mức" : `hạn mức hiện tại ${formatVndCompact(currentLimit)}`}
+          {currentBalance === null ? "chưa có số dư" : `số dư hiện tại ${formatVndCompact(currentBalance)}`}
         </div>
       </div>
       <input
