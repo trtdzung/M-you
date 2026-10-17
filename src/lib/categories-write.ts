@@ -93,11 +93,9 @@ function assertLabelFree(cif: string, label: string, exceptId?: string): void {
  * Create a user category for `cif`. `kind` is forced to `expense` — the transfer
  * category is a system concept the engine uses to EXCLUDE a txn from spend.
  *
- * With no `jarId` the row is inserted and the jar set re-read: the read-heal sees
- * a brand-new orphan expense category and puts it in "Khác", which is then
- * persisted. With a `jarId` the jar set is read BEFORE the insert (so no orphan
- * exists yet, and no stray empty "Khác" jar is synthesised) and the id is
- * appended to that jar instead.
+ * With no `jarId` the row is inserted and the jar set re-read unchanged: the new
+ * category is "chưa xếp hũ" (in no jar). With a `jarId` the id is appended to that
+ * jar instead.
  */
 export function insertCategory(
   cif: string,
@@ -128,7 +126,7 @@ export function insertCategory(
 
     const jars =
       input.jarId === undefined
-        ? readJarConfig(cif).jars // heal drops the new orphan into "Khác"
+        ? readJarConfig(cif).jars // no jar claims the new category — "chưa xếp hũ"
         : before.jars.map((j) => (j.id === input.jarId ? { ...j, categoryIds: [...j.categoryIds, id] } : j));
     return aggregate(cif, writeJarConfig(cif, { version: 3, jars }));
   });

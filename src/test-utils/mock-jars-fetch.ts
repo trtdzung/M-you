@@ -12,7 +12,7 @@
  * Business logic is never duplicated — only the HTTP/DB transport is faked.
  */
 
-import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
+import { dedupeCategories } from "@/domain/jar-rules";
 import { fitsCasaCap, jarSpendableTotal } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
 import type { JarConfig } from "@/domain/models";
@@ -83,16 +83,12 @@ function commit(next: JarConfig, cif: string | null, write = true): JarConfig {
   const nowIso = transferNow().toISOString();
   const jars = next.jars.map((j) => ({ ...j, createdAt: createdById.get(j.id) ?? nowIso }));
   const ids = new Set(jars.map((j) => j.id));
-  // A write stores every jar it was handed (like `writeJarConfig`); a read stores
-  // nothing, so a "Khác" the heal adds below on a GET has no row yet.
+  // A write stores every jar it was handed (like `writeJarConfig`).
   if (write) rowIds = ids;
   const ledger = (next.ledger ?? store.ledger ?? []).filter((e) => ids.has(e.jarId));
-  // No cif ⇒ no persona ⇒ no taxonomy to heal against. An EMPTY set is the honest
-  // answer (nothing is orphaned because nothing is known), and it matches the
-  // real route, which refuses a cif-less write outright rather than healing
-  // against the bundled seed.
-  const assignable = cif ? mockAssignableCategoryIds(cif) : new Set<string>();
-  store = { ...healOrphanCategories(dedupeCategories({ version: 3, jars }), assignable), ledger };
+  // Like the real `readJarConfig`: deduped only — a category no jar claims is
+  // simply "chưa xếp hũ", nothing is invented to hold it.
+  store = { ...dedupeCategories({ version: 3, jars }), ledger };
   return store;
 }
 

@@ -222,7 +222,7 @@ describe("HuEditorSheet — delete with rebalance legs (U8)", () => {
     const { dialog } = await openEditor("Di chuyển");
     await waitFor(() => expect(screen.getByTestId("legs")).toHaveTextContent("1"));
     fireEvent.click(within(dialog).getByRole("button", { name: /Xoá hũ/ }));
-    expect(within(dialog).getByText(/Danh mục trong hũ sẽ chuyển sang “Khác”/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Các danh mục trong hũ sẽ thành “Chưa xếp hũ”/)).toBeInTheDocument();
     expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
   });
 });

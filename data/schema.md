@@ -101,8 +101,8 @@ category added in code appears on the next read for every persona, an existing
 
 **Why per-cif.** `jars` is per-cif and every expense category belongs to exactly
 one jar. With a global taxonomy, one persona creating a category would make it an
-orphan for *every* persona, and each one's next `readJarConfig` would silently
-heal it into their "Khác" jar — one user's edit rewriting everyone's jar config.
+orphan for *every* persona, and every persona would suddenly own a category
+their jars do not claim — one user's edit rewriting everyone's taxonomy.
 
 > ⚠️ **Not backward compatible.** The pre-Phase-02 table has no `cif` column and
 > `CREATE TABLE IF NOT EXISTS` will not add one, so a stale `data/pfm.sqlite3`
@@ -129,7 +129,7 @@ resulting aggregate `{categories, jarConfig}`. Ids are generated server-side fro
 the label (slug whitelist `c_` + `[a-z0-9-]`) — a client-supplied `id` is ignored.
 
 Three id sets are derived from this table (`categories-store.ts`):
-`assignableCategoryIds` (active expense — pickers and the orphan-heal),
+`assignableCategoryIds` (active expense — the jar pickers),
 `knownExpenseCategoryIds` (active ∪ archived expense — the jar write guard) and
 `knownCategoryIds` (everything — the `transaction_corrections` write guard).
 Archiving is the escape hatch for a category still in use: it leaves the pickers

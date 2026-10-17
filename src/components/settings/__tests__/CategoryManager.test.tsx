@@ -25,8 +25,6 @@ import { HuCategoryTab } from "../HuCategoryTab";
  * `groceries`, and the persona's taxonomy is the 10 bundled expense presets.
  *
  * The invariants under test, not just the clicks:
- *  - create-from-a-hũ is ONE write carrying `jarId` (never create-into-Khác then
- *    move — two writes, a flicker, and a third door onto `categoryIds`);
  *  - a refused delete is never a dead end: the 409 swaps the same sheet to the
  *    hide offer, with the SERVER's count;
  *  - hiding moves nothing: the hũ keeps the category, so no displayed total
@@ -60,19 +58,6 @@ function interceptFetch(handler: (url: string, init?: RequestInit) => Promise<Re
   });
 }
 
-/** Record every call matching `pred` (url + raw body) without altering the response. */
-function captureCalls(pred: (url: string, init?: RequestInit) => boolean) {
-  const calls: { url: string; body: string }[] = [];
-  interceptFetch((url, init) => {
-    if (pred(url, init)) calls.push({ url, body: String(init?.body) });
-    return null;
-  });
-  return calls;
-}
-
-const isCategoryPost = (url: string, init?: RequestInit) =>
-  url.startsWith("/api/categories") && init?.method === "POST";
-
 const topDialog = async () => (await screen.findAllByRole("dialog")).at(-1) as HTMLElement;
 const jarRowText = (label: string) => screen.getByText(label).closest("button")?.textContent ?? "";
 
@@ -93,20 +78,25 @@ async function submitCreate(label: string) {
   fireEvent.click(screen.getByRole("button", { name: "Tạo danh mục" }));
 }
 
-/** Create from the manager (no hũ chosen → the server heals it into "Khác"). */
+/** Create from the manager (no hũ chosen → the category is "chưa xếp hũ"). */
 async function createFromManager(label: string) {
   fireEvent.click(screen.getByRole("button", { name: "Thêm danh mục" }));
   await submitCreate(label);
   fireEvent.click(await screen.findByRole("button", { name: "Xong" }));
 }
 
-/** Open the "Ăn uống" hũ editor and create `label` straight into it. */
-async function createFromJarPicker(label: string) {
+/**
+ * The jar editor no longer offers "＋ Thêm danh mục": create `label` from the manager,
+ * assign it to the "Ăn uống" hũ with the row's hũ select, then reopen that hũ's editor.
+ */
+async function createIntoFoodJar(label: string) {
+  const manager = await openManager();
+  await createFromManager(label);
+  fireEvent.change(await screen.findByLabelText(`Hũ của ${label}`), { target: { value: "food" } });
+  await waitFor(() => expect((screen.getByLabelText(`Hũ của ${label}`) as HTMLSelectElement).value).toBe("food"));
+  fireEvent.click(within(manager).getByLabelText("Đóng"));
   fireEvent.click(screen.getByText("Ăn uống"));
-  const editor = await topDialog();
-  fireEvent.click(await within(editor).findByRole("button", { name: "Thêm danh mục" }));
-  await submitCreate(label);
-  return editor;
+  return topDialog();
 }
 
 beforeEach(() => {
@@ -135,33 +125,19 @@ describe("CategoryManager — the two sections (invariant #5: user data is not b
     expect(screen.getAllByLabelText("Danh mục mặc định (khoá)")).toHaveLength(10);
   });
 
-  it("puts a category created from the manager into «Khác» and under «Danh mục của bạn»", async () => {
+  it("leaves a category created from the manager unassigned (Chưa xếp hũ) and under «Danh mục của bạn»", async () => {
     await openTab();
     await openManager();
     fireEvent.click(screen.getByRole("button", { name: "Thêm danh mục" }));
     await submitCreate("Học phí");
 
-    expect(await screen.findByText(/Đã thêm vào hũ «Khác»/)).toBeInTheDocument();
+    expect(await screen.findByText(/Danh mục đang ở “Chưa xếp hũ”/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Xong" }));
 
     const mine = (await screen.findByRole("heading", { name: "Danh mục của bạn" })).closest("section");
     expect(mine).not.toBeNull();
     expect(within(mine as HTMLElement).getByLabelText("Tên danh mục Học phí")).toBeInTheDocument();
-    expect((screen.getByLabelText("Hũ của Học phí") as HTMLSelectElement).value).toBe("khac");
-  });
-});
-
-describe("CategoryManager — create from inside a hũ is ONE write", () => {
-  it("POSTs once with the open hũ's jarId and renders the new row already checked", async () => {
-    const calls = captureCalls(isCategoryPost);
-    await openTab();
-    const editor = await createFromJarPicker("Học phí");
-
-    const row = await within(editor).findByRole("button", { name: /Học phí/ });
-    await waitFor(() => expect(row).toHaveAttribute("aria-pressed", "true"));
-
-    expect(calls).toHaveLength(1);
-    expect(JSON.parse(calls[0].body)).toMatchObject({ label: "Học phí", fixed: false, jarId: "food" });
+    expect((screen.getByLabelText("Hũ của Học phí") as HTMLSelectElement).value).toBe("");
   });
 });
 
@@ -201,7 +177,7 @@ describe("CategoryManager — rename", () => {
 describe("CategoryManager — delete", () => {
   it("removes an unused category and drops the owning hũ's category count by one", async () => {
     await openTab();
-    const editor = await createFromJarPicker("Học phí");
+    const editor = await createIntoFoodJar("Học phí");
     await within(editor).findByRole("button", { name: /Học phí/ });
     fireEvent.click(within(editor).getByLabelText("Đóng"));
     await waitFor(() => expect(jarRowText("Ăn uống")).toMatch(/3 danh mục/));
@@ -217,7 +193,7 @@ describe("CategoryManager — delete", () => {
 
   it("offers hiding with the SERVER's count when the category is still in use, and hiding moves no total", async () => {
     await openTab();
-    const editor = await createFromJarPicker("Học phí");
+    const editor = await createIntoFoodJar("Học phí");
     await within(editor).findByRole("button", { name: /Học phí/ });
     fireEvent.click(within(editor).getByLabelText("Đóng"));
 

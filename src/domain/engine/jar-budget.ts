@@ -65,8 +65,8 @@ export function ownedCategories(jarId: string, categoryIds: string[], catToJar: 
 
 /**
  * Compute the per-jar budget for `period` vs `prevPeriod`. Pure and deterministic;
- * `now` is injected for `daysLeft`. Jars keep config order; the "Khác" catch-all
- * (if present in config) is treated like any other jar.
+ * `now` is injected for `daysLeft`. Jars keep config order. A category in no jar is
+ * simply not part of any jar's budget ("chưa xếp hũ" — the reports group it separately).
  */
 export function evaluateJarBudget(
   config: JarConfig,
@@ -151,7 +151,7 @@ export function evaluateJarBudget(
   };
 
   // Result-level provenance over every contributing category (unmapped categories
-  // are not this engine's concern — the "Khác" jar, if configured, covers them).
+  // are not this engine's concern — they belong to no jar's budget).
   const allSources = Array.from(catToJar.keys()).flatMap((c) => provNow.get(c)?.sources ?? []);
   const freshness = lines.reduce<string | null>(
     (acc, l) => (l.freshness && (!acc || l.freshness > acc) ? l.freshness : acc),

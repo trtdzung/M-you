@@ -13,8 +13,7 @@ import "server-only";
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
-import { dedupeCategories, healOrphanCategories, isJarAmount } from "@/domain/jar-rules";
-import { assignableCategoryIds } from "./categories-store";
+import { dedupeCategories, isJarAmount } from "@/domain/jar-rules";
 import { getDb } from "./db";
 import { transferNow } from "./demo-clock";
 import { deleteLedgerExcept, readJarLedger } from "./jar-ledger-store";
@@ -122,24 +121,25 @@ export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | nul
 
 /**
  * Guard for a `POST /api/jars` body (plan 260923, D2): the jar must pass
- * `sanitizeJar` AND carry a `budgetLimit`, and `balance` (the opening deposit) is
- * REQUIRED — both whole-VND in `[0, MAX_JAR_AMOUNT]`. A missing balance is never
- * defaulted to 0 (invariant #6); the caller answers 422 with `error`.
+ * `sanitizeJar`, and `balance` (the opening deposit) is REQUIRED whole VND in
+ * `[0, MAX_JAR_AMOUNT]` — a missing balance is never defaulted to 0 by the server
+ * (invariant #6); the caller answers 422 with `error`. `budgetLimit` is OPTIONAL:
+ * a jar with nothing to plan (e.g. "Tiết kiệm") is created with no limit — stored
+ * as null, "chưa đặt" — and an explicit opening balance of 0.
  */
 export function sanitizeJarCreate(
   body: unknown,
-): { jar: Jar & { budgetLimit: number }; balance: number } | { error: string } {
+): { jar: Jar; balance: number } | { error: string } {
   const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
   const jar = sanitizeJar(b.jar);
   if (!jar) return { error: "jar is invalid" };
-  if (jar.budgetLimit === undefined) return { error: "jar.budgetLimit is required" };
   if (!isJarAmount(b.balance)) return { error: "balance is required (whole VND, 0 to 10^12)" };
-  return { jar: { ...jar, budgetLimit: jar.budgetLimit }, balance: b.balance };
+  return { jar, balance: b.balance };
 }
 
 /**
  * Ids of the persona's jars that have a REAL `jars` row — i.e. excluding the
- * synthetic "Khác" `readJarConfig` heals in on the fly. Ledger writes are allowed
+ * synthetic "Khác" the old `readJarConfig` healed in on the fly. Ledger writes are allowed
  * only for these (Red Team #5): a row-less jar has no anchor to hold a balance.
  */
 export function readJarRowIds(cif: string): Set<string> {
@@ -160,24 +160,19 @@ export function sanitizeJars(input: unknown): Jar[] | null {
 }
 
 /**
- * The persona's jars in display order, normalized (dedupe → heal) on every call
- * — this is what makes every route handler's response correct regardless of how
- * the underlying rows got there. An unknown `cif` (or one that has never had a
- * jar) does NOT yield an empty list: with zero stored rows,
- * `healOrphanCategories` sees every expense category as orphaned and synthesizes
- * a single catch-all "Khác" jar holding all of them (the same healing that runs
- * for any other persona) — this config is never a crash, but callers should not
- * assume "no rows" means "no jars back". The heal runs against this persona's
- * STORED assignable taxonomy, not the bundled constant: that is what makes a
- * category the user just created land in "Khác" by itself, and what leaves an
- * ARCHIVED one (absent from that set) exactly where it is — the heal only ever
- * adds, so no historical jar total moves.
+ * The persona's jars in display order, deduped (one category, at most one jar) on
+ * every call — this is what makes every route handler's response correct
+ * regardless of how the underlying rows got there. An unknown `cif` (or one that
+ * has never had a jar) yields an empty list. Nothing is invented for a category
+ * that no jar claims (a new category, or one whose jar was deleted): it is simply
+ * "chưa xếp hũ" — its spend still counts in the reports, under their own
+ * "Chưa xếp hũ" group, never silently dropped.
  */
 export function readJarConfig(cif: string): JarConfig {
   const rows = getDb().prepare("SELECT * FROM jars WHERE cif = ? ORDER BY sort_order ASC").all(cif) as JarRow[];
   const config = dedupeCategories({ version: 3, jars: rows.map(toJar) });
-  // Ledger attached AFTER dedupe/heal — both rebuild the config object.
-  return { ...healOrphanCategories(config, assignableCategoryIds(cif)), ledger: readJarLedger(cif) };
+  // Ledger attached AFTER dedupe — it rebuilds the config object.
+  return { ...config, ledger: readJarLedger(cif) };
 }
 
 /**

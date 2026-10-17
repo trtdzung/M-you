@@ -93,13 +93,7 @@ describe("HuCategoryTab", () => {
 
     fireEvent.change(within(sheet).getByLabelText("Tên hũ mới"), { target: { value: "Du lịch" } });
     fireEvent.change(within(sheet).getByLabelText("Hạn mức chi mỗi tháng"), { target: { value: "2000000" } });
-    // Empty balance is rejected, never read as 0.
-    fireEvent.click(within(sheet).getByRole("button", { name: "Tạo hũ" }));
-    expect(within(sheet).getByRole("alert")).toHaveTextContent("Nhập số dư ban đầu");
-    expect(screen.queryByText("Du lịch")).not.toBeInTheDocument();
-
-    // An explicit 0 is a valid known balance.
-    fireEvent.change(within(sheet).getByLabelText("Số dư ban đầu"), { target: { value: "0" } });
+    // A blank opening balance is created as an explicit 0 (the limit/balance are optional to fill).
     fireEvent.click(within(sheet).getByRole("button", { name: "Tạo hũ" }));
     const editor = await screen.findByRole("dialog", { name: "Sửa hũ" });
     expect(within(editor).getByDisplayValue("Du lịch")).toBeInTheDocument();

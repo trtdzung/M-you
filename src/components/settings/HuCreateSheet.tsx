@@ -11,22 +11,24 @@ import { parseVndInput } from "./parse-vnd-input";
 const inputClass =
   "min-h-11 rounded-row border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
 
-/** A required VND field: empty is NOT 0 (invariant #6), so it is an error here. */
-function requiredVnd(raw: string, emptyMessage: string): { value: number } | { error: string } {
+/** A typed (non-blank) VND field: unparseable or oversized input is an error. */
+function typedVnd(raw: string): { value: number } | { error: string } {
   const parsed = parseVndInput(raw);
-  if (parsed.kind === "empty") return { error: emptyMessage };
+  if (parsed.kind === "empty") return { error: "Nhập số tiền." };
   if (parsed.kind === "error") return { error: parsed.message };
   if (!isJarAmount(parsed.value)) return { error: "Số tiền quá lớn" };
   return { value: parsed.value };
 }
 
 /**
- * "Thêm hũ" (plan 260923 D2): a jar is created ONLY once name, HẠN MỨC (monthly
- * plan) and SỐ DƯ BAN ĐẦU (opening balance) are all valid — one POST, no empty
- * "Hũ mới" persisted first. Balance 0 is an explicit, allowed value (a known 0);
- * an empty balance is rejected, never read as 0. A balance > 0 must fit "Chờ phân
- * bổ" (the server re-checks: 422 `overBy`). With the pool unknown/loading only a
- * 0 balance can be created. No money moves, no OTP (invariant #3).
+ * "Thêm hũ" (plan 260923 D2): a jar is created ONLY once its name is set and any
+ * HẠN MỨC (monthly plan) / SỐ DƯ BAN ĐẦU (opening balance) typed are valid — one
+ * POST, no empty "Hũ mới" persisted first. Both are OPTIONAL to fill in: a jar with
+ * nothing to plan (e.g. "Tiết kiệm") is created with the limit left blank
+ * (= "chưa đặt", stored null — never a fake 0) and an opening balance of 0. A
+ * balance > 0 must fit "Chờ phân bổ" (the server re-checks: 422 `overBy`). With the
+ * pool unknown/loading only a 0 balance can be created. No money moves, no OTP
+ * (invariant #3).
  */
 export function HuCreateSheet({
   funds,
@@ -55,12 +57,13 @@ export function HuCreateSheet({
         ? "Chưa có số dư tài khoản — chỉ tạo được hũ với số dư 0."
         : `Chờ phân bổ: ${formatVnd(available)}`;
 
-  function validate(): { label: string; limit: number; balance: number } | string {
+  function validate(): { label: string; limit: number | undefined; balance: number } | string {
     const label = name.trim();
     if (!label) return "Nhập tên hũ.";
-    const limit = requiredVnd(limitRaw, "Nhập hạn mức chi mỗi tháng.");
+    // Blank limit = "chưa đặt" (undefined → stored null); blank balance = an explicit 0.
+    const limit = limitRaw.trim() === "" ? { value: undefined } : typedVnd(limitRaw);
     if ("error" in limit) return `Hạn mức: ${limit.error}`;
-    const balance = requiredVnd(balanceRaw, "Nhập số dư ban đầu (nhập 0 nếu chưa nạp).");
+    const balance = balanceRaw.trim() === "" ? { value: 0 } : typedVnd(balanceRaw);
     if ("error" in balance) return `Số dư: ${balance.error}`;
     if (balance.value > 0 && available === null) return poolHint;
     if (available !== null && balance.value > available) {
@@ -79,7 +82,10 @@ export function HuCreateSheet({
     setRefused(false);
     setSaving(true);
     const id = `jar-${Date.now()}`;
-    const ok = await addJar({ id, label: valid.label, categoryIds: [], budgetLimit: valid.limit }, valid.balance);
+    const ok = await addJar(
+      { id, label: valid.label, categoryIds: [], ...(valid.limit !== undefined ? { budgetLimit: valid.limit } : {}) },
+      valid.balance,
+    );
     setSaving(false);
     if (ok) onCreated(id);
     else setRefused(true);
@@ -92,7 +98,7 @@ export function HuCreateSheet({
   };
 
   return (
-    <Sheet title="Thêm hũ" description="Đặt hạn mức chi mỗi tháng và số dư ban đầu cho hũ mới." onClose={onClose}>
+    <Sheet title="Thêm hũ" description="Hạn mức chi mỗi tháng và số dư ban đầu có thể để trống (hạn mức chưa đặt, số dư 0)." onClose={onClose}>
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">Tên hũ</span>
@@ -100,8 +106,8 @@ export function HuCreateSheet({
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">Hạn mức chi mỗi tháng</span>
-          <input value={limitRaw} onChange={edit(setLimitRaw)} inputMode="numeric" placeholder="vd 3.000.000" aria-label="Hạn mức chi mỗi tháng" className={`${inputClass} text-right`} />
-          <span className="text-xs text-muted">Kế hoạch chi, đặt lại mỗi tháng — không phải tiền trong hũ.</span>
+          <input value={limitRaw} onChange={edit(setLimitRaw)} inputMode="numeric" placeholder="Để trống nếu chưa đặt (vd 3.000.000)" aria-label="Hạn mức chi mỗi tháng" className={`${inputClass} text-right`} />
+          <span className="text-xs text-muted">Kế hoạch chi, đặt lại mỗi tháng — không phải tiền trong hũ. Để trống nếu hũ không cần (vd Tiết kiệm).</span>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">Số dư ban đầu</span>

@@ -110,7 +110,7 @@ tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng
 |---|---|---|
 | `id` | string | id hũ — Agent trả lại đúng id này trong `edit_jar` / `rebalance_jars` |
 | `label` | string | tên hiển thị |
-| `categoryIds` | string[] | category chi tiêu thuộc hũ (**1 category chỉ thuộc đúng 1 hũ**) |
+| `categoryIds` | string[] | category chi tiêu thuộc hũ (**1 category thuộc tối đa 1 hũ**; category không nằm trong `categoryIds` của hũ nào là "chưa xếp hũ") |
 | `limit` | number \| `null` | **hạn mức tháng** (kế hoạch chi, VND/tháng, đặt lại mỗi tháng). `null` = chưa đặt — không phải `0`. **Không phải tiền trong hũ** |
 | `budgetLimit` | number \| `null` | alias của `limit` (giữ cho code cũ) |
 | `spent` | number | đã chi trong `month` (chi tiêu ròng, đã trừ hoàn tiền) |
@@ -150,6 +150,18 @@ Hũ **"cần bù"** = `balance < 0` (không phải `overLimit`).
 **Cách nói với khách:** không nói "số dư âm". Hũ có `balance < 0` thì nói "hết số dư, còn
 thiếu {−balance} chưa được bù"; nói "đã vượt hạn mức {spent − limit}" **riêng** khi
 `overLimit` là `true`. `balance: null` thì nói "hũ chưa có số dư", không nói "0".
+
+> ⚠️ **Thay đổi (2026-09-24, không đổi shape response):**
+> - **Không còn hũ "Khác" tự sinh trong `jars[]`.** Trước đây danh mục không hũ nào giữ được server
+>   chữa vào 1 hũ `id: "khac"`; nay xoá hũ là xoá hẳn và danh mục của hũ đó (cũng như danh mục mới
+>   tạo) đơn giản **không thuộc hũ nào** — chỉ có hũ nào thật sự có trong DB mới xuất hiện. "Danh
+>   mục chưa xếp" = danh mục `kind: "expense"` từ `GET /api/categories` mà **không** nằm trong
+>   `categoryIds` của hũ nào ở `jar-summary`. Chi tiêu của chúng vẫn tính vào tổng chi (báo cáo
+>   nhóm "Chưa xếp hũ") nhưng không thuộc ngân sách hũ nào.
+> - **Hũ có thể `limit: null` mà `balance` là số (thường `0`).** Tạo hũ giờ cho phép không đặt hạn
+>   mức (vd "Tiết kiệm"): `limit: null` (chưa đặt hạn mức) + số dư ban đầu tường minh `0` →
+>   `balance: 0`, `spendable: 0` — khác `balance: null` (hũ chưa từng được nạp). Đừng suy `limit`
+>   `null` ⇒ `balance` `null`.
 
 Các số tiền `null` nghĩa là **chưa biết** — đừng coi là 0. `500`
 `{"error":"jar summary unavailable"}` là lỗi đọc dữ liệu, không phải "hũ trống".
@@ -298,7 +310,8 @@ Agent **không gửi `id`** (`pfm` tự sinh). Khi gợi ý phải tôn trọng:
   `initial_balance: 0`; nói rõ trong `answer` là hũ chưa có tiền. Server kiểm lại (`422` nếu
   vượt), card hiện lý do bằng tiếng Việt.
 - **`category_ids` của `create_jar` chỉ được gồm danh mục "chưa xếp hũ".** Một danh mục là
-  chưa xếp khi **không hũ nào** giữ nó, hoặc chỉ hũ **"Khác"** (`id: "khac"`) giữ nó — suy ra từ
+  chưa xếp khi **không hũ nào** giữ nó (từ 2026-09-24 xoá hũ là xoá hẳn — danh mục của hũ đó
+  thành "chưa xếp hũ", không còn hũ "Khác" tự sinh) — suy ra từ
   `categoryIds` của từng hũ trong `jar-summary` so với danh sách `GET /api/categories?cif=`.
   Form tạo hũ trên `pfm` **chỉ cho chọn trong các danh mục chưa xếp** và **bỏ** danh mục đang
   thuộc hũ khác khỏi đề xuất (kèm dòng "… đang thuộc hũ X nên không chọn được"). Muốn lấy danh
@@ -338,11 +351,11 @@ Sửa tên, hạn mức, category của 1 hũ đã có.
 
 Khi khách muốn chuyển danh mục X từ hũ **A** sang hũ **B**, Agent trả **một** `edit_jar`
 cho **hũ nhận B**, với `category_ids` = **danh sách đầy đủ của B sau khi nhận** (danh mục B
-đang có + X). Server tự lấy X ra khỏi A vì 1 danh mục chỉ thuộc 1 hũ.
+đang có + X). Server tự lấy X ra khỏi A vì 1 danh mục chỉ thuộc tối đa 1 hũ.
 
-**Không** trả `edit_jar` cho hũ cho A với `category_ids` bỏ X: khi đó X không thuộc hũ nào và
-server đưa nó về hũ **"Khác"**, không sang B như khách yêu cầu. Chỉ bỏ X khỏi một hũ (không
-gán cho hũ nào) khi khách nói rõ muốn đưa X về "Khác".
+**Không** trả `edit_jar` cho hũ cho A với `category_ids` bỏ X: khi đó X không thuộc hũ nào
+("Chưa xếp hũ"), không sang B như khách yêu cầu. Chỉ bỏ X khỏi một hũ (không gán cho hũ
+nào) khi khách nói rõ muốn để X "chưa xếp hũ".
 
 Ví dụ (`CIF_0003`: chuyển Giải trí từ Hưởng thụ sang Ăn uống; Ăn uống đang có `dining`,
 `groceries`, hạn mức 12.800.000đ giữ nguyên):
@@ -499,7 +512,7 @@ tra hình dạng lẫn các quy tắc cứng đối chiếu với `jar-summary` 
 1. **Chuyển danh mục trả sai hũ.** "Chuyển Giải trí từ Hưởng thụ sang Ăn uống" → Agent trả
    `edit_jar` cho **Hưởng thụ** với `category_ids: ["shopping"]`; đúng phải là `edit_jar` cho
    **Ăn uống** với `["dining","groceries","entertainment"]` (xem B3). Làm theo payload Agent thì
-   Giải trí rơi về hũ "Khác".
+   Giải trí thành "Chưa xếp hũ".
 2. **Bịa `jar_id`.** Hũ chỉ có trong hội thoại (vừa đề xuất tạo, hoặc chỉ có ở DB local) →
    Agent trả `edit_jar` với `jar_id: "lien-thien"` (suy từ tên). `pfm` báo "Không tìm thấy hũ
    này". Kỳ vọng: không có `ui`, hỏi lại khách. Đề nghị `server.py` bỏ `ui` nếu `jar_id` không

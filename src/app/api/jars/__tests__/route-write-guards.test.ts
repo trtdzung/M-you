@@ -133,10 +133,11 @@ describe("POST /api/jars — limit + opening balance (plan 260923 D2)", () => {
     },
   );
 
-  it.each([[null], [undefined]])("a %j budgetLimit is rejected — the limit is required on create", async (budgetLimit) => {
-    const res = await post({ id: "b", label: "B", categoryIds: [], budgetLimit });
-    expect(res.status).toBe(422);
-    expect((await res.json()).error).toBe("jar.budgetLimit is required");
+  // The limit is optional on create: absent/null = "chưa đặt" (stored null, never 0).
+  it.each([[null], [undefined]])("a %j budgetLimit creates the jar with no limit", async (budgetLimit) => {
+    const res = await post({ id: "b", label: "B", categoryIds: [], budgetLimit }, 0);
+    expect(res.status).toBe(201);
+    expect(limitOf("b")).toBeUndefined();
   });
 
   it("accepts limit and balance at exactly 10^12", async () => {

@@ -42,7 +42,7 @@ export interface JarConfigContextValue {
    * over a jar's balance) resolves `false` with the reason in `mutationError`.
    */
   postLedger: (entries: JarLedgerInput[]) => Promise<boolean>;
-  /** Remove a jar; its categories move to "Khác" and its rebalance legs are deleted server-side. */
+  /** Remove a jar outright; its categories become "chưa xếp hũ" and its rebalance legs are deleted server-side. */
   removeJar: (id: string) => Promise<boolean>;
   /** Move a category into `jarId`. `jarId === null` is a no-op (exactly-one). */
   assignCategory: (categoryId: string, jarId: string | null) => Promise<boolean>;

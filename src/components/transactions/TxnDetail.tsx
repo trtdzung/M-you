@@ -169,7 +169,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
       </div>
 
       {/* Tạo từ một giao dịch: KHÔNG kèm `jarId` — người dùng chưa chọn hũ nào,
-          nên server heal danh mục mới vào "Khác" và sheet nói rõ nó rơi vào đâu.
+          nên danh mục mới ở "Chưa xếp hũ" và sheet nói rõ nó rơi vào đâu.
           Danh mục vừa tạo được gán luôn cho giao dịch này. */}
       {adding && <CategoryCreateSheet onCreated={choose} onClose={() => setAdding(false)} />}
     </Sheet>

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { StoredCategory } from "@/domain/models";
-import { categoryToJarMap, KHAC_JAR_ID } from "@/domain/engine";
+import { categoryToJarMap } from "@/domain/engine";
 import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { AddCategoryButton } from "@/components/common/AddCategoryButton";
@@ -47,7 +47,7 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
     <CategoryRow
       key={c.id}
       category={c}
-      jarId={catToJar.get(c.id) ?? KHAC_JAR_ID}
+      jarId={catToJar.get(c.id) ?? null}
       jars={config.jars}
       onDelete={setDeleting}
     />

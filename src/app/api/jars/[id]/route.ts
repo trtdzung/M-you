@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { healOrphanCategories, stripCategories } from "@/domain/jar-rules";
-import { assignableCategoryIds } from "@/lib/categories-store";
+import { stripCategories } from "@/domain/jar-rules";
 import { getDb } from "@/lib/db";
 import { transferNow } from "@/lib/demo-clock";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
@@ -52,8 +51,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 }
 
 /**
- * DELETE /api/jars/:id?cif= — remove one jar. Its categories are force-moved to
- * "Khác" first, so no expense category is ever orphaned (invariant #6). Every
+ * DELETE /api/jars/:id?cif= — remove one jar, for real. Its categories are NOT
+ * moved anywhere: they become "chưa xếp hũ" (in no jar; their spend still counts
+ * in the reports, under "Chưa xếp hũ", and they can be assigned to any jar
+ * later — invariant #6: never dropped from totals). Every
  * rebalance leg (`dieu-chinh-hu` manual txn) whose `rebalance.fromJarId` or
  * `toJarId` is this jar is deleted in the SAME DB transaction (S8) — a leg
  * pointing at a vanished jar would move money "from nowhere". Response: the
@@ -70,13 +71,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const target = current.jars.find((j) => j.id === id);
   if (!target) return NextResponse.json({ error: `jar ${id} not found` }, { status: 404 });
 
-  const remaining = { version: 3 as const, jars: current.jars.filter((j) => j.id !== id) };
-  // The deleted jar's categories are re-homed into "Khác" against THIS persona's
-  // assignable taxonomy — including any category the user created.
-  const next =
-    target.categoryIds.length > 0
-      ? healOrphanCategories(remaining, assignableCategoryIds(cif))
-      : remaining;
+  const next = { version: 3 as const, jars: current.jars.filter((j) => j.id !== id) };
   const removeJarAndLegs = getDb().transaction(() => {
     const legsDeleted = deleteRebalanceLegsForJar(cif, id);
     return { config: writeJarConfig(cif, next), legsDeleted };

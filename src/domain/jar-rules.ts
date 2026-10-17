@@ -8,10 +8,12 @@
  * Framework-free (no React, no `server-only`, no storage) so a route handler can
  * import it directly. Behaviour is unchanged from the client-side versions.
  *
- *  - **One category, exactly one jar** (`stripCategories` / `dedupeCategories` /
- *    `healOrphanCategories`) — invariant #6, Σ-conservation: a category is never
- *    claimed twice (the engine would double-count its spend) and never dropped
- *    (an orphan is healed into the "Khác" jar).
+ *  - **One category, AT MOST one jar** (`stripCategories` / `dedupeCategories`) —
+ *    invariant #6, Σ-conservation: a category is never claimed twice (the engine
+ *    would double-count its spend). A category in NO jar is legal ("chưa xếp hũ",
+ *    e.g. after its jar was deleted): its spend is never dropped — the report
+ *    groups it under "Chưa xếp hũ" (`groupSpendingByJar`) — it just belongs to no
+ *    jar's budget.
  *
  * A jar carries NO stored balance: its balance is DERIVED by the engine from the
  * `jar_ledger` rows + txn history since its anchor (`jar-balance.ts`, invariant #1),
@@ -20,14 +22,14 @@
 
 import type { Jar, JarConfig } from "@/domain/models";
 import { REBALANCE_CATEGORY, UNCLASSIFIED } from "@/domain/models";
-import { KHAC_JAR_ID, KHAC_JAR_LABEL, orphanExpenseCategoryIds } from "@/domain/engine/category-jars";
+import { KHAC_JAR_ID } from "@/domain/engine/category-jars";
 import { POOL_DONOR_ID } from "@/domain/engine/jar-funding";
 
 /**
  * Ids a user jar may never take (S9): the pool donor sentinel, the unclassified
  * group and the rebalance system category would collide with engine sentinels.
- * "Khác" is reserved on CREATE only — it is the system heal jar, so a full-set
- * replace (PUT) must be able to round-trip it.
+ * "khac" (the id of the report's "Chưa xếp hũ" group) is reserved on CREATE only;
+ * a legacy stored jar with that id must still round-trip a full-set replace (PUT).
  */
 const ALWAYS_RESERVED_JAR_IDS: ReadonlySet<string> = new Set([POOL_DONOR_ID, UNCLASSIFIED, REBALANCE_CATEGORY]);
 
@@ -79,43 +81,6 @@ export function uniqueJarId(jars: Jar[], base: string): string {
   let n = 2;
   while (taken.has(`${base}-${n}`)) n += 1;
   return `${base}-${n}`;
-}
-
-/**
- * Enforce the exactly-one invariant: any expense category no jar claims is moved
- * into the "Khác" jar (created if absent) so it is never dropped from
- * budgets/report (invariant #6, Σ-conservation). The "Khác" jar carries NO
- * `budgetLimit` — an unassigned catch-all has no meaningful monthly limit
- * (unknown, never 0). A no-op for a config that already covers every expense
- * category (every template does), so a fresh seed is untouched.
- *
- * `expenseIds` is the taxonomy to heal against and is REQUIRED — `readJarConfig`
- * passes the persona's stored ASSIGNABLE set (active expense ids), which is what
- * makes a newly created category land in "Khác" by itself, and what keeps an
- * ARCHIVED category from being yanked out of its jar: this function only ever
- * ADDS, never strips, so an id missing from `expenseIds` but already in a jar
- * stays put (and its historical jar totals never move). Never make it strip, and
- * never give it a bundled-preset default — healing persona A's config against the
- * seed would drop A's own categories out of every hũ.
- */
-export function healOrphanCategories(config: JarConfig, expenseIds: Iterable<string>): JarConfig {
-  const orphans = orphanExpenseCategoryIds(config, expenseIds);
-  if (orphans.length === 0) return config;
-  const existing = config.jars.find((j) => j.id === KHAC_JAR_ID);
-  if (existing) {
-    return {
-      ...config,
-      jars: config.jars.map((j) =>
-        j.id === KHAC_JAR_ID ? { ...j, categoryIds: [...j.categoryIds, ...orphans] } : j,
-      ),
-    };
-  }
-  const khac: Jar = {
-    id: KHAC_JAR_ID,
-    label: KHAC_JAR_LABEL,
-    categoryIds: orphans,
-  };
-  return { ...config, jars: [...config.jars, khac] };
 }
 
 /**

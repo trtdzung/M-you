@@ -3,7 +3,7 @@
 import { Eye, EyeOff, Lock, Trash2 } from "lucide-react";
 import type { Jar, StoredCategory } from "@/domain/models";
 import { CUSTOM_CATEGORY_PREFIX, MAX_CATEGORY_LABEL } from "@/domain/models/category-rules";
-import { KHAC_JAR_ID, KHAC_JAR_LABEL } from "@/domain/engine";
+import { KHAC_JAR_LABEL } from "@/domain/engine";
 import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { categoryColor } from "@/lib/category-colors";
@@ -39,7 +39,8 @@ export function CategoryRow({
 }: {
   category: StoredCategory;
   /** Hũ đang giữ danh mục này (config đã heal khi tải, nên luôn có chủ). */
-  jarId: string;
+  /** The jar holding the category, or `null` = chưa xếp hũ. */
+  jarId: string | null;
   jars: Jar[];
   onDelete: (category: StoredCategory) => void;
 }) {
@@ -155,16 +156,19 @@ export function ArchivedCategoryRow({ category }: { category: StoredCategory }) 
 }
 
 /**
- * Mỗi danh mục chi thuộc đúng một hũ, nên đổi hũ là một ô chọn: `assignCategory`
- * gỡ khỏi hũ cũ trong cùng lượt ghi.
+ * Mỗi danh mục chi thuộc TỐI ĐA một hũ, nên đổi hũ là một ô chọn: `assignCategory`
+ * gỡ khỏi hũ cũ trong cùng lượt ghi. Danh mục chưa thuộc hũ nào (vd hũ của nó đã
+ * bị xoá) hiện "Chưa xếp hũ" — chọn một hũ để xếp nó vào.
  */
-function JarSelect({ category, jarId, jars }: { category: StoredCategory; jarId: string; jars: Jar[] }) {
+function JarSelect({ category, jarId, jars }: { category: StoredCategory; jarId: string | null; jars: Jar[] }) {
   const { assignCategory } = useJarConfig();
   return (
     <select
       aria-label={`Hũ của ${category.label}`}
-      value={jarId}
-      onChange={(e) => void assignCategory(category.id, e.target.value)}
+      value={jarId ?? ""}
+      onChange={(e) => {
+        if (e.target.value) void assignCategory(category.id, e.target.value);
+      }}
       className="min-h-9 min-w-0 flex-1 rounded-sm border border-border bg-surface px-2 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
     >
       {jars.map((j) => (
@@ -172,15 +176,10 @@ function JarSelect({ category, jarId, jars }: { category: StoredCategory; jarId:
           {j.label}
         </option>
       ))}
-      {/* Defensive: keep the current value selectable if a category resolves to
-          "Khác" but no "Khác" jar is materialized yet. Unreachable in the normal
-          flow — load-time healOrphanCategories always creates a real "Khác" jar
-          (exactly-one) before this renders — but it guards against selecting a
-          value the list would otherwise drop. Do NOT rely on this to assign to
-          "Khác": assignCategory to a non-existent jar id would orphan the
-          category until the next heal. */}
-      {jarId === KHAC_JAR_ID && !jars.some((j) => j.id === KHAC_JAR_ID) && (
-        <option value={KHAC_JAR_ID}>{KHAC_JAR_LABEL}</option>
+      {jarId === null && (
+        <option value="" disabled>
+          {KHAC_JAR_LABEL}
+        </option>
       )}
     </select>
   );

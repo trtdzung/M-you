@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
  * label (slug whitelist) — a client-supplied `id` is ignored outright.
  *
  * Optional `jarId` lands the category in THAT jar atomically ("Thêm danh mục"
- * from inside a jar); without it the jar read-heal puts it in "Khác". The
+ * from inside a jar); without it the category is simply "chưa xếp hũ" (in no jar). The
  * response carries the whole resulting aggregate so the client never re-fetches
  * into a race.
  */

@@ -17,14 +17,15 @@ const DUPLICATE_LABEL = "Tên danh mục đã tồn tại. Hãy chọn tên khá
 const INVALID_LABEL = `Tên danh mục cần từ 1 đến ${MAX_CATEGORY_LABEL} ký tự.`;
 
 /**
- * Tạo một danh mục chi của NGƯỜI DÙNG. Mở từ ba chỗ: trình sửa hũ (kèm `jarId` —
- * danh mục vào thẳng hũ đang mở), bộ chọn danh mục của giao dịch, và màn "Quản lý
- * danh mục" (không `jarId` — server heal vào hũ "Khác").
+ * Tạo một danh mục chi của NGƯỜI DÙNG. Mở từ hai chỗ: bộ chọn danh mục của giao
+ * dịch và màn "Quản lý danh mục" — cả hai không kèm `jarId`, nên danh mục mới ở
+ * "Chưa xếp hũ". (Trình sửa hũ KHÔNG còn tạo danh mục; `jarId` vẫn được server
+ * hỗ trợ, chỉ là không có chỗ nào trong UI truyền vào nữa.)
  *
  * MỘT lượt ghi duy nhất: `POST /api/categories { label, fixed, jarId }`. Sheet này
- * KHÔNG bao giờ tự ghi `categoryIds` của hũ — nếu tạo vào "Khác" rồi chuyển sang
+ * KHÔNG bao giờ tự ghi `categoryIds` của hũ — nếu tạo (chưa xếp hũ) rồi chuyển sang
  * hũ đích thì đó là hai lượt ghi, một khoảng nhấp nháy, và là cửa ghi THỨ BA có
- * thể làm vỡ bất biến "mỗi danh mục đúng một hũ". Hai cửa hợp lệ chỉ gồm POST này
+ * thể làm vỡ bất biến "mỗi danh mục tối đa một hũ". Hai cửa hợp lệ chỉ gồm POST này
  * và `PATCH /api/jars/:id` trọn tập của `HuCategoryPicker`.
  *
  * Kiểm tra trùng tên phía client chỉ để đỡ một vòng mạng: server mới là trọng
@@ -37,7 +38,7 @@ export function CategoryCreateSheet({
   onCreated,
   onClose,
 }: {
-  /** Hũ nhận danh mục mới. Bỏ trống = server tự heal vào "Khác". */
+  /** Hũ nhận danh mục mới. Bỏ trống = danh mục chưa xếp hũ. */
   jarId?: string;
   /** Tên hũ đích, chỉ để hiển thị. */
   jarLabel?: string;
@@ -109,7 +110,7 @@ export function CategoryCreateSheet({
       <Sheet title="Đã tạo danh mục" description={createdLabel} onClose={finish}>
         <div className="flex flex-col gap-4">
           <p role="status" className="rounded-row bg-surface-muted px-3 py-2.5 text-sm text-text">
-            Đã thêm vào hũ «{KHAC_JAR_LABEL}» — bạn có thể đổi hũ trong Cài đặt.
+            Danh mục đang ở “{KHAC_JAR_LABEL}” — bạn có thể xếp vào một hũ trong Cài đặt.
           </p>
           <button
             type="button"
@@ -126,7 +127,7 @@ export function CategoryCreateSheet({
   return (
     <Sheet
       title="Thêm danh mục"
-      description={`Danh mục mới sẽ nằm trong hũ “${jarLabel ?? KHAC_JAR_LABEL}”`}
+      description={jarLabel ? `Danh mục mới sẽ nằm trong hũ “${jarLabel}”` : `Danh mục mới sẽ ở “${KHAC_JAR_LABEL}” cho tới khi bạn xếp vào một hũ`}
       onClose={onClose}
     >
       <form onSubmit={submit} className="flex flex-col gap-4">

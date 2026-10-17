@@ -89,8 +89,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const close = (dialog: HTMLElement) => fireEvent.click(within(dialog).getByLabelText("Đóng"));
+
 describe("HuEditorSheet — HuCategoryPicker: adding a category", () => {
-  it("checking a category owned by another jar PATCHes /api/jars/food with it appended, and flips it to checked", async () => {
+  it("checking a category owned by another jar writes NOTHING until Đóng, then PATCHes /api/jars/food once with it appended", async () => {
     const calls = captureCalls(isJarPatch);
     const dialog = await openEditor("Ăn uống");
 
@@ -100,10 +102,14 @@ describe("HuEditorSheet — HuCategoryPicker: adding a category", () => {
 
     fireEvent.click(row);
 
-    await waitFor(() => expect(row).toHaveAttribute("aria-pressed", "true"));
-    expect(within(row).queryByText(/đang ở/)).not.toBeInTheDocument();
+    // A draft only: checked, labelled where it will come from, and NOT saved yet.
+    expect(row).toHaveAttribute("aria-pressed", "true");
+    expect(within(row).getByText("lấy từ Thiết yếu")).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
 
-    expect(calls).toHaveLength(1);
+    close(dialog);
+
+    await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0].url).toMatch(/^\/api\/jars\/food\?cif=/);
     const parsed = JSON.parse(calls[0].body);
     // "food" already owns dining + groceries; the tapped id is appended, not
@@ -112,11 +118,28 @@ describe("HuEditorSheet — HuCategoryPicker: adding a category", () => {
     // "housing" is appended after the existing ids — "dining" stays first, so
     // the accent is unaffected and `nextCategoryPatch` omits `color`.
     expect(parsed.patch).not.toHaveProperty("color");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("picking a category from another jar and unpicking it again saves nothing — the other jar keeps it", async () => {
+    const calls = captureCalls(isJarPatch);
+    const dialog = await openEditor("Ăn uống");
+    const row = await within(dialog).findByRole("button", { name: /Nhà ở/ });
+
+    fireEvent.click(row);
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-pressed", "false");
+    // Back to where it truly is — never "Chưa xếp hũ".
+    expect(within(row).getByText("đang ở Thiết yếu")).toBeInTheDocument();
+
+    close(dialog);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(calls).toHaveLength(0);
   });
 });
 
 describe("HuEditorSheet — HuCategoryPicker: removing a category", () => {
-  it("unchecking an owned category PATCHes categoryIds with it removed and the rest kept, pinning the accent in the SAME request", async () => {
+  it("unchecking an owned category writes nothing until Đóng, then PATCHes categoryIds with it removed, pinning the accent in the SAME request", async () => {
     const calls = captureCalls(isJarPatch);
     const dialog = await openEditor("Ăn uống");
 
@@ -126,41 +149,44 @@ describe("HuEditorSheet — HuCategoryPicker: removing a category", () => {
 
     fireEvent.click(row);
 
-    await waitFor(() => expect(row).toHaveAttribute("aria-pressed", "false"));
-    // Server heals the orphan into "Khác" — the client never sends a "Khác" target itself.
-    expect(within(row).getByText("đang ở Khác")).toBeInTheDocument();
+    expect(row).toHaveAttribute("aria-pressed", "false");
+    // Pending: it will belong to no jar once saved.
+    expect(within(row).getByText("đang ở Chưa xếp hũ")).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
 
-    expect(calls).toHaveLength(1);
+    close(dialog);
+
+    await waitFor(() => expect(calls).toHaveLength(1));
     const parsed = JSON.parse(calls[0].body);
     expect(parsed.patch.categoryIds).toEqual(["groceries"]);
     // "food" has no explicit color and "dining" (removed) was its first
     // category — the new first ("groceries") has a different accent, so
-    // `nextCategoryPatch` pins the PRE-toggle accent into this same PATCH
-    // (no second request: `calls` above already asserts exactly one call).
+    // `nextCategoryPatch` pins the PRE-toggle accent into this same PATCH.
     expect(parsed.patch.color).toBe(categoryColor("dining"));
   });
 
-  it("shows the live count in the field header and updates it after a change", async () => {
+  it("shows the live count in the field header and updates it as the draft changes", async () => {
     const dialog = await openEditor("Ăn uống");
     expect(await within(dialog).findByText(countLabel(2))).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Ăn uống" }));
 
-    await waitFor(() => expect(within(dialog).getByText(countLabel(1))).toBeInTheDocument());
+    expect(within(dialog).getByText(countLabel(1))).toBeInTheDocument();
     expect(within(dialog).queryByText(countLabel(2))).not.toBeInTheDocument();
   });
 });
 
 describe("HuEditorSheet — HuCategoryPicker: refused writes stay visible (U20)", () => {
-  it("surfaces a failed categoryIds PATCH via JarMutationErrorNotice and keeps the row checked", async () => {
+  it("a refused save on Đóng keeps the sheet open, shows why, and keeps the draft", async () => {
     interceptFetch((url, init) => (isJarPatch(url, init) ? Promise.resolve(json({ error: "db" }, 500)) : null));
     const dialog = await openEditor("Ăn uống");
 
     const row = await within(dialog).findByRole("button", { name: "Ăn uống" });
     fireEvent.click(row);
+    close(dialog);
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/Không lưu được/);
-    expect(row).toHaveAttribute("aria-pressed", "true");
-    expect(await within(dialog).findByText(countLabel(2))).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument(); // did not close
+    expect(row).toHaveAttribute("aria-pressed", "false"); // the draft is still there
   });
 });

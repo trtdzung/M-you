@@ -11,8 +11,10 @@ One row per spending jar ("hũ"), scoped by `cif` (the persona's customer id —
 is enforced by the route handlers via `src/domain/jar-rules.ts` — the table
 itself holds no constraints beyond its primary key and `NOT NULL` columns:
 
-- **One category belongs to exactly one jar.** Enforced on every write
-  (`stripCategories`/`healOrphanCategories`/`dedupeCategories`).
+- **One category belongs to AT MOST one jar.** Enforced on every write
+  (`stripCategories`/`dedupeCategories`). A category in no jar is legal ("chưa xếp
+  hũ"): nothing is synthesised for it, and its spend is reported under "Chưa xếp
+  hũ" (`groupSpendingByJar`) — never dropped from totals.
 - **Two numbers per jar, two axes (plan `260923-jar-limit-vs-balance-split`):**
   - **Hạn mức (limit)** = `budget_limit`, the monthly PLAN. The verdict is
     `overLimit = đã chi tháng này > budget_limit`; it resets every month and is
@@ -62,10 +64,10 @@ endpoint in this prototype.
 | Method | Path | Body | Behavior |
 |---|---|---|---|
 | GET | `/api/jars?cif=` | — | Read every jar for `cif` (+ its `ledger`). |
-| POST | `/api/jars` | `{cif, jar, balance}` | Create a jar. `jar.budgetLimit` (monthly limit) and `balance` (opening deposit) are REQUIRED whole VND in `[0, 10^12]`; jar row + opening ledger row (`is_opening = 1`, also for 0) in one transaction. CASA cap on Σ spendable with the opening deposit folded in. |
+| POST | `/api/jars` | `{cif, jar, balance}` | Create a jar. `balance` (opening deposit, 0 allowed) is REQUIRED whole VND in `[0, 10^12]`; `jar.budgetLimit` (monthly limit) is OPTIONAL — omitted/null = "chưa đặt", stored NULL (a jar like "Tiết kiệm" is created with no limit and balance 0); jar row + opening ledger row (`is_opening = 1`, also for 0) in one transaction. CASA cap on Σ spendable with the opening deposit folded in. |
 | PUT | `/api/jars` | `{cif, jars}` | Replace the whole jar set (template apply / reset to default). Writes NO ledger rows (a new id has balance `null`); ledger rows of dropped ids are deleted. |
 | PATCH | `/api/jars/:id?cif=` | `{patch}` | Update one jar's fields. A limit edit is never CASA-capped (≤ 10^12 only); the cap runs only when `categoryIds` change. |
-| DELETE | `/api/jars/:id?cif=` | — | Remove a jar (its categories move to "Khác"; its ledger rows and rebalance legs go in the same transaction). |
+| DELETE | `/api/jars/:id?cif=` | — | Remove a jar outright (its categories become "chưa xếp hũ" — moved nowhere; its ledger rows and rebalance legs go in the same transaction). |
 | POST | `/api/jars/:id/categories?cif=` | `{categoryId}` | Move one category into this jar. |
 | POST | `/api/jar-ledger` | `{cif, entries: [{jarId, kind: "deposit"\|"withdraw", amount}]}` | Atomic batch of 1–50 deposits/withdrawals (amount whole VND in `(0, 10^12]`, Σ ≤ 10^12). All-or-nothing; CASA cap checked once on the whole batch. |
 
@@ -77,8 +79,7 @@ callers never need a second round-trip to see the result of their own write.
 `POST /api/jars` and `POST /api/jar-ledger` return `201`; every other success
 is `200`. Errors: `422` for a missing/invalid `cif`, `jar`, `balance`, `jars`,
 `patch`, `categoryId`, `entries`, a `PUT` body with a duplicate jar `id`, a
-ledger entry for a jar with no DB row (the synthetic "Khác" — `jar not
-persisted`), a withdraw over a jar's balance or on an unfunded jar (`over
+ledger entry for a jar with no DB row (`jar not persisted`), a withdraw over a jar's balance or on an unfunded jar (`over
 balance` + `maxWithdraw`, `null` when unknown), or a write raising Σ spendable
 past CASA (`over CASA cap` + `overBy`); `404` for `PATCH`/`DELETE`/
 categories-`POST` against an unknown jar `id`, and for a ledger entry's unknown

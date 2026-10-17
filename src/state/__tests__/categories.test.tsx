@@ -114,9 +114,11 @@ describe("CategoryTaxonomyProvider — a write applies BOTH halves of the aggreg
     expect(ok).toBe(true);
     expect(ids(hook)).toContain("c_hoc-phi");
     expect(hook.result.current.cats.assignable.map((c) => c.id)).toContain("c_hoc-phi");
-    // The jar provider reflects the SAME response: the server healed the new
-    // orphan into "Khác" and that config came back with the taxonomy.
-    await waitFor(() => expect(jarOf(hook.result.current.jars.config, "c_hoc-phi")?.id).toBe("khac"));
+    // The jar provider reflects the SAME response: no jar claims the new category
+    // ("chưa xếp hũ") and no catch-all jar is invented for it.
+    await waitFor(() => expect(hook.result.current.cats.assignable.map((c) => c.id)).toContain("c_hoc-phi"));
+    expect(jarOf(hook.result.current.jars.config, "c_hoc-phi")).toBeUndefined();
+    expect(hook.result.current.jars.config.jars.some((j) => j.id === "khac")).toBe(false);
   });
 
   it("a create with an explicit jarId lands in THAT hũ, and in exactly one", async () => {

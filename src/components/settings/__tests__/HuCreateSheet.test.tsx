@@ -45,19 +45,23 @@ describe("HuCreateSheet — validation", () => {
     expect(addJar).not.toHaveBeenCalled();
   });
 
-  it("requires a limit (empty is not 0)", () => {
+  // A jar with nothing to plan (e.g. "Tiết kiệm") is created with the limit left
+  // blank — "chưa đặt", never a stored 0 — and an explicit opening balance of 0.
+  it("creates a jar with no limit (blank = chưa đặt) and a 0 opening balance when both are left blank", async () => {
     open();
-    fill({ limit: "", balance: "0" });
+    fill({ name: "Tiết kiệm", limit: "", balance: "" });
     create();
-    expect(screen.getByRole("alert")).toHaveTextContent("Hạn mức: Nhập hạn mức chi mỗi tháng.");
-    expect(addJar).not.toHaveBeenCalled();
+    await waitFor(() => expect(addJar).toHaveBeenCalledTimes(1));
+    const [jar, balance] = addJar.mock.calls[0];
+    expect(jar).not.toHaveProperty("budgetLimit");
+    expect(balance).toBe(0);
   });
 
-  it("rejects an EMPTY opening balance — never read as 0 (invariant #6)", () => {
+  it("still rejects a typed limit that is not a valid amount", () => {
     open();
-    fill({ balance: "" });
+    fill({ limit: "abc", balance: "0" });
     create();
-    expect(screen.getByRole("alert")).toHaveTextContent("Số dư: Nhập số dư ban đầu (nhập 0 nếu chưa nạp).");
+    expect(screen.getByRole("alert")).toHaveTextContent("Hạn mức:");
     expect(addJar).not.toHaveBeenCalled();
   });
 

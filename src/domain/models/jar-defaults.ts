@@ -12,9 +12,9 @@
  * against the bundled taxonomy — they cannot know about a category the user
  * created. Consequence a caller must accept before applying one: a template
  * replaces the whole jar set with these preset-only jars, so every CUSTOM
- * category is re-orphaned and the read-heal (`healOrphanCategories`) lands it in
- * "Khác". Nothing is lost and no total moves (heal only ever ADDS), but the
- * user's own grouping of their own categories is gone. Do NOT "fix" this by
+ * category ends up in no jar ("chưa xếp hũ"). Nothing is lost and no total moves
+ * (its spend shows under "Chưa xếp hũ"), but the user's own grouping of their own
+ * categories is gone. Do NOT "fix" this by
  * reading the stored taxonomy here: this module is pure, cif-less and is the
  * seed itself.
  */

@@ -13,8 +13,8 @@ import { cn } from "@/lib/cn";
  * category picker and the Add-transaction form. Under exactly-one, a
  * transaction's category also fixes its hũ, so picking one here is all it takes.
  * `onAddCategory` opens `CategoryCreateSheet` with NO `jarId`: from a
- * transaction the user has not chosen a hũ, so the server heals the new category
- * into "Khác" and the sheet says so. Omitted, the "＋" hides — surfaces that
+ * transaction the user has not chosen a hũ, so the new category is "Chưa xếp hũ"
+ * and the sheet says so. Omitted, the "＋" hides — surfaces that
  * cannot own a create flow (the transfer categorize step) simply don't pass it.
  *
  * Options come from the PERSONA'S stored taxonomy (`useCategories()`), never from

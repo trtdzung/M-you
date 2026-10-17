@@ -6,7 +6,7 @@ import { Money } from "@/components/primitives";
 import { ChartFrame } from "@/components/charts/ChartFrame";
 import { categoryColor, CATEGORY_COLOR_FALLBACK } from "@/lib/category-colors";
 import { formatVndCompact, formatVndUnit } from "@/lib/format";
-import { KHAC_JAR_ID, KHAC_JAR_LABEL } from "@/domain/engine";
+import { KHAC_JAR_ID } from "@/domain/engine";
 
 /** One jar's slice. `colorKey` is a category id used for a stable hue. */
 export interface JarDonutDatum {
@@ -24,7 +24,11 @@ interface Slice extends JarDonutDatum {
 
 const MAX_SLICES = 6;
 
-/** Donut nhóm theo hũ (không phải danh mục lẻ). >6 hũ → gộp phần dư vào "Khác",
+/** Slice gộp phần dư khi >6 nhóm — id/nhãn RIÊNG, không được trùng nhóm "Chưa xếp hũ" (`KHAC_JAR_ID`). */
+const OTHER_ID = "other";
+const OTHER_LABEL = "Khác";
+
+/** Donut nhóm theo hũ (không phải danh mục lẻ). >6 nhóm → gộp phần dư vào "Khác",
  * nên tổng slice luôn = tổng chi (Σ-conservation, H4). Slice lớn nhất trước. */
 function toSlices(data: JarDonutDatum[]): { slices: Slice[]; total: number } {
   const positive = data.filter((d) => d.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -34,13 +38,13 @@ function toSlices(data: JarDonutDatum[]): { slices: Slice[]; total: number } {
   if (positive.length > MAX_SLICES) {
     const head = positive.slice(0, MAX_SLICES - 1);
     const rest = positive.slice(MAX_SLICES - 1).reduce((s, d) => s + d.amount, 0);
-    kept = [...head, { id: KHAC_JAR_ID, label: KHAC_JAR_LABEL, amount: rest, colorKey: KHAC_JAR_ID }];
+    kept = [...head, { id: OTHER_ID, label: OTHER_LABEL, amount: rest, colorKey: OTHER_ID }];
   }
 
   const slices = kept.map((d) => ({
     ...d,
     share: total > 0 ? d.amount / total : 0,
-    color: d.id === KHAC_JAR_ID ? CATEGORY_COLOR_FALLBACK : categoryColor(d.colorKey),
+    color: d.id === KHAC_JAR_ID || d.id === OTHER_ID ? CATEGORY_COLOR_FALLBACK : categoryColor(d.colorKey),
   }));
   return { slices, total };
 }

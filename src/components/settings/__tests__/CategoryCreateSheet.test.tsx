@@ -143,7 +143,7 @@ describe("CategoryCreateSheet — created without a hũ", () => {
       </StubCategoryTaxonomy>,
     );
 
-    expect(await screen.findByText(/Đã thêm vào hũ «Khác»/)).toBeInTheDocument();
+    expect(await screen.findByText(/Danh mục đang ở “Chưa xếp hũ”/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Xong" }));
     expect(onCreated).toHaveBeenCalledWith("c_hoc-phi");
     expect(onClose).toHaveBeenCalled();

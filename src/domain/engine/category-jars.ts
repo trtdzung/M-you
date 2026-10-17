@@ -7,12 +7,12 @@
  * (Σ jar + residual ≡ balance) is untouched (invariant #2).
  *
  * Invariants honoured here:
- *  - Every expense category belongs to exactly one jar. Config is already
+ *  - Every expense category belongs to AT MOST one jar. Config is already
  *    deduped one-category-one-jar (`state/jars` load + mutations), but this map
  *    is first-wins as a defensive second gate so a category can never be
  *    double-counted across two groups.
  *  - Total is conserved: `Σ group.amount === Σ spendingByCategory.amount` — a
- *    category mapped to no jar flows to the catch-all "Khác" group, so the chart
+ *    category mapped to no jar flows to the "Chưa xếp hũ" group, so the chart
  *    is always exactly 100% of the period's spend (never a silent drop).
  *  - Chips are spend-independent (red-team #11): `jarChipList` is derived from the
  *    full config (every configured jar, plus "Khác" only when some expense
@@ -25,9 +25,13 @@ import { UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
 import { spendingByCategory, type CategorySpend } from "./category";
 import type { Period } from "./types";
 
-/** Catch-all group id/label for expense categories in no jar (orphans). */
+/**
+ * Group id/label for expense categories in NO jar (deleted jar, new category, a
+ * removed pick) — "Chưa xếp hũ". The id stays "khac" (a stable sentinel the UI and
+ * the reserved-id rule already key on); it is a REPORT group only, never a jar row.
+ */
 export const KHAC_JAR_ID = "khac";
-export const KHAC_JAR_LABEL = "Khác";
+export const KHAC_JAR_LABEL = "Chưa xếp hũ";
 
 /**
  * Dedicated group for un-enriched spend (the `UNCLASSIFIED` sentinel). Kept
@@ -108,13 +112,13 @@ export function orphanExpenseCategoryIds(
 
 /**
  * The filter chips for Dòng tiền: one per configured jar (in config order), plus
- * a trailing "Khác" chip ONLY when some expense category is mapped to no jar.
+ * a trailing "Chưa xếp hũ" chip ONLY when some expense category is mapped to no jar.
  * Spend-independent by construction — a jar with zero spend this period keeps its
  * chip (selecting it yields an empty state, red-team #11). "Tất cả" is a UI
  * concern the view prepends; it is not part of this list.
  *
  * `expenseIds` is REQUIRED for the same reason as `orphanExpenseCategoryIds`:
- * whether "Khác" gets a chip is a statement about the PERSONA'S taxonomy.
+ * whether "Chưa xếp hũ" gets a chip is a statement about the PERSONA'S taxonomy.
  */
 export function jarChipList(config: JarConfig, expenseIds: Iterable<string>): JarChip[] {
   const chips: JarChip[] = config.jars.map((jar) => ({ jarId: jar.id, label: jar.label }));
@@ -152,7 +156,7 @@ export function groupSpendingByJar(
   const jarLabels = labelByJarId(config);
 
   // Accumulate categories under their jar id. Unclassified spend goes to its own
-  // group (never "Khác"); other unmapped expense categories → "Khác".
+  // group (never "Chưa xếp hũ"); other unmapped expense categories → "Chưa xếp hũ".
   const byJar = new Map<string, CategorySpend[]>();
   for (const spend of spends) {
     const jarId =
@@ -181,7 +185,7 @@ export function groupSpendingByJar(
     };
   });
 
-  // Amount-desc, but "Khác" then "Chưa phân loại" are always pinned last.
+  // Amount-desc, but "Chưa xếp hũ" then "Chưa phân loại" are always pinned last.
   const pinRank = (jarId: string): number =>
     jarId === UNCLASSIFIED_JAR_ID ? 2 : jarId === KHAC_JAR_ID ? 1 : 0;
   groups.sort((a, b) => {

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { JarConfig, StoredCategory } from "@/domain/models";
 import { categoryLabel } from "@/domain/models";
 import { BUILT_IN_EXPENSE_IDS } from "@/domain/models/jar-defaults";
-import { healOrphanCategories } from "@/domain/jar-rules";
 import {
   categoryToJarMap,
   groupSpendingByJar,
@@ -59,7 +58,7 @@ const spend = [
   txn({ categoryId: "c_qua-tet", amount: 500_000 }),
 ];
 
-describe("#6 a custom category with no jar is an orphan, and heals into Khác exactly once", () => {
+describe("#6 a custom category with no jar is an orphan — \"chưa xếp hũ\", its spend grouped separately", () => {
   it("orphanExpenseCategoryIds reports it once the persona's set includes it", () => {
     const config = cfg([{ id: "food", label: "Ăn uống", categoryIds: ["dining"] }]);
     const orphans = orphanExpenseCategoryIds(config, ASSIGNABLE);
@@ -70,18 +69,14 @@ describe("#6 a custom category with no jar is an orphan, and heals into Khác ex
     expect(orphans).not.toContain("c_qua-tet");
   });
 
-  it("healOrphanCategories puts it in Khác once, and is idempotent", () => {
+  it("its spend is grouped under \"Chưa xếp hũ\" — never dropped, and no jar is invented", () => {
     const config = cfg([{ id: "food", label: "Ăn uống", categoryIds: ["dining"] }]);
-    const healed = healOrphanCategories(config, ASSIGNABLE);
-    const khac = healed.jars.find((j) => j.id === KHAC_JAR_ID);
-    expect(khac?.categoryIds.filter((id) => id === "c_hoc-phi")).toEqual(["c_hoc-phi"]);
-    // Running it again adds nothing (no duplicate, no second Khác jar).
-    const twice = healOrphanCategories(healed, ASSIGNABLE);
-    expect(twice.jars.filter((j) => j.id === KHAC_JAR_ID)).toHaveLength(1);
-    expect(twice.jars.find((j) => j.id === KHAC_JAR_ID)?.categoryIds).toEqual(khac?.categoryIds);
-    // Every assignable id is claimed by exactly one jar afterwards.
-    const claimed = twice.jars.flatMap((j) => j.categoryIds);
-    for (const id of ASSIGNABLE) expect(claimed.filter((c) => c === id)).toHaveLength(1);
+    const groups = groupSpendingByJar(config, spend, JUNE, LABELS);
+    const unassigned = groups.find((g) => g.jarId === KHAC_JAR_ID);
+    expect(unassigned?.label).toBe("Chưa xếp hũ");
+    expect(unassigned?.categories.map((c) => c.categoryId)).toContain("c_hoc-phi");
+    expect(config.jars).toHaveLength(1); // nothing synthesised
+    expect(groups.reduce((s, g) => s + g.amount, 0)).toBe(9_500_000); // Σ conserved
   });
 });
 
@@ -134,10 +129,8 @@ describe("#9 an archived id still held by a jar keeps its spend there", () => {
     expect(groups.find((g) => g.jarId === "gift")?.amount).toBe(500_000);
     expect(groups.find((g) => g.jarId === KHAC_JAR_ID)?.amount).toBe(7_000_000);
 
-    // And healing must not strip it: heal only ever ADDS, so the jar keeps it.
-    const healed = healOrphanCategories(config, ASSIGNABLE);
-    expect(healed.jars.find((j) => j.id === "gift")?.categoryIds).toContain("c_qua-tet");
-    expect(groupSpendingByJar(healed, spend, JUNE, LABELS).find((g) => g.jarId === "gift")?.amount).toBe(500_000);
+    // The jar keeps holding the archived category — nothing is stripped or re-homed.
+    expect(config.jars.find((j) => j.id === "gift")?.categoryIds).toContain("c_qua-tet");
   });
 });
 

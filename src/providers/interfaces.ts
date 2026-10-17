@@ -120,10 +120,8 @@ export interface Providers
   /**
    * Read the user's current spending-jar configuration. Backed by
    * `data/pfm.sqlite3` via `/api/jars` (invariant #4) — always returns a
-   * config, never `null`. NOTE: a persona with zero stored rows does not
-   * come back with an empty `jars` array — the server's healing step
-   * synthesizes a single catch-all "Khác" jar in that case (see
-   * `src/lib/jars-store.ts`'s `readJarConfig`).
+   * config, never `null`. A persona with zero stored rows comes back with an
+   * empty `jars` array (see `src/lib/jars-store.ts`'s `readJarConfig`).
    *
    * Every jar and category method REJECTS with an `ApiError` (`./api-error`) on
    * a non-ok response — a failed load is never disguised as an empty config
@@ -154,7 +152,7 @@ export interface Providers
    */
   postJarLedger(entries: JarLedgerInput[]): Promise<JarConfig>;
   /**
-   * Remove a jar (its categories move to "Khác"; the server also deletes every
+   * Remove a jar outright (its categories become "chưa xếp hũ"; the server also deletes every
    * "điều chỉnh hũ" rebalance leg from/to it). Returns the full updated config.
    */
   removeJar(id: string): Promise<JarConfig>;
@@ -174,8 +172,8 @@ export interface Providers
   /**
    * Create one user category. `kind` is always `expense` server-side and the id
    * is generated there from the label — a client-supplied id is ignored. With
-   * `jarId` the category lands in THAT jar atomically; without it the server's
-   * read-heal puts it in "Khác".
+   * `jarId` the category lands in THAT jar atomically; without it the
+   * category is "chưa xếp hũ" (in no jar).
    */
   createCategory(input: { label: string; fixed?: boolean; jarId?: string }): Promise<CategoryWriteResult>;
   /** Rename / re-flag one CUSTOM category (a bundled preset answers 403). */

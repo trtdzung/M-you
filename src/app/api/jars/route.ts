@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
+import { dedupeCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import type { JarConfig, JarLedgerEntry } from "@/domain/models";
-import { assignableCategoryIds } from "@/lib/categories-store";
 import { getDb } from "@/lib/db";
 import { transferNow } from "@/lib/demo-clock";
 import { appendJarLedger, ledgerEntryId } from "@/lib/jar-ledger-store";
@@ -37,13 +36,14 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/jars — create one jar (body `{cif, jar, balance}`, plan 260923 D2).
- * `jar.budgetLimit` (the monthly LIMIT) and `balance` (the opening deposit, ≥ 0)
- * are both REQUIRED whole VND ≤ 10^12. The id is made unique against the existing
+ * `balance` (the opening deposit, ≥ 0, 0 allowed)
+ * is REQUIRED whole VND ≤ 10^12; `jar.budgetLimit` (the monthly LIMIT) is OPTIONAL —
+ * omitted/null = "chưa đặt" (never a stored 0). The id is made unique against the existing
  * set and the new jar's categories are taken away from whichever jar held them
  * (one-category-one-jar). The jar row and its opening ledger row (`is_opening`,
  * even for 0 — a known 0, not "chưa có số dư") are written in ONE transaction.
  * 422 on a sentinel id (`pool`, `unclassified`, `dieu-chinh-hu`, `khac`), a
- * non-expense category, a missing/invalid limit or balance, or an opening
+ * non-expense category, a missing/invalid balance or an invalid (present) limit, or an opening
  * balance that raises Σ spendable past CASA (`overBy`).
  */
 export async function POST(req: NextRequest) {
@@ -88,9 +88,9 @@ export async function POST(req: NextRequest) {
 /**
  * PUT /api/jars — REPLACE the persona's whole jar set (body `{cif, jars}`),
  * used by "áp mẫu" and "khôi phục mặc định". An arbitrary incoming set has not
- * been through the mutators, so it is deduped and healed (no category claimed
- * twice, none orphaned) before it is stored. 422 on `pool`/`unclassified`/
- * `dieu-chinh-hu` ids (`khac` round-trips — it is the system heal jar), a
+ * been through the mutators, so it is deduped (no category claimed
+ * twice) before it is stored. 422 on `pool`/`unclassified`/
+ * `dieu-chinh-hu` ids (`khac` round-trips — a legacy stored jar), a
  * non-expense category, or a replace that raises Σ spendable past CASA. Creates
  * NO ledger rows; ledger rows of ids that leave the set go with them.
  */
@@ -107,13 +107,10 @@ export async function PUT(req: NextRequest) {
     reservedIdViolation(jars.map((j) => j.id), false) ?? categoryViolation(cif, jars.flatMap((j) => j.categoryIds));
   if (rejected) return rejected;
 
-  // Heal against THIS persona's assignable taxonomy: a preset-only template must
-  // not leave the user's own categories orphaned, and an archived one already in
-  // a jar must stay there (the heal only ever adds).
-  const healed = healOrphanCategories(
-    dedupeCategories({ version: 3, jars }),
-    assignableCategoryIds(cif),
-  );
+  // Deduped only: a category the incoming set does not claim (a preset-only
+  // template next to the user's own categories) is simply "chưa xếp hũ" — nothing
+  // is invented to hold it.
+  const healed = dedupeCategories({ version: 3, jars });
   // D3: no deposits here — a new id has balance `null` until the user deposits.
   // The cap still runs (a category shuffle re-attributes spend since each anchor)
   // against the stored ledger + anchors of the ids that survive the replace.

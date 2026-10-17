@@ -10,7 +10,6 @@ import { Sheet } from "@/components/primitives";
 import { JAR_COLOR_OPTIONS, jarAccent } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
 import { JAR_ICON_KEYS, jarIcon } from "./jar-visuals";
-import { CategoryCreateSheet } from "./CategoryCreateSheet";
 import { HuCategoryPicker } from "./HuCategoryPicker";
 import { nextCategoryPatch } from "./hu-category-patch";
 import { HuLimitField } from "./HuLimitField";
@@ -21,8 +20,8 @@ import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 /**
  * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức chi mỗi tháng (`HuLimitField`),
  * số dư — nạp/rút (`HuBalanceField`, tách khỏi hạn mức, plan 260923), màu,
- * icon, danh mục trong hũ (`HuCategoryPicker` — chọn/bỏ chọn tại chỗ,
- * exactly-one), và xoá hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig`
+ * icon, danh mục trong hũ (`HuCategoryPicker` — chọn/bỏ chọn là bản nháp, lưu
+ * MỘT lần khi đóng; tối đa một hũ), và xoá hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig`
  * — state (theo phản hồi server) là nguồn sự thật; lần ghi bị từ chối hiện ở
  * `JarMutationErrorNotice`.
  */
@@ -40,15 +39,37 @@ export function HuEditorSheet({
   // Mẫu số của nhãn "(n/total)" là số danh mục chi ĐANG DÙNG của persona — người
   // dùng thêm/ẩn danh mục thì tổng này đổi theo, không phải hằng số 10 preset.
   const { assignable } = useCategories();
-  const [adding, setAdding] = useState(false);
   const jar = config.jars.find((j) => j.id === jarId);
+  // Danh mục là bản NHÁP tới khi đóng: chạm trong `HuCategoryPicker` chỉ đổi state
+  // này (chưa ghi gì), và `close` lưu MỘT lần nếu tập thật sự khác tập đã lưu — nên
+  // chọn một danh mục đang ở hũ khác rồi bỏ chọn lại không làm nó rơi về "Chưa xếp
+  // hũ". Các trường khác (tên, hạn mức, màu, icon, số dư) vẫn ghi ngay như cũ.
+  const [pendingCategories, setPendingCategories] = useState<string[] | null>(null);
+  const [closing, setClosing] = useState(false);
 
   if (!jar) return null;
+
+  const selectedCategories = pendingCategories ?? jar.categoryIds;
+  const categoriesChanged =
+    pendingCategories !== null &&
+    (pendingCategories.length !== jar.categoryIds.length || pendingCategories.some((id) => !jar.categoryIds.includes(id)));
+
+  /** Lưu danh mục (nếu đổi) rồi đóng. Bị từ chối → ở lại, lý do hiện ở `JarMutationErrorNotice`. */
+  async function close() {
+    if (closing) return;
+    if (categoriesChanged && pendingCategories) {
+      setClosing(true);
+      const ok = await updateJar(jarId, nextCategoryPatch(jar!, pendingCategories));
+      setClosing(false);
+      if (!ok) return;
+    }
+    onClose();
+  }
 
   const dup = isDuplicateLabel(jar.label, config.jars, jarId);
 
   return (
-    <Sheet title="Sửa hũ" description={jar.label} onClose={onClose}>
+    <Sheet title="Sửa hũ" description={jar.label} onClose={() => void close()}>
       <div className="flex flex-col gap-5">
         <JarMutationErrorNotice />
         <label className="flex flex-col gap-1">
@@ -116,27 +137,18 @@ export function HuEditorSheet({
           </div>
         </Field>
 
-        <Field label={`Danh mục trong hũ (${jar.categoryIds.length}/${assignable.length})`}>
+        <Field label={`Danh mục trong hũ (${selectedCategories.length}/${assignable.length})`}>
           <HuCategoryPicker
             jar={jar}
             jars={config.jars}
-            // Một cửa ghi cho cả thêm lẫn gỡ: PATCH gỡ danh mục khỏi hũ cũ
-            // (`stripCategories`) và heal danh mục mồ côi vào "Khác" cùng lúc.
-            // `nextCategoryPatch` ghim màu hũ khi tập mới sẽ làm accent đổi.
-            onCommit={(categoryIds) => updateJar(jarId, nextCategoryPatch(jar, categoryIds))}
-            onAddCategory={() => setAdding(true)}
+            selected={selectedCategories}
+            onChange={setPendingCategories}
           />
         </Field>
 
+        {/* Xoá hũ bỏ luôn bản nháp danh mục — không lưu gì trước khi đóng. */}
         <HuDeleteSection jar={jar} jars={config.jars} onDeleted={onClose} />
       </div>
-
-      {/* MỘT lượt ghi: `POST /api/categories { jarId }` đặt danh mục mới vào
-          đúng hũ này, nên hàng hiện ra đã tick sẵn — không tạo vào "Khác" rồi
-          PATCH chuyển sang (hai lượt ghi, một khoảng danh mục mồ côi). */}
-      {adding && (
-        <CategoryCreateSheet jarId={jar.id} jarLabel={jar.label} onClose={() => setAdding(false)} />
-      )}
     </Sheet>
   );
 }

@@ -11,7 +11,7 @@ import { linkedJarIds, rebalanceLegsForJar } from "./jar-rebalance-legs";
 const POOL_LABEL = "Chưa phân bổ";
 
 /**
- * "Xoá hũ" with a confirm step. Categories move to "Khác" server-side. When the
+ * "Xoá hũ" with a confirm step. The jar is deleted outright; its categories become "chưa xếp hũ" (in no jar). When the
  * jar has "điều chỉnh hũ" rebalance legs (U8/S8/A47) the confirm says so: the
  * server deletes those legs with the jar, and the linked jars' balance is
  * recalculated. After a successful delete the same legs are dropped from the
@@ -54,7 +54,7 @@ export function HuDeleteSection({ jar, jars, onDeleted }: { jar: Jar; jars: Jar[
 
   return (
     <div className="flex flex-col gap-2 rounded-row border border-negative/40 bg-negative-soft/40 p-3">
-      <p className="text-sm text-text">Xoá hũ này? Danh mục trong hũ sẽ chuyển sang “Khác”.</p>
+      <p className="text-sm text-text">Xoá hũ này? Các danh mục trong hũ sẽ thành “Chưa xếp hũ” — chi tiêu cũ vẫn được tính, bạn có thể xếp chúng vào hũ khác sau.</p>
       {legs.length > 0 && (
         <p role="alert" className="text-sm text-negative">
           Hũ này có {legs.length} khoản “Điều chỉnh hũ”. Xoá hũ sẽ xoá luôn các khoản điều chỉnh này

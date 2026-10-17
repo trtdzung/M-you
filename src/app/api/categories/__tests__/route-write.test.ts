@@ -58,14 +58,15 @@ beforeEach(() => {
 });
 
 describe("POST /api/categories", () => {
-  it("creates a c_-prefixed category and the response already shows it in Khác", async () => {
+  it("creates a c_-prefixed category that belongs to no jar (chưa xếp hũ) — no catch-all jar is invented", async () => {
     const [id, body] = await create("Học phí");
     expect(id).toBe("c_hoc-phi");
-    expect(jarOf(body.jarConfig, id)).toBe("khac");
+    expect(jarOf(body.jarConfig, id)).toBeUndefined();
+    expect(body.jarConfig.jars.some((j) => j.id === "khac")).toBe(false);
     expect((await (await get()).json()).map((c: { id: string }) => c.id)).toContain(id);
   });
 
-  it("lands the category in the requested jar, not Khác", async () => {
+  it("lands the category in the requested jar", async () => {
     writeJarConfig(CIF, { version: 3, jars: [{ id: "study", label: "Học", categoryIds: ["subscriptions"] }] });
     const [id, body] = await create("Học phí", { jarId: "study" });
     expect(jarOf(body.jarConfig, id)).toBe("study");
@@ -156,7 +157,7 @@ describe("PATCH /api/categories/:id", () => {
     expect((await patch(id, { archived: true })).status).toBe(200);
     const body = (await (await patch(id, { archived: false })).json()) as Aggregate;
     expect(body.categories.find((c) => c.id === id)?.archived).toBeUndefined();
-    expect(jarOf(body.jarConfig, id)).toBe("khac");
+    expect(jarOf(body.jarConfig, id)).toBeUndefined(); // still in no jar
   });
 
   it("re-runs the duplicate-label check on un-archive", async () => {

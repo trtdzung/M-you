@@ -24,12 +24,14 @@ function handleCollection(method: string, body: Record<string, unknown> | undefi
   const store = ports.readConfig();
   if (method === "GET") return jsonResponse(ports.commit(store, cif, false));
   if (method === "POST") {
-    // Plan 260923 D2: `jar.budgetLimit` and the opening `balance` are both required.
+    // The opening `balance` is required (0 allowed); `jar.budgetLimit` is optional — absent = "chưa đặt".
     const jar = body?.jar as Jar | undefined;
     if (!jar || typeof jar.id !== "string" || !Array.isArray(jar.categoryIds)) {
       return jsonResponse({ error: "jar is invalid" }, 422);
     }
-    if (!isJarAmount(jar.budgetLimit)) return jsonResponse({ error: "jar.budgetLimit is required" }, 422);
+    if (jar.budgetLimit !== undefined && jar.budgetLimit !== null && !isJarAmount(jar.budgetLimit)) {
+      return jsonResponse({ error: "jar is invalid" }, 422);
+    }
     if (!isJarAmount(body?.balance)) {
       return jsonResponse({ error: "balance is required (whole VND, 0 to 10^12)" }, 422);
     }

@@ -14,7 +14,7 @@ import { CategoryOptionGrid } from "./CategoryPickerSheet";
  * same merchant is recognised next time (invariant #4 — overlay, never mutation).
  *
  * "＋ Thêm danh mục" mở trình tạo KHÔNG kèm `jarId`: từ một giao dịch, người dùng
- * chưa chọn hũ nào cả, nên server heal danh mục mới vào "Khác" và sheet nói rõ
+ * chưa chọn hũ nào cả, nên danh mục mới ở "Chưa xếp hũ" và sheet nói rõ
  * điều đó. Danh mục vừa tạo được gán luôn cho giao dịch này.
  */
 export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: () => void }) {

@@ -95,7 +95,7 @@ export function AgentJarCategoryPicker({
       )}
       {moving.length > 0 && <p className="text-[11px] text-muted">{moving.join("; ")}.</p>}
       {isEdit && released.length > 0 && (
-        <p className="text-[11px] text-muted">{released.join(", ")} bỏ khỏi hũ này sẽ về hũ Khác.</p>
+        <p className="text-[11px] text-muted">{released.join(", ")} bỏ khỏi hũ này sẽ thành “Chưa xếp hũ”.</p>
       )}
     </div>
   );

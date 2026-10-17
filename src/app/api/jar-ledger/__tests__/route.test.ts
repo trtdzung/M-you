@@ -198,12 +198,12 @@ describe("POST /api/jar-ledger — rejections (nothing is written)", () => {
     expect(ledgerCount()).toBe(1);
   });
 
-  it("the synthetic healed 'Khác' (no DB row) → 422 jar not persisted (Red Team #5)", async () => {
+  it("there is no synthetic catch-all 'Khác' jar any more — its id is simply unknown (404)", async () => {
     seed({ a: 1_000_000 });
-    expect(readJarConfig(CIF).jars.map((j) => j.id)).toContain("khac"); // healed in, not stored
+    expect(readJarConfig(CIF).jars.map((j) => j.id)).not.toContain("khac");
     const res = await post([dep("khac", 1_000)]);
-    expect(res.status).toBe(422);
-    expect(await res.json()).toEqual({ error: "jar not persisted", jarId: "khac" });
+    expect(res.status).toBe(404);
+    expect((await res.json()).jarId).toBe("khac");
     expect(ledgerCount()).toBe(1);
   });
 
