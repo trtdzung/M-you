@@ -9,6 +9,7 @@ import { formatDate, formatVndCompact } from "@/lib/format";
 import { fundOutcomeNote } from "@/components/transfer/fund-outcome-note";
 import { useCategories } from "@/state/categories";
 import { useConfirmCategory, useCorrections } from "@/state/corrections";
+import { useManualTxns } from "@/state/manual-txns";
 import { useAutoFund } from "@/state/use-auto-fund";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { cn } from "@/lib/cn";
@@ -33,6 +34,7 @@ export function UnlabeledSpendSheet({
   onClose: () => void;
 }) {
   const confirmCategory = useConfirmCategory();
+  const { update: updateManualTxn } = useManualTxns();
   // The txn `type` follows the category's KIND in the PERSONA'S taxonomy — a
   // category they created is a real expense and must be typed as one, otherwise
   // the engine would drop that spend as a transfer (invariant #6).
@@ -56,7 +58,18 @@ export function UnlabeledSpendSheet({
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      confirmCategory(txn, categoryId);
+      const nextType = typeForCategory(categoryId, categoryById);
+      if (txn.type === "transfer") {
+        // An app-made transfer becomes a real spend only on this explicit choice:
+        // flip transfer→expense on the STORED self-reported record. A corrections
+        // overlay only overrides `categoryId`, never `type`, so the cashflow/jar
+        // engines would keep excluding it as a transfer (invariant #6). Same path
+        // as the transfer-success card's "Phân loại giao dịch".
+        const ok = updateManualTxn(txn.id, { categoryId, type: nextType });
+        if (!ok) return; // record vanished mid-edit (race) — leave the picker as-is
+      } else {
+        confirmCategory(txn, categoryId);
+      }
       setActiveId(null);
       setFundNote(null);
       const result = autoFund.reconcile({
@@ -64,7 +77,7 @@ export function UnlabeledSpendSheet({
         categoryId,
         postedAt: txn.postedAt,
         origin: "manual",
-        override: { categoryId, type: typeForCategory(categoryId, categoryById) },
+        override: { categoryId, type: nextType },
       });
       // funded / partial cover + residual (U5) / covered — one shared copy.
       if (result) setFundNote(fundOutcomeNote(result));
@@ -92,7 +105,7 @@ export function UnlabeledSpendSheet({
   return (
     <Sheet
       title="Gắn nhãn chi tiêu"
-      description="Các khoản tiêu từ TK chính chưa vào hũ. Chọn danh mục để đưa vào hũ tương ứng."
+      description="Các khoản chi & chuyển khoản từ TK chính chưa vào hũ. Chọn danh mục để đưa vào hũ tương ứng."
       onClose={onClose}
     >
       {unsaved && (

@@ -33,6 +33,11 @@ vi.mock("@/state/corrections", () => ({
 vi.mock("@/state/use-auto-fund", () => ({
   useAutoFund: () => ({ reconcile: () => ({ status: "covered", donors: [], targetLabel: "hũ" }) }),
 }));
+// The labeling sheet flips a transfer's type via the manual-txn store; stub it so
+// the row stays free of the ManualTxnsProvider.
+vi.mock("@/state/manual-txns", () => ({
+  useManualTxns: () => ({ update: vi.fn(() => true) }),
+}));
 
 import { HuOverviewRow } from "../HuOverviewRow";
 

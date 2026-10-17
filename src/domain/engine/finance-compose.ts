@@ -126,10 +126,13 @@ export interface Financials {
    */
   jarRebalances: Transaction[];
   /**
-   * Current-month expenses spent straight from CASA that never got a category
-   * ("Chưa gắn nhãn"). Posted-only, in-period (`selectUnlabeledSpend`). The
-   * overview card reads `count`/`amount`; the labeling sheet re-runs the SAME
-   * selector for the list (parity by construction).
+   * Current-month spend from CASA that never got a spending category ("Chưa gắn
+   * nhãn") — unclassified expenses AND app-made (self-reported) transfers still
+   * tagged "Chuyển khoản". Posted-only, in-period (`selectUnlabeledSpend`). A
+   * queued transfer is NOT counted as expense until the user labels it (invariant
+   * #6); it is only a data-quality prompt here. The overview card reads
+   * `count`/`amount`; the labeling sheet re-runs the SAME selector for the list
+   * (parity by construction).
    *
    * CLIENT-ONLY: corrections live in localStorage, so only the client hook feeds
    * correction-applied txns here. The server/AI-facade path sees RAW txns and

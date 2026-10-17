@@ -52,6 +52,38 @@ describe("selectUnlabeledSpend", () => {
     expect(res.count).toBe(0);
   });
 
+  it("includes an app-made (self-reported) outgoing transfer still tagged 'transfer'", () => {
+    const spend = txn({ id: "e", categoryId: UNCLASSIFIED, amount: 100_000, postedAt: IN });
+    const transfer = txn({
+      id: "tr",
+      type: "transfer",
+      categoryId: "transfer",
+      source: "self_reported",
+      direction: "debit",
+      amount: 12_000,
+      postedAt: IN,
+    });
+    const res = selectUnlabeledSpend([spend, transfer], PERIOD);
+    expect(res.count).toBe(2);
+    expect(res.amount).toBe(112_000);
+    expect(res.items.map((t) => t.id)).toContain("tr");
+  });
+
+  it("excludes BANK-history transfers tagged 'transfer' (only self-reported ones queue)", () => {
+    // Mock internal-savings / P2P-history legs all carry categoryId 'transfer';
+    // they must never flood the queue (invariant #6 — bank transfers stay out).
+    const internal = txn({ id: "s", type: "transfer", categoryId: "transfer", source: "mock", direction: "debit", postedAt: IN });
+    const incomingLeg = txn({ id: "c", type: "transfer", categoryId: "transfer", source: "self_reported", direction: "credit", postedAt: IN });
+    const res = selectUnlabeledSpend([internal, incomingLeg], PERIOD);
+    expect(res.count).toBe(0);
+  });
+
+  it("excludes a self-reported transfer already given a spending category", () => {
+    const labeled = txn({ id: "tr", type: "expense", categoryId: "dining", source: "self_reported", direction: "debit", postedAt: IN });
+    const res = selectUnlabeledSpend([labeled], PERIOD);
+    expect(res.count).toBe(0);
+  });
+
   it("excludes out-of-period transactions", () => {
     // VN business time (UTC+7): 31/05 23:00 VN is May; 01/07 00:30 VN is July.
     const before = txn({ id: "b", categoryId: UNCLASSIFIED, amount: 100_000, postedAt: "2026-05-31T16:00:00.000Z" });
