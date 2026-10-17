@@ -9,7 +9,7 @@ import type { Jar, JarConfig } from "@/domain/models";
  * POST/PUT (S4) with the "only an INCREASE of Σ is rejected" rule (S5), reserved
  * sentinel ids (S9), strict `budgetLimit` (S15/A24/A25/A09), expense-only
  * categories (A11/A49), and DELETE removing the jar's rebalance legs (S8). Real
- * handlers + real stores over an in-memory SQLite. CIF_0001 CASA = 18tr.
+ * handlers + real stores over an in-memory SQLite. CIF_0001 CASA pinned to 18tr.
  */
 
 vi.mock("server-only", () => ({}));
@@ -49,6 +49,8 @@ beforeEach(() => {
   holder.db.exec(JARS_DDL);
   holder.db.exec(ACCOUNTS_DDL);
   holder.db.exec(TRANSACTIONS_DDL);
+  // Pin the cap these cases are written against, independent of persona salary.
+  setCasa(18_000_000);
 });
 
 describe("POST /api/jars", () => {

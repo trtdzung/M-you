@@ -50,9 +50,9 @@ const SEED_JARS = JSON.parse(readFileSync(SEED_JARS_PATH, "utf8"));
 // Scaling the seed by it keeps Σ budgetLimit tracking CASA per persona
 // (Σ/CASA ≈ 0.94, dư về "Chờ phân bổ") and fixes CIF_0002 over-allocation.
 const SALARY_BASE_BY_CIF = {
-  CIF_0001: 25_000_000,
-  CIF_0002: 22_000_000,
-  CIF_0003: 80_000_000,
+  CIF_0001: 30_000_000,
+  CIF_0002: 35_000_000,
+  CIF_0003: 100_000_000,
 };
 const SALARY_REF = 25_000_000;
 const CIFS = Object.keys(SALARY_BASE_BY_CIF);

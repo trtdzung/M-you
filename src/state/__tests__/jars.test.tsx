@@ -195,12 +195,12 @@ describe("JarConfigProvider — mutation errors (U20/S14/K02)", () => {
     const hook = await renderLoaded();
     // BALANCE LENS: overBy = Σ new spendable − CASA. Setting food (limit 4tr, its
     // spendable already reduced by this month's dining spend) to 50tr raises Σ
-    // spendable to 34,486,000 over CASA — less than the 45tr a pure-limit cap would
+    // spendable to 30,886,000 over CASA — less than the 45tr a pure-limit cap would
     // report, because spent money no longer counts as claimed.
     await act(async () => {
       await hook.result.current.jars.updateJar("food", { budgetLimit: 50_000_000 });
     });
-    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 34\.486\.000/);
+    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 30\.886\.000/);
     expect(jarById(hook, "food")?.budgetLimit).toBe(4_000_000);
   });
 

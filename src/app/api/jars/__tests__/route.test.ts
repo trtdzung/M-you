@@ -16,7 +16,7 @@ import type { Jar, JarConfig } from "@/domain/models";
  *
  * `@/lib/db` is mocked to an in-memory SQLite so the real `jars-store` runs for
  * real; `server-only` is neutralised (it throws outside a Server Component).
- * CIF_0001's CASA pool is 18tr (salaryBase 25tr → 18tr × 25/25).
+ * CIF_0001's CASA pool is 21.6tr (salaryBase 30tr → 18tr × 30/25).
  */
 
 vi.mock("server-only", () => ({}));
@@ -30,7 +30,7 @@ import { writeJarConfig } from "@/lib/jars-store";
 import { ACCOUNTS_DDL, JARS_DDL, TRANSACTIONS_DDL } from "./jar-route-test-ddl";
 
 const CIF = "CIF_0001";
-const CASA = 18_000_000;
+const CASA = 21_600_000;
 
 /** Seed a controlled jar set (bypasses the cap on purpose — writeJarConfig never caps). */
 function seed(jars: Jar[]): void {
@@ -90,10 +90,10 @@ describe("PATCH /api/jars (batch cap door)", () => {
       { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 },
       { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000 },
     ]);
-    const res = await batchPatch({ a: { budgetLimit: 10_000_000 }, b: { budgetLimit: 10_000_000 } });
+    const res = await batchPatch({ a: { budgetLimit: 12_000_000 }, b: { budgetLimit: 12_000_000 } });
     expect(res.status).toBe(422);
     const body = await res.json();
-    expect(body.overBy).toBe(20_000_000 - CASA); // 2tr over
+    expect(body.overBy).toBe(24_000_000 - CASA); // 2.4tr over
     // Store untouched — the atomic write never ran.
     const after = await readConfig();
     expect(findJar(after, "a")?.budgetLimit).toBe(5_000_000);
@@ -130,11 +130,11 @@ describe("PATCH /api/jars/:id (single cap door)", () => {
       { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 },
       { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000 },
     ]);
-    const [req, ctx] = singlePatch("a", { budgetLimit: 15_000_000 });
+    const [req, ctx] = singlePatch("a", { budgetLimit: 19_000_000 });
     const res = await patchJar(req, ctx);
     expect(res.status).toBe(422);
     const body = await res.json();
-    expect(body.overBy).toBe(20_000_000 - CASA);
+    expect(body.overBy).toBe(24_000_000 - CASA);
   });
 
   it("clears a limit (null) even when the stored config is already over cap — no cap check", async () => {
