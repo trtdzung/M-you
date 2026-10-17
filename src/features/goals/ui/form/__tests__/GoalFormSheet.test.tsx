@@ -36,16 +36,15 @@ describe("GoalFormSheet", () => {
       openingAmount: null,
     });
   });
-  it("formats money, retains supplementary values, and confirms a date from the calendar", async () => {
+  it("formats money, shows supplementary fields inline, and confirms a date from the calendar", async () => {
     const onSubmit = vi.fn();
     render(<Harness inline pending={false} onSubmit={onSubmit} />);
     fireEvent.change(screen.getByLabelText("Tên mục tiêu"), { target: { value: "Mua xe" } });
     fireEvent.change(screen.getByLabelText("Số tiền mục tiêu"), { target: { value: "600000000" } });
     expect(screen.getByLabelText("Số tiền mục tiêu")).toHaveValue("600,000,000");
-    fireEvent.click(screen.getByRole("button", { name: "Thông tin bổ sung" }));
-    expect(await screen.findByRole("dialog", { name: "Thông tin bổ sung" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Thông tin bổ sung" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Thông tin bổ sung" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Số đã có sẵn"), { target: { value: "1000000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Xong" }));
     fireEvent.click(screen.getByLabelText("Ngày hoàn thành"));
     expect(await screen.findByRole("dialog", { name: "Ngày hoàn thành" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "15/09/2026" })).toBeDisabled();
