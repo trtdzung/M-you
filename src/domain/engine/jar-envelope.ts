@@ -24,8 +24,10 @@
  *     not (the hạn mức still stands). The card is the CTA into the sheet, so it
  *     must promise the headroom the sheet can actually accept — otherwise it
  *     invites the user to split money the cap will reject (422).
- *  2. Per-jar "còn lại trong hũ" = `budgetLimit − spent`. `spent` reuses the
- *     jar-budget net expense (DRY, invariant #2). `overLimit = spent > budgetLimit`.
+ *  2. Per-jar SỐ DƯ "còn lại trong hũ" = `budgetLimit − spent + (Σ nhận − Σ cho)`.
+ *     `spent` reuses the jar-budget net expense (DRY, invariant #2). An inter-jar
+ *     transfer moves this balance and NOTHING else — `overLimit = spent > budgetLimit`
+ *     stays on the plan axis, so being covered never erases "đã vượt hạn mức".
  *
  * Invariants honoured:
  *  - Engine is the sole source of these numbers (invariant #1); the UI renders.
@@ -77,9 +79,12 @@ export interface JarEnvelopeLine {
   budgetLimit: number | null;
   /** Net expense over this jar's categories this period (from jar-budget). */
   spent: number;
-  /** "còn lại trong hũ" = `budgetLimit − spent`; `null` when no budgetLimit. May be negative. */
+  /**
+   * SỐ DƯ hũ = `budgetLimit − spent + (Σ nhận − Σ cho)`; `null` when no budgetLimit.
+   * May be negative (hết tiền — a separate axis from `overLimit`).
+   */
   remaining: number | null;
-  /** True khi chi vượt hạn mức (`budgetLimit != null && spent > budgetLimit`). */
+  /** True khi chi vượt HẠN MỨC GỐC (`budgetLimit != null && spent > budgetLimit`). */
   overLimit: boolean;
   /** True when the jar has spending this period (spent > 0). */
   inUse: boolean;
@@ -100,10 +105,10 @@ function buildLine(
   spent: number,
   rebalanceNet: number,
 ): JarEnvelopeLine {
-  // `budgetLimit` là con số duy nhất: số dành cho hũ = trần chi = số dư gốc. Chưa
-  // đặt → "chưa có số dư" (null, không phải 0 — invariant #6). Rebalance coverage
-  // (Σ nhận − Σ cho) folds into remaining; `overLimit` is recomputed against the
-  // POST-rebalance remaining, so a jar that has been covered is no longer "vượt".
+  // `budgetLimit` là hạn mức tháng, cũng là số dư gốc đầu kỳ. Chưa đặt → "chưa có
+  // số dư" (null, không phải 0 — invariant #6). HAI TRỤC TÁCH BẠCH: rebalance
+  // (Σ nhận − Σ cho) chỉ dịch chuyển `remaining` (SỐ DƯ); `overLimit` vẫn đo `spent`
+  // với `budgetLimit` GỐC, nên một hũ đã được bù tiền vẫn là "vượt kế hoạch".
   const hasLimit = budgetLimit !== null;
   const remaining = hasLimit ? budgetLimit - spent + rebalanceNet : null;
   return {
@@ -112,7 +117,7 @@ function buildLine(
     budgetLimit,
     spent,
     remaining,
-    overLimit: remaining !== null && remaining < 0,
+    overLimit: hasLimit && spent > budgetLimit,
     inUse: spent > 0,
     // A budgetLimit is user-entered (self_reported); an empty jar carries the baseline.
     source: hasLimit ? "self_reported" : "mock",

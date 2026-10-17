@@ -217,8 +217,8 @@ describe("evaluateJarEnvelope — per-jar còn lại trong hũ (một con số)"
   });
 });
 
-describe("evaluateJarEnvelope — rebalance fold (Phase 03): a covered jar is no longer `overLimit`", () => {
-  it("remaining folds the net rebalance; overLimit is recomputed off the POST-rebalance remaining", () => {
+describe("evaluateJarEnvelope — rebalance fold: moves `remaining` (SỐ DƯ), never `overLimit`", () => {
+  it("remaining folds the net rebalance; overLimit keeps measuring spent vs the ORIGINAL budgetLimit", () => {
     const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 4_000_000 }]);
     const spent = new Map([["food", 4_500_000]]); // 500k over budget
     const withoutCoverage = evaluateJarEnvelope(cfg, CURRENT, spent, PERIOD);
@@ -227,17 +227,18 @@ describe("evaluateJarEnvelope — rebalance fold (Phase 03): a covered jar is no
 
     const net = new Map([["food", 500_000]]); // a donor covered the overspend
     const withCoverage = evaluateJarEnvelope(cfg, CURRENT, spent, PERIOD, net);
-    expect(withCoverage.jars[0].remaining).toBe(0); // (4M − 4.5M) + 0.5M
-    expect(withCoverage.jars[0].overLimit).toBe(false); // covered — no longer "vượt"
+    expect(withCoverage.jars[0].remaining).toBe(0); // (4M − 4.5M) + 0.5M — balance healed
+    expect(withCoverage.jars[0].budgetLimit).toBe(4_000_000); // plan untouched
+    expect(withCoverage.jars[0].overLimit).toBe(true); // 4.5M spent on a 4M plan is still "vượt"
   });
 
-  it("a jar that DONATED (negative net) shows a lowered remaining and may flip to overLimit", () => {
+  it("a jar that DONATED (negative net) shows a lowered remaining but is NOT 'vượt'", () => {
     const cfg = config([{ id: "bills", label: "Hóa đơn", budgetLimit: 1_000_000 }]);
     const spent = new Map([["bills", 800_000]]); // within budget on its own
     const net = new Map([["bills", -400_000]]); // donated 400k to another jar
     const res = evaluateJarEnvelope(cfg, CURRENT, spent, PERIOD, net);
-    expect(res.jars[0].remaining).toBe(1_000_000 - 800_000 - 400_000); // -200k
-    expect(res.jars[0].overLimit).toBe(true); // donating pushed it over
+    expect(res.jars[0].remaining).toBe(1_000_000 - 800_000 - 400_000); // -200k: hết tiền
+    expect(res.jars[0].overLimit).toBe(false); // but it never overspent its own plan
   });
 
   it("no rebalanceNetByJar argument leaves remaining/overLimit exactly as the pre-Phase-03 computation", () => {

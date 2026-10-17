@@ -176,4 +176,39 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
       jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines: [] }) })),
     ).toBeNull();
   });
+
+  describe("hai trục: hũ vượt kế hoạch nhưng đã được bù đủ số dư thì nhường lượt kể", () => {
+    const covered = makeJarBudgetLine({
+      huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000,
+      limitState: "set", status: "over", pct: 1.2, rebalanceNet: 800_000,
+      remaining: 0, thresholdHit: true,
+    });
+    const short = makeJarBudgetLine({
+      huId: "transport", label: "Đi lại", spent: 2_100_000, limit: 2_000_000,
+      limitState: "set", status: "over", pct: 1.05, remaining: -100_000, thresholdHit: true,
+    });
+    const run = (lines: ReturnType<typeof makeJarBudgetLine>[]) =>
+      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines }) }));
+
+    it("hũ vượt kế hoạch nhưng đã được bù đủ tiền → nhường cho jarOverspendCovered, không bắn", () => {
+      expect(run([covered])).toBeNull();
+    });
+
+    it("hũ còn thiếu tiền vẫn bắn urgent, dù pct thấp hơn hũ đã bù", () => {
+      const insight = run([covered, short]);
+      expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:transport`);
+      expect(insight?.severity).toBe("urgent");
+      assertGrounded(insight!);
+    });
+
+    it("hũ đã bù không che mất một hũ 'sắp chạm' khác", () => {
+      const nearLine = makeJarBudgetLine({
+        huId: "fun", label: "Hưởng thụ", spent: 900_000, limit: 1_000_000,
+        limitState: "set", status: "near", pct: 0.9, remaining: 100_000, thresholdHit: true,
+      });
+      const insight = run([covered, nearLine]);
+      expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:fun`);
+      expect(insight?.severity).toBe("attention");
+    });
+  });
 });

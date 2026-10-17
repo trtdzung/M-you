@@ -70,21 +70,30 @@ export function makeJarBudgetResult(over: Partial<JarBudgetResult> = {}): JarBud
   };
 }
 
-/** A single jarBudget line, defaulted to an unset (no-limit) jar with no spend. */
+/**
+ * A single jarBudget line, defaulted to an unset (no-limit) jar with no spend.
+ *
+ * `remaining` (the BALANCE axis) defaults to what the engine would derive —
+ * `limit − spent + rebalanceNet` — instead of `null`, so a fixture cannot describe a
+ * jar the engine can never produce (e.g. `status: "over"` with a null balance). Pass
+ * it explicitly to model a jar that a rebalance moved off that identity.
+ */
 export function makeJarBudgetLine(over: Partial<JarBudgetLine> = {}): JarBudgetLine {
+  const limit = over.limit ?? null;
+  const spent = over.spent ?? 0;
+  const rebalanceNet = over.rebalanceNet ?? 0;
   return {
     huId: over.huId ?? "food",
     label: over.label ?? "Ăn uống",
     categoryIds: over.categoryIds ?? ["dining"],
-    spent: over.spent ?? 0,
+    spent,
     prevSpent: over.prevSpent ?? 0,
     momDelta: over.momDelta ?? 0,
     momPct: over.momPct ?? null,
-    limit: over.limit ?? null,
+    limit,
     limitState: over.limitState ?? "unset",
-    rebalanceNet: over.rebalanceNet ?? 0,
-    effectiveLimit: over.effectiveLimit ?? (over.limit != null ? over.limit + (over.rebalanceNet ?? 0) : null),
-    remaining: over.remaining ?? null,
+    rebalanceNet,
+    remaining: over.remaining ?? (limit !== null ? limit - spent + rebalanceNet : null),
     pct: over.pct ?? null,
     status: over.status ?? null,
     thresholdHit: over.thresholdHit ?? false,

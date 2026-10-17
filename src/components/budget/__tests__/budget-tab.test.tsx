@@ -47,7 +47,7 @@ function jarBudget(over: Partial<JarBudgetResult["summary"]>, lines: JarBudgetRe
 function line(over: Partial<JarBudgetResult["lines"][number]>): JarBudgetResult["lines"][number] {
   return {
     huId: "food", label: "Ăn uống", categoryIds: ["dining"], spent: 1_400_000, prevSpent: 1_000_000,
-    momDelta: 400_000, momPct: 0.4, limit: 4_000_000, limitState: "set", rebalanceNet: 0, effectiveLimit: 4_000_000, remaining: 2_600_000,
+    momDelta: 400_000, momPct: 0.4, limit: 4_000_000, limitState: "set", rebalanceNet: 0, remaining: 2_600_000,
     pct: 0.35, status: "ok", thresholdHit: false, source: "mock", freshness: null, ...over,
   };
 }
@@ -124,17 +124,21 @@ describe("BudgetTab", () => {
     expect(screen.queryByText("Chưa có hũ nào")).not.toBeInTheDocument();
   });
 
-  it("D24/U18: a jar covered back to 0 shows 'Đã bù', not 'Vượt hạn mức … Đã vượt'", () => {
+  it("hai trục: một hũ được bù đủ tiền vẫn báo vượt hạn mức, và nói rõ số dư đến từ đâu", () => {
     const covered = line({
-      label: "Hưởng thụ", spent: 2_704_000, limit: 2_500_000, rebalanceNet: 204_000, effectiveLimit: 2_704_000,
-      remaining: 0, pct: 1, status: "near", thresholdHit: true,
+      label: "Hưởng thụ", spent: 2_704_000, limit: 2_500_000, rebalanceNet: 204_000,
+      remaining: 0, pct: 1.0816, status: "over", thresholdHit: true,
     });
     mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [covered])) };
     render(<BudgetTab />);
-    expect(screen.getByText("Đã bù vượt hạn mức")).toBeInTheDocument();
-    expect(screen.getByText(/Đã bù 204\.000/)).toBeInTheDocument();
-    expect(screen.queryByText("Vượt hạn mức")).not.toBeInTheDocument();
-    expect(screen.queryByText("Đã vượt")).not.toBeInTheDocument();
+    // Trục hạn mức: hạn mức GỐC 2.500.000 (không bị nâng lên 2.704.000) + verdict vượt.
+    expect(screen.getByText(/2\.500\.000/)).toBeInTheDocument();
+    expect(screen.queryByText(/2\.704\.000 \//)).not.toBeInTheDocument();
+    expect(screen.getByText("Vượt hạn mức")).toBeInTheDocument();
+    expect(screen.getByText(/Đã vượt 204\.000/)).toBeInTheDocument();
+    // Trục số dư: đã về 0 nhờ nhận từ hũ khác → không còn "cần bù thủ công".
+    expect(screen.getByText("Số dư")).toBeInTheDocument();
+    expect(screen.getByText(/Đã nhận 204\.000 ₫ từ hũ khác/)).toBeInTheDocument();
     expect(screen.queryByText("Cần bù thủ công")).not.toBeInTheDocument();
   });
 

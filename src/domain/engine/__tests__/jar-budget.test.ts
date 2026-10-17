@@ -212,7 +212,7 @@ describe("evaluateJarBudget — summary gauge counts only jars with a set limit"
 });
 
 describe("evaluateJarBudget — rebalance fold (Phase 03): remaining += Σnhận − Σcho, spent UNCHANGED", () => {
-  it("a jar that received a covering rebalance shows a LIFTED remaining while `spent` stays the raw spend-vs-limit truth", () => {
+  it("a jar that received a covering rebalance shows a LIFTED remaining while `spent` AND its limit verdict stay the raw truth", () => {
     const net = new Map([["food", 1_000_000]]); // received 1tr from a donor
     const r = evaluateJarBudget(
       config,
@@ -225,13 +225,12 @@ describe("evaluateJarBudget — rebalance fold (Phase 03): remaining += Σnhận
     const j = byId(r);
     expect(j.food.spent).toBe(4_500_000); // the REAL spend — untouched by the rebalance
     expect(j.food.remaining).toBe(500_000); // (4M − 4.5M) + 1M nhận = 0.5M — no longer negative
-    // D24/L13: the verdict is post-rebalance — effective limit 5M, 4.5M/5M = 90% → near,
-    // NOT "over" (same verdict as the envelope's overLimit=false).
+    // Two axes: the transfer refilled the balance but did NOT rewrite the plan —
+    // 4.5M spent against a 4M limit is still "over" at 112.5%.
     expect(j.food.rebalanceNet).toBe(1_000_000);
-    expect(j.food.effectiveLimit).toBe(5_000_000);
-    expect(j.food.limit).toBe(4_000_000); // raw limit kept
-    expect(j.food.status).toBe("near");
-    expect(j.food.pct).toBeCloseTo(0.9, 10);
+    expect(j.food.limit).toBe(4_000_000); // never lifted to 5M by the coverage
+    expect(j.food.status).toBe("over");
+    expect(j.food.pct).toBeCloseTo(1.125, 10);
   });
 
   it("a jar that DONATED shows a lowered remaining, spend on its own category untouched", () => {

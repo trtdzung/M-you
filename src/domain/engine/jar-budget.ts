@@ -54,22 +54,20 @@ export interface JarBudgetLine {
   /** Net inter-jar rebalance this period (`Σ nhận − Σ cho`); 0 when untouched. */
   rebalanceNet: number;
   /**
-   * `limit + rebalanceNet` when set, else `null` — the ceiling AFTER coverage. The
-   * verdict (`status`/`pct`) is measured against this, so a jar covered back to ≥ 0
-   * is no longer "over" (same verdict as the envelope's `overLimit`).
-   */
-  effectiveLimit: number | null;
-  /**
-   * `limit − spent + Σ nhận − Σ cho` (rebalance net) when set, else `null`. Folds
-   * inter-jar rebalance coverage so the derived `spendable`/pool every screen reads
-   * reflects a rebalance instantly (Phase 03). `spent` itself is UNCHANGED.
+   * **TRỤC SỐ DƯ** — `limit − spent + Σ nhận − Σ cho` (rebalance net) when set, else
+   * `null`. This IS the jar's balance ("số dư hũ"): the money still available to
+   * spend. Folds inter-jar rebalance coverage so the derived `spendable`/pool every
+   * screen reads reflects a transfer instantly. `spent` itself is UNCHANGED.
    */
   remaining: number | null;
-  /** `spent / effectiveLimit` in [0, ∞), or `null` when unset. */
+  /** `spent / limit` in [0, ∞), or `null` when unset — the PLAN axis, never the balance. */
   pct: number | null;
   /**
-   * ok/near/over from the POST-rebalance remaining when set, else `null`:
-   * `over` ⇔ `remaining < 0` (⇔ envelope `overLimit`). Unset jar → no status.
+   * **TRỤC HẠN MỨC** — ok/near/over measured against the ORIGINAL `limit` when set,
+   * else `null`: `over` ⇔ `spent > limit`. An inter-jar transfer moves balance, never
+   * the plan, so a jar covered back to a ≥ 0 balance STILL reads "over" while its
+   * spend exceeds its own limit (⇔ envelope `overLimit`). "Hết tiền" is the separate
+   * balance axis (`remaining < 0` → `jarNeedsManualTopUp`). Unset jar → no status.
    */
   status: PressureStatus | null;
   /** True when a SET limit is ≥ 80% used. Always false when unset. */
@@ -112,21 +110,21 @@ export interface JarBudgetResult {
 const EXPENSE_TYPES: ReadonlySet<Transaction["type"]> = new Set(["expense", "fee", "refund"]);
 
 /**
- * Classify usage against the EFFECTIVE (post-rebalance) limit. `over` exactly when
- * `spent > effectiveLimit` (⇔ remaining < 0), so a covered jar reads the same as
- * the envelope. An effective limit ≤ 0 is "over" once anything is spent.
+ * Classify usage against the jar's OWN limit — the plan the user set. An inter-jar
+ * transfer never raises or lowers this ceiling, so `over` is exactly `spent > limit`
+ * whatever coverage arrived. A limit ≤ 0 is "over" once anything is spent.
  */
-function jarStatus(spent: number, effectiveLimit: number): PressureStatus {
-  if (spent > effectiveLimit) return "over";
-  if (effectiveLimit <= 0) return "ok";
-  if (spent / effectiveLimit >= NEAR_THRESHOLD) return "near";
+function jarStatus(spent: number, limit: number): PressureStatus {
+  if (spent > limit) return "over";
+  if (limit <= 0) return "ok";
+  if (spent / limit >= NEAR_THRESHOLD) return "near";
   return "ok";
 }
 
-/** Usage ratio vs the effective limit; finite for a ≤ 0 ceiling (1 when over, else 0). */
-function jarPct(spent: number, effectiveLimit: number): number {
-  if (effectiveLimit > 0) return spent / effectiveLimit;
-  return spent > effectiveLimit ? 1 : 0;
+/** Usage ratio vs the jar's own limit; finite for a ≤ 0 ceiling (1 when over, else 0). */
+function jarPct(spent: number, limit: number): number {
+  if (limit > 0) return spent / limit;
+  return spent > limit ? 1 : 0;
 }
 
 /** A usable stored limit: a finite, non-negative number. Anything else is "unset". */
@@ -194,15 +192,15 @@ export function evaluateJarBudget(
     const prevSpent = owned.reduce((s, c) => s + (spendPrev.get(c) ?? 0), 0);
     const momDelta = spent - prevSpent;
     const momPct = prevSpent > 0 ? momDelta / prevSpent : null;
-    // Rebalance coverage (Σ nhận − Σ cho) lifts/lowers the ceiling; `spent` (đã
-    // tiêu) stays raw truth. The verdict is measured post-rebalance (D24/L13).
+    // Rebalance coverage (Σ nhận − Σ cho) moves the SỐ DƯ only. It never touches the
+    // ceiling, and `spent` (đã tiêu) stays raw truth — so the verdict below reads the
+    // plan the user actually set, not one a transfer rewrote behind their back.
     const rawNet = rebalanceNetByJar?.get(jar.id) ?? 0;
     const rebalanceNet = Number.isFinite(rawNet) ? rawNet : 0;
 
     const limit = validBudgetLimit(jar.budgetLimit);
-    const effectiveLimit = limit !== null ? limit + rebalanceNet : null;
-    const status = effectiveLimit !== null ? jarStatus(spent, effectiveLimit) : null;
-    const pct = effectiveLimit !== null ? jarPct(spent, effectiveLimit) : null;
+    const status = limit !== null ? jarStatus(spent, limit) : null;
+    const pct = limit !== null ? jarPct(spent, limit) : null;
 
     const sources = owned.flatMap((c) => provNow.get(c)?.sources ?? []);
     const latest = owned.reduce<string | null>((acc, c) => {
@@ -222,8 +220,7 @@ export function evaluateJarBudget(
       limit,
       limitState: limit !== null ? "set" : "unset",
       rebalanceNet,
-      effectiveLimit,
-      remaining: effectiveLimit !== null ? effectiveLimit - spent : null,
+      remaining: limit !== null ? limit - spent + rebalanceNet : null,
       pct,
       status,
       thresholdHit: pct !== null && pct >= NEAR_THRESHOLD,
