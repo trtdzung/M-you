@@ -7,6 +7,7 @@ import type {
   LedgerEntryInput,
   SavingsGoalView,
 } from "../model/types";
+import type { CoachAnswer, CoachResponse } from "../coach/contracts";
 import { fetchJson, jsonInit } from "./http";
 
 const enc = encodeURIComponent;
@@ -39,3 +40,6 @@ export const checkFeasibility = (cif: string, input: FeasibilityRequest) =>
 
 export const seedDemoGoals = (cif: string) =>
   fetchJson<{ inserted: number }>("/api/goals/demo", jsonInit("POST", { cif }));
+
+export const coachGoal = (cif: string, input: { request: string; answers: CoachAnswer[] }) =>
+  fetchJson<CoachResponse>("/api/goals/coach", jsonInit("POST", { cif, ...input }));
