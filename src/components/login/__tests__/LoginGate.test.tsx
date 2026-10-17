@@ -10,8 +10,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 /**
  * The login gate is the app's front door: renders `LoginScreen` until a sample
  * customer (CIF_0001..0003) logs in with the shared demo password, then reveals
- * `children` and switches the active persona to match the chosen customer — all
- * session-only (no localStorage), so a reload always starts back at login.
+ * `children` and switches the active persona to match the chosen customer — the
+ * login is remembered in localStorage, so a reload stays signed in.
  */
 function ActivePersonaLabel() {
   const { persona } = usePersona();
@@ -75,6 +75,23 @@ describe("LoginGate", () => {
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
 
     expect(push).toHaveBeenCalledWith("/");
+  });
+
+  it("stays signed in after a reload", () => {
+    const first = renderGate();
+    fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), {
+      target: { value: "CIF_0002" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
+      target: { value: LOGIN_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    first.unmount();
+
+    renderGate();
+
+    expect(screen.getByText("Persona hiện tại: irregular")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Khách hàng" })).not.toBeInTheDocument();
   });
 
   it("stays clickable and shows an error when the password is typed before a customer is chosen", () => {
