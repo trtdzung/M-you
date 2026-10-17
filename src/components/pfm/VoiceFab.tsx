@@ -99,6 +99,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const [sectionOpen, setSectionOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const holding = useRef(false);
   const [transcript, setTranscript] = useState("");
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState<{ answer: string; ui: UiPayload } | null>(null);
@@ -141,38 +142,46 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (!listening) {
-      voiceRef.current.stop();
-      return;
-    }
-    setTranscript("");
-    setReply(null);
-    voiceRef.current.start();
-    
     function stopListening() {
+      if (!holding.current) return;
+      holding.current = false;
       setListening(false);
+      voiceRef.current.stop();
     }
-    const releaseEvents = ["pointerup", "pointercancel", "mouseup", "touchend", "touchcancel"] as const;
+    const releaseEvents = ["pointerup", "pointercancel", "mouseup", "touchend", "touchcancel", "blur"] as const;
     for (const type of releaseEvents) window.addEventListener(type, stopListening);
+    const releaseKey = (event: KeyboardEvent) => {
+      if (event.key === " " || event.key === "Enter") stopListening();
+    };
+    window.addEventListener("keyup", releaseKey);
     return () => {
       for (const type of releaseEvents) window.removeEventListener(type, stopListening);
+      window.removeEventListener("keyup", releaseKey);
     };
-  }, [listening]);
+  }, []);
 
   function onPointerDown() {
+    if (holding.current || voiceRef.current.state !== "idle" || sending) return;
     if (!sectionOpen) {
       setSectionOpen(true);
     }
     setListening(true);
+    holding.current = true;
+    setTranscript("");
+    setReply(null);
+    // Run inside the gesture so mobile browsers can resume AudioContext.
+    voiceRef.current.start();
   }
 
   function closeSection() {
+    holding.current = false;
     setSectionOpen(false);
     setListening(false);
     voiceRef.current.cancel();
   }
 
   function switchToChat() {
+    holding.current = false;
     setSectionOpen(false);
     setListening(false);
     voiceRef.current.cancel();
@@ -182,6 +191,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   }
 
   function handleRefresh() {
+    holding.current = false;
     setTranscript("");
     setReply(null);
     setListening(false);
@@ -191,12 +201,25 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const micButton = (
     <button
       type="button"
-      onPointerDown={onPointerDown}
+      onPointerDown={(event) => { if (event.button > 0 || event.isPrimary === false) return; onPointerDown(); }}
+      onKeyDown={(event) => {
+        if (event.key !== " " && event.key !== "Enter") return;
+        event.preventDefault();
+        if (!event.repeat) onPointerDown();
+      }}
+      onKeyUp={(event) => {
+        if (event.key !== " " && event.key !== "Enter") return;
+        event.preventDefault();
+        if (!holding.current) return;
+        holding.current = false;
+        setListening(false);
+        voiceRef.current.stop();
+      }}
       aria-label="Giữ để hỏi M-Your bằng giọng nói"
       aria-pressed={listening}
       className={cn(
         "pointer-events-auto flex h-16 w-16 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-surface shadow-nav ring-4 transition-transform duration-150 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-primary/60 [touch-action:none]",
-        listening ? "animate-pulse ring-negative" : "ring-surface/80 hover:scale-105",
+        listening && voice.state === "recording" ? "animate-pulse ring-negative" : "ring-surface/80 hover:scale-105",
       )}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -247,11 +270,11 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             {voice.error ? (
               <span role="alert" className="text-xs text-negative">{voice.error}</span>
             ) : voice.state === "connecting" ? (
-              <span role="status" className="text-xs text-muted">Đang chuẩn bị micro…</span>
+              <span role="status" className="text-xs text-muted">Đang mở micro… Hãy cho phép micro nếu được hỏi.</span>
             ) : voice.state === "recording" ? (
               <span role="status" className="text-xs text-muted">Mình đang nghe… Thả tay khi bạn nói xong.</span>
             ) : voice.state === "finishing" ? (
-              <span role="status" className="text-xs text-muted">Đang hoàn thiện câu chữ…</span>
+              <span role="status" className="text-xs text-muted">Đã ghi âm. Đang nhận dạng và hoàn thiện câu chữ…</span>
             ) : sending ? (
               <span className="text-xs text-muted">Đang phân tích…</span>
             ) : reply ? (
@@ -272,6 +295,11 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               )
             ) : (
               <span className="text-xs text-muted">M-Your sẵn sàng hỗ trợ bạn</span>
+            )}
+            {voice.partial && voice.state !== "idle" && (
+              <p className="w-full max-h-24 overflow-y-auto break-words text-sm text-text" aria-label="Nội dung nghe được tạm thời">
+                Mình nghe được: {voice.partial}
+              </p>
             )}
           </div>
 

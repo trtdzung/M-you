@@ -97,8 +97,8 @@ export function MYourWidget() {
   const voicePrefix = useRef("");
 
   const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean, metadata?: SpeechFinalMetadata) => {
-    // Partials are useful to the recognizer but are deliberately hidden from the
-    // composer. The server emits `final` only after OpenAI refinement/fallback.
+    // Partial captions stay separate from the draft. Only the server's final
+    // after refinement/fallback may update the composer.
     if (!final) return;
     setInput(composeVoiceDraft(voicePrefix.current, text.trim()));
     const interpretation = metadata?.interpretation;
@@ -367,12 +367,17 @@ export function MYourWidget() {
                 {!voice.error && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />}
                 <span>
                   {voice.error || voiceGuidance || (voice.state === "connecting"
-                    ? "Đang chuẩn bị micro…"
+                    ? "Đang mở micro… Hãy cho phép micro nếu được hỏi."
                     : voice.state === "recording"
                       ? "Mình đang nghe… Bấm dừng khi bạn nói xong."
-                      : "Đang hoàn thiện câu chữ…")}
+                      : "Đã ghi âm. Đang nhận dạng và hoàn thiện câu chữ…")}
                 </span>
               </div>
+            )}
+            {voice.partial && voiceBusy && (
+              <p className="mt-2 max-h-24 overflow-y-auto break-words text-sm text-text" aria-label="Nội dung nghe được tạm thời">
+                Mình nghe được: {voice.partial}
+              </p>
             )}
           </div>
         </div>
