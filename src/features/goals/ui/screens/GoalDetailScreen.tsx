@@ -6,7 +6,7 @@ import { Card } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalDetail } from "../../client/hooks/use-goal-detail";
 import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
-import type { GoalStatus } from "../../model/types";
+import type { GoalLedgerKind, GoalStatus } from "../../model/types";
 import { GOALS_COPY } from "../copy";
 import { DeleteGoalConfirm } from "../detail/DeleteGoalConfirm";
 import { GoalActionBar } from "../detail/GoalActionBar";
@@ -15,6 +15,7 @@ import { GoalDetailStats } from "../detail/GoalDetailStats";
 import { LedgerHistory } from "../detail/LedgerHistory";
 import { primaryButton, secondaryButton } from "../styles";
 import { EditGoalFlow } from "./EditGoalFlow";
+import { LedgerFlow } from "./LedgerFlow";
 
 export function GoalDetailScreen({ id }: { id: string }) {
   const router = useRouter();
@@ -22,6 +23,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
   const { update, remove, pending, errors } = useGoalMutations();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [ledgerKind, setLedgerKind] = useState<GoalLedgerKind | null>(null);
 
   if (loading) return <SkeletonCard />;
   if (status === 404) {
@@ -68,6 +70,8 @@ export function GoalDetailScreen({ id }: { id: string }) {
       </Card>
       <GoalActionBar
         status={goal.status}
+        onContribute={() => setLedgerKind("deposit")}
+        onWithdraw={() => setLedgerKind("withdraw")}
         onEdit={() => setEditing(true)}
         onTogglePause={() => setStatus(goal.status === "paused" ? "active" : "paused")}
         onArchive={() => setStatus("archived")}
@@ -76,6 +80,14 @@ export function GoalDetailScreen({ id }: { id: string }) {
       <Card>
         <LedgerHistory entries={ledger} />
       </Card>
+      {ledgerKind && (
+        <LedgerFlow
+          goal={goal}
+          kind={ledgerKind}
+          onClose={() => setLedgerKind(null)}
+          onDone={refresh}
+        />
+      )}
       {editing && (
         <EditGoalFlow goal={goal} onClose={() => setEditing(false)} onSaved={refresh} />
       )}
