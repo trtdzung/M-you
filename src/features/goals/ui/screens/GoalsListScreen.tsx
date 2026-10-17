@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
@@ -8,16 +9,18 @@ import { CreateGoalButton } from "../list/CreateGoalButton";
 import { GoalList } from "../list/GoalList";
 import { GoalListEmpty } from "../list/GoalListEmpty";
 import { secondaryButton } from "../styles";
+import { CreateGoalFlow } from "./CreateGoalFlow";
 
 export function GoalsListScreen() {
   const router = useRouter();
   const { data, loading, error, refresh } = useGoalsList();
-  // Opening the create sheet is wired in T19.
-  const onCreate = () => {};
+  const [creating, setCreating] = useState(false);
+  const onCreate = () => setCreating(true);
 
-  if (loading) return <SkeletonCard />;
-  if (error !== null) {
-    return (
+  let body;
+  if (loading) body = <SkeletonCard />;
+  else if (error !== null) {
+    body = (
       <ErrorState
         description={error || GOALS_COPY.loadError}
         action={
@@ -27,12 +30,20 @@ export function GoalsListScreen() {
         }
       />
     );
+  } else if (!data || data.length === 0) body = <GoalListEmpty onCreate={onCreate} />;
+  else {
+    body = (
+      <div className="flex flex-col gap-4">
+        <GoalList goals={data} onOpen={(id) => router.push("/goals/" + id)} />
+        <CreateGoalButton onClick={onCreate} />
+      </div>
+    );
   }
-  if (!data || data.length === 0) return <GoalListEmpty onCreate={onCreate} />;
+
   return (
-    <div className="flex flex-col gap-4">
-      <GoalList goals={data} onOpen={(id) => router.push("/goals/" + id)} />
-      <CreateGoalButton onClick={onCreate} />
-    </div>
+    <>
+      {body}
+      {creating && <CreateGoalFlow onClose={() => setCreating(false)} onCreated={refresh} />}
+    </>
   );
 }

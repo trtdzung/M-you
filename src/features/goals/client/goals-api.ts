@@ -1,27 +1,13 @@
 import type {
   GoalCreateInput,
-  GoalFeasibility,
   GoalLedgerEntry,
+  FeasibilityRequest,
+  FeasibilityResponse,
   GoalUpdateInput,
-  Lever,
   LedgerEntryInput,
   SavingsGoalView,
 } from "../model/types";
 import { fetchJson, jsonInit } from "./http";
-
-export interface FeasibilityRequest {
-  targetAmount: number;
-  targetDate: string;
-  currentAmount?: number;
-  flexibility?: "fixed" | "flexible";
-  estimatedMonthlySurplus?: number;
-}
-
-export interface FeasibilityResponse {
-  surplus: number | "unknown";
-  feasibility: GoalFeasibility;
-  levers: Lever[];
-}
 
 const enc = encodeURIComponent;
 

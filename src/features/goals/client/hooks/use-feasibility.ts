@@ -2,17 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { usePersonaCif } from "@/providers/context";
-import {
-  checkFeasibility,
-  type FeasibilityRequest,
-  type FeasibilityResponse,
-} from "../goals-api";
+import type {
+  FeasibilityInput,
+  FeasibilityRequest,
+  FeasibilityResponse,
+} from "../../model/types";
+import { checkFeasibility } from "../goals-api";
 
 const DEBOUNCE_MS = 400;
-
-export type FeasibilityInput = Partial<Omit<FeasibilityRequest, "targetAmount">> & {
-  targetAmount?: number | null;
-};
 
 /**
  * Debounced what-if check. Idle (no call) until both `targetAmount` and

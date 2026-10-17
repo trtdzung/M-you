@@ -71,6 +71,7 @@ export const GOALS_COPY = {
 
   feasibility: {
     title: "Khả năng đạt mục tiêu",
+    calculating: "Đang tính khả năng đạt mục tiêu…",
     met: "Bạn đã đạt mục tiêu này.",
     feasible: "Khả thi với phần dư hiện tại.",
     infeasible: "Chưa khả thi với phần dư hiện tại.",

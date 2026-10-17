@@ -106,3 +106,23 @@ export interface SavingsGoalView extends SavingsGoal {
   progress: GoalProgress;
   feasibility: GoalFeasibility;
 }
+
+/** Body of the what-if feasibility check. */
+export interface FeasibilityRequest {
+  targetAmount: number;
+  targetDate: string;
+  currentAmount?: number;
+  flexibility?: GoalFlexibility;
+  estimatedMonthlySurplus?: number;
+}
+
+export interface FeasibilityResponse {
+  surplus: number | "unknown";
+  feasibility: GoalFeasibility;
+  levers: Lever[];
+}
+
+/** Partially filled request, as built from a half-typed form. */
+export type FeasibilityInput = Partial<Omit<FeasibilityRequest, "targetAmount">> & {
+  targetAmount?: number | null;
+};
