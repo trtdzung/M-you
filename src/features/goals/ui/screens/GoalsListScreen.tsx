@@ -6,7 +6,7 @@ import { ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
 import { GOALS_COPY } from "../copy";
 import { GoalList } from "../list/GoalList";
-import { secondaryButton } from "../styles";
+import { primaryButton, secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
 import { GoalCoachPanel } from "./GoalCoachPanel";
 
@@ -15,9 +15,13 @@ export function GoalsListScreen() {
   const { data, loading, error, refresh } = useGoalsList();
   const [activeTab, setActiveTab] = useState<"manual" | "chat">("manual");
   const [formKey, setFormKey] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const hasGoals = !!data?.length;
   const created = () => {
     refresh();
     setFormKey((key) => key + 1);
+    setCreating(false);
+    setActiveTab("manual");
   };
 
   let body;
@@ -43,8 +47,21 @@ export function GoalsListScreen() {
     );
   }
 
+  if (loading || error !== null) return <>{body}</>;
+  if (hasGoals && !creating) return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2>
+        <p className="mt-1 text-[14px] leading-5 text-muted">Theo dõi tiến độ tích lũy cho những điều bạn muốn.</p>
+      </div>
+      {body}
+      <button type="button" className={`${primaryButton} w-full text-[15px]`} onClick={() => setCreating(true)}>Tạo mục tiêu mới</button>
+    </section>
+  );
+
   return (
     <div className="flex flex-col gap-4">
+      {hasGoals && <button type="button" className="min-h-11 self-start text-[14px] font-medium text-primary" onClick={() => setCreating(false)}>← Về danh sách mục tiêu</button>}
       <div role="tablist" aria-label="Cách tạo mục tiêu" className="grid grid-cols-2 gap-1 rounded-2xl bg-border/40 p-1">
         {([
           ["manual", "Tạo thủ công"],
@@ -77,9 +94,8 @@ export function GoalsListScreen() {
         <CreateGoalFlow key={formKey} inline onClose={() => {}} onCreated={created} />
       </div>
       <div role="tabpanel" id="goals-panel-chat" aria-labelledby="goals-tab-chat" hidden={activeTab !== "chat"}>
-        <GoalCoachPanel onCreated={refresh} />
+        <GoalCoachPanel onCreated={created} />
       </div>
-      {body && <section className="flex flex-col gap-3"><h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2>{body}</section>}
     </div>
   );
 }
