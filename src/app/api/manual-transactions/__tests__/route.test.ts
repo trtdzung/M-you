@@ -24,6 +24,8 @@ const holder = vi.hoisted(() => ({ db: null as InstanceType<typeof import("bette
 vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));
 
 import { GET, POST, PATCH, DELETE } from "../route";
+import { writeJarConfig } from "@/lib/jars-store";
+import { readAccounts } from "@/lib/accounts-store";
 
 const CIF = "CIF_0001";
 
@@ -78,9 +80,28 @@ function del(id: string, cif: string | null = CIF): Promise<Response> {
   return DELETE(new NextRequest(url, { method: "DELETE" }));
 }
 
+const JAR_ANCHOR = "2026-09-01T00:00:00.000Z";
+
+/** Seed jars with an opening balance each (`null` = no ledger row → chưa có số dư). */
+function seedJars(balances: Record<string, number | null>, cif = CIF): void {
+  writeJarConfig(cif, { version: 3, jars: Object.keys(balances).map((id) => ({ id, label: id, categoryIds: [] })) }, JAR_ANCHOR);
+  const insert = holder.db!.prepare(
+    "INSERT OR IGNORE INTO jar_ledger (cif, id, jar_id, kind, amount, is_opening, created_at) VALUES (?, ?, ?, 'deposit', ?, 1, ?)",
+  );
+  for (const [id, amount] of Object.entries(balances)) if (amount !== null) insert.run(cif, `open-${id}`, id, amount, JAR_ANCHOR);
+}
+
+/** Pin the persona's CASA (seeds its accounts first, then rewrites the current account). */
+function setCasa(value: number, cif = CIF): void {
+  readAccounts(cif); // lazily seeds the persona's accounts
+  holder.db!.prepare("UPDATE accounts SET available_balance = ? WHERE cif = ? AND type = 'current'").run(value, cif);
+}
+
 beforeEach(() => {
   holder.db = new Database(":memory:");
   holder.db.exec(SCHEMA);
+  seedJars({ savings: 1_000_000, food: 0, buffer: 500_000 });
+  insertBankRow("bank-trigger");
 });
 
 describe("/api/manual-transactions", () => {
@@ -130,7 +151,7 @@ describe("/api/manual-transactions", () => {
   });
 
   it("round-trips a rebalance txn's meta through create → list (Phase 03 allowlist)", async () => {
-    const rebalance = { fromJarId: "savings", toJarId: "food", triggerTxnId: "manual-trigger", origin: "auto" as const };
+    const rebalance = { fromJarId: "savings", toJarId: "food", triggerTxnId: "bank-trigger", origin: "auto" as const };
     await post({ cif: CIF, txn: txn({ id: "manual-rb", categoryId: "dieu-chinh-hu", rebalance }) });
     const rows = (await (await list()).json()) as Transaction[];
     expect(rows[0].categoryId).toBe("dieu-chinh-hu");
@@ -139,7 +160,7 @@ describe("/api/manual-transactions", () => {
 
   it("patches rebalance meta and clears it with null (Phase 03 allowlist)", async () => {
     await post({ cif: CIF, txn: txn({ id: "manual-rb2" }) });
-    const rebalance = { fromJarId: "buffer", toJarId: "pool", triggerTxnId: "t2", origin: "manual" as const };
+    const rebalance = { fromJarId: "buffer", toJarId: "pool", triggerTxnId: "bank-trigger", origin: "manual" as const };
     await patch({ cif: CIF, id: "manual-rb2", patch: { rebalance } });
     let rows = (await (await list()).json()) as Transaction[];
     expect(rows[0].rebalance).toEqual(rebalance);
@@ -172,7 +193,9 @@ describe("/api/manual-transactions", () => {
   });
 
   it("counts the rebalance legs referencing a jar (?jarId=) for the pre-delete warning", async () => {
-    const leg = (from: string, to: string) => ({ fromJarId: from, toJarId: to, triggerTxnId: "t", origin: "auto" as const });
+    const leg = (from: string, to: string) => ({ fromJarId: from, toJarId: to, triggerTxnId: "bank-trigger", origin: "auto" as const });
+    seedJars({ savings: 1_000_000, food: 0 }, "CIF_OTHER");
+    insertBankRow("bank-trigger", "CIF_OTHER");
     await post({ cif: CIF, txn: txn({ id: "l1", rebalance: leg("savings", "food") }) });
     await post({ cif: CIF, txn: txn({ id: "l2", rebalance: leg("pool", "savings") }) });
     await post({ cif: CIF, txn: txn({ id: "l3", rebalance: leg("pool", "food") }) });
@@ -214,5 +237,60 @@ describe("/api/manual-transactions", () => {
     await post({ cif: CIF, txn: txn({ id: "a" }) });
     await post({ cif: "CIF_OTHER", txn: txn({ id: "b" }) });
     expect(((await (await list("CIF_OTHER")).json()) as Transaction[]).map((t) => t.id)).toEqual(["b"]);
+  });
+});
+
+describe("POST/PATCH rebalance leg guard (plan 260923 Phase 04)", () => {
+  const leg = (fromJarId: string, toJarId: string, amount: number, triggerTxnId = "jar-transfer-1") =>
+    txn({ id: `leg-${fromJarId}-${toJarId}-${amount}`, categoryId: "dieu-chinh-hu", amount, rebalance: { fromJarId, toJarId, triggerTxnId, origin: "manual" } });
+  const postLeg = async (...args: Parameters<typeof leg>) => post({ cif: CIF, txn: leg(...args) });
+
+  it("404s an end that is not a configured jar; the pool sentinel is valid", async () => {
+    expect((await postLeg("ghost", "food", 1)).status).toBe(404);
+    expect((await postLeg("savings", "ghost", 1)).status).toBe(404);
+    expect((await postLeg("savings", "pool", 1)).status).toBe(201);
+  });
+
+  it("422s from === to on every leg, even a real-txn trigger", async () => {
+    expect((await postLeg("savings", "savings", 1)).status).toBe(422);
+    expect((await postLeg("savings", "savings", 1, "bank-trigger")).status).toBe(422);
+  });
+
+  it("caps a self-made leg at the source balance (exactly the cap passes)", async () => {
+    const over = await postLeg("savings", "food", 1_000_001);
+    expect(over.status).toBe(422);
+    expect(await over.json()).toMatchObject({ error: "over balance", jarId: "savings", max: 1_000_000 });
+    expect((await postLeg("savings", "food", 1_000_000)).status).toBe(201);
+    // Savings is now empty — a second leg sees the first one.
+    expect((await postLeg("savings", "buffer", 1)).status).toBe(422);
+  });
+
+  it("caps a pool-sourced self-made leg at the unallocated amount", async () => {
+    setCasa(2_000_000); // pool = 2tr − (1tr + 0 + 0.5tr) = 0.5tr
+    const over = await postLeg("pool", "food", 500_001);
+    expect(over.status).toBe(422);
+    expect(await over.json()).toMatchObject({ error: "over balance", max: 500_000 });
+    expect((await postLeg("pool", "food", 500_000)).status).toBe(201);
+  });
+
+  it("an unfunded jar (no balance) can neither give nor receive a self-made leg", async () => {
+    seedJars({ savings: 1_000_000, empty: null });
+    expect((await postLeg("savings", "empty", 1)).status).toBe(422);
+    expect((await postLeg("empty", "savings", 1)).status).toBe(422);
+  });
+
+  it("does not cap a leg triggered by a real txn (auto-fund / reconcile)", async () => {
+    expect((await postLeg("savings", "food", 9_000_000, "bank-trigger")).status).toBe(201);
+  });
+
+  it("re-checks a PATCH that sets rebalance meta on an existing txn", async () => {
+    await post({ cif: CIF, txn: txn({ id: "p1", amount: 2_000_000 }) });
+    const rebalance = { fromJarId: "savings", toJarId: "food", triggerTxnId: "jar-transfer-2", origin: "manual" as const };
+    expect((await patch({ cif: CIF, id: "p1", patch: { rebalance } })).status).toBe(422);
+    expect((await patch({ cif: CIF, id: "p1", patch: { rebalance: { ...rebalance, fromJarId: "ghost" } } })).status).toBe(404);
+    expect((await patch({ cif: CIF, id: "p1", patch: { rebalance, amount: 1_000_000 } })).status).toBe(200);
+    // An amount-only edit on an existing self-made leg is re-checked too.
+    expect((await patch({ cif: CIF, id: "p1", patch: { amount: 1_000_001 } })).status).toBe(422);
+    expect((await patch({ cif: CIF, id: "p1", patch: { amount: 900_000 } })).status).toBe(200);
   });
 });

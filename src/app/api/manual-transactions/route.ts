@@ -9,6 +9,7 @@ import {
   type ManualTxnPatch,
   ManualTxnIdConflictError,
 } from "@/lib/manual-txns-store";
+import { rebalanceLegViolation } from "./rebalance-leg-guard";
 
 /**
  * Self-reported transactions per persona (`cif`), backed by `data/pfm.sqlite3`
@@ -22,8 +23,10 @@ import {
  *                              from/to is that jar (warn before deleting the jar)
  *   POST   {cif, txn}       → persist one client-built Transaction (201); a
  *                              present `rebalance` must be well-formed (else 422)
+ *                              and pass `rebalanceLegViolation` (404 / 422)
  *   PATCH  {cif, id, patch} → merge whitelisted fields (200) / 404 if absent;
- *                              a malformed `rebalance` patch → 422
+ *                              a malformed `rebalance` patch → 422; a set one
+ *                              is re-checked by `rebalanceLegViolation`
  *   DELETE ?cif=&id=        → remove one (204)
  */
 
@@ -99,6 +102,8 @@ export async function POST(req: NextRequest) {
   if (txn.rebalance !== undefined && !isValidRebalanceTxn(txn)) {
     return NextResponse.json({ error: "rebalance is invalid" }, { status: 422 });
   }
+  const legViolation = rebalanceLegViolation(cif, txn);
+  if (legViolation) return legViolation;
   try {
     upsertManualTxn(cif, txn);
   } catch (err) {
@@ -123,7 +128,16 @@ export async function PATCH(req: NextRequest) {
   if (rawRebalance !== undefined && rawRebalance !== null && !isRebalanceMeta(rawRebalance)) {
     return NextResponse.json({ error: "rebalance is invalid" }, { status: 422 });
   }
-  const updated = patchManualTxn(cif, id, sanitizePatch(patch as Record<string, unknown>));
+  const clean = sanitizePatch(patch as Record<string, unknown>);
+  // Re-check the leg as it WILL be: a new/changed meta, or an amount edit on an existing leg.
+  if (clean.rebalance || clean.amount !== undefined) {
+    const existing = readManualTxns(cif).find((t) => t.id === id);
+    const rebalance = clean.rebalance === undefined ? existing?.rebalance : clean.rebalance;
+    const legViolation =
+      existing && rebalance ? rebalanceLegViolation(cif, { ...existing, amount: clean.amount ?? existing.amount, rebalance }) : null;
+    if (legViolation) return legViolation;
+  }
+  const updated = patchManualTxn(cif, id, clean);
   if (!updated) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json(updated);
 }
