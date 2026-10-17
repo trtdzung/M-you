@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
+import { parseVndInput } from "@/components/settings/parse-vnd-input";
+import { amountInWords } from "../amount-in-words";
 import { fieldError, hint as hintClass, input, label as labelClass } from "../../styles";
 
 export function MoneyField({
@@ -17,6 +19,8 @@ export function MoneyField({
   hint?: string;
 }) {
   const id = useId();
+  const parsed = parseVndInput(value);
+  const words = parsed.kind === "ok" ? amountInWords(parsed.value) : "";
   const display = /^\d[\d,]*$/.test(value) ? value.replace(/,/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") : value;
   const digits = value.replace(/,/g, "");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -60,6 +64,7 @@ export function MoneyField({
         }}
         inputMode="numeric"
         aria-invalid={error ? true : undefined}
+        aria-describedby={words ? `${id}-words` : undefined}
         placeholder="0"
         className={`${input} w-full border-primary/30 bg-primary/5 pr-16 text-[18px] font-semibold tabular-nums text-right focus:border-primary placeholder:font-normal`}
       />
@@ -71,6 +76,7 @@ export function MoneyField({
         </button>)}
       </div>}
       </div>
+      {words && <p id={`${id}-words`} className="mt-1 text-[13px] leading-5 text-muted">{words}</p>}
       {hint && <p className={hintClass}>{hint}</p>}
       {error && (
         <p role="alert" className={fieldError}>
