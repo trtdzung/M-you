@@ -57,11 +57,13 @@ export function GoalDateField({
           <CalendarDays size={20} className="text-muted" aria-hidden="true" />
         </button>
         {open && <Sheet title="Ngày hoàn thành" description="Chọn ngày bạn muốn đạt mục tiêu." onClose={() => setOpen(false)}>
-          <div className="mb-4 flex items-center gap-2">
-            <button type="button" aria-label="Tháng trước" disabled={month <= min.slice(0, 7)} onClick={() => shift(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-muted disabled:opacity-30"><ChevronLeft size={20} /></button>
-            <button type="button" aria-label="Chọn tháng" aria-expanded={view === "months"} onClick={() => setView(view === "months" ? "days" : "months")} className={`flex min-h-11 flex-1 items-center justify-between rounded-xl px-3 text-sm font-medium ${view === "months" ? "bg-primary/10 text-primary" : "bg-surface-muted text-text"}`}>Tháng {monthNumber}<ChevronDown size={16} /></button>
-            <button type="button" aria-label="Chọn năm" aria-expanded={view === "years"} onClick={() => { setYearStart(Math.max(minYear, year - 5)); setView(view === "years" ? "days" : "years"); }} className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium ${view === "years" ? "bg-primary/10 text-primary" : "bg-surface-muted text-text"}`}>{year}<ChevronDown size={16} /></button>
-            <button type="button" aria-label="Tháng sau" onClick={() => shift(1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-muted"><ChevronRight size={20} /></button>
+          <div className="mb-4 flex h-11 items-center justify-between gap-1">
+            <button type="button" aria-label="Tháng trước" disabled={month <= min.slice(0, 7)} onClick={() => shift(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-muted disabled:opacity-30"><ChevronLeft size={20} /></button>
+            <div className="flex items-center justify-center gap-1">
+            <button type="button" aria-label="Chọn tháng" aria-expanded={view === "months"} onClick={() => setView(view === "months" ? "days" : "months")} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[16px] font-semibold transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${view === "months" ? "text-primary" : "text-text"}`}>Tháng {monthNumber}<ChevronDown size={14} strokeWidth={1.75} className="text-muted" aria-hidden="true" /></button>
+            <button type="button" aria-label="Chọn năm" aria-expanded={view === "years"} onClick={() => { setYearStart(Math.max(minYear, year - 5)); setView(view === "years" ? "days" : "years"); }} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[16px] font-semibold transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${view === "years" ? "text-primary" : "text-text"}`}>{year}<ChevronDown size={14} strokeWidth={1.75} className="text-muted" aria-hidden="true" /></button>
+            </div>
+            <button type="button" aria-label="Tháng sau" onClick={() => shift(1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-muted"><ChevronRight size={20} /></button>
           </div>
           <div className="h-[328px] overflow-y-auto">
           {view === "months" && <div className="grid grid-cols-3 gap-2" aria-label="Chọn tháng">
