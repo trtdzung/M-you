@@ -36,7 +36,7 @@ export function GoalForm({ form, slot, compact = false }: { form: GoalFormState;
         error={errors.targetDate}
       />
       {compact ? <>
-        <button type="button" onClick={() => setExtraOpen(true)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-3 text-left text-[14px] leading-5 font-medium text-text hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+        <button type="button" onClick={() => setExtraOpen(true)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-5 py-3 text-left text-[14px] leading-5 font-medium text-text hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
           <span className="min-w-0 flex-1">Thông tin bổ sung</span><ChevronRight size={18} className="shrink-0 text-muted" aria-hidden="true" />
         </button>
         {(errors.openingAmount || errors.monthlyContribution) && <p role="alert" className="text-sm text-negative">Kiểm tra số tiền trong thông tin bổ sung.</p>}

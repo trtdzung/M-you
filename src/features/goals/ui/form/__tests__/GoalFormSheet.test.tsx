@@ -59,4 +59,19 @@ describe("GoalFormSheet", () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ targetAmount: 600000000, openingAmount: 1000000, targetDate: "2029-09-15" }));
   });
 
+  it("offers million shortcuts based on the number of entered digits", () => {
+    render(<Harness inline pending={false} onSubmit={vi.fn()} />);
+    const money = screen.getByLabelText("Số tiền mục tiêu");
+    fireEvent.change(money, { target: { value: "1" } });
+    for (const name of ["1 triệu", "10 triệu", "100 triệu"]) expect(screen.getByRole("button", { name, exact: true })).toBeInTheDocument();
+    fireEvent.change(money, { target: { value: "12" } });
+    expect(screen.getByRole("button", { name: "12 triệu", exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "120 triệu", exact: true }));
+    expect(money).toHaveValue("120,000,000");
+    expect(screen.queryByRole("button", { name: "120 triệu", exact: true })).not.toBeInTheDocument();
+    fireEvent.change(money, { target: { value: "123" } });
+    expect(screen.getByRole("button", { name: "123 triệu", exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1230 triệu", exact: true })).not.toBeInTheDocument();
+  });
+
 });
