@@ -10,15 +10,17 @@ export function CoachQuestion({
   question,
   disabled,
   onAnswer,
+  hideTextInput = false,
 }: {
   question: Question;
   disabled?: boolean;
   onAnswer: (value: string, source: "option" | "text") => void;
+  hideTextInput?: boolean;
 }) {
   const [text, setText] = useState("");
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-medium text-text">{question.text}</p>
+      <p className="rounded-2xl rounded-tl-sm bg-surface-tint p-4 text-[16px] leading-6 text-text">{question.text}</p>
       {question.options.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {question.options.map((o) => (
@@ -28,7 +30,7 @@ export function CoachQuestion({
           ))}
         </div>
       )}
-      {question.allow_free_text && (
+      {question.allow_free_text && !hideTextInput && (
         <form
           className="flex gap-2"
           onSubmit={(e) => {

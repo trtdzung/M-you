@@ -25,7 +25,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   };
 
   let body;
-  if (coach.phase === "idle") body = <CoachInput active={active} onSubmit={coach.start} />;
+  if (coach.phase === "idle") body = null;
   else if (coach.phase === "out_of_scope") body = <CoachOutOfScope onRestart={restart} />;
   else if (coach.phase === "failed") {
     body = <CoachFallback request={coach.request} onManual={() => setManual(true)} onRestart={restart} />;
@@ -36,6 +36,8 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         {busy && <p className="text-sm text-muted">{GOALS_COPY.coach.thinking}</p>}
         {coach.question && (
           <CoachQuestion
+            hideTextInput
+            disabled={busy}
             key={coach.question.code + coach.answers.length}
             question={coach.question}
             onAnswer={(value, source) => coach.answer(coach.question!.slot, value, source)}
@@ -54,13 +56,23 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
     restart();
   };
   return (
-    <section className={`flex flex-col gap-4 ${coach.phase === "idle" ? "pb-44" : ""}`}>
+    <section className="flex flex-col gap-4 pb-44">
       <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles size={18} aria-hidden="true" /></span><h2 className="text-[16px] leading-6 font-semibold text-text">M-You</h2></div>
       {coach.phase === "idle" && <div className="rounded-2xl rounded-tl-sm bg-surface-tint p-4">
         <p className="text-[16px] leading-6 font-medium text-text">Bạn đang muốn dành tiền cho điều gì?</p>
         <p className="mt-2 text-[14px] leading-6 text-muted">Kể mình nghe, mình sẽ giúp bạn xác định số tiền và thời gian.</p>
       </div>}
       {body}
+      <CoachInput
+        active={active}
+        showSuggestions={coach.phase === "idle"}
+        disabled={coach.phase !== "idle" && !(coach.phase === "need_info" && coach.question?.allow_free_text)}
+        placeholder={busy ? "M-You đang trả lời…" : coach.phase === "draft" ? "Kiểm tra mục tiêu trước khi lưu" : coach.phase === "need_info" ? "Nhập câu trả lời của bạn…" : "Kể M-You nghe mục tiêu của bạn…"}
+        onSubmit={(text) => {
+          if (coach.phase === "idle") coach.start(text);
+          else if (coach.question) coach.answer(coach.question.slot, text, "text");
+        }}
+      />
       {coach.draft && (
         <CreateGoalFlow
           prefill={draftToForm(coach.draft, transferNow())}

@@ -9,8 +9,8 @@ export function CoachTranscript({ turns }: { turns: CoachTurn[] }) {
           key={i}
           className={
             t.role === "customer"
-              ? "ml-auto max-w-[85%] rounded-2xl bg-surface-muted px-3 py-2 text-sm text-text"
-              : "max-w-[85%] text-sm text-muted"
+              ? "ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-surface-muted px-4 py-3 text-[16px] leading-6 text-text"
+              : "max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-tl-sm bg-surface-tint px-4 py-3 text-[16px] leading-6 text-text"
           }
         >
           {t.text}
