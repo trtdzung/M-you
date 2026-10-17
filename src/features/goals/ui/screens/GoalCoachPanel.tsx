@@ -85,10 +85,10 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         key={composerKey}
         active={active}
         showSuggestions={coach.phase === "idle"}
-        disabled={coach.phase !== "idle" && !(coach.phase === "need_info" && coach.question?.allow_free_text)}
-        placeholder={busy ? "M-You đang trả lời…" : coach.phase === "draft" ? "Kiểm tra mục tiêu trước khi lưu" : coach.phase === "need_info" ? "Nhập câu trả lời của bạn…" : "Kể M-You nghe mục tiêu của bạn…"}
+        disabled={busy || coach.phase === "draft" || (coach.phase === "need_info" && !coach.question?.allow_free_text)}
+        placeholder={busy ? "M-You đang trả lời…" : coach.phase === "draft" ? "Kiểm tra mục tiêu trước khi lưu" : coach.phase === "need_info" ? coach.question?.allow_free_text ? "Nhập câu trả lời của bạn…" : "Chọn một gợi ý ở trên" : "Kể M-You nghe mục tiêu của bạn…"}
         onSubmit={(text) => {
-          if (coach.phase === "idle") coach.start(text);
+          if (["idle", "out_of_scope", "failed"].includes(coach.phase)) coach.start(text);
           else if (coach.question) coach.answer(coach.question.slot, text, "text");
         }}
       />
