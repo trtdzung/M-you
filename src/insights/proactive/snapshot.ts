@@ -14,7 +14,12 @@ export interface SnapshotCandidate {
   title: string;
   body: string;
   metric: { label: string; value: number; unit: "VND" };
-  facts: Record<string, string | number | null>;
+  /**
+   * `items` (the "payment"/"bill" candidates below) is a flat-record array — the
+   * shape the agent reads verbatim, never a free-form object — everything else
+   * here is a single scalar.
+   */
+  facts: Record<string, string | number | null | Array<Record<string, string | number | null>>>;
   action: "overview" | "chat";
   question: string;
 }
