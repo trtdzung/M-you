@@ -300,7 +300,14 @@ export function MYourWidget() {
           <header className="shadow-card flex shrink-0 items-center gap-2.5 px-4 py-3">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icon_agent.png" alt="" width={36} height={36} className="h-full w-full object-cover" />
+              <img
+                src="/icon_agent.png"
+                alt=""
+                width={36}
+                height={36}
+                draggable={false}
+                className="pointer-events-none h-full w-full select-none object-cover [-webkit-touch-callout:none]"
+              />
             </span>
             <div className="min-w-0">
               <p className="truncate text-xs text-muted">Trợ lý Tài chính của bạn</p>

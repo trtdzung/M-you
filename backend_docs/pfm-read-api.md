@@ -133,8 +133,12 @@ CASA, gọi `GET /api/account-summary?cif=` (mục 2). `unallocated`/`allocation
 **Về số dư của hũ:** đây là số **tính ra**, Agent không ghi trực tiếp. Số dư chỉ đổi khi:
 1. **Khách tự nạp/rút** trong `pfm` (Cài đặt → Hũ & danh mục, hoặc "Chia tiền vào hũ") — không
    có form Agent cho việc này;
-2. **Tạo hũ** kèm `initial_balance` (`create_jar`, B2);
-3. **Lấy từ hũ/pool khác** (`rebalance_jars`, B4).
+2. **Khách tự chuyển số dư giữa 2 hũ** ngay ở Tổng quan (bấm vào thẻ hũ tháng hiện tại →
+   `JarTransferSheet`, thêm 2026-09-23) — cùng cơ chế `dieu-chinh-hu` với `rebalance_jars` (B4),
+   nhưng khách tự làm, **không qua Agent**. Nghĩa là số dư 2 hũ có thể đã đổi giữa các lượt hỏi mà
+   Agent không đề xuất gì — luôn đọc lại `jar-summary` mới nhất trước khi gợi ý (B0);
+3. **Tạo hũ** kèm `initial_balance` (`create_jar`, B2);
+4. **Lấy từ hũ/pool khác** (`rebalance_jars`, B4).
 
 **Tăng hạn mức (`edit_jar`) KHÔNG tăng số dư** — hạn mức chỉ là kế hoạch chi mỗi tháng.
 
@@ -399,6 +403,12 @@ tắc cứng): `pool` trước, sau đó các hũ còn lại theo `spendable` gi
 tiền nhất lấy trước). Không có hũ nào được bảo vệ — hũ không có vai trò. Mỗi nguồn lấy
 `min(spendable, phần còn thiếu)` rồi dừng khi đủ. Tổng mọi nguồn vẫn không đủ →
 **không trả `ui`**, nói rõ trong `answer` là không đủ.
+
+**Từ 2026-09-23, 4 quy tắc cứng trên còn được kiểm lại lần nữa ngay tại nơi ghi**
+(`POST`/`PATCH /api/manual-transactions`, `rebalance-leg-guard.ts`) — không chỉ ở card trước khi
+khách bấm xác nhận. Cùng giới hạn (`spendable`/`unallocated`), không phải quy tắc mới; Agent
+không cần đổi gì, chỉ là con số Agent đề xuất giờ không thể lọt qua kể cả khi có lỗi ở phía
+`pfm` render card.
 
 **Khi khách xác nhận**, `pfm` (không phải Agent) ghi mỗi `moves[]` một bản ghi bù giữa
 hũ; số dư hai hũ tự cập nhật, còn `spent` và `limit` không đổi. Số dư sau khi bù

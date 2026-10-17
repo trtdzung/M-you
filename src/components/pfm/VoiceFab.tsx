@@ -16,6 +16,7 @@ import { AgentChartCard } from "./AgentChartCard";
 import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
+import { VoiceWaveform } from "./VoiceWaveform";
 
 /** Tallest the plain-text answer may grow in the voice section before it is cut off. */
 const ANSWER_MAX_HEIGHT_PX = 144;
@@ -99,7 +100,13 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const [sectionOpen, setSectionOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  // `pending` = pointer/key is down, waiting to see if this turns into a hold;
+  // `holding` = the threshold passed and the mic is actually live. A press that
+  // releases before the threshold is a plain TAP — it only opens the section
+  // (already done on pointerdown) and never touches the microphone.
+  const pending = useRef(false);
   const holding = useRef(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [transcript, setTranscript] = useState("");
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState<{ answer: string; ui: UiPayload } | null>(null);
@@ -140,39 +147,74 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     setContainer(document.getElementById("device-canvas") ?? document.body);
   }, []);
 
-  useEffect(() => {
-    function stopListening() {
-      if (!holding.current) return;
-      holding.current = false;
-      setListening(false);
-      voiceRef.current.stop();
+  // How long a press must be held before it counts as "giữ" (hold-to-talk)
+  // rather than "bấm" (a plain tap that just opens the section).
+  const HOLD_THRESHOLD_MS = 220;
+
+  function clearHoldTimer() {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
     }
+  }
+
+  function handleRelease() {
+    clearHoldTimer();
+    if (pending.current) {
+      // Released before the threshold — a plain tap: the section is already
+      // open from pointerdown, and the mic never started. Nothing to stop.
+      pending.current = false;
+      return;
+    }
+    if (!holding.current) return;
+    holding.current = false;
+    setListening(false);
+    voiceRef.current.stop();
+  }
+  const releaseRef = useRef(handleRelease);
+  releaseRef.current = handleRelease;
+
+  useEffect(() => {
+    const release = () => releaseRef.current();
     const releaseEvents = ["pointerup", "pointercancel", "mouseup", "touchend", "touchcancel", "blur"] as const;
-    for (const type of releaseEvents) window.addEventListener(type, stopListening);
+    for (const type of releaseEvents) window.addEventListener(type, release);
     const releaseKey = (event: KeyboardEvent) => {
-      if (event.key === " " || event.key === "Enter") stopListening();
+      if (event.key === " " || event.key === "Enter") release();
     };
     window.addEventListener("keyup", releaseKey);
     return () => {
-      for (const type of releaseEvents) window.removeEventListener(type, stopListening);
+      for (const type of releaseEvents) window.removeEventListener(type, release);
       window.removeEventListener("keyup", releaseKey);
     };
   }, []);
 
+  /**
+   * Bấm (tap, release before `HOLD_THRESHOLD_MS`) → just opens the section,
+   * already done below, the mic never starts. Giữ (still down once the
+   * threshold passes) → starts listening, same push-to-talk as before.
+   */
   function onPointerDown() {
-    if (holding.current || voiceRef.current.state !== "idle" || sending) return;
+    if (pending.current || holding.current || voiceRef.current.state !== "idle" || sending) return;
     if (!sectionOpen) {
       setSectionOpen(true);
     }
-    setListening(true);
-    holding.current = true;
-    setTranscript("");
-    setReply(null);
-    // Run inside the gesture so mobile browsers can resume AudioContext.
-    voiceRef.current.start();
+    pending.current = true;
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      if (!pending.current) return; // already released — this was a tap, not a hold
+      pending.current = false;
+      holding.current = true;
+      setListening(true);
+      setTranscript("");
+      setReply(null);
+      // Run inside the gesture so mobile browsers can resume AudioContext.
+      voiceRef.current.start();
+    }, HOLD_THRESHOLD_MS);
   }
 
   function closeSection() {
+    clearHoldTimer();
+    pending.current = false;
     holding.current = false;
     setSectionOpen(false);
     setListening(false);
@@ -180,6 +222,8 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   }
 
   function switchToChat() {
+    clearHoldTimer();
+    pending.current = false;
     holding.current = false;
     setSectionOpen(false);
     setListening(false);
@@ -190,6 +234,8 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   }
 
   function handleRefresh() {
+    clearHoldTimer();
+    pending.current = false;
     holding.current = false;
     setTranscript("");
     setReply(null);
@@ -209,10 +255,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
       onKeyUp={(event) => {
         if (event.key !== " " && event.key !== "Enter") return;
         event.preventDefault();
-        if (!holding.current) return;
-        holding.current = false;
-        setListening(false);
-        voiceRef.current.stop();
+        handleRelease();
       }}
       aria-label="Giữ để hỏi M-You bằng giọng nói"
       aria-pressed={listening}
@@ -221,8 +264,19 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
         listening && voice.state === "recording" ? "animate-pulse ring-negative" : "ring-surface/80 hover:scale-105",
       )}
     >
+      {/* pointer-events-none: touches land on the <button> itself, not this <img> — otherwise
+          a mobile browser treats the long PRESS-AND-HOLD gesture as "long-press an image" and
+          pops its own save/copy menu instead of letting onPointerDown fire. touch-callout:none
+          is the same guard for iOS Safari specifically, which ignores pointer-events for it. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icon_agent.png" alt="" width={64} height={64} draggable={false} className="h-full w-full object-cover" />
+      <img
+        src="/icon_agent.png"
+        alt=""
+        width={64}
+        height={64}
+        draggable={false}
+        className="pointer-events-none h-full w-full select-none object-cover [-webkit-touch-callout:none]"
+      />
     </button>
   );
 
@@ -248,7 +302,14 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             <div className="flex min-w-0 items-center gap-2">
               <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icon_agent.png" alt="" width={32} height={32} className="h-full w-full object-cover" />
+                <img
+                  src="/icon_agent.png"
+                  alt=""
+                  width={32}
+                  height={32}
+                  draggable={false}
+                  className="pointer-events-none h-full w-full select-none object-cover [-webkit-touch-callout:none]"
+                />
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-bold leading-tight text-text">M-You</p>
@@ -269,13 +330,25 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             {voice.error ? (
               <span role="alert" className="text-xs text-negative">{voice.error}</span>
             ) : voice.state === "connecting" ? (
-              <span role="status" className="text-xs text-muted">Đang mở micro… Hãy cho phép micro nếu được hỏi.</span>
+              <>
+                <VoiceWaveform />
+                <span role="status" className="text-xs text-muted">Đang mở micro… Hãy cho phép micro nếu được hỏi.</span>
+              </>
             ) : voice.state === "recording" ? (
-              <span role="status" className="text-xs text-muted">Mình đang nghe… Thả tay khi bạn nói xong.</span>
+              <>
+                <VoiceWaveform active />
+                <span role="status" className="text-xs text-muted">Mình đang nghe… Thả tay khi bạn nói xong.</span>
+              </>
             ) : voice.state === "finishing" ? (
-              <span role="status" className="text-xs text-muted">Đã ghi âm. Đang nhận dạng và hoàn thiện câu chữ…</span>
+              <>
+                <VoiceWaveform />
+                <span role="status" className="text-xs text-muted">Đã ghi âm. Đang nhận dạng và hoàn thiện câu chữ…</span>
+              </>
             ) : sending ? (
-              <span className="text-xs text-muted">Đang phân tích…</span>
+              <>
+                <VoiceWaveform />
+                <span className="text-xs text-muted">Đang phân tích…</span>
+              </>
             ) : reply ? (
               isTransferFormUi(reply.ui, expenseIds) ? (
                 <div className="flex w-full flex-col items-start">
@@ -298,7 +371,10 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
                 <VoiceAnswer text={reply.answer} onOpenChat={switchToChat} />
               )
             ) : (
-              <span className="text-xs text-muted">M-You sẵn sàng hỗ trợ bạn</span>
+              <>
+                <VoiceWaveform />
+                <span className="text-xs text-muted">M-You sẵn sàng hỗ trợ bạn</span>
+              </>
             )}
             {voice.partial && voice.state !== "idle" && (
               <p className="w-full max-h-24 overflow-y-auto break-words text-sm text-text" aria-label="Nội dung nghe được tạm thời">

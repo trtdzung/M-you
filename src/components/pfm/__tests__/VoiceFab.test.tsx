@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VoiceFab } from "../VoiceFab";
 import * as agentApi from "@/lib/agent-api";
 import type { SpeechFinalMetadata, SpeechSessionOptions } from "@/lib/speech-types";
@@ -43,6 +43,9 @@ vi.mock("@/lib/use-streaming-speech", () => ({
 }));
 
 describe("VoiceFab refined transcript hand-off", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   beforeEach(() => {
     speech.state = "idle";
     speech.partial = "";
@@ -73,10 +76,15 @@ describe("VoiceFab refined transcript hand-off", () => {
     ));
   });
 
+  // The mic only starts once a press has been HELD past the threshold ("giữ"); a
+  // quick press-and-release ("bấm") just opens the section and never starts it.
   it("starts once per hold and flushes once despite duplicate browser release events", () => {
+    vi.useFakeTimers();
     render(<VoiceFab />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
+    expect(speech.start).not.toHaveBeenCalled(); // still inside the tap-vs-hold window
+    act(() => { vi.advanceTimersByTime(300); });
     expect(speech.start).toHaveBeenCalledTimes(1);
     fireEvent.pointerUp(window);
     fireEvent.mouseUp(window);
@@ -84,8 +92,11 @@ describe("VoiceFab refined transcript hand-off", () => {
   });
 
   it("supports a keyboard hold even when opening the section replaces the button", () => {
+    vi.useFakeTimers();
     render(<VoiceFab />);
     fireEvent.keyDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }), { key: " " });
+    expect(speech.start).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(300); });
     expect(speech.start).toHaveBeenCalledTimes(1);
     fireEvent.keyUp(window, { key: " " });
     expect(speech.stop).toHaveBeenCalledTimes(1);

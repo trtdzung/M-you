@@ -201,6 +201,25 @@ body {
     transform: none;
   }
 }
+@keyframes voice-wave {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Sóng âm thanh của khung Voice tab (`VoiceWaveform.tsx`) — mỗi thanh tự đặt
+   riêng animation-duration/-delay qua style inline (so le nhịp nảy), utility
+   này chỉ gánh phần chung. */
+@utility voice-wave-bar {
+  transform-origin: bottom;
+  animation-name: voice-wave;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
 
 /* Shimmer peach cho skeleton loading */
 @utility shimmer {
