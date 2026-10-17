@@ -17,19 +17,24 @@ export function MoneyField({
   hint?: string;
 }) {
   const id = useId();
+  const display = /^\d[\d,]*$/.test(value) ? value.replace(/,/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") : value;
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className={labelClass}>
         {label}
       </label>
+      <div className="relative">
       <input
         id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={display}
+        onChange={(e) => onChange(e.target.value.replace(/,/g, ""))}
         inputMode="numeric"
         aria-invalid={error ? true : undefined}
-        className={`${input} text-right`}
+        placeholder="0"
+        className={`${input} w-full pr-14 text-[16px] text-right`}
       />
+      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[13px] font-medium text-muted">VND</span>
+      </div>
       {hint && <p className={hintClass}>{hint}</p>}
       {error && (
         <p role="alert" className={fieldError}>

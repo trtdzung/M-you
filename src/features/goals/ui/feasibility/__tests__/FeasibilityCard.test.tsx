@@ -95,7 +95,7 @@ describe("FeasibilityCard", () => {
   it("keeps the estimate field while the text is non-empty", () => {
     renderCard(response("met"), { estimate: "12000000" });
     expect(screen.getByText("Bạn đã đạt mục tiêu này.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Phần dư ước tính mỗi tháng")).toHaveValue("12000000");
+    expect(screen.getByLabelText("Phần dư ước tính mỗi tháng")).toHaveValue("12,000,000");
   });
 
   it("applies an extend chip and does not render the category cut as a button", () => {

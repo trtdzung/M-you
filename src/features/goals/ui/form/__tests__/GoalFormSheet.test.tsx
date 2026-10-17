@@ -7,9 +7,9 @@ vi.mock("@/lib/demo-clock", () => ({
   transferNow: () => new Date("2026-09-15T00:00:00.000Z"),
 }));
 
-function Harness({ pending, onSubmit }: { pending: boolean; onSubmit: (input: unknown) => void }) {
+function Harness({ pending, onSubmit, inline = false }: { pending: boolean; onSubmit: (input: unknown) => void; inline?: boolean }) {
   const form = useGoalForm();
-  return <GoalFormSheet form={form} pending={pending} onSubmit={onSubmit} onClose={vi.fn()} />;
+  return <GoalFormSheet inline={inline} form={form} pending={pending} onSubmit={onSubmit} onClose={vi.fn()} />;
 }
 
 describe("GoalFormSheet", () => {
@@ -36,4 +36,25 @@ describe("GoalFormSheet", () => {
       openingAmount: null,
     });
   });
+  it("formats money, retains supplementary values, and confirms a date from the calendar", async () => {
+    const onSubmit = vi.fn();
+    render(<Harness inline pending={false} onSubmit={onSubmit} />);
+    fireEvent.change(screen.getByLabelText("Tên mục tiêu"), { target: { value: "Mua xe" } });
+    fireEvent.change(screen.getByLabelText("Số tiền mục tiêu"), { target: { value: "600000000" } });
+    expect(screen.getByLabelText("Số tiền mục tiêu")).toHaveValue("600,000,000");
+    fireEvent.click(screen.getByRole("button", { name: "Thông tin bổ sung" }));
+    expect(await screen.findByRole("dialog", { name: "Thông tin bổ sung" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Số đã có sẵn"), { target: { value: "1000000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Xong" }));
+    fireEvent.click(screen.getByLabelText("Ngày hoàn thành"));
+    expect(await screen.findByRole("dialog", { name: "Ngày hoàn thành" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "15/09/2026" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Năm"), { target: { value: "2029" } });
+    fireEvent.click(screen.getByRole("button", { name: "15/09/2029" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chọn ngày này" }));
+    expect(screen.getByLabelText("Ngày hoàn thành")).toHaveTextContent("15/09/2029");
+    fireEvent.click(screen.getByRole("button", { name: "Tạo mục tiêu" }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ targetAmount: 600000000, openingAmount: 1000000, targetDate: "2029-09-15" }));
+  });
+
 });
