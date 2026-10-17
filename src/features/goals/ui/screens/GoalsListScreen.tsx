@@ -3,12 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ErrorState, SkeletonCard } from "@/components/states";
-import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
 import { GOALS_COPY } from "../copy";
-import { CreateGoalButton } from "../list/CreateGoalButton";
 import { GoalList } from "../list/GoalList";
-import { GoalListEmpty } from "../list/GoalListEmpty";
 import { secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
 import { GoalCoachPanel } from "./GoalCoachPanel";
@@ -16,13 +13,11 @@ import { GoalCoachPanel } from "./GoalCoachPanel";
 export function GoalsListScreen() {
   const router = useRouter();
   const { data, loading, error, refresh } = useGoalsList();
-  const { seedDemo } = useGoalMutations();
-  const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = useState<"manual" | "chat">("manual");
-  const onCreate = () => setCreating(true);
-  const onSeedDemo = async () => {
-    const res = await seedDemo();
-    if (res?.ok) refresh();
+  const [formKey, setFormKey] = useState(0);
+  const created = () => {
+    refresh();
+    setFormKey((key) => key + 1);
   };
 
   let body;
@@ -38,12 +33,12 @@ export function GoalsListScreen() {
         }
       />
     );
-  } else if (!data || data.length === 0) body = <GoalListEmpty onCreate={onCreate} onSeedDemo={onSeedDemo} />;
+  } else if (!data || data.length === 0) body = null;
   else {
     body = (
       <div className="flex flex-col gap-4">
         <GoalList goals={data} onOpen={(id) => router.push("/goals/" + id)} />
-        <CreateGoalButton onClick={onCreate} />
+
       </div>
     );
   }
@@ -79,12 +74,12 @@ export function GoalsListScreen() {
         ))}
       </div>
       <div role="tabpanel" id="goals-panel-manual" aria-labelledby="goals-tab-manual" hidden={activeTab !== "manual"}>
-        {body}
+        <CreateGoalFlow key={formKey} inline onClose={() => {}} onCreated={created} />
       </div>
       <div role="tabpanel" id="goals-panel-chat" aria-labelledby="goals-tab-chat" hidden={activeTab !== "chat"}>
         <GoalCoachPanel onCreated={refresh} />
       </div>
-      {creating && <CreateGoalFlow onClose={() => setCreating(false)} onCreated={refresh} />}
+      {body && <section className="flex flex-col gap-3"><h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2>{body}</section>}
     </div>
   );
 }

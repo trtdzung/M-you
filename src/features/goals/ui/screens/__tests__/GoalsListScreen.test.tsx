@@ -75,14 +75,15 @@ describe("GoalsListScreen", () => {
     expect(list.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the empty state", () => {
+  it("shows the inline form when there are no goals", () => {
     list.data = [];
     render(<GoalsListScreen />);
-    expect(screen.getByText("Chưa có mục tiêu nào")).toBeInTheDocument();
-    expect(screen.getByText("Tạo mục tiêu đầu tiên để bắt đầu tích lũy.")).toBeInTheDocument();
+    expect(screen.getByText("Bạn muốn tích lũy cho điều gì?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tạo mục tiêu" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("groups archived goals, opens a goal, and opens the create sheet", async () => {
+  it("groups archived goals, opens a goal, and validates the inline form", async () => {
     list.data = [
       view({ id: "goal_live", name: "Mua nhà", status: "active" }),
       view({ id: "goal_old", name: "Nhà cũ", status: "archived" }),
@@ -95,6 +96,7 @@ describe("GoalsListScreen", () => {
     expect(nav.push).toHaveBeenCalledWith("/goals/goal_live");
 
     fireEvent.click(screen.getByRole("button", { name: "Tạo mục tiêu" }));
-    expect(await screen.findByRole("dialog", { name: "Tạo mục tiêu" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Bạn muốn tích lũy cho điều gì?")).toBeInTheDocument();
   });
 });

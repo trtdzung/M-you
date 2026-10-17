@@ -19,6 +19,7 @@ export function CreateGoalFlow({
   prefill,
   requestKey,
   suggestion,
+  inline = false,
 }: {
   onClose: () => void;
   onCreated: () => void;
@@ -28,6 +29,7 @@ export function CreateGoalFlow({
   requestKey?: string;
   /** The customer's own sentence, shown as a hint above the form. */
   suggestion?: string;
+  inline?: boolean;
 }) {
   const form = useGoalForm(undefined, prefill);
   const [estimate, setEstimate] = useState("");
@@ -50,6 +52,7 @@ export function CreateGoalFlow({
 
   return (
     <GoalFormSheet
+      inline={inline}
       form={form}
       pending={pending}
       formError={formError}
@@ -58,13 +61,13 @@ export function CreateGoalFlow({
       slot={
         <>
           {suggestion && <p className={hint}>{GOALS_COPY.coach.yourSentence(suggestion)}</p>}
-          <FeasibilityCard
+          {!inline && <FeasibilityCard
             data={feasibility.data}
             loading={feasibility.loading}
             estimate={estimate}
             onEstimateChange={setEstimate}
             onApplyLever={form.applyLever}
-          />
+          />}
         </>
       }
     />
