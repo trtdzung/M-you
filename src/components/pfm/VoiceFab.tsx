@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { usePersona } from "@/providers/context";
-import { sendChatMessage, isChartUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
+import { sendChatMessage, isChartUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { jarSpeechContext } from "@/lib/speech-context";
 import type { SpeechFinalMetadata } from "@/lib/speech-types";
@@ -15,6 +15,7 @@ import { useCategories } from "@/state/categories";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
+import { AgentJarUiCard } from "./AgentJarUiCard";
 
 /** Tallest the plain-text answer may grow in the voice section before it is cut off. */
 const ANSWER_MAX_HEIGHT_PX = 144;
@@ -257,6 +258,10 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               isTransferFormUi(reply.ui, expenseIds) ? (
                 <div className="flex w-full flex-col items-start">
                   <AgentTransferFormCard form={reply.ui} fullWidth />
+                </div>
+              ) : isJarUi(reply.ui, expenseIds) ? (
+                <div className="flex w-full flex-col items-start">
+                  <AgentJarUiCard ui={reply.ui} fullWidth />
                 </div>
               ) : isChartUi(reply.ui) ? (
                 <div className="flex w-full flex-col items-start">

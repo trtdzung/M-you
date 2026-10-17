@@ -16,6 +16,7 @@ import {
   sendChatMessage,
   deleteChatHistory,
   isChartUi,
+  isJarUi,
   isTransferFormUi,
   type HistoryMessage,
   type UiPayload,
@@ -23,6 +24,7 @@ import {
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
+import { AgentJarUiCard } from "./AgentJarUiCard";
 
 interface ChatBubble {
   id: string;
@@ -300,6 +302,7 @@ export function MYourWidget() {
                     </div>
                     {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
                     {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
+                    {m.role === "agent" && isJarUi(m.ui, expenseIds) && <AgentJarUiCard ui={m.ui} />}
                   </div>
                 ))}
                 {sending && (

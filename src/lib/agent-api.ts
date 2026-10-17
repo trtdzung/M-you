@@ -36,7 +36,47 @@ export interface TransferFormUi {
   category: string;
 }
 
-export type UiPayload = ChartUi | TransferFormUi | { type: string } | null;
+/**
+ * Jar proposals (Feature 4, contract in `backend_docs/pfm-read-api.md` B2–B4).
+ * The agent only proposes; `pfm` performs the change after the customer confirms.
+ * Amounts are VND; jar ids come from `GET /api/jar-summary` — the agent never
+ * relays names, so a stale or unknown id is caught when the card resolves it.
+ */
+export interface CreateJarUi {
+  type: "create_jar";
+  jar_name: string;
+  allocation_amount: number;
+  category_ids: string[];
+  reason: string;
+}
+
+export interface EditJarUi {
+  type: "edit_jar";
+  jar_id: string;
+  jar_name: string;
+  allocation_amount: number;
+  /** The jar's COMPLETE new category list; absent = unchanged. */
+  category_ids?: string[];
+  reason: string;
+}
+
+export interface RebalanceMove {
+  /** A jar id, or `"pool"` for the derived "Chưa phân bổ". */
+  from_jar_id: string;
+  amount: number;
+}
+
+export interface RebalanceJarsUi {
+  type: "rebalance_jars";
+  target_jar_id: string;
+  shortfall: number;
+  moves: RebalanceMove[];
+  reason: string;
+}
+
+export type JarUi = CreateJarUi | EditJarUi | RebalanceJarsUi;
+
+export type UiPayload = ChartUi | TransferFormUi | JarUi | { type: string } | null;
 
 /**
  * True only for a `ui.type === "chart"` payload that is actually safe to
@@ -97,6 +137,74 @@ export function isTransferFormUi(
     typeof f.category === "string" &&
     knownExpense(f.category)
   );
+}
+
+const nonEmpty = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
+const positive = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+
+/** Every id a known expense category of THIS persona, no repeats (same whitelist rule as `isTransferFormUi`). */
+function validCategoryIds(ids: unknown, expenseIds?: ReadonlySet<string>): ids is string[] {
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) return false;
+  if (new Set(ids).size !== ids.length) return false;
+  return ids.every((id) => (expenseIds ? expenseIds.has(id) : CATEGORY_BY_ID[id]?.kind === "expense"));
+}
+
+/**
+ * `create_jar` shape: `jar_name`, `allocation_amount > 0`, `category_ids` (may be
+ * `[]`), `reason`; a `jar_id` is NOT allowed (`pfm` mints the id). Shape only —
+ * headroom, duplicate names and category ownership are re-checked by the card
+ * against live data. Never throws; a bad payload just falls back to `answer`.
+ */
+export function isCreateJarUi(ui: UiPayload | null | undefined, expenseIds?: ReadonlySet<string>): ui is CreateJarUi {
+  if (!ui || ui.type !== "create_jar") return false;
+  const f = ui as Partial<CreateJarUi> & { jar_id?: unknown };
+  return (
+    f.jar_id === undefined &&
+    nonEmpty(f.jar_name) &&
+    positive(f.allocation_amount) &&
+    validCategoryIds(f.category_ids, expenseIds) &&
+    nonEmpty(f.reason)
+  );
+}
+
+/** `edit_jar` shape: `jar_id`, `jar_name`, `allocation_amount > 0`, optional full `category_ids`, `reason`. */
+export function isEditJarUi(ui: UiPayload | null | undefined, expenseIds?: ReadonlySet<string>): ui is EditJarUi {
+  if (!ui || ui.type !== "edit_jar") return false;
+  const f = ui as Partial<EditJarUi>;
+  return (
+    nonEmpty(f.jar_id) &&
+    nonEmpty(f.jar_name) &&
+    positive(f.allocation_amount) &&
+    (f.category_ids === undefined || validCategoryIds(f.category_ids, expenseIds)) &&
+    nonEmpty(f.reason)
+  );
+}
+
+/**
+ * `rebalance_jars` shape — the checks that need no live data (contract "quy tắc
+ * cứng" 1–2): fields well-typed, Σ `moves[].amount` equals `shortfall`, no source
+ * equals the target or repeats, target is not `"pool"`. Caps against real balances
+ * are checked by `AgentRebalanceCard` (it needs the jar snapshot).
+ */
+export function isRebalanceJarsUi(ui: UiPayload | null | undefined): ui is RebalanceJarsUi {
+  if (!ui || ui.type !== "rebalance_jars") return false;
+  const f = ui as Partial<RebalanceJarsUi>;
+  if (!nonEmpty(f.target_jar_id) || f.target_jar_id === "pool" || !positive(f.shortfall) || !nonEmpty(f.reason)) return false;
+  if (!Array.isArray(f.moves) || f.moves.length === 0) return false;
+  const seen = new Set<string>();
+  let sum = 0;
+  for (const m of f.moves) {
+    if (!m || !nonEmpty(m.from_jar_id) || !positive(m.amount)) return false;
+    if (m.from_jar_id === f.target_jar_id || seen.has(m.from_jar_id)) return false;
+    seen.add(m.from_jar_id);
+    sum += m.amount;
+  }
+  return Math.abs(sum - f.shortfall) < 0.5;
+}
+
+/** Any of the three jar proposals (create / edit / rebalance). */
+export function isJarUi(ui: UiPayload | null | undefined, expenseIds?: ReadonlySet<string>): ui is JarUi {
+  return isCreateJarUi(ui, expenseIds) || isEditJarUi(ui, expenseIds) || isRebalanceJarsUi(ui);
 }
 
 export interface ChatResponse {

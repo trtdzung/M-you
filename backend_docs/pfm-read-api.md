@@ -23,8 +23,15 @@ Không có auth thật (cùng mô hình trust với mọi endpoint khác của p
 chỉ cần query param `cif`. `cif` trong demo là id persona giả lập (`CIF_0001`…),
 không phải CIF MSB thật.
 
-> ⚠️ `GET /api/jar-summary` là endpoint **mới**: chỉ có sau khi build/deploy lại
-> image từ repo `pfm`. Bản đang chạy ở URL trên có thể còn trả `404` cho đường dẫn này.
+**Trạng thái (đối chiếu với repo và bản deploy ngày 2026-09-21):** `GET /api/jar-summary`
+đã có trong repo và đã chạy trên URL trên (`200`; thiếu `cif` hoặc `month` sai → `422`).
+Bản deploy đã bỏ `role` của hũ (hũ không còn vai trò/hũ mục tiêu, xem B4).
+
+**Agent gọi đúng URL này** (`PFM_BASE_URL` trong `tools/customer_data_tools.py` của repo
+Agent): tool `get_jar_summary(month)` ↔ `GET /api/jar-summary`, tool `query_beneficiaries` ↔
+`GET /api/beneficiaries`. Vì Agent đọc **bản deploy**, hũ/danh mục tạo ở một DB khác (vd
+`pfm` chạy local) **không hiện với Agent** — UI và Agent phải trỏ cùng một bản `pfm` thì
+`jar_id` Agent trả ra mới khớp hũ trên UI.
 
 ## ⚠️ Agent chỉ được gọi method GET
 
@@ -160,8 +167,10 @@ hiện `answer`**. Nguyên tắc: **Agent chỉ trả `id` và con số đề xu
 tên/số tài khoản), điền sẵn form cho khách xem lại; `pfm` mới thực hiện thay đổi,
 và chỉ khi khách bấm xác nhận.
 
-> Trạng thái phía `pfm`: `transfer_form` đã làm xong; `create_jar`, `edit_jar`,
-> `rebalance_jars` **chưa làm** — đây là contract `pfm` sẽ nhận (todo Feature 4).
+> Trạng thái phía `pfm`: cả 4 loại (`transfer_form`, `create_jar`, `edit_jar`, `rebalance_jars`)
+> đã có card trên UI (màn Chat và ô kết quả của Voice tab). Mỗi card tự kiểm lại với số liệu thật
+> trước khi cho khách bấm xác nhận; đề xuất không còn khớp thì hiện "không còn khớp số liệu" và
+> không có nút áp dụng.
 
 ## B0. Khi nào trả form nào (đọc phần này trước)
 
@@ -173,6 +182,7 @@ một lượt. Sau khi khách xác nhận 1 thay đổi, số trong `jar-summary
 |---|---|---|
 | Muốn tạo hũ mới | `create_jar` | chỉ khi `allocation_amount ≤ allocationHeadroom`; không thì không trả `ui` (xem "Không trả `ui`") |
 | Đổi tên / hạn mức / category của hũ | `edit_jar` | dùng `jar_id` từ `jar-summary` |
+| **Chuyển danh mục** từ hũ A sang hũ B | `edit_jar` cho **hũ nhận B** | xem "Chuyển danh mục giữa hai hũ" ở B3 — **không** sửa hũ cho A |
 | "Thêm tiền cho hũ X" **lâu dài** (mỗi tháng) | `edit_jar` tăng hạn mức | cần `allocationHeadroom` còn đủ; không đủ thì đề xuất giảm hạn mức hũ khác (`edit_jar`) hoặc bù tạm (`rebalance_jars`) |
 | Hũ X **cần bù** (`remaining < 0`), hoặc không đủ số dư cho khoản khách định chi, hoặc khách muốn chia lại tiền **trong tháng này** | `rebalance_jars` | target phải có `budgetLimit`; hũ `null` thì đề xuất `edit_jar` đặt hạn mức trước |
 | Chuyển tiền cho người đã lưu | `transfer_form` | độc lập với các form hũ |
@@ -184,7 +194,10 @@ vì tiền "Chưa phân bổ" có thể đã được dùng hết).
 
 **Không trả `ui`, chỉ nói trong `answer`** khi:
 - `jar-summary` lỗi (`500`) hoặc số cần thiết là `null` — **không đoán số**;
-- `jar_id` khách nhắc không có trong `jar-summary` → hỏi lại khách hũ nào;
+- `jar_id` khách nhắc không có trong `jar-summary` → hỏi lại khách hũ nào. Kể cả hũ vừa được
+  **đề xuất tạo** ở lượt trước: chưa được khách xác nhận thì chưa tồn tại — chỉ hũ có trong
+  `jar-summary` **của lượt này** mới được sửa/bù. **Không bao giờ bịa `id`** (vd `"lien-thien"`
+  suy từ tên hũ);
 - tên hũ mới trùng `label` một hũ đang có (`create_jar`);
 - `allocationHeadroom` không đủ cho `create_jar`, hoặc không tăng được hạn mức;
 - các nguồn cộng lại vẫn không đủ để bù (B4).
@@ -256,7 +269,7 @@ Sửa tên, hạn mức, category của 1 hũ đã có.
 
 | Field | Bắt buộc | Ghi chú |
 |---|---|---|
-| `jar_id` | ✅ | **`id` hũ từ `jar-summary`** (không khớp theo tên) — không tồn tại thì `pfm` bỏ qua |
+| `jar_id` | ✅ | **`id` hũ sao chép nguyên văn từ `jar-summary`** (không khớp theo tên, không tự suy từ tên hũ) — không tồn tại thì `pfm` bỏ qua, chỉ hiện `answer` |
 | `jar_name` | ✅ | tên hũ sau khi sửa (giữ tên cũ nếu không đổi) |
 | `allocation_amount` | ✅ | `budgetLimit` mới, > 0 |
 | `category_ids` | tuỳ chọn | **danh sách đầy đủ** category mới của hũ; bỏ field = không đổi. Category lấy từ hũ khác sẽ bị chuyển sang hũ này |
@@ -267,6 +280,33 @@ Sửa tên, hạn mức, category của 1 hũ đã có.
 - Đổi `budgetLimit` làm `remaining` đổi đúng bằng chênh lệch. Giảm xuống dưới số đã
   chi (`spent`) thì `overLimit` thành `true` và `remaining` có thể âm ("cần bù") — nói rõ trong `reason`.
 - Hũ chưa có `budgetLimit` (`null`): đặt lần đầu cũng tính là tăng.
+
+### Chuyển danh mục giữa hai hũ (chỉ là `edit_jar`, không phải `rebalance_jars`)
+
+Khi khách muốn chuyển danh mục X từ hũ **A** sang hũ **B**, Agent trả **một** `edit_jar`
+cho **hũ nhận B**, với `category_ids` = **danh sách đầy đủ của B sau khi nhận** (danh mục B
+đang có + X). Server tự lấy X ra khỏi A vì 1 danh mục chỉ thuộc 1 hũ.
+
+**Không** trả `edit_jar` cho hũ cho A với `category_ids` bỏ X: khi đó X không thuộc hũ nào và
+server đưa nó về hũ **"Khác"**, không sang B như khách yêu cầu. Chỉ bỏ X khỏi một hũ (không
+gán cho hũ nào) khi khách nói rõ muốn đưa X về "Khác".
+
+Ví dụ (`CIF_0003`: chuyển Giải trí từ Hưởng thụ sang Ăn uống; Ăn uống đang có `dining`,
+`groceries`, hạn mức 12.800.000đ giữ nguyên):
+
+```json
+{
+  "type": "edit_jar",
+  "jar_id": "food",
+  "jar_name": "Ăn uống",
+  "allocation_amount": 12800000,
+  "category_ids": ["dining", "groceries", "entertainment"],
+  "reason": "Chuyển danh mục Giải trí từ hũ Hưởng thụ sang hũ Ăn uống; hũ Hưởng thụ còn phụ trách Mua sắm, hạn mức giữ nguyên"
+}
+```
+
+`answer` nên nói rõ hũ nào mất danh mục và hạn mức không đổi. Chuyển **tiền** giữa hai hũ mới
+dùng `rebalance_jars` (B4).
 
 ## B4. `rebalance_jars` — Form 3: điều chỉnh số dư giữa các hũ
 
@@ -324,3 +364,59 @@ Hưởng thụ (`spendable` 1.296.000) → `moves` như JSON trên. Sau khi
 áp dụng và chi: Ăn uống `remaining` = 4.000.000 − (2.187.000 + 3.313.000) + 1.500.000 = 0
 (hết tiền nhưng **không âm**), còn `overLimit` vẫn `true` vì `spent` 5.500.000 > hạn mức
 4.000.000 — bù giữa hũ không xoá việc khách đã chi vượt kế hoạch.
+
+---
+
+# Phần C — Kỳ vọng từ Agent (đã kiểm với agent thật, 2026-09-21)
+
+Agent trả `answer` + tối đa 1 khối `ui` (trong repo Agent là khối ```` ```ui-json ````, `server.py`
+tách ra thành field `ui`). Phân vai kiểm tra:
+
+| Ai | Kiểm gì | Nếu sai |
+|---|---|---|
+| **Agent** (`server.py`, `text_utils.py`) | chỉ **hình dạng**: đủ field, đúng kiểu; `create_jar` **không** có `jar_id`; `edit_jar` có `jar_id`; `category_ids` không lặp; `rebalance_jars`: `target_jar_id` ≠ `"pool"`, mỗi nguồn ≠ đích và không lặp, mỗi `amount` > 0, **Σ `moves` = `shortfall`** | bỏ `ui` (`ui = null`), chỉ còn `answer` |
+| **`pfm`** | đối chiếu với số thật: `jar_id`/nguồn có tồn tại; hạn mức vượt `allocationHeadroom`; tên hũ trùng; mỗi nguồn ≤ `spendable`; "pool" ≤ `unallocated`; `shortfall` khớp số thiếu thật của hũ âm | bỏ đề xuất, chỉ hiện `answer` |
+
+## C1. Kịch bản → kết quả kỳ vọng
+
+Gọi thật `POST /chat` (persona `CIF_0001` trừ khi ghi khác); "OK" = `ui` đúng loại, qua cả kiểm
+tra hình dạng lẫn các quy tắc cứng đối chiếu với `jar-summary` thật.
+
+| Khách nói | Kỳ vọng | Kết quả |
+|---|---|---|
+| Tạo hũ Du lịch 800 nghìn, chưa gắn danh mục | `create_jar` `allocation_amount: 800000`, `category_ids: []` (≤ `allocationHeadroom` 1.000.000) | OK |
+| Tạo hũ Giải trí 800 nghìn với danh mục Giải trí | `create_jar` `category_ids: ["entertainment"]`; `reason` nói Giải trí đang thuộc hũ Hưởng thụ sẽ chuyển sang | OK |
+| Giảm hạn mức hũ Hưởng thụ xuống 2 triệu | `edit_jar` `jar_id: "lifestyle"`, `allocation_amount: 2000000` | OK |
+| Tăng hạn mức hũ Ăn uống lên 4,2 triệu | `edit_jar` `jar_id: "food"` (tăng 200.000đ ≤ headroom 1.000.000) | OK |
+| Tăng hạn mức hũ Ăn uống lên 6 triệu | **không có `ui`** (tăng 2.000.000đ > headroom 1.000.000); `answer` nêu lý do | OK |
+| Đổi hạn mức hũ "Học tập" (không tồn tại) | **không có `ui`**, liệt kê các hũ đang có, hỏi lại | OK |
+| Hũ Ăn uống còn bao nhiêu? | **không có `ui`**; `answer` = 1.813.000đ (hạn mức 4.000.000đ, đã chi 2.187.000đ) | OK |
+| Chuyển 500 nghìn cho Trần Văn Bình tiền cà phê | `transfer_form` `beneficiary_id: "b_stable_binh"`, `category: "dining"` | OK |
+| Định chi 16 triệu từ hũ Ăn uống, thiếu thì chia từ hũ khác | `rebalance_jars` `target_jar_id: "food"`, `shortfall: 14187000`, Σ `moves` = 14.187.000 | OK (xem C2 về thứ tự) |
+| `CIF_0002` — Hũ Thiết yếu hết tiền, chia bù giúp | `rebalance_jars` `target_jar_id: "essentials"`, `shortfall: 2389000` (= −`remaining`), `moves: [pool 2389000]` | OK |
+| `CIF_0002` — Các hũ đang âm, bù giúp | `rebalance_jars` cho **1 hũ** (Thiết yếu, âm nhiều nhất), `answer` nói còn Hưởng thụ (âm 1.002.000đ) để lượt sau | OK |
+| `CIF_0002` — Tạo hũ Du lịch 2 triệu (headroom 880.000) | **không có `ui`** (vượt phần được đặt thêm) | OK |
+| `CIF_0003` — Định chi 90 triệu từ hũ Ăn uống | **không có `ui`** (tổng mọi nguồn khác ~49,5 triệu < 81,9 triệu thiếu) | OK |
+
+## C2. Điểm Agent hiện chưa đúng kỳ vọng
+
+Đã gặp khi kiểm; là việc bên repo Agent, `pfm` chỉ chặn được hậu quả.
+
+1. **Chuyển danh mục trả sai hũ.** "Chuyển Giải trí từ Hưởng thụ sang Ăn uống" → Agent trả
+   `edit_jar` cho **Hưởng thụ** với `category_ids: ["shopping"]`; đúng phải là `edit_jar` cho
+   **Ăn uống** với `["dining","groceries","entertainment"]` (xem B3). Làm theo payload Agent thì
+   Giải trí rơi về hũ "Khác".
+2. **Bịa `jar_id`.** Hũ chỉ có trong hội thoại (vừa đề xuất tạo, hoặc chỉ có ở DB local) →
+   Agent trả `edit_jar` với `jar_id: "lien-thien"` (suy từ tên). `pfm` báo "Không tìm thấy hũ
+   này". Kỳ vọng: không có `ui`, hỏi lại khách. Đề nghị `server.py` bỏ `ui` nếu `jar_id` không
+   nằm trong kết quả `get_jar_summary` vừa đọc.
+3. **Whitelist danh mục cố định 10 mục.** `_VALID_EXPENSE_CATEGORIES` (`text_utils.py`) chỉ
+   chứa 10 danh mục mặc định, nên `create_jar`/`edit_jar`/`transfer_form` có danh mục khách tự
+   tạo (`c_<slug>`) bị Agent bỏ `ui`. Kỳ vọng: whitelist lấy từ `GET /api/categories?cif=`
+   (mục `kind: "expense"`, chưa lưu trữ).
+4. **Skill `jar-rebalance` còn nhắc `role`.** Repo Agent vẫn mô tả thứ tự `buffer → spending →
+   essential` và hũ `goal` được bảo vệ; `pfm` đã bỏ vai trò hũ. Kỳ vọng: `pool` trước, sau đó các
+   hũ còn lại theo `spendable` **giảm dần**; không hũ nào được bảo vệ.
+5. **Thứ tự lấy tiền lệch** (hệ quả của mục 4): định chi 16 triệu, Agent lấy pool 13.044.000 →
+   Di chuyển 796.000 (nhỏ hơn) → Hưởng thụ 347.000; theo thứ tự kỳ vọng phải là pool 13.044.000
+   → Hưởng thụ 1.143.000 (đủ một mình). Không vi phạm quy tắc cứng nên `pfm` vẫn nhận.
