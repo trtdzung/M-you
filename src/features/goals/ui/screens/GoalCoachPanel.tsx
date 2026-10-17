@@ -23,6 +23,13 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const coach = useGoalCoach();
   const analyzeDraft = coach.draft ? coachDraftToAnalyze(coach.draft, transferNow()) : null;
   const advisor = useGoalAdvisor(analyzeDraft, coach.requestId);
+  // The form opens with the plan the customer picked (its date/amount), not the raw draft.
+  const chosen = advisor.view.analysis && advisor.selectedPlanId ? advisor.view.analysis.plans[advisor.selectedPlanId] : null;
+  const reviewPrefill = coach.draft
+    ? chosen && analyzeDraft
+      ? { ...draftToForm(coach.draft, transferNow()), targetAmount: String(chosen.targetAmount), targetDate: chosen.targetDate }
+      : draftToForm(coach.draft, transferNow())
+    : null;
   const [reviewing, setReviewing] = useState(false);
   const [manual, setManual] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -106,7 +113,16 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         </div>
       </Sheet>}
       {coach.draft && !reviewing && analyzeDraft && advisor.phase !== "failed" && (
-        <GoalAdvisorCard draft={analyzeDraft} analysis={advisor.analysis} onReview={() => setReviewing(true)} />
+        <GoalAdvisorCard
+          draft={analyzeDraft}
+          analysis={advisor.analysis}
+          view={advisor.view}
+          overrides={advisor.overrides}
+          onOverrides={advisor.setOverrides}
+          selectedPlanId={advisor.selectedPlanId}
+          onSelectPlan={advisor.selectPlan}
+          onReview={() => setReviewing(true)}
+        />
       )}
       {coach.draft && !reviewing && (!analyzeDraft || advisor.phase === "failed") && <section className="rounded-2xl border border-border bg-surface p-5">
         <h3 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h3>
@@ -116,9 +132,9 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         <p className="mt-3 text-[13px] leading-5 text-muted">M-You đã điền thông tin từ cuộc trò chuyện. Bạn kiểm tra và chỉnh sửa trước khi lưu.</p>
         <button type="button" className={`${primaryButton} mt-4 w-full`} onClick={() => setReviewing(true)}>Kiểm tra và tạo mục tiêu</button>
       </section>}
-      {coach.draft && reviewing && (
+      {coach.draft && reviewPrefill && reviewing && (
         <CreateGoalFlow
-          prefill={draftToForm(coach.draft, transferNow())}
+          prefill={reviewPrefill}
           requestKey={coach.requestId ? `coach:${coach.requestId}` : undefined}
           onCreated={done}
           onClose={() => setReviewing(false)}

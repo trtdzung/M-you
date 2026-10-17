@@ -1,6 +1,6 @@
 // Fixed Vietnamese sentences for the analysis card (no LLM). Numbers come from the engine's Analysis.
 import { formatGoalMoney } from "../ui/shared/format-goal-money";
-import type { Analysis, AnalyzeDraft } from "./analysis-types";
+import type { Analysis, AnalyzeDraft, Plan, PlanCut } from "./analysis-types";
 
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
 
@@ -33,5 +33,49 @@ export function verdictSentence(a: Analysis): string {
         : `Chưa khả thi theo kế hoạch này: cần góp ${need}/tháng, gấp ${a.gapMultiple.toLocaleString("vi-VN")} lần phần dư. Mình gợi ý vài hướng điều chỉnh bên dưới.`;
     case "unknown":
       return `Cần góp khoảng ${need}/tháng, nhưng chưa đủ dữ liệu để so với phần dư của bạn.`;
+  }
+}
+
+const perMonth = (n: number) => `${formatGoalMoney(n)}/tháng`;
+
+/** One line per plan: what changes and what it costs each month. */
+export function planSummary(plan: Plan): string {
+  const monthly = perMonth(plan.monthly);
+  switch (plan.id) {
+    case "keep_deadline":
+      return `Giữ hạn ${dmy(plan.targetDate)}, góp ${monthly}.`;
+    case "extend_deadline":
+      return plan.needed
+        ? `Lùi hạn đến ${dmy(plan.targetDate)} (${plan.months} tháng), góp ${monthly}.`
+        : `Không cần lùi hạn, vẫn góp ${monthly}.`;
+    case "reduce_amount":
+      return plan.needed
+        ? `Giảm mục tiêu còn ${formatGoalMoney(plan.targetAmount)}, góp ${monthly}.`
+        : `Không cần giảm số tiền, vẫn góp ${monthly}.`;
+  }
+}
+
+const CUT_NOTE: Record<PlanCut["reason"], string> = {
+  spike: " (đang tăng so với tháng trước)",
+  subscription: " (thuê bao mới)",
+  category: "",
+};
+
+export function cutSentence(cut: PlanCut): string {
+  return `Giảm chi ${cut.label ?? "nhóm này"} ${perMonth(cut.perMonth)}${CUT_NOTE[cut.reason]}`;
+}
+
+/** Sentence under the sliders: what the current position means. Fixed templates, instant. */
+export function sliderSentence(a: Analysis, targetDate: string, targetAmount: number): string {
+  const head = `Với ${formatGoalMoney(targetAmount)} đến ${dmy(targetDate)}, cần góp ${perMonth(a.requiredMonthly)}`;
+  switch (a.verdict) {
+    case "feasible":
+      return `${head}: khả thi.`;
+    case "stretch":
+      return `${head}: làm được nhưng khá sát phần dư.`;
+    case "not_feasible":
+      return `${head}: vượt phần dư hiện tại.`;
+    case "unknown":
+      return `${head}.`;
   }
 }
