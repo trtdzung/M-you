@@ -40,14 +40,16 @@ export function GoalFormSheet({
             {formError || GOALS_COPY.actionError}
           </p>
         )}
-        <button type="button" onClick={submit} disabled={pending} className={primaryButton}>
+        <div className={inline ? "sticky bottom-0 z-10 -mx-4 border-t border-border/60 bg-surface/95 px-4 py-3 backdrop-blur" : ""}>
+        <button type="button" onClick={submit} disabled={pending} className={`${primaryButton} w-full ${inline ? "h-12 text-[16px]" : ""}`}>
           {pending ? GOALS_COPY.saving : inline ? GOALS_COPY.create : GOALS_COPY.save}
         </button>
+        </div>
       </div>
   );
-  return inline ? <section className="rounded-2xl border border-border bg-surface p-4">
+  return inline ? <section className="flex flex-col gap-1">
     <h2 className="text-[18px] leading-6 font-semibold text-text">Bạn muốn tích lũy cho điều gì?</h2>
-    <p className="mb-5 mt-2 text-[14px] leading-5 text-muted">Tự chọn số tiền và thời gian phù hợp.</p>
+    <p className="mb-5 mt-1 text-[14px] leading-6 text-muted">Đặt số tiền và thời hạn. Bạn có thể điều chỉnh kế hoạch sau.</p>
     {content}
   </section> : <Sheet title={title} onClose={onClose}>{content}</Sheet>;
 }

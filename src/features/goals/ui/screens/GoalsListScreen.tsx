@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
 import { GOALS_COPY } from "../copy";
+import { GoalsHeader } from "../GoalsHeader";
 import { GoalList } from "../list/GoalList";
 import { secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
@@ -26,6 +27,7 @@ export function GoalsListScreen() {
     setFormKey((key) => key + 1);
     setCreating(false);
     setActiveTab("manual");
+    document.getElementById("main-content")?.scrollTo({ top: 0 });
   };
 
   let body;
@@ -51,18 +53,20 @@ export function GoalsListScreen() {
     );
   }
 
-  if (loading || error !== null) return <>{body}</>;
+  const resetScroll = () => document.getElementById("main-content")?.scrollTo({ top: 0 });
+  const openCreate = () => { setCreating(true); resetScroll(); };
+  const closeCreate = () => { setCreating(false); resetScroll(); };
+  if (loading || error !== null) return <div className="flex flex-col gap-5"><GoalsHeader />{body}</div>;
   if (hasGoals && !creating) return (
     <section className="flex flex-col gap-4 pb-24">
+      <GoalsHeader />
       <div>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2>
-        </div>
-        <p className="mt-1 text-[14px] leading-5 text-muted">Theo dõi tiến độ tích lũy cho những điều bạn muốn.</p>
+        <p className="text-[15px] leading-6 text-muted">Từng bước đến những điều bạn muốn.</p>
+        <p className="mt-4 text-[13px] font-medium text-muted">{data?.filter(goal => goal.status === "active").length} mục tiêu đang tích lũy</p>
       </div>
       {body}
       {frame && createPortal(
-        <button type="button" aria-label="Tạo mục tiêu mới" onClick={() => setCreating(true)} className="absolute bottom-[calc(24px+var(--safe-area-bottom))] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
+        <button type="button" aria-label="Tạo mục tiêu mới" onClick={openCreate} className="absolute bottom-[calc(24px+var(--safe-area-bottom))] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
           <Plus size={26} strokeWidth={2} aria-hidden="true" />
         </button>, frame,
       )}
@@ -70,9 +74,9 @@ export function GoalsListScreen() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      {hasGoals && <button type="button" className="min-h-11 self-start text-[14px] font-medium text-primary" onClick={() => setCreating(false)}>← Về danh sách mục tiêu</button>}
-      <div role="tablist" aria-label="Cách tạo mục tiêu" className="grid grid-cols-2 gap-1 rounded-2xl bg-border/40 p-1">
+    <div className="flex flex-col gap-5 pb-[calc(24px+var(--safe-area-bottom))]">
+      <GoalsHeader title="Tạo mục tiêu" onBack={hasGoals ? closeCreate : undefined} />
+      <div role="tablist" aria-label="Cách tạo mục tiêu" className="grid grid-cols-2 gap-1 rounded-2xl bg-surface-muted p-1">
         {([
           ["manual", "Tạo thủ công"],
           ["chat", "Chat với M-You"],

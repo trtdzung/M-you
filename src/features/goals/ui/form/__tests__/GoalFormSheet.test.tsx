@@ -49,8 +49,8 @@ describe("GoalFormSheet", () => {
     expect(await screen.findByRole("dialog", { name: "Ngày hoàn thành" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "15/09/2026" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Chọn năm" }));
-    fireEvent.click(screen.getByRole("button", { name: "2029", exact: true }));
-    fireEvent.click(screen.getByRole("button", { name: "Tháng 9", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "2029" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tháng 9" }));
     fireEvent.click(screen.getByRole("button", { name: "15/09/2029" }));
     fireEvent.click(screen.getByRole("button", { name: "Chọn ngày này" }));
     expect(screen.getByLabelText("Ngày hoàn thành")).toHaveTextContent("15/09/2029");

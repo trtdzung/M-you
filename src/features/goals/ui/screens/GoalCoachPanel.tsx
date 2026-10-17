@@ -53,7 +53,7 @@ export function GoalCoachPanel({ onCreated }: { onCreated: () => void }) {
     restart();
   };
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+    <section className="flex flex-col gap-4">
       <h2 className="text-[18px] leading-6 font-semibold text-text">M-You</h2>
       {coach.phase === "idle" && <div className="rounded-2xl rounded-tl-sm bg-surface-tint p-4">
         <p className="text-[16px] leading-6 font-medium text-text">Bạn đang muốn dành tiền cho điều gì?</p>

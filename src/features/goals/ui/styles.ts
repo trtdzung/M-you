@@ -3,9 +3,9 @@ import type { GoalProgressState } from "../model/types";
 
 const ring = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
 
-export const input = `min-h-11 rounded-row border border-border bg-surface px-3 text-sm text-text ${ring}`;
+export const input = `min-h-12 rounded-xl border border-border bg-surface px-4 text-[16px] text-text ${ring}`;
 export const label = "text-sm font-medium text-text";
-export const hint = "text-xs text-muted";
+export const hint = "text-[13px] leading-5 text-muted";
 export const fieldError = "text-sm text-negative";
 export const primaryButton = `inline-flex h-12 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg disabled:opacity-50 ${ring}`;
 export const secondaryButton = `min-h-11 rounded-full border border-border px-3 text-sm font-semibold text-text transition-colors hover:bg-surface-muted ${ring}`;

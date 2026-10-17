@@ -100,7 +100,7 @@ describe("GoalsListScreen", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("Bạn muốn tích lũy cho điều gì?")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Mua nhà/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Về danh sách mục tiêu/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
     expect(screen.getByRole("button", { name: /Mua nhà/ })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Tạo thủ công" })).not.toBeInTheDocument();
   });

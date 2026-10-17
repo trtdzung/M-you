@@ -113,6 +113,10 @@ body {
   padding: 0;
 }
 
+.shell-main--goals {
+  padding-bottom: var(--safe-area-bottom);
+}
+
 /* Login: no bottom nav to clear, so drop only the reserved nav-clearance
    bottom padding — the horizontal `px-shell-main-inset` utility on `main`
    must stay in effect (PromoCarousel's `-mx-4` bleed depends on it), so this

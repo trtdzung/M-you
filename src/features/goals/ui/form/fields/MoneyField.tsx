@@ -66,7 +66,7 @@ export function MoneyField({
         aria-invalid={error ? true : undefined}
         aria-describedby={words ? `${id}-words` : undefined}
         placeholder="0"
-        className={`${input} w-full border-primary/30 bg-primary/5 pr-16 text-[18px] font-semibold tabular-nums text-right focus:border-primary placeholder:font-normal`}
+        className={`${input} w-full pr-16 text-[18px] font-semibold tabular-nums text-right focus:border-primary placeholder:font-normal`}
       />
       <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[13px] font-semibold text-primary">VND</span>
       {expanded && <div id={`${id}-suggestions`} className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-card" role="listbox" aria-label={`Gợi ý ${label.toLowerCase()}`}>

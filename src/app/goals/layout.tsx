@@ -20,8 +20,8 @@ export default function GoalsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PhoneShell background={<CalmBg />} className="shell-calm">
-      <div className="px-4 pb-6">{children}</div>
+    <PhoneShell background={<CalmBg />} className="shell-calm" mainClassName="shell-main--goals">
+      {children}
     </PhoneShell>
   );
 }
