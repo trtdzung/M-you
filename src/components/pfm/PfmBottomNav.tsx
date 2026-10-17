@@ -7,7 +7,7 @@ import { VoiceFab } from "./VoiceFab";
 
 /**
  * BIDV-style wallet bottom nav for `/pfm/*` (plan 260910-1626): 4 destinations —
- * Tổng quan · Giao dịch · (M-Your) · Ngân sách · Cài đặt — with a raised center
+ * Tổng quan · Giao dịch · (M-You) · Ngân sách · Cài đặt — with a raised center
  * agent icon (`VoiceFab`, Feature 5; a second copy floats on the main screen).
  * Pinned to the
  * device-canvas bottom via the PhoneShell `nav` slot (same pattern as the

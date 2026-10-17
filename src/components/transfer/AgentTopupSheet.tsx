@@ -7,7 +7,7 @@ import type { DonorProposal, FundingAssessment, JarSpendable } from "@/domain/en
 import { JarTopupSuggestionSheet, type AgentTopup } from "./JarTopupSuggestionSheet";
 
 /**
- * The top-up popup of the transfer flow with the M-Your agent's suggestion on top.
+ * The top-up popup of the transfer flow with the M-You agent's suggestion on top.
  *
  * "Chưa phân bổ" comes first: while it covers the whole shortfall the engine's chain
  * (the pool alone) IS the suggestion and the agent is not asked. Only when the

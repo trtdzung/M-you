@@ -25,7 +25,7 @@ function FestiveBg() {
 
 /**
  * Chrome for every non-PFM route (Home / accounts / settings / transfer / …):
- * festive photo surface + 3-tab MSB `BottomNav`, plus a floating M-Your agent icon
+ * festive photo surface + 3-tab MSB `BottomNav`, plus a floating M-You agent icon
  * (`VoiceFab floating`) that opens the voice section. `useSearchParams` inside it
  * needs a Suspense boundary on these statically-rendered pages.
  */

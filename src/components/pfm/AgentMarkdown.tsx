@@ -2,7 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 /**
- * Renders an agent reply as markdown (the real M-Your agent frequently answers
+ * Renders an agent reply as markdown (the real M-You agent frequently answers
  * with GFM tables and bold text, e.g. jar/card breakdowns). `react-markdown`
  * parses into a safe React element tree — no `dangerouslySetInnerHTML`, no raw
  * HTML plugin — so agent-generated text can never inject markup. Colors are

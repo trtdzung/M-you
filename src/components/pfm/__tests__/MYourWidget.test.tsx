@@ -28,7 +28,7 @@ vi.mock("@/state/jars", () => ({
 }));
 
 /**
- * The M-Your chat overlay lives on every /pfm screen (mounted via the
+ * The M-You chat overlay lives on every /pfm screen (mounted via the
  * PhoneShell `fab` slot). It is wired to the real agent (`src/lib/agent-api.ts`)
  * — opening the overlay loads real history and gates the composer until that
  * finishes; sending/deleting call the real endpoints. `cif` comes from the
@@ -55,7 +55,7 @@ beforeEach(() => {
   nav.search = "assistant=1";
   nav.replace.mockClear();
   vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
-  vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({ answer: "Trả lời từ M-Your", thread_id: "CIF_0001" });
+  vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({ answer: "Trả lời từ M-You", thread_id: "CIF_0001" });
   vi.spyOn(agentApi, "deleteChatHistory").mockResolvedValue(undefined);
 });
 
@@ -77,24 +77,24 @@ describe("MYourWidget", () => {
       </PersonaProvider>,
     );
 
-    expect(screen.getByRole("dialog", { name: "M-Your" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    expect(screen.getByRole("dialog", { name: "M-You" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
   });
 
-  it("shows a short intro line above the M-Your title", async () => {
+  it("shows a short intro line above the M-You title", async () => {
     renderWidget();
 
     expect(screen.getByText("Trợ lý Tài chính của bạn")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
   });
 
   it("loads real history for the active persona's CIF on open and gates the composer until it's ready", async () => {
     renderWidget();
 
     expect(agentApi.getChatHistory).toHaveBeenCalledWith("CIF_0001");
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeDisabled();
 
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
   });
 
   it("renders prior messages loaded from history", async () => {
@@ -116,8 +116,8 @@ describe("MYourWidget", () => {
     renderWidget();
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(screen.getByText("Không tải được lịch sử M-Your. Bạn vẫn có thể thử nhập bằng giọng nói.")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled();
+    expect(screen.getByText("Không tải được lịch sử M-You. Bạn vẫn có thể thử nhập bằng giọng nói.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled();
     expect(screen.getByRole("button", { name: "Nhập bằng giọng nói" })).toBeEnabled();
 
     vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
@@ -128,14 +128,14 @@ describe("MYourWidget", () => {
 
   it("sends a message via the real agent and shows the real reply", async () => {
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Xin chào" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Xin chào" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
     expect(agentApi.sendChatMessage).toHaveBeenCalledWith("Xin chào", "CIF_0001");
     expect(screen.getByText("Xin chào")).toBeInTheDocument();
-    expect(await screen.findByText("Trả lời từ M-Your")).toBeInTheDocument();
+    expect(await screen.findByText("Trả lời từ M-You")).toBeInTheDocument();
   });
 
   it("renders markdown in agent replies (bold text and a GFM table) as real elements", async () => {
@@ -145,9 +145,9 @@ describe("MYourWidget", () => {
       thread_id: "CIF_0001",
     });
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Tôi có bao nhiêu hũ" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Tôi có bao nhiêu hũ" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
     await screen.findByRole("table");
@@ -169,9 +169,9 @@ describe("MYourWidget", () => {
       },
     });
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "So sánh chi tiêu" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "So sánh chi tiêu" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
     expect(await screen.findByText("Tháng này bạn chi nhiều nhất cho Mua sắm.")).toBeInTheDocument();
@@ -202,9 +202,9 @@ describe("MYourWidget", () => {
       },
     });
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Chi tiêu theo danh mục" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Chi tiêu theo danh mục" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
     // jsdom can't faithfully reproduce Recharts' real getBBox-based tick-skip
@@ -224,9 +224,9 @@ describe("MYourWidget", () => {
       ui: { type: "create_jar", jar_name: "Du lịch", allocation_amount: 1000000, reason: "reason" } as agentApi.UiPayload,
     });
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Tạo hũ mới" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Tạo hũ mới" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
     expect(await screen.findByText("Đây là đề xuất tạo hũ mới.")).toBeInTheDocument();
@@ -237,9 +237,9 @@ describe("MYourWidget", () => {
   it("shows an inline error on the reply bubble when sending fails", async () => {
     vi.spyOn(agentApi, "sendChatMessage").mockRejectedValueOnce(new Error("network down"));
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Xin chào" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Xin chào" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
     expect(await screen.findByText(/Không gửi được tin nhắn/)).toBeInTheDocument();
@@ -248,9 +248,9 @@ describe("MYourWidget", () => {
   it("deletes history via the real agent, clears the transcript, and locks the composer for 30s", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
-    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Xin chào" } });
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Xin chào" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
     await waitFor(() => expect(screen.getByText("Xin chào")).toBeInTheDocument());
 
@@ -258,23 +258,23 @@ describe("MYourWidget", () => {
     await waitFor(() => expect(agentApi.deleteChatHistory).toHaveBeenCalledWith("CIF_0001"));
 
     expect(screen.queryByText("Xin chào")).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeDisabled();
 
     act(() => {
       vi.advanceTimersByTime(29_000);
     });
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeDisabled();
 
     act(() => {
       vi.advanceTimersByTime(1_001);
     });
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
   });
 
   it("closes the overlay with the close button by clearing ?assistant", async () => {
     renderWidget();
-    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
-    expect(screen.getByRole("dialog", { name: "M-Your" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    expect(screen.getByRole("dialog", { name: "M-You" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AGENT_BASE_URL, agentAuthHeaders } from "@/lib/agent-proxy-auth";
 
 /**
- * Same-origin proxy to the real M-Your agent backend (`server.py`, see
+ * Same-origin proxy to the real M-You agent backend (`server.py`, see
  * `agent_backend_docs/api.md`) — the browser calls this route
  * (`src/lib/agent-api.ts`), never the agent server directly, so
  * `AGENT_API_KEY`/Auth0 credentials never reach the client.

@@ -60,7 +60,7 @@ function VoiceAnswer({ text, onOpenChat }: { text: string; onOpenChat: () => voi
 }
 
 /**
- * M-Your agent icon (Feature 5), rendered in TWO places: the center slot of the
+ * M-You agent icon (Feature 5), rendered in TWO places: the center slot of the
  * `/pfm/*` bottom nav (default), and a floating icon on the main (festive) screens
  * — Home, accounts, … — mounted in that layout's `PhoneShell` `fab` slot
  * (`floating`). Both open the same voice section; each instance keeps its own
@@ -215,7 +215,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
         setListening(false);
         voiceRef.current.stop();
       }}
-      aria-label="Giữ để hỏi M-Your bằng giọng nói"
+      aria-label="Giữ để hỏi M-You bằng giọng nói"
       aria-pressed={listening}
       className={cn(
         "pointer-events-auto flex h-16 w-16 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-surface shadow-nav ring-4 transition-transform duration-150 ease-out active:scale-95 focus-visible:outline-none focus-visible:ring-primary/60 [touch-action:none]",
@@ -252,7 +252,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
                 <img src="/icon_agent.png" alt="" width={32} height={32} className="h-full w-full object-cover" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-bold leading-tight text-text">M-Your</p>
+                <p className="text-sm font-bold leading-tight text-text">M-You</p>
                 <p className="truncate text-[11px] leading-tight text-muted">Trợ lý Tài chính của bạn</p>
               </div>
             </div>
@@ -294,7 +294,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
                 <VoiceAnswer text={reply.answer} onOpenChat={switchToChat} />
               )
             ) : (
-              <span className="text-xs text-muted">M-Your sẵn sàng hỗ trợ bạn</span>
+              <span className="text-xs text-muted">M-You sẵn sàng hỗ trợ bạn</span>
             )}
             {voice.partial && voice.state !== "idle" && (
               <p className="w-full max-h-24 overflow-y-auto break-words text-sm text-text" aria-label="Nội dung nghe được tạm thời">
@@ -308,7 +308,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             disabled={voice.state !== "idle" || sending}
-            placeholder="Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây"
+            placeholder="Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây"
             className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           />
 

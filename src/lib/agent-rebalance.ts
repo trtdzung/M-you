@@ -2,7 +2,7 @@
  * The "Agent suggests how to top up a jar" step of the transfer flow (Chuyển tiền):
  * the customer picks a jar as the source, enters more than it holds and taps
  * "Tiếp tục" — the engine already knows the jar is short (`evaluateFunding`), and
- * here the M-Your agent is ASKED how to cover the gap from other jars / the pool.
+ * here the M-You agent is ASKED how to cover the gap from other jars / the pool.
  *
  * The agent only proposes (`rebalance_jars`, contract in `backend_docs/pfm-read-api.md`
  * B4). Its numbers are never trusted: `checkDonorPlan` re-validates the plan against

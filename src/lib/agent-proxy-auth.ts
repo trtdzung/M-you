@@ -1,5 +1,5 @@
 /**
- * Server-only credentials for the same-origin proxies to the M-Your agent backend
+ * Server-only credentials for the same-origin proxies to the M-You agent backend
  * (`src/app/api/agent/*`). The browser only ever calls those routes, so
  * `AGENT_API_KEY` / Auth0 secrets never reach the client.
  */

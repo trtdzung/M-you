@@ -411,7 +411,7 @@ hũ đó rồi bấm "Tiếp tục", `pfm` mở popup "Hũ chưa đủ tiền" (
 (chỉ pool) chính là gợi ý và **không gọi Agent**. Chỉ khi phần thiếu **vượt quá pool**, `pfm`
 gọi endpoint trên với `spend_amount` = số khách nhập để Agent chia phần còn lại từ các hũ khác. Agent tự tính `shortfall` và trả
 `rebalance_jars` (~21 s, đã đo), nên popup hiện ngay cách rót của engine, ghi nhãn
-"Cách rót tạm tính" và dòng "M-Your đang phân tích…", rồi thay bằng đề xuất của Agent +
+"Cách rót tạm tính" và dòng "M-You đang phân tích…", rồi thay bằng đề xuất của Agent +
 `reason` khi về. Khi khách bấm "Đồng ý rót", `pfm` **kiểm lại** đề xuất với số hiện tại (các
 quy tắc cứng 1–4 ở trên, `shortfall` lấy theo engine) — không khớp / không có `ui` / lỗi /
 quá 60 s → dùng cách rót của engine. Lúc xác nhận chuyển tiền, `pfm` kiểm lại lần nữa với

@@ -57,10 +57,10 @@ async function openWidget() {
   render(<PersonaProvider><MYourWidget /></PersonaProvider>);
   await waitFor(() => expect(screen.getByRole("button", { name: "Nhập bằng giọng nói" })).toBeEnabled());
 }
-describe("M-Your voice composer", () => {
+describe("M-You voice composer", () => {
   it("shows partial captions separately, preserves typed text and sends the refined final text", async () => {
     await openWidget();
-    const input = screen.getByPlaceholderText("Nhắn tin cho M-Your…");
+    const input = screen.getByPlaceholderText("Nhắn tin cho M-You…");
     fireEvent.change(input, { target: { value: "Cho tôi biết" } });
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
     expect(voice.keyterms).toContain("hũ Ăn uống");
@@ -88,7 +88,7 @@ describe("M-Your voice composer", () => {
   });
   it("restores the typed draft when streaming fails", async () => {
     await openWidget();
-    const input = screen.getByPlaceholderText("Nhắn tin cho M-Your…");
+    const input = screen.getByPlaceholderText("Nhắn tin cho M-You…");
     fireEvent.change(input, { target: { value: "Bản nháp" } });
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
     act(() => voice.callbacks!.onTranscript("chưa chốt", false));
@@ -112,7 +112,7 @@ describe("M-Your voice composer", () => {
       });
       voice.callbacks!.onState("idle");
     });
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toHaveValue("Chuyển 500.000 VND sang hũ Ăn uống");
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toHaveValue("Chuyển 500.000 VND sang hũ Ăn uống");
     expect(screen.getByRole("status")).toHaveTextContent("Bạn muốn chuyển tiền từ hũ nào?");
   });
 });

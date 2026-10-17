@@ -1,6 +1,6 @@
-# Streaming voice input for M-Your
+# Streaming voice input for M-You
 
-Press the microphone in M-Your, speak Vietnamese, then pause or press stop.
+Press the microphone in M-You, speak Vietnamese, then pause or press stop.
 Partial transcripts stay hidden so unstable words never overwrite the user's
 draft. While recording, the composer shows a short listening/finishing status.
 The final transcript appears only after server-side refinement and stays editable;
@@ -28,7 +28,7 @@ Closing the chat, switching persona, errors and timeouts stop microphone capture
 7. The final message also includes a validated `interpretation`. A jar transfer
    becomes actionable only with an amount, one unambiguous source jar, and one
    different destination jar. VoiceTab shows `clarification` and does not call
-   the agent when information is missing, ambiguous, negated, or invalid. M-Your
+   the agent when information is missing, ambiguous, negated, or invalid. M-You
    keeps the draft editable and shows the same specific follow-up below it.
 
 Jar names are never hard-coded in the speech service. Renaming or adding a jar in
@@ -108,7 +108,7 @@ npm run build
 
 After both services are deployed, open PFM over HTTPS, grant microphone access,
 and say a short Vietnamese sentence. Check that the typed draft remains unchanged
-while speaking, a pause stops M-Your but does not stop VoiceTab while the button
+while speaking, a pause stops M-You but does not stop VoiceTab while the button
 is still held, the refined final text appears and remains editable, and Send uses
 the existing agent API. An incomplete jar transfer must show the specific missing
 field and must not be submitted automatically. Closing the chat during recording

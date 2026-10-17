@@ -34,7 +34,7 @@ interface ChatBubble {
   error?: boolean;
 }
 
-const GREETING = "Xin chào 👋 Mình là M-Your. Bạn cần hỏi gì về tài chính của mình?";
+const GREETING = "Xin chào 👋 Mình là M-You. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
 const DELETE_LOCK_MS = 30_000;
 
@@ -52,7 +52,7 @@ function composeVoiceDraft(prefix: string, transcript: string) {
 }
 
 /**
- * Full-screen "M-Your" chat overlay for `/pfm/*`, mounted via the `PhoneShell`
+ * Full-screen "M-You" chat overlay for `/pfm/*`, mounted via the `PhoneShell`
  * `fab` slot. It has no entry button of its own any more: `VoiceFab` (the center
  * agent tab of the bottom nav) opens its voice section first, and that section's
  * "Chuyển qua Chat" button opens this overlay via `?assistant=1` (same idiom as
@@ -239,7 +239,7 @@ export function MYourWidget() {
             <div className="min-w-0">
               <p className="truncate text-xs text-muted">Trợ lý Tài chính của bạn</p>
               <h2 id={titleId} className="text-base font-bold tracking-tight text-text">
-                M-Your
+                M-You
               </h2>
             </div>
             <div className="ml-auto flex items-center gap-1">
@@ -268,7 +268,7 @@ export function MYourWidget() {
 
             {historyUnavailable && (
               <div role="alert" className="mb-3 rounded-2xl bg-warning-soft px-3.5 py-3 text-sm text-text">
-                <p>Không tải được lịch sử M-Your. Bạn vẫn có thể thử nhập bằng giọng nói.</p>
+                <p>Không tải được lịch sử M-You. Bạn vẫn có thể thử nhập bằng giọng nói.</p>
                 <button
                   type="button"
                   onClick={loadHistory}
@@ -328,7 +328,7 @@ export function MYourWidget() {
                 onKeyDown={handleKey}
                 rows={1}
                 disabled={composerDisabled || voiceBusy}
-                placeholder="Nhắn tin cho M-Your…"
+                placeholder="Nhắn tin cho M-You…"
                 className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface-muted px-3.5 py-2.5 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
               />
               <button

@@ -58,8 +58,8 @@ describe("VoiceFab refined transcript hand-off", () => {
     expect(speech.options.keyterms).toContain("hũ Ăn uống");
     expect(speech.options.entities).toContainEqual(expect.objectContaining({ id: "food", label: "Ăn uống" }));
     expect(speech.options.endpointing).toBe("manual");
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
-    const input = await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
+    const input = await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
 
     act(() => speech.callback?.("chuyển năm trăm", false));
     expect(input).toHaveValue("");
@@ -75,8 +75,8 @@ describe("VoiceFab refined transcript hand-off", () => {
 
   it("starts once per hold and flushes once despite duplicate browser release events", () => {
     render(<VoiceFab />);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     expect(speech.start).toHaveBeenCalledTimes(1);
     fireEvent.pointerUp(window);
     fireEvent.mouseUp(window);
@@ -85,7 +85,7 @@ describe("VoiceFab refined transcript hand-off", () => {
 
   it("supports a keyboard hold even when opening the section replaces the button", () => {
     render(<VoiceFab />);
-    fireEvent.keyDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }), { key: " " });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }), { key: " " });
     expect(speech.start).toHaveBeenCalledTimes(1);
     fireEvent.keyUp(window, { key: " " });
     expect(speech.stop).toHaveBeenCalledTimes(1);
@@ -94,24 +94,24 @@ describe("VoiceFab refined transcript hand-off", () => {
   it("does not restart STT while the final transcript is still being prepared", () => {
     speech.state = "finishing";
     render(<VoiceFab />);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     expect(speech.start).not.toHaveBeenCalled();
   });
 
   it("shows a temporary caption without populating or sending the input", async () => {
     const { rerender } = render(<VoiceFab />);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     speech.state = "recording";
     speech.partial = "chi tiêu tháng này";
     rerender(<VoiceFab />);
     expect(screen.getByLabelText("Nội dung nghe được tạm thời")).toHaveTextContent("chi tiêu tháng này");
-    expect(screen.getByPlaceholderText("Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây")).toHaveValue("");
     expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
   });
 
   it("cancels when the section closes and ignores the subsequent release", () => {
     render(<VoiceFab />);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
     expect(speech.cancel).toHaveBeenCalledTimes(1);
     fireEvent.pointerUp(window);
@@ -120,8 +120,8 @@ describe("VoiceFab refined transcript hand-off", () => {
 
   it("asks for missing transfer details instead of auto-sending", async () => {
     render(<VoiceFab />);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
-    await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
+    await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
     act(() => speech.callback?.("Chuyển 500.000 VND sang hũ Ăn uống", true, {
       rawText: "Chuyển năm trăm nghìn sang hũ ăn uống",
       refinementStatus: "fallback",
@@ -137,8 +137,8 @@ describe("VoiceFab refined transcript hand-off", () => {
 
   it("does not auto-send a complete command when it is negated", async () => {
     render(<VoiceFab />);
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
-    await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
+    await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
     act(() => speech.callback?.("Đừng chuyển 500.000 VND từ hũ Ăn uống sang hũ Khác", true, {
       rawText: "Đừng chuyển năm trăm nghìn từ hũ ăn uống sang hũ khác",
       refinementStatus: "unchanged",

@@ -75,7 +75,7 @@ export function AgentJarFormCard({ form, fullWidth = false }: { form: CreateJarU
   if (isEdit && loaded && !jar && status !== "done") {
     return (
       <div className={wrap}>
-        <p className="text-xs text-negative">Không tìm thấy hũ này. Hỏi lại M-Your để có đề xuất mới.</p>
+        <p className="text-xs text-negative">Không tìm thấy hũ này. Hỏi lại M-You để có đề xuất mới.</p>
       </div>
     );
   }
@@ -176,7 +176,7 @@ export function AgentJarFormCard({ form, fullWidth = false }: { form: CreateJarU
     const freshJar = isEdit ? fresh.jars.find((j) => j.id === jar?.id) : undefined;
     if (isEdit && !freshJar) {
       setStatus("idle");
-      setProblem("Hũ này không còn tồn tại. Hỏi lại M-Your để có đề xuất mới.");
+      setProblem("Hũ này không còn tồn tại. Hỏi lại M-You để có đề xuất mới.");
       return;
     }
     const found = validate(fresh, freshJar);

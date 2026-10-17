@@ -6,7 +6,7 @@ import { Sheet } from "@/components/primitives";
 import { formatVnd } from "@/lib/format";
 import type { DonorProposal, FundingAssessment } from "@/domain/engine";
 
-/** The M-Your agent's take on this top-up, alongside the engine's own chain. */
+/** The M-You agent's take on this top-up, alongside the engine's own chain. */
 export type AgentTopup =
   | { status: "idle" | "none" }
   | { status: "loading" }
@@ -71,7 +71,7 @@ export function JarTopupSuggestionSheet({
         <div className="rounded-2xl border border-border bg-surface p-3">
           <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted">
             {agent.status === "ready" && <Sparkles size={12} className="text-primary" aria-hidden />}
-            {agent.status === "ready" ? "M-Your gợi ý rót từ" : agent.status === "loading" ? "Cách rót tạm tính" : poolSource ? "Lấy thêm từ" : "Đề xuất rót từ"}
+            {agent.status === "ready" ? "M-You gợi ý rót từ" : agent.status === "loading" ? "Cách rót tạm tính" : poolSource ? "Lấy thêm từ" : "Đề xuất rót từ"}
           </p>
           <ul className="flex flex-col divide-y divide-border">
             {donors.map((donor) => (
@@ -86,7 +86,7 @@ export function JarTopupSuggestionSheet({
         {agent.status === "loading" && (
           <p role="status" className="flex items-start gap-1.5 text-xs text-muted">
             <Loader2 size={13} className="mt-0.5 shrink-0 animate-spin" aria-hidden />
-            M-Your đang phân tích cách chia phù hợp (có thể mất chừng 20 giây). Bạn có thể đồng ý cách rót bên trên ngay.
+            M-You đang phân tích cách chia phù hợp (có thể mất chừng 20 giây). Bạn có thể đồng ý cách rót bên trên ngay.
           </p>
         )}
         {agent.status === "ready" && <p className="text-xs text-text">{agent.reason}</p>}

@@ -76,7 +76,7 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
     return (
       <div className={wrap}>
         <p className="text-[11px] font-semibold text-muted">Đề xuất chia tiền giữa các hũ</p>
-        <p role="alert" className="text-xs text-negative">Không tìm thấy hũ cần bù. Hỏi lại M-Your để có đề xuất mới.</p>
+        <p role="alert" className="text-xs text-negative">Không tìm thấy hũ cần bù. Hỏi lại M-You để có đề xuất mới.</p>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 /**
- * Client for the real M-Your agent, proxied through `src/app/api/agent/chat`
+ * Client for the real M-You agent, proxied through `src/app/api/agent/chat`
  * (same-origin — the client never sees `AGENT_API_KEY`/Auth0 credentials,
  * see `route.ts`). `UiPayload` is a discriminated union the agent may return
  * alongside `answer` — `ChartUi` (Feature 2) and `TransferFormUi` (Feature 3)
