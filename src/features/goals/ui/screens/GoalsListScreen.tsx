@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ErrorState, SkeletonCard } from "@/components/states";
+import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
 import { GOALS_COPY } from "../copy";
 import { CreateGoalButton } from "../list/CreateGoalButton";
@@ -14,8 +15,13 @@ import { CreateGoalFlow } from "./CreateGoalFlow";
 export function GoalsListScreen() {
   const router = useRouter();
   const { data, loading, error, refresh } = useGoalsList();
+  const { seedDemo } = useGoalMutations();
   const [creating, setCreating] = useState(false);
   const onCreate = () => setCreating(true);
+  const onSeedDemo = async () => {
+    const res = await seedDemo();
+    if (res?.ok) refresh();
+  };
 
   let body;
   if (loading) body = <SkeletonCard />;
@@ -30,7 +36,7 @@ export function GoalsListScreen() {
         }
       />
     );
-  } else if (!data || data.length === 0) body = <GoalListEmpty onCreate={onCreate} />;
+  } else if (!data || data.length === 0) body = <GoalListEmpty onCreate={onCreate} onSeedDemo={onSeedDemo} />;
   else {
     body = (
       <div className="flex flex-col gap-4">

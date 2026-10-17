@@ -36,3 +36,6 @@ export const addLedgerEntry = (cif: string, id: string, entry: Partial<LedgerEnt
 
 export const checkFeasibility = (cif: string, input: FeasibilityRequest) =>
   fetchJson<FeasibilityResponse>("/api/goals/feasibility", jsonInit("POST", { cif, ...input }));
+
+export const seedDemoGoals = (cif: string) =>
+  fetchJson<{ inserted: number }>("/api/goals/demo", jsonInit("POST", { cif }));

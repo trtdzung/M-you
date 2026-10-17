@@ -11,6 +11,7 @@ export const GOALS_COPY = {
   back: "Quay lại",
 
   create: "Tạo mục tiêu",
+  seedDemo: "Thêm mục tiêu mẫu",
   edit: "Sửa mục tiêu",
   save: "Lưu",
   saving: "Đang lưu…",
