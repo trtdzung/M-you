@@ -73,7 +73,6 @@ export function GoalsListScreen() {
       </div>
       <div className="flex items-center justify-between gap-3 pt-1"><h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2><span className="text-[13px] text-muted">{summary.active} đang tích lũy</span></div>
       {body}
-      {summary.count < 3 && <p className="px-1 pt-1 text-[13px] leading-6 text-muted">Bạn muốn dành tiền cho điều gì tiếp theo? Bấm <span className="font-semibold text-text">+</span> để thêm mục tiêu.</p>}
       {frame && createPortal(
         <button type="button" aria-label="Tạo mục tiêu mới" onClick={openCreate} className="absolute bottom-[calc(24px+var(--safe-area-bottom))] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">
           <Plus size={26} strokeWidth={2} aria-hidden="true" />
