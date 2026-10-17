@@ -66,7 +66,7 @@ describe("goals HTTP handlers", () => {
 
     const broken = await createGoal(request("http://localhost/api/goals", "POST", undefined, "{"));
     expect(broken.status).toBe(422);
-    expect(await broken.json()).toEqual({ error: "cif is required" });
+    expect(await broken.json()).toEqual({ error: "invalid JSON body" });
 
     const brokenPut = await updateGoal(request("http://localhost/api/goals/x", "PUT", undefined, "[]"), ctx("x"));
     expect(brokenPut.status).toBe(422);
@@ -82,7 +82,11 @@ describe("goals HTTP handlers", () => {
       request("http://localhost/api/goals/feasibility", "POST", undefined, "{"),
     );
     expect(brokenFeasibility.status).toBe(422);
-    expect(await brokenFeasibility.json()).toEqual({ error: "cif is required" });
+    expect(await brokenFeasibility.json()).toEqual({ error: "invalid JSON body" });
+
+    // A valid JSON body without a cif is still reported as a missing cif.
+    const noCif = await createGoal(request("http://localhost/api/goals", "POST", { name: "x" }));
+    expect(await noCif.json()).toEqual({ error: "cif is required" });
   });
 
   it("returns 422 with field errors for invalid goal, update, and ledger input", async () => {

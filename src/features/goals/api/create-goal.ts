@@ -4,12 +4,13 @@ import { validateGoalCreate } from "../model/validate-goal";
 import { createGoalWithOpening } from "../server/create-goal";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { loadGoalView } from "../server/goal-view";
-import { cifOf, invalid, missingCif, readJson } from "./_http";
+import { badBody, cifOf, invalid, missingCif, readJson } from "./_http";
 
 /** POST /api/goals — body { cif, name, targetAmount, targetDate, flexibility, ... } */
 export async function POST(req: NextRequest) {
   const body = await readJson(req);
-  const cif = cifOf(body?.cif);
+  if (!body) return badBody();
+  const cif = cifOf(body.cif);
   if (!cif) return missingCif();
   const now = transferNow();
   const result = validateGoalCreate(body, now);

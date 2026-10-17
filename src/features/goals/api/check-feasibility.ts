@@ -6,7 +6,7 @@ import { averageSurplus } from "../engine/surplus";
 import type { FieldErrors } from "../model/types";
 import { validateGoalCreate } from "../model/validate-goal";
 import { goalCashflowInput } from "../server/cashflow-input";
-import { cifOf, invalid, missingCif, readJson } from "./_http";
+import { badBody, cifOf, invalid, missingCif, readJson } from "./_http";
 
 /** Optional integer field; undefined/null -> null, junk -> error. */
 function optionalInt(v: unknown, field: string, errors: FieldErrors, min?: number): number | null {
@@ -21,8 +21,9 @@ function optionalInt(v: unknown, field: string, errors: FieldErrors, min?: numbe
 /** POST /api/goals/feasibility — read-only what-if; never writes to the DB. */
 export async function POST(req: NextRequest) {
   const body = await readJson(req);
-  const cif = cifOf(body?.cif);
-  if (!cif || !body) return missingCif();
+  if (!body) return badBody();
+  const cif = cifOf(body.cif);
+  if (!cif) return missingCif();
   const now = transferNow();
 
   const checked = validateGoalCreate(

@@ -1,7 +1,10 @@
-/** Calendar months from `now`'s month to `targetDate`'s month, at least 1. */
+import { todayVn } from "../model/today";
+
+/** Calendar months from `now`'s month (Vietnam time) to `targetDate`'s month, at least 1. */
 export function monthsLeft(now: Date, targetDate: string): number {
   const [y, m] = targetDate.split("-").map(Number);
-  const diff = (y - now.getUTCFullYear()) * 12 + (m - 1 - now.getUTCMonth());
+  const [ny, nm] = todayVn(now).split("-").map(Number);
+  const diff = (y - ny) * 12 + (m - nm);
   return Math.max(1, diff);
 }
 

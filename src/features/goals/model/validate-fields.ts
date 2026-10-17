@@ -1,4 +1,5 @@
 import { MAX_VND } from "@/domain/models/asset-liability-input";
+import { todayVn } from "./today";
 import type { FieldErrors, GoalFlexibility } from "./types";
 
 const MAX_NAME_LEN = 80;
@@ -13,10 +14,6 @@ function isIsoDate(v: unknown): v is string {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = new Date(`${v}T00:00:00.000Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
-}
-
-function todayOf(now: Date): string {
-  return now.toISOString().slice(0, 10);
 }
 
 export function checkName(v: unknown, errors: FieldErrors): string | undefined {
@@ -41,7 +38,7 @@ export function checkDate(v: unknown, now: Date, errors: FieldErrors): string | 
     errors.targetDate = "Ngày không hợp lệ";
     return undefined;
   }
-  if (v <= todayOf(now)) {
+  if (v <= todayVn(now)) {
     errors.targetDate = "Ngày mục tiêu phải sau hôm nay";
     return undefined;
   }

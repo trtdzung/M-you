@@ -22,6 +22,15 @@ describe("monthsLeft", () => {
   });
 });
 
+describe("monthsLeft near the Vietnam month boundary", () => {
+  it("uses the Vietnam (UTC+7) month, not the UTC month", () => {
+    // 2026-08-31T20:00Z is already 1 Sep 03:00 in Vietnam.
+    const lateAugustUtc = new Date("2026-08-31T20:00:00.000Z");
+    expect(monthsLeft(lateAugustUtc, "2026-10-15")).toBe(1);
+    expect(monthsLeft(lateAugustUtc, "2026-12-15")).toBe(3);
+  });
+});
+
 describe("addMonthsToDate", () => {
   it("clamps 31 Jan to 28 Feb in a non-leap year", () => {
     expect(addMonthsToDate("2026-01-31", 1)).toBe("2026-02-28");

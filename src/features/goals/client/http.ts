@@ -18,7 +18,11 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<Fet
   }
   if (res.ok) {
     if (res.status === 204) return { ok: true, data: undefined as T };
-    return { ok: true, data: (await res.json()) as T };
+    try {
+      return { ok: true, data: (await res.json()) as T };
+    } catch {
+      return { ok: false, status: res.status };
+    }
   }
   const body = (await res.json().catch(() => null)) as {
     error?: string;

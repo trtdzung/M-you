@@ -57,6 +57,11 @@ describe("fetchJson", () => {
     });
   });
 
+  it("keeps a 200 response with a non-JSON body from throwing", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>", { status: 200 }));
+    await expect(fetchJson("/api/goals")).resolves.toEqual({ ok: false, status: 200 });
+  });
+
   it("turns a thrown fetch into status 0", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     await expect(fetchJson("/api/goals")).resolves.toEqual({ ok: false, status: 0 });

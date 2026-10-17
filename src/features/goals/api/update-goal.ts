@@ -4,12 +4,13 @@ import { validateGoalUpdate } from "../model/validate-goal";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { loadGoalView } from "../server/goal-view";
 import { updateGoal } from "../server/goals-repo";
-import { cifOf, invalid, missingCif, notFound, readJson, type RouteCtx } from "./_http";
+import { badBody, cifOf, invalid, missingCif, notFound, readJson, type RouteCtx } from "./_http";
 
 /** PUT /api/goals/:id — body { cif, ...fields, status? } */
 export async function PUT(req: NextRequest, ctx: RouteCtx) {
   const body = await readJson(req);
-  const cif = cifOf(body?.cif);
+  if (!body) return badBody();
+  const cif = cifOf(body.cif);
   if (!cif) return missingCif();
   const { id } = await ctx.params;
   const now = transferNow();

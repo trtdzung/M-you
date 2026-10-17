@@ -6,6 +6,9 @@ export type RouteCtx = { params: Promise<{ id: string }> };
 export const missingCif = () =>
   NextResponse.json({ error: "cif is required" }, { status: 422 });
 
+export const badBody = () =>
+  NextResponse.json({ error: "invalid JSON body" }, { status: 422 });
+
 export const invalid = (errors: FieldErrors) =>
   NextResponse.json({ errors }, { status: 422 });
 

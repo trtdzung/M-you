@@ -2,12 +2,13 @@
 
 import { useId } from "react";
 import { transferNow } from "@/lib/demo-clock";
+import { todayVn } from "../../../model/today";
 import { GOALS_COPY } from "../../copy";
 import { fieldError, input, label } from "../../styles";
 
 /** "YYYY-MM-DD" of the day after the demo "today" (a goal must end after today). */
 function tomorrow(): string {
-  const d = transferNow();
+  const d = new Date(`${todayVn(transferNow())}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 }
