@@ -53,8 +53,12 @@ function ready() {
 describe("streaming microphone lifecycle", () => {
   it("streams audio before stop, delivers revised partials and flushes the tail before stop", async () => {
     const cb = callbacks();
-    const speech = new StreamingSpeech(cb);
+    const speech = new StreamingSpeech(cb, ["hũ Ăn uống", "hũ Tiết kiệm"]);
     await speech.start();
+    expect(fetch).toHaveBeenCalledWith("/api/stt/session", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ keyterms: ["hũ Ăn uống", "hũ Tiết kiệm"] }),
+    }));
     ready();
     expect(socket.url).not.toContain("ticket");
     expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: "start", token: "ticket" }));

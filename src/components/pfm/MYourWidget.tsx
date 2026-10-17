@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, Trash2, X } from "lucide-react";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
+import { useJarConfig } from "@/state/jars";
+import { jarSpeechKeyterms } from "@/lib/speech-context";
 import {
   getChatHistory,
   sendChatMessage,
@@ -31,7 +33,6 @@ interface ChatBubble {
 const GREETING = "Xin chào 👋 Mình là M-Your. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
 const DELETE_LOCK_MS = 30_000;
-const VOICE_WORD_REVEAL_MS = 70;
 
 function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
   return messages.map((m, i) => ({
@@ -44,12 +45,6 @@ function fromHistory(messages: HistoryMessage[]): ChatBubble[] {
 
 function composeVoiceDraft(prefix: string, transcript: string) {
   return [prefix, transcript].filter(Boolean).join(" ");
-}
-
-function sharedWordPrefix(left: string[], right: string[]) {
-  let length = 0;
-  while (length < left.length && length < right.length && left[length] === right[length]) length += 1;
-  return length;
 }
 
 /**
@@ -66,7 +61,12 @@ function sharedWordPrefix(left: string[], right: string[]) {
  */
 export function MYourWidget() {
   const { persona } = usePersona();
+  const { config: jarConfig } = useJarConfig();
   const cif = persona.cif;
+  const speechKeyterms = useMemo(
+    () => jarSpeechKeyterms(jarConfig.jars.map((jar) => jar.label)),
+    [jarConfig.jars],
+  );
   const router = useRouter();
   const params = useSearchParams();
   const assistantParam = params?.get("assistant") === "1";
@@ -85,48 +85,17 @@ export function MYourWidget() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voicePrefix = useRef("");
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const revealedTranscriptRef = useRef("");
 
-  const clearVoiceReveal = useCallback(() => {
-    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-    revealTimerRef.current = null;
+  const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean) => {
+    // Partials are useful to the recognizer but are deliberately hidden from the
+    // composer. The server emits `final` only after OpenAI refinement/fallback.
+    if (!final) return;
+    setInput(composeVoiceDraft(voicePrefix.current, text.trim()));
   }, []);
 
-  const revealVoiceTranscript = useCallback((text: string, final: boolean) => {
-    clearVoiceReveal();
-    const target = text.trim();
-    if (final) {
-      revealedTranscriptRef.current = target;
-      setInput(composeVoiceDraft(voicePrefix.current, target));
-      return;
-    }
-
-    const visibleWords = revealedTranscriptRef.current.match(/\S+/g) ?? [];
-    const targetWords = target.match(/\S+/g) ?? [];
-    let position = sharedWordPrefix(visibleWords, targetWords);
-
-    // A revised hypothesis can change earlier words. Keep only its stable prefix
-    // before revealing the newer words, so the composer never appends stale text.
-    revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
-    setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
-
-    const revealNext = () => {
-      if (position >= targetWords.length) return;
-      position += 1;
-      revealedTranscriptRef.current = targetWords.slice(0, position).join(" ");
-      setInput(composeVoiceDraft(voicePrefix.current, revealedTranscriptRef.current));
-      if (position < targetWords.length) revealTimerRef.current = setTimeout(revealNext, VOICE_WORD_REVEAL_MS);
-    };
-    revealNext();
-  }, [clearVoiceReveal]);
-
-  const voice = useStreamingSpeech(revealVoiceTranscript);
+  const voice = useStreamingSpeech(acceptFinalVoiceTranscript, speechKeyterms);
   const voiceBusy = voice.state !== "idle";
-  const cancelVoice = useCallback(() => {
-    clearVoiceReveal();
-    voice.cancel();
-  }, [clearVoiceReveal, voice.cancel]);
+  const cancelVoice = voice.cancel;
 
   useEffect(() => {
     cancelVoice();
@@ -191,9 +160,8 @@ export function MYourWidget() {
   useEffect(() => {
     return () => {
       if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
-      clearVoiceReveal();
     };
-  }, [clearVoiceReveal]);
+  }, []);
 
   const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
 
@@ -347,9 +315,7 @@ export function MYourWidget() {
                 onClick={() => {
                   if (voiceBusy) voice.stop();
                   else {
-                    clearVoiceReveal();
                     voicePrefix.current = input.trim();
-                    revealedTranscriptRef.current = "";
                     voice.start();
                   }
                 }}
@@ -371,9 +337,20 @@ export function MYourWidget() {
               </button>
             </div>
             {(voiceBusy || voice.error) && (
-              <p role={voice.error ? "alert" : "status"} className={cn("mt-2 text-xs", voice.error ? "text-negative" : "text-muted")}>
-                {voice.error || (voice.state === "connecting" ? "Đang mở micro…" : voice.state === "recording" ? "Đang nghe… Ngừng nói để hoàn tất, hoặc bấm dừng." : "Đang hoàn tất bản chép lời…")}
-              </p>
+              <div
+                role={voice.error ? "alert" : "status"}
+                aria-live="polite"
+                className={cn("mt-2 flex items-center gap-2 text-xs", voice.error ? "text-negative" : "text-muted")}
+              >
+                {!voice.error && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />}
+                <span>
+                  {voice.error || (voice.state === "connecting"
+                    ? "Đang chuẩn bị micro…"
+                    : voice.state === "recording"
+                      ? "Mình đang nghe… Bấm dừng khi bạn nói xong."
+                      : "Đang hoàn thiện câu chữ…")}
+                </span>
+              </div>
             )}
           </div>
         </div>

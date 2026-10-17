@@ -1,21 +1,28 @@
 # Streaming voice input for M-Your
 
 Press the microphone in M-Your, speak Vietnamese, then pause or press stop.
-Partial transcripts replace the current voice draft. The final transcript stays
-editable in the composer; the existing Send button submits it to the agent.
+Partial transcripts stay hidden so unstable words never overwrite the user's
+draft. While recording, the composer shows a short listening/finishing status.
+The final transcript appears only after server-side refinement and stays editable;
+the existing Send button submits it to the agent.
 Closing the chat, switching persona, errors and timeouts stop microphone capture.
 
 ## Architecture
 
-1. Browser requests `POST /api/stt/session` from the Next.js backend.
+1. Browser requests `POST /api/stt/session` from the Next.js backend with a
+   bounded vocabulary built from the user's current jar labels.
 2. Backend calls STT `POST /api/v1/stream-sessions` using `STT_SERVICE_API_KEY`.
-3. Browser receives a 60-second, origin-bound ticket (never the service key).
+3. Browser receives a 60-second, origin-bound ticket that also signs the bounded
+   jar vocabulary (never the service key).
 4. Browser opens WSS `/api/v1/transcriptions/stream` directly on the STT host.
 5. First message authenticates with `{type: "start", token: "..."}`. Audio starts
    only after `ready`. AudioWorklet resamples to mono PCM16 LE at 16 kHz and sends
    100 ms binary packets. No WebM fragments, uploads or local audio persistence.
-6. Server emits `partial`, then `finishing`, then `final`. Stop flushes the final
-   short audio packet before `{type: "stop"}`. The stream closes after one utterance.
+6. Server emits `partial`, then `finishing`, then `final`. PFM does not render the
+   partial text. Stop flushes the final short audio packet before `{type: "stop"}`;
+   `final` arrives after OpenAI refinement or its safe fallback. The stream closes
+   after one utterance. The final refiner treats signed `hũ <tên hũ>` phrases as
+   protected entities and rejects model output that renames or drops them.
 
 This works with the existing Next.js standalone Docker image; it needs no custom
 Next server or additional npm dependencies. The model integration uses repeated
@@ -87,7 +94,8 @@ npm run build
 ```
 
 After both services are deployed, open PFM over HTTPS, grant microphone access,
-and say a short Vietnamese sentence. Check that text appears before you stop,
-pausing stops the microphone and leaves the final text editable, and Send uses
+and say a short Vietnamese sentence. Check that the typed draft remains unchanged
+while speaking, pausing stops the microphone, the refined final text appears and
+remains editable, and Send uses
 the existing agent API. Closing the chat during recording must turn off the mic.
 For server/gateway verification use `scripts/check_streaming.py` in the STT repo.

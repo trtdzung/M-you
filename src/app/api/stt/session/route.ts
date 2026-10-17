@@ -23,6 +23,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Chưa cấu hình dịch vụ nhập giọng nói." }, { status: 503 });
   }
   try {
+    let keyterms: string[] = [];
+    try {
+      const payload: unknown = await req.json();
+      if (payload && typeof payload === "object" && Array.isArray((payload as { keyterms?: unknown }).keyterms)) {
+        const seen = new Set<string>();
+        keyterms = (payload as { keyterms: unknown[] }).keyterms
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => value.trim().replace(/\s+/g, " "))
+          .filter((value) => value.length > 0 && value.length <= 64)
+          .filter((value) => {
+            const key = value.toLocaleLowerCase("vi");
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, 20);
+      }
+    } catch {
+      // Older clients sent an empty POST body; keep that path compatible.
+    }
     const url = new URL(base);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("Invalid STT URL");
     const response = await fetch(new URL("/api/v1/stream-sessions", url), {
@@ -31,7 +51,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         ...(process.env.STT_SERVICE_API_KEY ? { "x-api-key": process.env.STT_SERVICE_API_KEY } : {}),
       },
-      body: JSON.stringify({ origin }),
+      body: JSON.stringify({ origin, keyterms }),
       cache: "no-store",
       signal: AbortSignal.any([req.signal, AbortSignal.timeout(10_000)]),
       redirect: "error",

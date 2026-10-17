@@ -18,7 +18,7 @@ export class StreamingSpeech {
   private abort = new AbortController();
   private timer?: ReturnType<typeof setTimeout>;
 
-  constructor(private callbacks: Callbacks) {}
+  constructor(private callbacks: Callbacks, private keyterms: string[] = []) {}
 
   private deadline(ms: number, message: string) {
     clearTimeout(this.timer);
@@ -42,7 +42,12 @@ export class StreamingSpeech {
       if (this.cancelled) return;
       await this.context.audioWorklet.addModule("/stt-pcm-worklet.js");
       if (this.cancelled) return;
-      const response = await fetch("/api/stt/session", { method: "POST", signal: this.abort.signal });
+      const response = await fetch("/api/stt/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyterms: this.keyterms }),
+        signal: this.abort.signal,
+      });
       const session = await response.json();
       if (!response.ok) throw new Error(session.error || "Không tạo được phiên ghi âm.");
       if (this.cancelled) return;
