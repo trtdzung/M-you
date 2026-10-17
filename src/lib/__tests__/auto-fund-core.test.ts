@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Account, JarConfig, Transaction } from "@/domain/models";
 import { REBALANCE_CATEGORY } from "@/domain/models";
-import { POOL_DONOR_ID, type DonorProposal } from "@/domain/engine";
+import { evaluateFunding, POOL_DONOR_ID, type DonorProposal } from "@/domain/engine";
+import { monthAnchor, openingDeposit, withSeedDeposits } from "@/test-utils/jar-ledger-fixtures";
 import {
   jarIdForCategory,
   overspendOf,
@@ -54,10 +55,16 @@ function txn(over: Partial<Transaction> = {}): Transaction {
   };
 }
 
-const JAR_CONFIG: JarConfig = {
-  version: 3,
-  jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 }],
-};
+/** Migrated as of September (opening deposit = the 4M limit at 01/09 VN). */
+const JAR_CONFIG: JarConfig = withSeedDeposits(
+  { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 }] },
+  monthAnchor("2026-09"),
+);
+/** The same jar, funded since August — so an August trigger has a balance to read. */
+const JAR_CONFIG_SINCE_AUG: JarConfig = withSeedDeposits(
+  { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 }] },
+  monthAnchor("2026-08"),
+);
 
 describe("snapshotForDate — H4: the snapshot is pinned to postedAt's month, never 'now' or the viewed month", () => {
   const augSpend = txn({ id: "aug", amount: 3_000_000, postedAt: "2026-08-12T10:00:00.000Z" });
@@ -65,7 +72,7 @@ describe("snapshotForDate — H4: the snapshot is pinned to postedAt's month, ne
   const deps: AutoFundDeps = {
     transactions: [augSpend, sepSpend],
     accounts: [account("cur", 10_000_000)],
-    jarConfig: JAR_CONFIG,
+    jarConfig: JAR_CONFIG_SINCE_AUG,
     now: new Date("2026-09-15T00:00:00.000Z"), // "now" is September
   };
 
@@ -74,21 +81,123 @@ describe("snapshotForDate — H4: the snapshot is pinned to postedAt's month, ne
     expect(snap.month).toBe("2026-08");
     const food = snap.lines.find((l) => l.huId === "food")!;
     expect(food.spent).toBe(3_000_000); // August spend only — September's 1M excluded
-    expect(food.remaining).toBe(1_000_000);
+    expect(food.balance).toBe(1_000_000); // 4M deposit − 3M, as of end of August
   });
 
-  it("a trigger dated in September funds against SEPTEMBER spend only (the symmetric case)", () => {
+  it("a trigger dated in September: SEPTEMBER spend on the limit axis, balance CARRIED from August", () => {
     const snap = snapshotForDate(deps, "2026-09-05T10:00:00.000Z");
     expect(snap.month).toBe("2026-09");
     const food = snap.lines.find((l) => l.huId === "food")!;
     expect(food.spent).toBe(1_000_000); // September spend only
-    expect(food.remaining).toBe(3_000_000);
+    expect(food.balance).toBe(0); // running: 4M − 3M (Aug) − 1M (Sep), no monthly reset
+  });
+
+  it("a jar anchored in September has NO balance for an August trigger (pre-anchor → null)", () => {
+    const snap = snapshotForDate({ ...deps, jarConfig: JAR_CONFIG }, "2026-08-12T10:00:00.000Z");
+    expect(snap.lines.find((l) => l.huId === "food")!.balance).toBeNull();
+    expect(snap.spendables.find((s) => s.id === "food")?.spendable).toBeNull();
   });
 
   it("casaBalance and spendables come from the SAME snapshot regardless of postedAt", () => {
     const snap = snapshotForDate(deps, "2026-08-12T10:00:00.000Z");
     expect(snap.casaBalance).toBe(10_000_000);
     expect(snap.spendables.find((s) => s.id === "food")?.spendable).toBe(1_000_000);
+  });
+});
+
+describe("snapshotForDate — balance as of postedAt (Phase 05, one clock)", () => {
+  const anchor = monthAnchor("2026-09");
+  const oneJar = (limit: number, ledger: JarConfig["ledger"]): JarConfig => ({
+    version: 3,
+    jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: limit, createdAt: anchor }],
+    ledger,
+  });
+
+  it("month rollover (INJECTED clock in October): carries September's balance; Oct spend on the limit axis", () => {
+    const deps: AutoFundDeps = {
+      transactions: [
+        txn({ id: "sep", amount: 3_000_000, postedAt: "2026-09-10T03:00:00.000Z" }),
+        txn({ id: "oct", amount: 2_000_000, postedAt: "2026-10-05T03:00:00.000Z" }),
+      ],
+      accounts: [account("cur", 20_000_000)],
+      jarConfig: oneJar(7_000_000, [openingDeposit("food", 7_000_000, anchor)]),
+      now: new Date("2026-10-06T00:00:00.000Z"), // injected clock — the demo app never reaches October
+    };
+    const snap = snapshotForDate(deps, "2026-10-06T00:00:00.000Z");
+    expect(snap.month).toBe("2026-10");
+    const food = snap.lines.find((l) => l.huId === "food")!;
+    expect(food.spent).toBe(2_000_000); // limit axis resets: October spend only
+    expect(food.limit).toBe(7_000_000);
+    expect(food.balance).toBe(2_000_000); // 7M − 3M (Sep) − 2M (Oct): carried, no monthly reset
+    expect(snap.spendables.find((s) => s.id === "food")?.spendable).toBe(2_000_000);
+  });
+
+  it("rebalance legs dated before the anchor are ignored; legs after it count", () => {
+    const leg = (id: string, postedAt: string, amount: number) =>
+      txn({
+        id,
+        amount,
+        postedAt,
+        type: "transfer",
+        categoryId: REBALANCE_CATEGORY,
+        rebalance: { fromJarId: POOL_DONOR_ID, toJarId: "food", triggerTxnId: "x", origin: "auto" },
+      });
+    const deps: AutoFundDeps = {
+      transactions: [leg("pre", "2026-08-20T03:00:00.000Z", 900_000), leg("post", "2026-09-20T03:00:00.000Z", 400_000)],
+      accounts: [account("cur", 20_000_000)],
+      jarConfig: oneJar(7_000_000, [openingDeposit("food", 7_000_000, anchor)]),
+      now: new Date("2026-10-06T00:00:00.000Z"),
+    };
+    const food = snapshotForDate(deps, "2026-10-06T00:00:00.000Z").lines.find((l) => l.huId === "food")!;
+    expect(food.balance).toBe(7_400_000); // Aug leg (pre-anchor) ignored
+    expect(food.rebalanceNet).toBe(0); // period net: no October legs
+  });
+
+  it("a ledger row stamped AFTER postedAt is not yet in the snapshot balance", () => {
+    const later = { ...openingDeposit("food", 1_000_000, "2026-09-15T08:00:00.000Z"), id: "led-late", isOpening: false };
+    const deps: AutoFundDeps = {
+      transactions: [],
+      accounts: [account("cur", 20_000_000)],
+      jarConfig: oneJar(7_000_000, [openingDeposit("food", 5_000_000, anchor), later]),
+      now: new Date("2026-09-15T09:00:00.000Z"),
+    };
+    const at = (iso: string) => snapshotForDate(deps, iso).lines.find((l) => l.huId === "food")!.balance;
+    expect(at("2026-09-15T07:59:00.000Z")).toBe(5_000_000);
+    expect(at("2026-09-15T08:00:00.000Z")).toBe(6_000_000); // same instant (one clock) → visible
+  });
+
+  it("transfer of 5tr from a jar with balance 4tr proposes a 1tr top-up (balance-based tiers)", () => {
+    const deps: AutoFundDeps = {
+      transactions: [txn({ id: "sp", amount: 3_000_000, postedAt: "2026-09-05T03:00:00.000Z" })],
+      accounts: [account("cur", 20_000_000)],
+      jarConfig: oneJar(7_000_000, [openingDeposit("food", 7_000_000, anchor)]),
+      now: new Date("2026-09-15T00:00:00.000Z"),
+    };
+    const snap = snapshotForDate(deps, "2026-09-15T03:00:00.000Z");
+    const verdict = evaluateFunding({ amount: 5_000_000, sourceJarId: "food", casaBalance: snap.casaBalance, jars: snap.spendables });
+    expect(verdict.tier).toBe("topup");
+    expect(verdict.shortfall).toBe(1_000_000);
+  });
+
+  it("Case C (limit 7tr, balance 5tr, spend 6tr): shortfall 1tr; a 1tr pool cover leg → balance 0, not over limit", () => {
+    const spend = txn({ id: "trig", amount: 6_000_000, postedAt: "2026-09-05T03:00:00.000Z" });
+    const base: AutoFundDeps = {
+      transactions: [spend],
+      accounts: [account("cur", 20_000_000)],
+      jarConfig: oneJar(7_000_000, [openingDeposit("food", 5_000_000, anchor)]),
+      now: new Date("2026-09-15T00:00:00.000Z"),
+    };
+    const before = snapshotForDate(base, spend.postedAt);
+    expect(before.lines.find((l) => l.huId === "food")!.balance).toBe(-1_000_000);
+    expect(overspendOf(before.lines, "food")).toBe(1_000_000);
+    expect(before.spendables.find((s) => s.id === "food")?.spendable).toBe(0);
+
+    const [leg] = rebalanceInputsFor([{ jarId: POOL_DONOR_ID, label: "Chưa phân bổ", take: 1_000_000 }], "food", "trig", spend.postedAt, "auto");
+    const after = snapshotForDate({ ...base, transactions: [spend, txn({ id: "leg", ...leg })] }, spend.postedAt);
+    const food = after.lines.find((l) => l.huId === "food")!;
+    expect(food.balance).toBe(0);
+    expect(food.status).not.toBe("over"); // 6tr spent ≤ 7tr limit
+    expect(overspendOf(after.lines, "food")).toBe(0);
   });
 });
 
@@ -133,7 +242,7 @@ describe("C1 identity with a pool cover leg (S2)", () => {
     };
     const snap = snapshotForDate(deps, "2026-09-05T10:00:00.000Z");
     const food = snap.lines.find((l) => l.huId === "food")!;
-    expect(food.remaining).toBe(0);
+    expect(food.balance).toBe(0);
     expect(overspendOf(snap.lines, "food")).toBe(0);
     const spendable = snap.spendables.reduce((s, j) => s + (j.spendable ?? 0), 0);
     const pool = snap.casaBalance - spendable;
@@ -161,10 +270,10 @@ describe("snapshotForDate — overrides/excludeIds splice a not-yet-rerendered m
 
   it("excludeIds drops an already-removed rebalance from the computed snapshot", () => {
     const withOld = snapshotForDate(deps, "2026-09-05T10:00:00.000Z");
-    expect(withOld.lines.find((l) => l.huId === "food")!.remaining).toBe(1_500_000); // 4M − 3M + 0.5M
+    expect(withOld.lines.find((l) => l.huId === "food")!.balance).toBe(1_500_000); // 4M − 3M + 0.5M
 
     const withoutOld = snapshotForDate(deps, "2026-09-05T10:00:00.000Z", { excludeIds: new Set(["reb-old"]) });
-    expect(withoutOld.lines.find((l) => l.huId === "food")!.remaining).toBe(1_000_000); // 4M − 3M
+    expect(withoutOld.lines.find((l) => l.huId === "food")!.balance).toBe(1_000_000); // 4M − 3M
   });
 
   it("overrides applies a patch (e.g. a refund/amount edit) to the trigger txn BEFORE recomputation", () => {
@@ -185,12 +294,12 @@ describe("snapshotForDate — overrides/excludeIds splice a not-yet-rerendered m
 
 describe("overspendOf", () => {
   const lines = [
-    { huId: "over", label: "Over", categoryIds: [], spent: 5_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, remaining: -1_000_000, pct: 1.25, status: "over" as const, thresholdHit: true, source: "mock" as const, freshness: null },
-    { huId: "ok", label: "Ok", categoryIds: [], spent: 1_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, remaining: 3_000_000, pct: 0.25, status: "ok" as const, thresholdHit: false, source: "mock" as const, freshness: null },
-    { huId: "unset", label: "Unset", categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null, limit: null, limitState: "unset" as const, rebalanceNet: 0, remaining: null, pct: null, status: null, thresholdHit: false, source: "mock" as const, freshness: null },
+    { huId: "over", label: "Over", categoryIds: [], spent: 5_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, balance: -1_000_000, pct: 1.25, status: "over" as const, thresholdHit: true, source: "mock" as const, freshness: null },
+    { huId: "ok", label: "Ok", categoryIds: [], spent: 1_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, balance: 3_000_000, pct: 0.25, status: "ok" as const, thresholdHit: false, source: "mock" as const, freshness: null },
+    { huId: "unset", label: "Unset", categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null, limit: null, limitState: "unset" as const, rebalanceNet: 0, balance: null, pct: null, status: null, thresholdHit: false, source: "mock" as const, freshness: null },
   ];
 
-  it("returns the positive magnitude of a negative remaining", () => {
+  it("returns the positive magnitude of a negative balance", () => {
     expect(overspendOf(lines, "over")).toBe(1_000_000);
   });
 

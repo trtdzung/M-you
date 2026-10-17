@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { JarConfigProvider } from "@/state/jars";
 import { CategoryTaxonomyProvider } from "@/state/categories";
+import { FinancialsTestProviders } from "@/test-utils/financials-test-providers";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 
 const replace = vi.fn();
@@ -20,7 +21,9 @@ function wrapper({ children }: { children: ReactNode }) {
     <PersonaProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
-          <CategoryTaxonomyProvider>{children}</CategoryTaxonomyProvider>
+          <CategoryTaxonomyProvider>
+            <FinancialsTestProviders>{children}</FinancialsTestProviders>
+          </CategoryTaxonomyProvider>
         </JarConfigProvider>
       </ManualTxnsProvider>
     </PersonaProvider>
@@ -64,7 +67,7 @@ describe("HuCategoryTab", () => {
     expect(within(dialog).getByText(/Để trống = chưa đặt/)).toBeInTheDocument();
   });
 
-  it("blocks a monthly limit that would push Σ over CASA and surfaces an over-balance error", async () => {
+  it("a monthly LIMIT above CASA is accepted — a limit is a plan, the cap reads balances (plan 260923)", async () => {
     render(<HuCategoryTab />, { wrapper });
     await waitFor(() => expect(screen.getByText("Ăn uống")).toBeInTheDocument());
 
@@ -72,19 +75,52 @@ describe("HuCategoryTab", () => {
     const dialog = await screen.findByRole("dialog");
     const limit = within(dialog).getByLabelText("Hạn mức mỗi tháng");
 
-    // CIF_0001 CASA is 18tr and the seed already allocates 17tr across the other
-    // jars; pushing Ăn uống to 20tr would blow the cap → the client rejects it.
+    // CIF_0001 CASA is 18tr; Σ limits would reach ~33tr. Editing a limit moves no
+    // balance (Σ max(0, balance) is unchanged), so the cap has nothing to reject.
     fireEvent.change(limit, { target: { value: "20000000" } });
     fireEvent.blur(limit);
-    expect(await within(dialog).findByText(/Vượt số dư/)).toBeInTheDocument();
+    await waitFor(() => expect((limit as HTMLInputElement).value).toBe("20000000"));
+    expect(within(dialog).queryByText(/Vượt số dư/)).not.toBeInTheDocument();
   });
 
-  it("adds a new jar and opens its editor", async () => {
+  it("creates a jar only once name + limit + opening balance are valid, then opens its editor", async () => {
     render(<HuCategoryTab />, { wrapper });
     await waitFor(() => expect(screen.getByText("Ăn uống")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /Thêm hũ/ }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByDisplayValue("Hũ mới")).toBeInTheDocument();
+    const sheet = await screen.findByRole("dialog");
+    // No empty "Hũ mới" is persisted up front (D2).
+    expect(within(sheet).queryByDisplayValue("Hũ mới")).not.toBeInTheDocument();
+
+    fireEvent.change(within(sheet).getByLabelText("Tên hũ mới"), { target: { value: "Du lịch" } });
+    fireEvent.change(within(sheet).getByLabelText("Hạn mức chi mỗi tháng"), { target: { value: "2000000" } });
+    // Empty balance is rejected, never read as 0.
+    fireEvent.click(within(sheet).getByRole("button", { name: "Tạo hũ" }));
+    expect(within(sheet).getByRole("alert")).toHaveTextContent("Nhập số dư ban đầu");
+    expect(screen.queryByText("Du lịch")).not.toBeInTheDocument();
+
+    // An explicit 0 is a valid known balance.
+    fireEvent.change(within(sheet).getByLabelText("Số dư ban đầu"), { target: { value: "0" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Tạo hũ" }));
+    const editor = await screen.findByRole("dialog", { name: "Sửa hũ" });
+    expect(within(editor).getByDisplayValue("Du lịch")).toBeInTheDocument();
+    expect((within(editor).getByLabelText("Hạn mức mỗi tháng") as HTMLInputElement).value).toBe("2000000");
+    // The new jar's opening row is a KNOWN 0 balance (not "chưa có số dư").
+    expect(await within(editor).findByRole("button", { name: "Rút về Chờ phân bổ" })).toBeInTheDocument();
+    expect(within(editor).queryByText("Hũ chưa có số dư — nạp để bắt đầu")).not.toBeInTheDocument();
+  });
+
+  it("refuses an opening balance above Chờ phân bổ", async () => {
+    render(<HuCategoryTab />, { wrapper });
+    await waitFor(() => expect(screen.getByText("Ăn uống")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Thêm hũ/ }));
+    const sheet = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(sheet).getByText(/Chờ phân bổ: /)).toBeInTheDocument());
+    fireEvent.change(within(sheet).getByLabelText("Tên hũ mới"), { target: { value: "Du lịch" } });
+    fireEvent.change(within(sheet).getByLabelText("Hạn mức chi mỗi tháng"), { target: { value: "2000000" } });
+    fireEvent.change(within(sheet).getByLabelText("Số dư ban đầu"), { target: { value: "900000000000" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Tạo hũ" }));
+    expect(within(sheet).getByRole("alert")).toHaveTextContent("Số dư ban đầu vượt số tiền chờ phân bổ");
+    expect(screen.queryByText("Du lịch")).not.toBeInTheDocument();
   });
 
   it("auto-opens the jar named by ?hu= and clears the param on close", async () => {

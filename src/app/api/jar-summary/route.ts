@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { computeFinancials, type RawData } from "@/domain/engine/finance-compose";
 import { jarSpendable } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
-import { currentMonthKey } from "@/lib/demo-clock";
+import { currentMonthKey, transferNow } from "@/lib/demo-clock";
 import { readAccounts } from "@/lib/accounts-store";
 import { readCorrections } from "@/lib/corrections-store";
 import { readJarConfig } from "@/lib/jars-store";
@@ -18,6 +18,11 @@ import { applyCorrections, isHidden } from "@/state/corrections-core";
  * this to PROPOSE a jar change; `pfm` performs it after the customer confirms.
  *
  *   GET ?cif=&month=YYYY-MM → { month, unallocated, allocationHeadroom, jars[] }
+ *   jars[i] = { id, label, categoryIds, limit, budgetLimit (alias), spent,
+ *               balance, remaining (DEPRECATED alias = balance), spendable, overLimit }
+ *
+ * `limit`/`spent`/`overLimit` are the MONTHLY axis; `balance` is the running
+ * stock carried across months (`null` = "chưa có số dư", never 0 — #6).
  *
  * `month` defaults to the demo clock's current month. Money-in-account figures
  * are `null` when the persona has no `current` account (unknown, never a fake 0 — #6).
@@ -57,7 +62,8 @@ export async function GET(req: NextRequest) {
       goals: [],
       products: [],
     };
-    const fin = computeFinancials(raw, month, { transactions, jarConfig });
+    // One clock (Red Team #1): the same `transferNow()` that stamps ledger rows.
+    const fin = computeFinancials(raw, month, { now: transferNow(), transactions, jarConfig });
     const jarById = new Map(jarConfig.jars.map((j) => [j.id, j]));
 
     const jars = fin.jarEnvelope.jars.map((line) => {
@@ -66,10 +72,14 @@ export async function GET(req: NextRequest) {
         id: line.jarId,
         label: line.label,
         categoryIds: jar?.categoryIds ?? [],
-        budgetLimit: line.budgetLimit,
+        limit: line.limit,
+        /** Alias of `limit`, kept for existing agent callers. */
+        budgetLimit: line.limit,
         spent: line.spent,
-        remaining: line.remaining,
-        spendable: jarSpendable(line.remaining),
+        balance: line.balance,
+        /** DEPRECATED alias of `balance` (plan 260923 D5) — a running balance now, not "limit − spent". */
+        remaining: line.balance,
+        spendable: jarSpendable(line.balance),
         overLimit: line.overLimit,
       };
     });

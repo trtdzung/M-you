@@ -53,12 +53,12 @@ export type TransactionStatus = "pending" | "posted" | "refunded" | "reversed";
  * `Transaction` tagged `categoryId: REBALANCE_CATEGORY` (plan 260918-1120, Phase
  * 03). NOT a separate ledger: it rides the existing manual-txns store/API. The one
  * record encodes both legs — the engine applies `−amount` to `fromJarId`'s
- * remaining (cho) and `+amount` to `toJarId`'s remaining (nhận).
+ * balance (cho) and `+amount` to `toJarId`'s balance (nhận).
  *
  * `"pool"` sentinel: an end pointing at the DERIVED "Chưa phân bổ" pool. It is
  * never credited/debited as a bucket (the pool is `casaBalance − Σ spendable`, so a
  * jar→pool move already lifts the pool via the donor's reduced spendable — invariant
- * #1). Only real jar ids get a remaining net.
+ * #1). Only real jar ids get a balance net.
  *
  * `origin` is provenance (invariant #5): an engine-`auto` rebalance is NOT presented
  * as user-typed even though the txn's `source` is `self_reported` (it's not bank
@@ -112,7 +112,7 @@ export interface Transaction {
   /**
    * Set ONLY on an inter-jar rebalance txn (`categoryId: REBALANCE_CATEGORY`). See
    * `RebalanceMeta`. The engine reads this to fold `Σ nhận − Σ cho` into each jar's
-   * remaining; the amount stays excluded from spend/thu/chi. Absent on every other txn.
+   * balance; the amount stays excluded from spend/thu/chi. Absent on every other txn.
    */
   rebalance?: RebalanceMeta;
 }
@@ -234,6 +234,10 @@ export interface Budget {
  * `budgetLimit` is OPTIONAL: `undefined` means "chưa đặt hạn mức" — a genuinely
  * unknown limit, NEVER a silent 0 (invariant #6). A limit is set at onboarding /
  * settings. The legacy balance-lens `allocation` share was dropped in phase 08.
+ *
+ * LIMIT ≠ BALANCE (plan 260923-jar-limit-vs-balance-split): `budgetLimit` is the
+ * monthly PLAN (resets each month); the jar's running BALANCE is derived by the
+ * engine from `JarConfig.ledger` + spend since `createdAt` — never stored here.
  */
 export interface Jar {
   id: string;
@@ -245,7 +249,35 @@ export interface Jar {
   /** Optional presentation overrides (settings). Absent = derive from category. */
   color?: string;
   icon?: string;
+  /**
+   * ISO instant the jar's running balance is anchored at. Server-owned
+   * (`jars.created_at`): read-only on the wire, never trusted from a client write.
+   */
+  createdAt?: string;
 }
+
+/**
+ * One row of the per-jar `jar_ledger` (deposit/withdraw into a jar's running
+ * balance). A DISPLAY partition of CASA, never money movement (invariant #3);
+ * always `self_reported` (#5). `amount` is a positive whole-VND integer, except
+ * the single opening deposit per jar (`isOpening`), which may be 0 so a jar
+ * created with a 0 balance reads 0 rather than unknown (#6).
+ */
+export interface JarLedgerEntry {
+  id: string;
+  jarId: string;
+  kind: "deposit" | "withdraw";
+  amount: number;
+  isOpening: boolean;
+  createdAt: string;
+  source: "self_reported";
+}
+
+/**
+ * What a client sends to `POST /api/jar-ledger` per entry: ids, timestamps,
+ * `isOpening` and `source` are server-minted, never trusted from the wire.
+ */
+export type JarLedgerInput = Pick<JarLedgerEntry, "jarId" | "kind" | "amount">;
 
 /**
  * Persisted jar configuration (user state, threaded into the engine — never
@@ -257,6 +289,8 @@ export interface Jar {
 export interface JarConfig {
   version: 3;
   jars: Jar[];
+  /** Read-only projection of `jar_ledger` for this persona; absent = no deposits. Ignored on write. */
+  ledger?: JarLedgerEntry[];
 }
 
 export interface Goal {
@@ -351,6 +385,8 @@ export interface InsightFact {
   value: number | string;
   period?: string;
   txnIds?: string[];
+  /** Provenance of the value when it is not plain bank data (e.g. a self-reported jar balance, invariant #5). */
+  source?: DataSource;
 }
 
 export interface Insight {

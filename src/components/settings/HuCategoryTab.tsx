@@ -5,28 +5,36 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, ChevronRight, Tag } from "lucide-react";
 import { duplicateLabelIds } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
-import { SectionHeader, Money } from "@/components/primitives";
+import { useCurrentJarFunds } from "@/state/use-current-jar-funds";
+import { SectionHeader } from "@/components/primitives";
 import { jarAccent } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
 import { jarIcon } from "./jar-visuals";
 import { HuEditorSheet } from "./HuEditorSheet";
+import { HuCreateSheet } from "./HuCreateSheet";
+import { HuJarRowFigures } from "./HuJarRowFigures";
 import { CategoryManager } from "./CategoryManager";
 import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
  * Cài đặt → "Hũ & danh mục": danh sách hũ (icon/màu, tên, số danh mục, hạn mức
- * hoặc "chưa đặt"), thêm hũ, mở trình sửa; + lối vào Quản lý danh mục. Deep-link
+ * hoặc "chưa đặt", số dư hoặc "chưa có số dư"), thêm hũ (`HuCreateSheet` — tên +
+ * hạn mức + số dư ban đầu, plan 260923), mở trình sửa; + lối vào Quản lý danh mục. Deep-link
  * `?hu=<id>` (từ nút "Đặt hạn mức" ở tab Ngân sách) tự mở đúng hũ. Cảnh báo ⚠ khi
  * hai hũ trùng tên (dedupe — chỉ cảnh báo, không tự gộp). Có trạng thái đang
  * tải / lỗi tải (+ "Thử lại") — lỗi tải KHÔNG hiển thị như "chưa có hũ" (U10).
  */
 export function HuCategoryTab() {
-  const { config, addJar, loaded, error, retry } = useJarConfig();
+  const { config, loaded, error, retry } = useJarConfig();
+  // One composition for the whole tab: the rows, the editor and the create sheet
+  // all read the same current-month balances + "Chờ phân bổ".
+  const funds = useCurrentJarFunds();
   const router = useRouter();
   const params = useSearchParams();
   const huParam = params?.get("hu");
   const [editing, setEditing] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const dupes = useMemo(() => duplicateLabelIds(config.jars), [config.jars]);
   const openJar = huParam && config.jars.some((j) => j.id === huParam) ? huParam : editing;
@@ -40,12 +48,10 @@ export function HuCategoryTab() {
     }
   }
 
-  function addAndEdit() {
-    const id = `jar-${Date.now()}`;
+  /** A jar exists only once its create sheet is valid; then its editor opens for categories. */
+  function created(id: string) {
+    setCreating(false);
     setEditing(id);
-    void addJar({ id, label: "Hũ mới", categoryIds: [] }).then((ok) => {
-      if (!ok) setEditing((cur) => (cur === id ? null : cur)); // reason shows in the notice
-    });
   }
 
   if (error) {
@@ -74,13 +80,13 @@ export function HuCategoryTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      {!editorOpen && !managing && <JarMutationErrorNotice />}
+      {!editorOpen && !managing && !creating && <JarMutationErrorNotice />}
       <SectionHeader
         title="Hũ & danh mục"
         action={
           <button
             type="button"
-            onClick={addAndEdit}
+            onClick={() => setCreating(true)}
             className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full bg-primary px-3 text-[13px] font-semibold text-primary-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <Plus size={14} aria-hidden /> Thêm hũ
@@ -107,14 +113,7 @@ export function HuCategoryTab() {
                     <span className="truncate text-sm font-semibold text-text">{jar.label}</span>
                     {dupes.has(jar.id) && <span className="shrink-0 text-xs text-warning" aria-label="Trùng tên">⚠</span>}
                   </span>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    {jar.categoryIds.length} danh mục ·{" "}
-                    {jar.budgetLimit != null ? (
-                      <Money amount={jar.budgetLimit} className="text-muted" />
-                    ) : (
-                      <span className="text-muted">chưa đặt hạn mức</span>
-                    )}
-                  </span>
+                  <HuJarRowFigures jar={jar} funds={funds} />
                 </span>
                 <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden />
               </button>
@@ -141,7 +140,8 @@ export function HuCategoryTab() {
         <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden />
       </button>
 
-      {openJar && <HuEditorSheet jarId={openJar} onClose={closeEditor} />}
+      {openJar && <HuEditorSheet jarId={openJar} funds={funds} onClose={closeEditor} />}
+      {creating && <HuCreateSheet funds={funds} onCreated={created} onClose={() => setCreating(false)} />}
       {managing && <CategoryManager onClose={() => setManaging(false)} />}
     </div>
   );

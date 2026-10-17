@@ -6,11 +6,12 @@ import type { DataSource } from "@/domain/models";
 import { BudgetGauge } from "./BudgetGauge";
 
 /**
- * Ngân sách header: gauge + Đã tiêu / Hạn mức / Còn lại|Vượt. Every figure is the
- * engine's `jarBudget.summary`. U22: rebalance legs to the pool / an unset or
- * deleted jar move `totalRemaining` without touching spend or limits, so the
- * header shows that net as an "Điều chỉnh hũ" line — the arithmetic always adds
- * up: Hạn mức − Đã tiêu + Điều chỉnh = Còn lại (or −Vượt).
+ * Ngân sách header: gauge + Đã tiêu / Hạn mức (the monthly PLAN axis) and "Tổng số dư"
+ * — Σ running balance of the funded jars (the MONEY axis, plan 260923; carried
+ * across months, so it is NOT Hạn mức − Đã tiêu). A negative total reads in
+ * `text-negative`; no funded jar → "—" (invariant #6). Every figure is the
+ * engine's `jarBudget.summary`. U22: this month's inter-jar/pool rebalance net
+ * is shown as an "Điều chỉnh hũ" line — it moves balances, never limits.
  */
 export function BudgetSummaryCard({
   summary,
@@ -22,7 +23,7 @@ export function BudgetSummaryCard({
   source: DataSource;
 }) {
   const pctLabel = summary.pctUsed !== null ? `${Math.round(summary.pctUsed * 100)}%` : "Chưa đặt";
-  const remaining = summary.totalRemaining;
+  const balance = summary.totalBalance;
   const adjustment = summary.totalRebalanceNet ?? 0;
   return (
     <Card className="flex flex-col items-center gap-3" role="region" aria-label="Tổng ngân sách">
@@ -49,22 +50,17 @@ export function BudgetSummaryCard({
           node={summary.totalLimit !== null ? <Money amount={summary.totalLimit} className="font-semibold text-text" /> : <span className="text-muted">—</span>}
         />
         <GaugeStat
-          // A hũ holds money you put in — "còn lại" can't be negative. When the
-          // total is below zero, show the overspend as "Vượt X" (positive figure).
-          label={remaining !== null && remaining < 0 ? "Vượt" : "Còn lại"}
+          label="Tổng số dư"
           node={
-            remaining !== null ? (
-              <Money
-                amount={Math.abs(remaining)}
-                className={cn("font-semibold", remaining < 0 ? "text-negative" : "text-text")}
-              />
+            balance !== null ? (
+              <Money amount={balance} className={cn("font-semibold", balance < 0 ? "text-negative" : "text-text")} />
             ) : (
               <span className="text-muted">—</span>
             )
           }
         />
       </div>
-      {remaining !== null && adjustment !== 0 && (
+      {adjustment !== 0 && (
         <p className="w-full text-center text-[11px] text-muted" data-testid="budget-rebalance-adjustment">
           Điều chỉnh hũ {adjustment > 0 ? "+" : "−"}
           {formatVnd(Math.abs(adjustment))} (bù/chuyển với Chưa phân bổ hoặc hũ khác)

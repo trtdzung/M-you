@@ -28,7 +28,7 @@
 import { useCallback, useMemo } from "react";
 import type { Transaction } from "@/domain/models";
 import { evaluateFunding, type DonorProposal, type FundingAssessment } from "@/domain/engine";
-import { DEMO_NOW } from "@/lib/demo-clock";
+import { transferNow } from "@/lib/demo-clock";
 import { jarIdForCategory, rebalanceInputsFor, snapshotForDate, type AutoFundDeps, type JarSnapshot } from "@/lib/auto-fund-core";
 import type { RawData } from "@/domain/engine/finance-compose";
 import { planCover, triggerContribution, type SnapshotOpts } from "./auto-fund-plan";
@@ -67,8 +67,10 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
   const { config: jarConfig } = useJarConfig();
   const { add, remove, removeByTrigger, addPersisted } = useManualTxns();
 
+  // One clock (Red Team #1): the same `transferNow()` that stamps ledger rows and
+  // drives `useFinancials`, read at recompute time (config/txn change).
   const deps: AutoFundDeps = useMemo(
-    () => ({ transactions, accounts: raw?.accounts ?? [], jarConfig, now: DEMO_NOW }),
+    () => ({ transactions, accounts: raw?.accounts ?? [], jarConfig, now: transferNow() }),
     [transactions, raw, jarConfig],
   );
 

@@ -6,7 +6,6 @@ import { AssetLiabilityProvider } from "@/state/assets";
 import { CategoryTaxonomyProvider } from "@/state/categories";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
-import { JarTopupProvider } from "@/state/jar-topup";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
@@ -49,7 +48,6 @@ function renderScreen(ui: ReactElement) {
     <PersonaProvider>
       <CorrectionsProvider>
       <ManualTxnsProvider>
-        <JarTopupProvider>
         <JarConfigProvider>
           <CategoryTaxonomyProvider>
             <AssetLiabilityProvider>
@@ -59,7 +57,6 @@ function renderScreen(ui: ReactElement) {
             </AssetLiabilityProvider>
           </CategoryTaxonomyProvider>
         </JarConfigProvider>
-        </JarTopupProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>
     </PersonaProvider>,

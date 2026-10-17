@@ -49,9 +49,9 @@ export function productOpportunityCandidate(input: OpportunityInput): ProactiveC
 
   const spendJars = fin.jarBudget.lines.filter((l) => l.categoryIds.length > 0);
   if (spendJars.length === 0 || spendJars.some((l) => l.limitState !== "set" ||
-      !nonNegativeVnd(l.limit) || !Number.isSafeInteger(l.remaining) || (l.remaining as number) < 0 ||
+      !nonNegativeVnd(l.limit) || !Number.isSafeInteger(l.balance) || (l.balance as number) < 0 ||
       l.spent > (l.limit as number) * 0.8)) return null;
-  const jarReserved = spendJars.reduce((sum, l) => sum + Math.max(0, l.remaining as number), 0);
+  const jarReserved = spendJars.reduce((sum, l) => sum + Math.max(0, l.balance as number), 0);
   if (!Number.isSafeInteger(jarReserved)) return null;
 
   const monthlySpend = Math.max(fin.cashflow.expense, fin.prevCashflow.expense);

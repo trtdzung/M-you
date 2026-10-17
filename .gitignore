@@ -62,3 +62,6 @@ next-env.d.ts
 data/*.sqlite3-shm
 data/*.sqlite3-wal
 
+# pre-migration DB backups written by src/lib/db-migrate-jar-ledger.ts
+# (restore path: data/schema.md)
+data/*.bak-*

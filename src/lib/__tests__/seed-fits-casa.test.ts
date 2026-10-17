@@ -7,7 +7,11 @@ import { PERSONA_LIST } from "@/providers/mock/personas";
 
 /**
  * C3 guard: the COMMITTED `data/pfm.sqlite3` (git-tracked, shipped to every
- * clone/CI/demo) must have Σ budgetLimit ≤ CASA for every persona. CASA is
+ * clone/CI/demo) must seed opening jar balances that fit CASA for every persona.
+ * The seed and the one-time jar-ledger migration both give each jar with a
+ * non-NULL `budget_limit` ONE opening deposit of exactly that amount, so
+ * Σ opening balance = Σ budget_limit — read from `jars` because the committed
+ * file may predate the migration (it runs on the first server start). CASA is
  * derived from `personas.ts` (salaryBase, no hard-coded scale) exactly as the
  * server's `casa-pool.ts` does — 18tr × salaryBase/25tr. If this fails, run
  * `npm run db:seed` and commit the updated sqlite.
@@ -18,7 +22,7 @@ const CASA_BASE = 18_000_000;
 const SALARY_REF = 25_000_000;
 
 describe("seeded jars fit CASA (committed sqlite)", () => {
-  it("Σ budgetLimit ≤ CASA for every persona", () => {
+  it("Σ opening balance (= Σ seeded budget_limit) ≤ CASA for every persona", () => {
     expect(existsSync(DB_PATH)).toBe(true);
     const db = new Database(DB_PATH, { readonly: true });
     try {

@@ -10,10 +10,10 @@ function budget(overrides: Partial<JarBudgetResult["lines"][number]> = {}): JarB
   return {
     lines: [{ huId: "food", label: "Ăn uống", categoryIds: ["dining"], spent: 800_000,
       prevSpent: 0, momDelta: 800_000, momPct: null, limit: 1_000_000, limitState: "set",
-      rebalanceNet: 0, remaining: 200_000, pct: 0.8, status: "near", thresholdHit: true,
+      rebalanceNet: 0, balance: 200_000, pct: 0.8, status: "near", thresholdHit: true,
       source: "mock", freshness: "2026-09-14T00:00:00.000Z", ...overrides }],
     summary: { totalLimit: 1_000_000, totalSpent: 800_000, totalSpentSet: 800_000,
-      totalRebalanceNet: 0, totalRemaining: 200_000, pctUsed: 0.8, daysLeft: 15,
+      totalRebalanceNet: 0, totalBalance: 200_000, pctUsed: 0.8, daysLeft: 15,
       setCount: 1, unsetCount: 0 },
     meta: { period: { from: "2026-08-31T17:00:00.000Z", to: "2026-09-30T16:59:59.999Z", label: "09/2026" },
       sourceCoverage: { sources: ["mock"], knownCount: 1, unknownCount: 0 }, freshness: "2026-09-14T00:00:00.000Z" },
@@ -29,18 +29,18 @@ describe("jar plan signals", () => {
   });
 
   it("separates over-limit covered from a negative balance that needs cover", () => {
-    const covered = jarPlanCandidates("2026-09", budget({ spent: 1_100_000, remaining: 100_000, rebalanceNet: 200_000 }), now)[0];
-    const short = jarPlanCandidates("2026-09", budget({ spent: 1_100_000, remaining: -100_000 }), now)[0];
+    const covered = jarPlanCandidates("2026-09", budget({ spent: 1_100_000, balance: 100_000, rebalanceNet: 200_000 }), now)[0];
+    const short = jarPlanCandidates("2026-09", budget({ spent: 1_100_000, balance: -100_000 }), now)[0];
     expect(covered.semanticState).toBe("over_limit_covered");
     expect(short.semanticState).toBe("needs_cover");
     expect(short.severity).toBe("urgent");
   });
 
   it("skips unset, below threshold, and invalid values", () => {
-    expect(jarPlanCandidates("2026-09", budget({ limit: null, limitState: "unset", remaining: null }), now)).toEqual([]);
-    expect(jarPlanCandidates("2026-09", budget({ spent: 799_999, remaining: 200_001 }), now)).toEqual([]);
+    expect(jarPlanCandidates("2026-09", budget({ limit: null, limitState: "unset", balance: null }), now)).toEqual([]);
+    expect(jarPlanCandidates("2026-09", budget({ spent: 799_999, balance: 200_001 }), now)).toEqual([]);
     expect(jarPlanCandidates("2026-09", budget({ spent: Number.POSITIVE_INFINITY }), now)).toEqual([]);
-    expect(jarPlanCandidates("2026-09", budget({ limit: 0, spent: 0, remaining: 0 }), now)).toEqual([]);
+    expect(jarPlanCandidates("2026-09", budget({ limit: 0, spent: 0, balance: 0 }), now)).toEqual([]);
   });
 });
 

@@ -9,6 +9,7 @@
  */
 
 import { CATEGORY_BY_ID } from "@/domain/models";
+import { isJarAmount } from "@/domain/jar-rules";
 
 const PROXY_PATH = "/api/agent/chat";
 
@@ -45,7 +46,14 @@ export interface TransferFormUi {
 export interface CreateJarUi {
   type: "create_jar";
   jar_name: string;
+  /** HẠN MỨC tháng (monthly plan, resets each month) — NOT money in the jar. */
   allocation_amount: number;
+  /**
+   * SỐ DƯ BAN ĐẦU (opening balance, whole VND ≥ 0) taken from "Chưa phân bổ".
+   * REQUIRED (plan 260923 D5): a payload without it is rejected, never read as 0
+   * (invariant #6). `0` is an explicit, allowed value.
+   */
+  initial_balance: number;
   category_ids: string[];
   reason: string;
 }
@@ -54,6 +62,7 @@ export interface EditJarUi {
   type: "edit_jar";
   jar_id: string;
   jar_name: string;
+  /** New HẠN MỨC tháng — an edit never moves the jar's balance. */
   allocation_amount: number;
   /** The jar's COMPLETE new category list; absent = unchanged. */
   category_ids?: string[];
@@ -183,9 +192,11 @@ function validCategoryIds(ids: unknown, expenseIds?: ReadonlySet<string>): ids i
 }
 
 /**
- * `create_jar` shape: `jar_name`, `allocation_amount > 0`, `category_ids` (may be
- * `[]`), `reason`; a `jar_id` is NOT allowed (`pfm` mints the id). Shape only —
- * headroom, duplicate names and category ownership are re-checked by the card
+ * `create_jar` shape: `jar_name`, `allocation_amount > 0` (the limit),
+ * `initial_balance` (REQUIRED whole VND ≥ 0 — missing, negative or fractional is
+ * rejected, never defaulted to 0), `category_ids` (may be `[]`), `reason`; a
+ * `jar_id` is NOT allowed (`pfm` mints the id). Shape only — the balance vs "Chưa
+ * phân bổ", duplicate names and category ownership are re-checked by the card
  * against live data. Never throws; a bad payload just falls back to `answer`.
  */
 export function isCreateJarUi(ui: UiPayload | null | undefined, expenseIds?: ReadonlySet<string>): ui is CreateJarUi {
@@ -195,6 +206,7 @@ export function isCreateJarUi(ui: UiPayload | null | undefined, expenseIds?: Rea
     f.jar_id === undefined &&
     nonEmpty(f.jar_name) &&
     positive(f.allocation_amount) &&
+    isJarAmount(f.initial_balance) && // whole VND ≥ 0, same bound the server applies
     validCategoryIds(f.category_ids, expenseIds) &&
     nonEmpty(f.reason)
   );

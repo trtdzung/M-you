@@ -6,7 +6,6 @@ import { ChevronRight, Sparkles } from "lucide-react";
 import { Sheet } from "@/components/primitives/Sheet";
 import { formatVnd } from "@/lib/format";
 import { usePersona } from "@/providers/context";
-import { useJarTopup } from "@/state/jar-topup";
 import { useAssetLiabilities } from "@/state/assets";
 import { useGoals } from "@/state/goals";
 import { useJarConfig } from "@/state/jars";
@@ -17,7 +16,6 @@ import { saveInsightDraft } from "@/insights/proactive/chat-handoff";
 
 export function HomeInsightWidget() {
   const { persona } = usePersona();
-  const { topupTxns } = useJarTopup();
   const profile = useAssetLiabilities();
   const goals = useGoals();
   const jars = useJarConfig();
@@ -33,8 +31,7 @@ export function HomeInsightWidget() {
   const ready = jars.loaded && corrections.loaded && !corrections.unsaved;
   const payload = JSON.stringify({ cif: persona.cif,
     profile: { assets: profile.assets, liabilities: profile.liabilities, goals: goals.goals,
-      complete: !profile.dropped && !goals.dropped },
-    topups: topupTxns.map((t) => ({ jarId: t.rebalance?.toJarId, amount: t.amount })) });
+      complete: !profile.dropped && !goals.dropped } });
   const revision = JSON.stringify([jars.config, corrections.corrections, manualTxns]);
   const resultKey = payload + revision;
   const insight = result?.key === resultKey && ready ? result.insight : null;

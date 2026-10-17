@@ -10,6 +10,13 @@ import "server-only";
 import Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  addJarsCreatedAtColumn,
+  backupDbFile,
+  jarLedgerAnchorIso,
+  needsJarLedgerMigration,
+  seedJarLedgerFromLimits,
+} from "./db-migrate-jar-ledger";
 
 let instance: Database.Database | null = null;
 
@@ -19,6 +26,10 @@ export function getDb(): Database.Database {
   const schemaPath = path.join(process.cwd(), "data", "schema.sql");
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
+  // Migration (jar limit vs balance): decide BEFORE any schema change, and back
+  // the file up first — a failed backup throws and nothing below runs.
+  const migrateJarLedger = needsJarLedgerMigration(db);
+  if (migrateJarLedger) backupDbFile(db, dbPath);
   // Migration: the `jar_allocations` ledger was retired with the single-number
   // jar model (a jar's `budget_limit` is now its allocation — no separate earmark
   // table). Drop the legacy table if an older DB file still carries it, so the
@@ -26,7 +37,9 @@ export function getDb(): Database.Database {
   // by design — the rows were disposable mock display-partitions, no real value.
   db.exec("DROP TABLE IF EXISTS jar_allocations");
   addTransactionsSourceColumn(db);
+  addJarsCreatedAtColumn(db);
   db.exec(readFileSync(schemaPath, "utf8"));
+  if (migrateJarLedger) seedJarLedgerFromLimits(db, jarLedgerAnchorIso());
   mergeManualTransactions(db);
   // Migration: the `jars.role` donor-waterfall column was retired (donors are now
   // ordered by balance alone). Drop it from an older DB file; `DROP COLUMN` throws

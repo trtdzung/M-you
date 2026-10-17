@@ -2,36 +2,39 @@ import type { LucideIcon } from "lucide-react";
 import { formatVndCompact } from "@/lib/format";
 
 /**
- * One jar's envelope card for the Tổng quan row: the jar's accent colour with
- * white text and "còn lại trong hũ" = `remaining` (hạn mức/nạp − đã tiêu, from
- * the engine). A jar with no limit and no allocation shows "Chưa có số dư" —
- * never a fabricated 0₫ (invariant #6). All numbers come from
- * `Financials.jarEnvelope`; this card never computes.
- *
- * A hũ is a money container: you cannot spend it below empty, so the balance is
- * floored at 0 here — an overspend is shown as a separate "đã vượt X" note, never
- * as a negative "còn lại" (which reads as nonsense for a jar). Tapping the card
- * opens the real jar view (Ngân sách) via `onOpen`.
+ * One jar's envelope card for the Tổng quan row, in the jar's accent colour. Two
+ * figures, kept apart (plan 260923):
+ *  - SỐ DƯ — the running `balance` (ledger deposits/withdrawals, spend and
+ *    rebalance since the jar's anchor). Negative = hết tiền, shown as such in
+ *    `text-negative`; `null` → "Chưa có số dư", never a fabricated 0 (invariant #6).
+ *  - HẠN MỨC gauge — "Đã chi Y / Z hạn mức" for the month (limit `null` →
+ *    "Chưa đặt hạn mức", no bar).
+ * All numbers come from `Financials.jarEnvelope`; this card never computes.
+ * Tapping the card opens the real jar view (Ngân sách) via `onOpen`.
  */
 export function JarEnvelopeCard({
   label,
   accent,
-  remaining,
+  balance,
+  spent,
+  limit,
   Icon,
   onOpen,
 }: {
   label: string;
   accent: string;
-  /** "còn lại trong hũ"; `null` = chưa đặt hạn mức & chưa nạp. Floored at 0 for display; the raw value may be negative (overspent). */
-  remaining: number | null;
+  /** Số dư hũ; `null` = chưa có số dư. May be negative. */
+  balance: number | null;
+  /** Đã chi this month (limit axis). */
+  spent: number;
+  /** Hạn mức tháng; `null` = chưa đặt. */
+  limit: number | null;
   Icon: LucideIcon;
   /** Open the real jar view (Ngân sách tab). Card is a button when provided. */
   onOpen?: () => void;
 }) {
-  const overspent = remaining !== null && remaining < 0;
-  // A jar cannot hold negative money — floor the displayed balance at 0.
-  const balance = remaining === null ? null : Math.max(0, remaining);
-  const overBy = overspent ? -(remaining as number) : 0;
+  // Bar width only (display); the verdict itself is the engine's `overLimit`.
+  const fill = limit === null ? 0 : limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : spent > 0 ? 100 : 0;
 
   const content = (
     <>
@@ -40,21 +43,36 @@ export function JarEnvelopeCard({
         <Icon size={18} className="shrink-0 opacity-90" aria-hidden />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <div>
-          <div className="text-[18px] font-bold leading-tight">
-            {balance === null ? "Chưa có số dư" : formatVndCompact(balance)}
+          <div className="text-[11px] text-white/85">Số dư</div>
+          {balance === null ? (
+            <div className="text-[15px] font-bold leading-tight">Chưa có số dư</div>
+          ) : balance < 0 ? (
+            // Readable on any accent: the negative figure sits on a white chip.
+            <div className="w-fit rounded-md bg-white px-1.5 text-[18px] font-bold leading-tight text-negative">
+              {formatVndCompact(balance)}
+            </div>
+          ) : (
+            <div className="text-[18px] font-bold leading-tight">{formatVndCompact(balance)}</div>
+          )}
+        </div>
+        {limit !== null && (
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/30" aria-hidden>
+            <div className="h-full rounded-full bg-white" style={{ width: `${fill}%` }} />
           </div>
-          <div className="text-[11px] text-white/85">
-            {overspent ? `đã vượt ${formatVndCompact(overBy)}` : "còn lại trong hũ"}
-          </div>
+        )}
+        <div className="text-[11px] text-white/85">
+          {limit === null
+            ? `Đã chi ${formatVndCompact(spent)} · Chưa đặt hạn mức`
+            : `Đã chi ${formatVndCompact(spent)} / ${formatVndCompact(limit)} hạn mức`}
         </div>
       </div>
     </>
   );
 
   const className =
-    "flex min-h-[124px] w-[160px] shrink-0 snap-start flex-col justify-between rounded-card p-4 text-left text-white shadow-card";
+    "flex min-h-[124px] w-[160px] shrink-0 snap-start flex-col justify-between gap-2 rounded-card p-4 text-left text-white shadow-card";
 
   if (onOpen) {
     return (

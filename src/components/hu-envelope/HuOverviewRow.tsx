@@ -7,6 +7,7 @@ import { useJarConfig } from "@/state/jars";
 import { ErrorState } from "@/components/states";
 import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
+import { currentMonthKey } from "@/lib/demo-clock";
 import type { PfmTabId } from "@/components/pfm/PfmTabs";
 import { PendingAllocationCard } from "./PendingAllocationCard";
 import { UnlabeledSpendCard } from "./UnlabeledSpendCard";
@@ -16,10 +17,11 @@ import { AllocationSheet } from "./AllocationSheet";
 
 /**
  * Tổng quan "hũ (phong bì)" row: a horizontally-scrolling strip of a "Chờ phân
- * bổ" card + one envelope card per jar ("còn lại trong hũ" = engine-derived
- * earmark − spent, where earmark = phân bổ CASA hoặc hạn mức). Pure presentation
- * of `financials.jarEnvelope` (invariant #1); jar colours/icons come from the jar
- * config (presentation state). "Chia ngay →" opens the allocation sheet.
+ * bổ" card + one envelope card per jar (SỐ DƯ + "Đã chi / hạn mức", plan 260923).
+ * Pure presentation of `financials.jarEnvelope` (invariant #1); jar colours/icons
+ * come from the jar config (presentation state). "Chia ngay →" opens the
+ * allocation sheet. The pool is a CURRENT stock, so "Chờ phân bổ" and the sheet
+ * render only when `financials.monthKey` is the current month (Red Team #2).
  *
  * Tapping a jar card jumps to the real jar view (the Ngân sách tab) via
  * `onNavigate` — the overview cards are a summary, the management lives there.
@@ -77,11 +79,11 @@ export function HuOverviewRow({
 
   // Pending + jar cards only make sense once jars exist (the unlabeled card can
   // stand alone — RT#11); with no jars the pending pool has no allocation target.
-  // `pending.amount` is the allocation headroom (CASA − Σ hạn mức), identical to
-  // the sheet's opening "Còn lại để chia" so "Chia ngay" never promises money the
-  // cap rejects. NOT the picker's "Chưa phân bổ" (spendable lens); ≤ 0 → hidden.
+  // `pending.amount` is "Chờ phân bổ" (CASA − Σ spendable), identical to the sheet's
+  // opening "Còn lại để chia" and the picker's "Chưa phân bổ" (D26); ≤ 0 → hidden.
   const hasJars = jars.length > 0;
-  const showPending = hasJars && (pending.amount === "unknown" || pending.amount > 0);
+  const isCurrentMonth = financials.monthKey === currentMonthKey();
+  const showPending = isCurrentMonth && hasJars && (pending.amount === "unknown" || pending.amount > 0);
 
   return (
     <section aria-label="Hũ chi tiêu" className="flex flex-col gap-2">
@@ -109,14 +111,16 @@ export function HuOverviewRow({
             key={line.jarId}
             label={line.label}
             accent={accentOf(line.jarId)}
-            remaining={line.remaining}
+            balance={line.balance}
+            spent={line.spent}
+            limit={line.limit}
             Icon={iconOf(line.jarId)}
             onOpen={onNavigate ? () => onNavigate("budget") : undefined}
           />
         ))}
       </div>
 
-      {sheetOpen && (
+      {sheetOpen && isCurrentMonth && (
         <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setSheetOpen(false)} />
       )}
 

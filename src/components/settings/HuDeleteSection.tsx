@@ -13,7 +13,7 @@ const POOL_LABEL = "Chưa phân bổ";
 /**
  * "Xoá hũ" with a confirm step. Categories move to "Khác" server-side. When the
  * jar has "điều chỉnh hũ" rebalance legs (U8/S8/A47) the confirm says so: the
- * server deletes those legs with the jar, and the linked jars' remaining is
+ * server deletes those legs with the jar, and the linked jars' balance is
  * recalculated. After a successful delete the same legs are dropped from the
  * local manual-txn state (the DELETE is idempotent server-side) so the budget
  * never keeps showing an orphan "Chuyển sang hũ khác" row.

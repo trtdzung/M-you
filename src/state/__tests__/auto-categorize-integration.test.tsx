@@ -4,7 +4,6 @@ import { PersonaProvider } from "@/providers/context";
 import { CorrectionsProvider, useCorrections, type Assignment } from "@/state/corrections";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { ManualTxnsProvider } from "@/state/manual-txns";
-import { JarTopupProvider } from "@/state/jar-topup";
 import { JarConfigProvider } from "@/state/jars";
 import { CategoryTaxonomyProvider } from "@/state/categories";
 import { AssetLiabilityProvider } from "@/state/assets";
@@ -49,7 +48,6 @@ function renderStack() {
       <CorrectionsProvider>
         <CategoryMemoryProvider>
           <ManualTxnsProvider>
-        <JarTopupProvider>
             <JarConfigProvider>
               <CategoryTaxonomyProvider>  
                 <AssetLiabilityProvider>
@@ -61,7 +59,6 @@ function renderStack() {
                   </AssetLiabilityProvider>
               </CategoryTaxonomyProvider>
             </JarConfigProvider>
-        </JarTopupProvider>
           </ManualTxnsProvider>
         </CategoryMemoryProvider>
       </CorrectionsProvider>

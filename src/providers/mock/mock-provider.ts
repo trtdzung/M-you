@@ -206,11 +206,11 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       if (!res.ok) throw await apiError("getJarConfig", res);
       return res.json();
     },
-    async createJar(jar) {
+    async createJar(jar, balance) {
       const res = await fetch("/api/jars", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cif, jar }),
+        body: JSON.stringify({ cif, jar, balance }),
       });
       if (!res.ok) throw await apiError("createJar", res);
       return res.json();
@@ -232,22 +232,18 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       if (!res.ok) throw await apiError("updateJar", res);
       return res.json();
     },
-    async updateJars(patches) {
-      // Same `undefined` → `null` wire-encoding as `updateJar` (clear a field),
-      // per patch. Batched into ONE PATCH so the server applies them in a single
-      // transaction with one cap check (invariant: no partial/racy write).
-      const wirePatches = Object.fromEntries(
-        Object.entries(patches).map(([jarId, patch]) => [
-          jarId,
-          Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, value === undefined ? null : value])),
-        ]),
-      );
-      const res = await fetch(`/api/jars?cif=${encodeURIComponent(cif)}`, {
-        method: "PATCH",
+    async postJarLedger(entries) {
+      // Only the three client-owned fields go on the wire; ids, timestamps,
+      // `isOpening` and `source` are server-minted. One POST = one transaction.
+      const res = await fetch("/api/jar-ledger", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cif, patches: wirePatches }),
+        body: JSON.stringify({
+          cif,
+          entries: entries.map(({ jarId, kind, amount }) => ({ jarId, kind, amount })),
+        }),
       });
-      if (!res.ok) throw await apiError("updateJars", res);
+      if (!res.ok) throw await apiError("postJarLedger", res);
       return res.json();
     },
     async removeJar(id) {

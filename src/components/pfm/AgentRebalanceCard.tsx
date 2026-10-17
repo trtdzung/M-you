@@ -22,18 +22,20 @@ const fieldClass =
 
 /**
  * Renders a `RebalanceJarsUi` (Feature 4) — the agent's proposal to cover a jar's
- * shortfall from other jars / the unallocated pool for THIS month. Every part is
- * editable: the jar being topped up, each source (a jar, or the pool), and each
- * amount, plus adding / removing sources. Moving balance changes neither a limit
- * (`budgetLimit`) nor any real money; "Áp dụng" is the customer's confirmation,
- * after which `pfm` writes one `dieu-chinh-hu` leg per source through the same
- * store the automatic top-up uses.
+ * shortfall from other jars / the unallocated pool. It moves SỐ DƯ (the running
+ * balance, which carries over months), never HẠN MỨC: a jar's monthly limit
+ * (`budgetLimit`) and any real money are untouched. Every part is editable: the
+ * jar being topped up, each source (a jar, or the pool), and each amount, plus
+ * adding / removing sources. "Áp dụng" is the customer's confirmation, after which
+ * `pfm` writes one `dieu-chinh-hu` leg per source through the same store the
+ * automatic top-up uses (invariant #3 — a display partition, no OTP, no transfer).
  *
  * The agent's proposal only PRE-FILLS the form (its shape was checked by
  * `isRebalanceJarsUi`). Whatever the customer ends up with is checked here against
  * the engine's snapshot before anything is written: each source must exist, is not
- * the target, appears once, and can give at most its own spendable (the pool: the
- * unallocated amount). A stale proposal simply shows those limits as errors the
+ * the target, appears once, and can give at most its own spendable balance
+ * (`max(0, balance)`; the pool: the unallocated amount). A jar with no balance yet
+ * (`null`, unfunded) can neither give nor receive. A stale proposal simply shows those limits as errors the
  * customer can fix, instead of a dead end.
  */
 export function AgentRebalanceCard({ form, fullWidth = false }: { form: RebalanceJarsUi; fullWidth?: boolean }) {
@@ -81,11 +83,11 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
     );
   }
 
-  const targetBalance = target?.spendable ?? null;
-  const remaining = snapshot.lines.find((l) => l.huId === targetId)?.remaining ?? null;
+  // The target's running balance (may be < 0 — hết số dư); `null` = chưa có số dư.
+  const balance = snapshot.lines.find((l) => l.huId === targetId)?.balance ?? null;
   // A jar that is out of money has an exactly-known gap; otherwise it is the amount
   // the agent worked out for a spend only the customer knows about.
-  const need = targetId === form.target_jar_id && remaining !== null && remaining < 0 ? -remaining : form.shortfall;
+  const need = targetId === form.target_jar_id && balance !== null && balance < 0 ? -balance : form.shortfall;
 
   const labelOf = (id: string) => (id === POOL_DONOR_ID ? POOL_DONOR_LABEL : jars.find((j) => j.id === id)?.label ?? id);
   const capOf = (id: string): number | null => (id === POOL_DONOR_ID ? pool : jars.find((j) => j.id === id)?.spendable ?? null);
@@ -95,14 +97,14 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
     if (row.jarId === targetId) return "Không lấy từ chính hũ cần bù.";
     if (rows.some((r) => r.key !== row.key && r.jarId === row.jarId)) return "Nguồn này đã có ở dòng khác.";
     const cap = capOf(row.jarId);
-    if (cap === null) return "Hũ này chưa đặt hạn mức nên không cho tiền được.";
+    if (cap === null) return "Hũ này chưa có số dư nên không cho tiền được.";
     if (!Number.isFinite(row.amount) || row.amount <= 0) return "Nhập số tiền lớn hơn 0.";
     if (row.amount > cap) return `Tối đa ${formatVnd(cap)}.`;
     return null;
   };
   const formProblem =
-    targetBalance === null
-      ? "Hũ cần bù chưa đặt hạn mức."
+    balance === null
+      ? "Hũ cần bù chưa có số dư."
       : rows.length === 0
         ? "Thêm ít nhất một nguồn lấy tiền."
         : rows.some((r) => rowError(r) !== null)
@@ -179,7 +181,11 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
         </select>
       </label>
       <p className="text-xs text-muted">
-        {targetBalance !== null && <>Số dư hiện tại: {formatVnd(targetBalance)} · </>}
+        {balance === null
+          ? "Chưa có số dư · "
+          : balance < 0
+            ? `Hết số dư, đang thiếu ${formatVnd(-balance)} · `
+            : `Số dư hiện tại: ${formatVnd(balance)} · `}
         cần thêm khoảng {formatVnd(need)}
       </p>
 
@@ -241,7 +247,7 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
       </p>
 
       <p className="text-xs text-muted">{form.reason}</p>
-      <p className="text-[11px] text-muted">Chỉ điều chỉnh số dư trong tháng này — không đổi hạn mức, không chuyển tiền thật.</p>
+      <p className="text-[11px] text-muted">Chỉ chuyển số dư giữa các hũ — không đổi hạn mức, không chuyển tiền thật, không cần OTP.</p>
       {problem && <p role="alert" className="text-xs text-negative">{problem}</p>}
 
       <button

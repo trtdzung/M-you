@@ -51,7 +51,7 @@ describe("runDetectors", () => {
         monthKey: currentMonthKey(),
         jarBudget: makeJarBudgetResult({
           lines: [
-            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, limitState: "set", status: "over", pct: 1.2, remaining: -800_000, thresholdHit: true }),
+            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, limitState: "set", status: "over", pct: 1.2, balance: -800_000, thresholdHit: true }),
           ],
         }),
         recurring: [{ merchantNormalizedName: "netflix", label: "Netflix", categoryId: "subscriptions", direction: "debit", occurrences: 6, distinctMonths: 6, averageAmount: 260_000, averageDayOfMonth: 15, lastPostedAt: "2026-06-15T10:00:00.000Z", isExpense: true }],
@@ -77,8 +77,8 @@ describe("runDetectors", () => {
         monthKey: currentMonthKey(),
         jarBudget: makeJarBudgetResult({
           lines: [
-            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, limitState: "set", status: "over", pct: 1.2, rebalanceNet: 800_000, remaining: 0, thresholdHit: true }),
-            makeJarBudgetLine({ huId: "transport", label: "Đi lại", spent: 0, limit: 2_000_000, limitState: "set", status: "ok", pct: 0, rebalanceNet: -800_000, remaining: 1_200_000 }),
+            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, limitState: "set", status: "over", pct: 1.2, rebalanceNet: 800_000, balance: 0, thresholdHit: true }),
+            makeJarBudgetLine({ huId: "transport", label: "Đi lại", spent: 0, limit: 2_000_000, limitState: "set", status: "ok", pct: 0, rebalanceNet: -800_000, balance: 1_200_000 }),
           ],
         }),
         jarRebalances: [leg],

@@ -102,7 +102,7 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     const burn = variable && activeDays >= 3 ? Math.max(0,
       0.6 * line.categoryIds.reduce((s, id) => s + (last7.get(id) ?? 0), 0) / 7 +
       0.4 * line.categoryIds.reduce((s, id) => s + (last30.get(id) ?? 0), 0) / 30) : null;
-    const remaining = line.remaining;
+    const remaining = line.balance;
     const burnRisk = remaining !== null && remaining > 0 && burn !== null && burn * fin.jarBudget.summary.daysLeft > remaining;
     const pressure = remaining !== null && (remaining < 0 || (line.limit !== null && line.limit > 0 && line.spent >= line.limit * 0.8));
     // Prior month spend for this jar's categories
@@ -153,7 +153,7 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     (l.outstandingPrincipal === 0 || (l.minimumPayment !== null && l.minimumPayment > 0 && l.interestRate !== null &&
       l.interestRate < 0.2 && l.dueDate !== null && Date.parse(`${l.dueDate}T23:59:59+07:00`) >= dayStart)));
   const eligible = overlay.complete && debtsKnown && pool !== null && fin.prevCashflow.expense > 0 &&
-    jars.every((j) => j.categoryIds.length === 0 || (j.limit !== null && j.remaining !== null && j.remaining >= 0)) &&
+    jars.every((j) => j.categoryIds.length === 0 || (j.limit !== null && j.balance !== null && j.balance >= 0)) &&
     !candidates.some((c) => c.priority <= 2) && fin.unlabeled.amount === 0;
   const estimatedSurplus = eligible ? Math.max(0, (pool ?? 0) - dueReserve - estimatedBillReserve - goalReserve - buffer) : null;
   if (estimatedSurplus !== null && estimatedSurplus >= 5_000_000) candidates.push({ id: "investment:discovery", topic: "investment",

@@ -12,12 +12,9 @@
 
 import { isUserOrigin, normalize, type Correction, type Corrections } from "@/state/corrections-core";
 import { mockKnownCategoryIds } from "./mock-categories-fetch";
+import { jsonResponse } from "./mock-json-response";
 
 let store: Record<string, Corrections> = {};
-
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
-}
 
 function patchCorrections(body: Record<string, unknown> | undefined): Response {
   const cif = body?.cif;

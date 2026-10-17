@@ -5,14 +5,12 @@ import Database from "better-sqlite3";
 import type { Jar, JarConfig } from "@/domain/models";
 
 /**
- * Route-level integration for the two cap-enforcing write doors — batch
- * `PATCH /api/jars` and single `PATCH /api/jars/:id`. The other suites cover
+ * Route-level integration for the per-jar limit door `PATCH /api/jars/:id` (the
+ * batch `PATCH /api/jars` is gone — plan 260923, Red Team #10). The other suites cover
  * `fitsCasaCap` and the seeded-DB invariant in isolation (unit + committed
- * -sqlite); this exercises the ACTUAL handlers end-to-end so the wiring the red
- * team cared about (C2 — server derives CASA itself and rejects an over-cap
- * write; 404-vs-422 status; `categoryIds` dropped from a batch) is load-bearing,
- * not just inspected. A jar has NO stored balance — the Σ budgetLimit ≤ CASA cap
- * is the only ceiling (spendable is derived, bounded by budgetLimit).
+ * -sqlite); this exercises the ACTUAL handlers end-to-end. A limit is a monthly
+ * PLAN, not money: it is bounded by 10^12 VND but never by CASA — the CASA cap
+ * reads Σ max(0, balance), which only ledger writes and category moves change.
  *
  * `@/lib/db` is mocked to an in-memory SQLite so the real `jars-store` runs for
  * real; `server-only` is neutralised (it throws outside a Server Component).
@@ -24,10 +22,10 @@ vi.mock("server-only", () => ({}));
 const holder = vi.hoisted(() => ({ db: null as InstanceType<typeof import("better-sqlite3")> | null }));
 vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));
 
-import { GET, PATCH } from "../route";
+import * as collectionRoute from "../route";
 import { PATCH as patchJar } from "../[id]/route";
 import { writeJarConfig } from "@/lib/jars-store";
-import { ACCOUNTS_DDL, JARS_DDL, TRANSACTIONS_DDL } from "./jar-route-test-ddl";
+import { ACCOUNTS_DDL, CORRECTIONS_DDL, JARS_DDL, TRANSACTIONS_DDL } from "./jar-route-test-ddl";
 
 const CIF = "CIF_0001";
 const CASA = 21_600_000;
@@ -37,11 +35,6 @@ function seed(jars: Jar[]): void {
   writeJarConfig(CIF, { version: 3, jars });
 }
 
-function batchPatch(patches: Record<string, unknown>, cif: string | null = CIF): Promise<Response> {
-  const url = cif ? `http://localhost/api/jars?cif=${cif}` : "http://localhost/api/jars";
-  return PATCH(new NextRequest(url, { method: "PATCH", body: JSON.stringify({ patches }) }));
-}
-
 function singlePatch(id: string, patch: unknown, cif: string | null = CIF): [NextRequest, { params: Promise<{ id: string }> }] {
   const url = cif ? `http://localhost/api/jars/${id}?cif=${cif}` : `http://localhost/api/jars/${id}`;
   const req = new NextRequest(url, { method: "PATCH", body: JSON.stringify({ patch }) });
@@ -49,7 +42,7 @@ function singlePatch(id: string, patch: unknown, cif: string | null = CIF): [Nex
 }
 
 async function readConfig(): Promise<JarConfig> {
-  const res = await GET(new NextRequest(`http://localhost/api/jars?cif=${CIF}`));
+  const res = await collectionRoute.GET(new NextRequest(`http://localhost/api/jars?cif=${CIF}`));
   return res.json();
 }
 
@@ -62,79 +55,34 @@ beforeEach(() => {
   holder.db.exec(JARS_DDL);
   holder.db.exec(ACCOUNTS_DDL);
   holder.db.exec(TRANSACTIONS_DDL);
+  holder.db.exec(CORRECTIONS_DDL);
 });
 
-describe("PATCH /api/jars (batch cap door)", () => {
-  it("422s when cif is missing", async () => {
-    const res = await batchPatch({ a: { budgetLimit: 1 } }, null);
-    expect(res.status).toBe(422);
-  });
-
-  it("422s when patches is not an object", async () => {
-    const req = new NextRequest(`http://localhost/api/jars?cif=${CIF}`, {
-      method: "PATCH",
-      body: JSON.stringify({ patches: ["nope"] }),
-    });
-    const res = await PATCH(req);
-    expect(res.status).toBe(422);
-  });
-
-  it("404s when a patched jar id does not exist", async () => {
-    seed([{ id: "a", label: "A", categoryIds: [] }]);
-    const res = await batchPatch({ ghost: { budgetLimit: 1_000_000 } });
-    expect(res.status).toBe(404);
-  });
-
-  it("rejects an over-cap batch with 422 + overBy and leaves the store unchanged", async () => {
-    seed([
-      { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 },
-      { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000 },
-    ]);
-    const res = await batchPatch({ a: { budgetLimit: 12_000_000 }, b: { budgetLimit: 12_000_000 } });
-    expect(res.status).toBe(422);
-    const body = await res.json();
-    expect(body.overBy).toBe(24_000_000 - CASA); // 2.4tr over
-    // Store untouched — the atomic write never ran.
-    const after = await readConfig();
-    expect(findJar(after, "a")?.budgetLimit).toBe(5_000_000);
-    expect(findJar(after, "b")?.budgetLimit).toBe(5_000_000);
-  });
-
-  it("accepts a within-cap batch and persists every new limit", async () => {
-    seed([
-      { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 },
-      { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000 },
-    ]);
-    const res = await batchPatch({ a: { budgetLimit: 8_000_000 }, b: { budgetLimit: 8_000_000 } });
-    expect(res.status).toBe(200);
-    const config: JarConfig = await res.json();
-    expect(findJar(config, "a")?.budgetLimit).toBe(8_000_000);
-    expect(findJar(config, "b")?.budgetLimit).toBe(8_000_000);
-  });
-
-  it("rejects a negative budgetLimit patch as invalid (422) rather than silently swallowing it (RT#6)", async () => {
-    seed([{ id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 }]);
-    const res = await batchPatch({ a: { budgetLimit: -1 } });
-    expect(res.status).toBe(422);
-    const body = await res.json();
-    expect(body.error).toBe("patch for a is invalid");
-    // Store untouched.
-    const after = await readConfig();
-    expect(findJar(after, "a")?.budgetLimit).toBe(5_000_000);
+describe("PATCH /api/jars (batch) — removed (Red Team #10)", () => {
+  it("exports no PATCH handler, so Next answers 405", () => {
+    expect((collectionRoute as Record<string, unknown>).PATCH).toBeUndefined();
+    expect(Object.keys(collectionRoute).sort()).toEqual(["GET", "POST", "PUT"]);
   });
 });
 
 describe("PATCH /api/jars/:id (single cap door)", () => {
-  it("rejects a per-jar budgetLimit set that pushes Σ over CASA (422 + overBy)", async () => {
+  it("a per-jar LIMIT raise past CASA passes — a limit is a monthly plan, not money (plan 260923)", async () => {
     seed([
       { id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 },
       { id: "b", label: "B", categoryIds: [], budgetLimit: 5_000_000 },
     ]);
     const [req, ctx] = singlePatch("a", { budgetLimit: 19_000_000 });
     const res = await patchJar(req, ctx);
-    expect(res.status).toBe(422);
-    const body = await res.json();
-    expect(body.overBy).toBe(24_000_000 - CASA);
+    expect(res.status).toBe(200); // Σ limits 24tr > CASA ${CASA}, yet no balance moved
+    expect(findJar(await res.json(), "a")?.budgetLimit).toBe(19_000_000);
+  });
+
+  it("rejects a limit above 10^12 VND (Red Team #12)", async () => {
+    seed([{ id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 }]);
+    const [req, ctx] = singlePatch("a", { budgetLimit: 1_000_000_000_001 });
+    expect((await patchJar(req, ctx)).status).toBe(422);
+    const [req2, ctx2] = singlePatch("a", { budgetLimit: 1_000_000_000_000 });
+    expect((await patchJar(req2, ctx2)).status).toBe(200);
   });
 
   it("clears a limit (null) even when the stored config is already over cap — no cap check", async () => {

@@ -7,12 +7,12 @@ import type { JarEnvelopeResult } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { jarAccent } from "@/lib/category-colors";
 import { formatVndCompact } from "@/lib/format";
-import { useJarTopup } from "@/state/jar-topup";
+import { useJarConfig } from "@/state/jars";
 import { AllocationJarRow } from "./AllocationJarRow";
 
 /**
  * "Chia ngay" bottom sheet: hand the "Chờ phân bổ" leftover into jars as **SỐ DƯ**
- * (balance) — it raises each jar's `remaining`, NOT its `budgetLimit` (hạn mức).
+ * (balance) — it raises each jar's `balance`, NOT its `budgetLimit` (hạn mức).
  * A jar already "đã vượt hạn mức" keeps that verdict after being topped up (the
  * two-axis rule, journal 260920). It moves NO real money — a pure display
  * partition of the CASA balance (invariant #3).
@@ -27,8 +27,11 @@ import { AllocationJarRow } from "./AllocationJarRow";
  * a positive total added, so an untouched sheet changes nothing.
  *
  * Guardrail: Σ (số dư mới của mọi hũ) ≤ CASA pool, i.e. tổng cộng thêm ≤ phần còn
- * lại. Persistence: DISPLAY-ONLY for the current month (`useJarTopup`) — the top-up
- * is a session pool→jar rebalance, never written to the DB and never a limit change.
+ * lại. Persistence (plan 260923): ONE atomic `postLedger` batch — a deposit per jar
+ * with a positive amount, all or nothing, never a limit change. States: saving
+ * (button off, "Đang lưu…"), error (`role="alert"` with the server reason, e.g.
+ * over-cap `overBy`; the WHOLE draft is kept), success (closes). Current month only
+ * — callers render the sheet only when the viewed month is the current one.
  */
 export function AllocationSheet({
   envelope,
@@ -40,7 +43,10 @@ export function AllocationSheet({
   jars: Jar[];
   onClose: () => void;
 }) {
-  const { addTopups } = useJarTopup();
+  const { postLedger, mutationError } = useJarConfig();
+  const [saving, setSaving] = useState(false);
+  /** This sheet's last batch was refused — only then is `mutationError` ours to show. */
+  const [refused, setRefused] = useState(false);
   const { pending } = envelope;
   // Every jar opens at 0 — the input is the amount to ADD to that jar's balance,
   // not its new total, so the user distributes the leftover rather than rewriting
@@ -51,11 +57,11 @@ export function AllocationSheet({
 
   const poolKnown = pending.pool !== "unknown";
   const pool = poolKnown ? (pending.pool as number) : 0;
-  // Each jar's current balance (`remaining`) from the engine — a null (no limit) or
+  // Each jar's current running `balance` from the engine — a null (no limit) or
   // overspent jar contributes 0 spendable. BALANCE LENS: leftToSplit = CASA − Σ new
-  // spendable, where adding Δ to a jar makes its spendable `max(0, remaining + Δ)`.
-  const remainingByJar = useMemo(
-    () => new Map(envelope.jars.map((l) => [l.jarId, l.remaining ?? 0])),
+  // spendable, where adding Δ to a jar makes its spendable `max(0, balance + Δ)`.
+  const balanceByJar = useMemo(
+    () => new Map(envelope.jars.map((l) => [l.jarId, l.balance ?? 0])),
     [envelope.jars],
   );
   const added = useMemo(() => Object.values(draft).reduce((s, n) => s + (n || 0), 0), [draft]);
@@ -64,25 +70,27 @@ export function AllocationSheet({
   // card shows; it shrinks as balance is added and must never go negative.
   const newSpendableTotal = useMemo(
     () =>
-      jars.reduce((s, j) => s + Math.max(0, (remainingByJar.get(j.id) ?? 0) + (draft[j.id] ?? 0)), 0),
-    [jars, draft, remainingByJar],
+      jars.reduce((s, j) => s + Math.max(0, (balanceByJar.get(j.id) ?? 0) + (draft[j.id] ?? 0)), 0),
+    [jars, draft, balanceByJar],
   );
   const leftToSplit = pool - newSpendableTotal;
   // Only savable once the user has actually added something: an untouched sheet
   // (nothing added) is a no-op.
-  const canSubmit = poolKnown && leftToSplit >= 0 && added > 0;
+  const canSubmit = poolKnown && leftToSplit >= 0 && added > 0 && !saving;
 
-  function submit() {
-    // Only the jars the user added to; a jar left at 0 is untouched (skipped). The
-    // top-up raises each jar's SỐ DƯ for the current month (display-only session
-    // pool→jar rebalance) and never touches its `budgetLimit`.
-    const patches: Record<string, number> = {};
-    for (const jar of jars) {
-      const delta = draft[jar.id] ?? 0;
-      if (delta > 0) patches[jar.id] = delta;
-    }
-    addTopups(patches);
-    onClose();
+  async function submit() {
+    // Only the jars the user added to; a jar left at 0 is untouched (skipped). Each
+    // deposit raises that jar's SỐ DƯ and never touches its `budgetLimit`.
+    const entries = jars
+      .filter((jar) => (draft[jar.id] ?? 0) > 0)
+      .map((jar) => ({ jarId: jar.id, kind: "deposit" as const, amount: draft[jar.id] }));
+    if (entries.length === 0) return;
+    setRefused(false);
+    setSaving(true);
+    const ok = await postLedger(entries);
+    setSaving(false);
+    if (ok) onClose();
+    else setRefused(true); // keep the whole draft so the user can adjust and retry
   }
 
   return (
@@ -104,7 +112,7 @@ export function AllocationSheet({
                 key={jar.id}
                 label={jar.label}
                 accent={jarAccent(jar)}
-                currentBalance={envelope.jars.find((l) => l.jarId === jar.id)?.remaining ?? null}
+                currentBalance={envelope.jars.find((l) => l.jarId === jar.id)?.balance ?? null}
                 value={draft[jar.id] ?? 0}
                 onChange={(next) => setDraft((d) => ({ ...d, [jar.id]: next }))}
               />
@@ -116,14 +124,19 @@ export function AllocationSheet({
               Tổng vượt quá số dư khả dụng. Giảm bớt để tổng ≤ số dư.
             </p>
           )}
+          {refused && mutationError && (
+            <p role="alert" className="mt-2 text-sm text-negative">
+              {mutationError}
+            </p>
+          )}
 
           <button
             type="button"
-            onClick={submit}
+            onClick={() => void submit()}
             disabled={!canSubmit}
             className="mt-4 inline-flex h-12 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
-            Thêm vào số dư
+            {saving ? "Đang lưu…" : "Thêm vào số dư"}
           </button>
         </div>
       )}

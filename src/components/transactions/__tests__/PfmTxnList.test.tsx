@@ -8,7 +8,6 @@ import { CategoryTaxonomyProvider } from "@/state/categories";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
-import { JarTopupProvider } from "@/state/jar-topup";
 import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
@@ -61,7 +60,6 @@ function renderList() {
     <PersonaProvider>
       <CorrectionsProvider>
         <ManualTxnsProvider>
-        <JarTopupProvider>
           <JarConfigProvider>
             <CategoryTaxonomyProvider>
               <CategoryMemoryProvider>
@@ -78,7 +76,6 @@ function renderList() {
               </CategoryMemoryProvider>
             </CategoryTaxonomyProvider>
           </JarConfigProvider>
-        </JarTopupProvider>
         </ManualTxnsProvider>
       </CorrectionsProvider>
     </PersonaProvider>,

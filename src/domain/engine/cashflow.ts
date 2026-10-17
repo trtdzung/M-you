@@ -53,7 +53,7 @@ export function netExpenseByCategory(txns: Transaction[], period: Period): Map<s
     if (t.status !== "posted" || !inPeriod(t, period)) continue;
     // Inter-jar rebalance txns are a bookkeeping move, NOT spend — excluded from
     // spend-by-category + jar `spent` + cashflow expense exactly like a transfer
-    // (invariant #6). The engine folds them into `remaining` via `rebalanceNetByJar`.
+    // (invariant #6). The engine folds them into each jar's `balance` via `rebalanceNetByJar`.
     if (isRebalanceCategory(t.categoryId)) continue;
     if (EXPENSE_TYPES.has(t.type)) {
       byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amount);

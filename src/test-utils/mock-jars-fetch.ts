@@ -4,79 +4,61 @@
  * Vitest/jsdom test environment (there's no server behind it). Tests that
  * render the real provider stack (`JarConfigProvider` over the real
  * `mock-provider.ts`) — by design, to exercise real component + state logic —
- * need a stand-in for that one network boundary. This stubs `fetch` for
- * `/api/jars*` against an in-memory `JarConfig`, mirroring each real route
- * handler's own sequence of `@/domain/jar-rules` calls (including the
- * 404-on-unknown-id guards) so business logic isn't duplicated and behavior
- * stays load-bearing-correct for any future test, not just today's — only
- * the HTTP/DB transport is faked.
+ * need a stand-in for that one network boundary. This stubs `fetch` against an
+ * in-memory `JarConfig` and routes each request to a mirror of its real handler:
+ * `mock-jars-routes.ts` (`/api/jars*`), `mock-jar-ledger-fetch.ts`
+ * (`/api/jar-ledger`), `mock-bank-fetch.ts` (`/api/accounts*`,
+ * `/api/transactions`), `mock-categories-fetch.ts` and `mock-corrections-fetch.ts`.
+ * Business logic is never duplicated — only the HTTP/DB transport is faked.
  */
 
-import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
+import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
 import { fitsCasaCap, jarSpendableTotal } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
-import type { Account, Jar, JarConfig, Transaction } from "@/domain/models";
+import type { JarConfig } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
-import { DEMO_NOW } from "@/lib/demo-clock";
-import { PERSONA_LIST } from "@/providers/mock/personas";
-import { buildPersonaAccounts, generateDataset } from "@/providers/mock/fixtures/generate";
+import { currentMonthKey, transferNow } from "@/lib/demo-clock";
 import {
   handleCategoriesRequest,
   mockAssignableCategoryIds,
   resetMockCategories,
 } from "./mock-categories-fetch";
 import { handleCorrectionsRequest, mockCorrectionUsage, resetMockCorrections } from "./mock-corrections-fetch";
+import { monthAnchor, withSeedDeposits } from "./jar-ledger-fixtures";
+import { handleJarLedgerRequest } from "./mock-jar-ledger-fetch";
+import { handleJarsRequest, type JarsPorts } from "./mock-jars-routes";
+import { handleAccountsRequest, handleTransactionsRequest, mockAccountsFor, mockTxnsFor, resetMockBank } from "./mock-bank-fetch";
+import { jsonResponse } from "./mock-json-response";
 
 /**
- * In-memory accounts per persona, mirroring the server's `accounts-store.ts`
- * (which is `server-only`). Seeded from the same canonical builder as the
- * fixtures/DB; a debit lowers `balance` + `availableBalance` so tests exercise
- * the real "money leaves the account" behavior over the fetch boundary.
+ * Σ spendable (`Σ max(0, balance)`) a config (jars + ledger) would hold, and
+ * the CASA pool — via the shared engine `jarSpendableTotal`, the exact function the
+ * real server guard uses (same `transferNow()` clock), so the mocked cap can never
+ * disagree with the card or the client preview. Bank history only (`mockTxnsFor`).
  */
-let accountsStore: Record<string, Account[]> = {};
-
-function accountsFor(cif: string): Account[] {
-  const persona = PERSONA_LIST.find((p) => p.cif === cif);
-  if (!persona) return [];
-  if (!accountsStore[cif]) accountsStore[cif] = buildPersonaAccounts(persona);
-  return accountsStore[cif];
-}
-
-/**
- * The persona's generated bank history (deterministic, memoized) — mirrors the
- * `server-only` `transactions-store.ts`. Empty for a non-persona cif.
- */
-function txnsFor(cif: string | null): Transaction[] {
-  if (!cif) return [];
-  const persona = PERSONA_LIST.find((p) => p.cif === cif);
-  if (!persona) return [];
-  txnCache[cif] ??= generateDataset(persona).transactions;
-  return txnCache[cif];
-}
-
-/**
- * Σ spendable (`Σ max(0, remaining)`) a jar config would hold, and the CASA pool —
- * via the shared engine `jarSpendableTotal`, the exact function the real server
- * guard uses, so the mocked cap can never disagree with the card or the client
- * preview. Bank history only (`txnsFor`), matching the server's read path.
- */
-function spendableTotalFor(jars: Jar[], cif: string | null): { total: number; pool: Amount } {
-  const accounts = cif ? accountsFor(cif) : [];
-  return jarSpendableTotal(jars, accounts, txnsFor(cif), DEMO_NOW);
+function spendableTotalFor(config: JarConfig, cif: string | null): { total: number; pool: Amount } {
+  const accounts = cif ? mockAccountsFor(cif) : [];
+  return jarSpendableTotal(config, accounts, mockTxnsFor(cif), transferNow());
 }
 
 let store: JarConfig = freshConfig();
+/** Ids with a real `jars` row — the heal-synthesized "Khác" is not one (Red Team #5). */
+let rowIds: Set<string> = new Set(store.jars.map((j) => j.id));
 let originalFetch: typeof globalThis.fetch | undefined;
 
+/**
+ * The seeded config, mirroring `scripts/seed-db.mjs` + the jar-ledger migration:
+ * `createdAt` = start of the demo month and one opening deposit = `budgetLimit` per
+ * limited jar, so a persona's current-month balances equal the pre-split numbers.
+ */
 function freshConfig(): JarConfig {
-  return {
-    version: 3,
-    jars: DEFAULT_JAR_CONFIG.jars.map((j) => ({ ...j, categoryIds: [...j.categoryIds] })),
-  };
-}
-
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+  return withSeedDeposits(
+    {
+      version: 3,
+      jars: DEFAULT_JAR_CONFIG.jars.map((j) => ({ ...j, categoryIds: [...j.categoryIds] })),
+    },
+    monthAnchor(currentMonthKey()),
+  );
 }
 
 /**
@@ -86,34 +68,48 @@ function jsonResponse(data: unknown, status = 200): Response {
  * normalizes (e.g. PATCH shrinking `categoryIds` without healing the
  * dropped category) still comes back healed. Routing every store update
  * AND every GET through this same commit point reproduces that guarantee
- * here, instead of each branch below needing to remember to normalize.
+ * here, instead of each branch needing to remember to normalize.
  *
  * The heal runs against the PERSONA'S taxonomy (`mock-categories-fetch`), the
  * same set the real `readJarConfig` passes: that is what makes a category the
  * test just created land in "Khác" by itself, and what keeps an archived one from
  * being yanked out of the hũ it is already in.
  */
-function commit(next: JarConfig, cif: string | null): JarConfig {
+function commit(next: JarConfig, cif: string | null, write = true): JarConfig {
+  // Mirror `writeJarConfig`: `createdAt` is server-owned (kept for an existing id,
+  // stamped on the one clock for a new one — a client value is never trusted), and
+  // the ledger is read-only on the wire: rows of jars that left the config go too.
+  const createdById = new Map(store.jars.map((j) => [j.id, j.createdAt]));
+  const nowIso = transferNow().toISOString();
+  const jars = next.jars.map((j) => ({ ...j, createdAt: createdById.get(j.id) ?? nowIso }));
+  const ids = new Set(jars.map((j) => j.id));
+  // A write stores every jar it was handed (like `writeJarConfig`); a read stores
+  // nothing, so a "Khác" the heal adds below on a GET has no row yet.
+  if (write) rowIds = ids;
+  const ledger = (next.ledger ?? store.ledger ?? []).filter((e) => ids.has(e.jarId));
   // No cif ⇒ no persona ⇒ no taxonomy to heal against. An EMPTY set is the honest
   // answer (nothing is orphaned because nothing is known), and it matches the
   // real route, which refuses a cif-less write outright rather than healing
   // against the bundled seed.
   const assignable = cif ? mockAssignableCategoryIds(cif) : new Set<string>();
-  store = healOrphanCategories(dedupeCategories(next), assignable);
+  store = { ...healOrphanCategories(dedupeCategories({ version: 3, jars }), assignable), ledger };
   return store;
 }
 
 /**
- * The server's cap rule (every write door), BALANCE LENS: 422 only when the write
- * RAISES Σ spendable (vs the stored config) AND the new Σ exceeds CASA — lowering,
- * clearing or re-saving always passes, even on an already-over-cap config.
+ * The server's cap rule (create, ledger batch, replace, category move), BALANCE
+ * LENS: 422 only when the write RAISES Σ spendable (vs the stored config) AND the
+ * new Σ exceeds CASA — lowering, clearing or re-saving always passes. `nextConfig`
+ * is a WHOLE config: a caller folds any not-yet-written ledger row into it.
  */
-function overCap(nextJars: Jar[], cif: string | null): Response | null {
-  const next = spendableTotalFor(nextJars, cif);
-  const base = spendableTotalFor(store.jars, cif);
+function overCap(nextConfig: JarConfig, cif: string | null): Response | null {
+  const next = spendableTotalFor(nextConfig, cif);
+  const base = spendableTotalFor(store, cif);
   const cap = fitsCasaCap(next.total, base.total, next.pool);
   return cap.ok ? null : jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
 }
+
+const jarsPorts: JarsPorts = { readConfig: () => store, commit, overCap };
 
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -121,143 +117,9 @@ function requestUrl(input: RequestInfo | URL): string {
   return input.url;
 }
 
-async function handleJarsRequest(url: string, init?: RequestInit): Promise<Response> {
-  const parsed = new URL(url, "http://localhost");
-  const method = (init?.method ?? "GET").toUpperCase();
-  const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
-  const cif = parsed.searchParams.get("cif") ?? (typeof body?.cif === "string" ? body.cif : null);
-  const idMatch = parsed.pathname.match(/^\/api\/jars\/([^/]+)(\/categories)?$/);
-
-  if (!idMatch) {
-    if (method === "GET") return jsonResponse(commit(store, cif));
-    if (method === "POST") {
-      const jar = body?.jar as Jar;
-      const created: Jar = { ...jar, id: uniqueJarId(store.jars, jar.id) };
-      const nextJars = [...stripCategories(store.jars, created.categoryIds), created];
-      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }, cif), 201);
-    }
-    if (method === "PUT") {
-      const nextJars = (body?.jars as Jar[]) ?? [];
-      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }, cif));
-    }
-    if (method === "PATCH") {
-      // Batch "Chia ngay": apply each patch (undefined-clears via null), reject
-      // (422) only a write that RAISES Σ budgetLimit above CASA, one write.
-      const patches = (body?.patches ?? {}) as Record<string, Record<string, unknown>>;
-      const byId = new Map(store.jars.map((j) => [j.id, j]));
-      const merged = new Map<string, Jar>();
-      for (const [jarId, patch] of Object.entries(patches)) {
-        const prev = byId.get(jarId);
-        if (!prev) return jsonResponse({ error: `jar ${jarId} not found` }, 404);
-        const next: Record<string, unknown> = { ...prev };
-        for (const [key, value] of Object.entries(patch)) {
-          if (key === "categoryIds") continue;
-          if (value === null) delete next[key];
-          else next[key] = value;
-        }
-        merged.set(jarId, next as unknown as Jar);
-      }
-      const nextJars = store.jars.map((j) => merged.get(j.id) ?? j);
-      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }, cif));
-    }
-    return jsonResponse({ error: "unhandled" }, 500);
-  }
-
-  const id = idMatch[1];
-  const target = store.jars.find((j) => j.id === id);
-  if (!target) return jsonResponse({ error: `jar ${id} not found` }, 404);
-
-  if (idMatch[2]) {
-    // POST /api/jars/:id/categories
-    const categoryId = body?.categoryId as string;
-    const stripped = stripCategories(store.jars, [categoryId]);
-    return jsonResponse(
-      commit(
-        {
-          version: 3,
-          jars: stripped.map((j) => (j.id === id ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j)),
-        },
-        cif,
-      ),
-    );
-  }
-
-  if (method === "PATCH") {
-    const patch = (body?.patch ?? {}) as Record<string, unknown>;
-    let jars = store.jars.map((j) => {
-      if (j.id !== id) return j;
-      const next: Record<string, unknown> = { ...j };
-      for (const [key, value] of Object.entries(patch)) {
-        if (value === null) delete next[key];
-        else next[key] = value;
-      }
-      return next as unknown as Jar;
-    });
-    if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds as string[], id);
-    return overCap(jars, cif) ?? jsonResponse(commit({ version: 3, jars }, cif));
-  }
-  if (method === "DELETE") {
-    return jsonResponse(commit({ version: 3, jars: store.jars.filter((j) => j.id !== id) }, cif));
-  }
-  return jsonResponse({ error: "unhandled" }, 500);
-}
-
-/**
- * `GET /api/transactions`, mirroring the `server-only` `transactions-store.ts`:
- * the persona's generated history (read-only, memoized — the generator is
- * deterministic), bounded by inclusive `from`/`to`, newest first.
- */
-const txnCache: Record<string, Transaction[]> = {};
-
-function handleTransactionsRequest(url: string, init?: RequestInit): Response {
-  const parsed = new URL(url, "http://localhost");
-  if ((init?.method ?? "GET").toUpperCase() !== "GET") return jsonResponse({ error: "unhandled" }, 500);
-  const cif = parsed.searchParams.get("cif");
-  if (!cif) return jsonResponse({ error: "cif is required" }, 422);
-  const persona = PERSONA_LIST.find((p) => p.cif === cif);
-  if (!persona) return jsonResponse([]);
-  txnCache[cif] ??= generateDataset(persona).transactions;
-  const from = parsed.searchParams.get("from");
-  const to = parsed.searchParams.get("to");
-  const rows = txnCache[cif]
-    .filter((t) => (!from || t.postedAt >= from) && (!to || t.postedAt <= to))
-    .sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
-  return jsonResponse(rows);
-}
-
-/**
- * `/api/accounts` + `/api/accounts/debit`, mirroring the real route handlers
- * over the fetch boundary: GET lists the persona's accounts, POST /debit lowers
- * `balance` + `availableBalance` (floored at 0) on the target row. This is the
- * test-side stand-in for the `server-only` `accounts-store.ts` DB.
- */
-async function handleAccountsRequest(url: string, init?: RequestInit): Promise<Response> {
-  const parsed = new URL(url, "http://localhost");
-  const method = (init?.method ?? "GET").toUpperCase();
-  const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : undefined;
-
-  if (parsed.pathname === "/api/accounts/debit") {
-    if (method !== "POST") return jsonResponse({ error: "unhandled" }, 500);
-    const cif = typeof body?.cif === "string" ? body.cif : null;
-    const accountId = typeof body?.accountId === "string" ? body.accountId : null;
-    const amount = typeof body?.amount === "number" ? body.amount : null;
-    if (!cif || !accountId || amount === null || amount < 0) {
-      return jsonResponse({ error: "cif, accountId and amount ≥ 0 required" }, 422);
-    }
-    const accounts = accountsFor(cif);
-    const target = accounts.find((a) => a.id === accountId);
-    if (!target) return jsonResponse({ error: `account ${accountId} not found` }, 404);
-    target.balance = Math.max(0, target.balance - amount);
-    target.availableBalance = Math.max(0, target.availableBalance - amount);
-    return jsonResponse(target);
-  }
-
-  const cif = parsed.searchParams.get("cif");
-  if (method === "GET") {
-    if (!cif) return jsonResponse({ error: "cif required" }, 422);
-    return jsonResponse(accountsFor(cif));
-  }
-  return jsonResponse({ error: "unhandled" }, 500);
+/** Run a sync handler as a fetch would: a throw becomes a rejected promise. */
+function settle(handler: () => Response): Promise<Response> {
+  return new Promise((resolve) => resolve(handler()));
 }
 
 /** Install the fetch stub — safe to call more than once (no-ops after the first). */
@@ -266,9 +128,20 @@ export function installMockJarsApi(): void {
   originalFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
-    if (url.startsWith("/api/jars")) return handleJarsRequest(url, init);
-    if (url.startsWith("/api/accounts")) return handleAccountsRequest(url, init);
-    if (url.startsWith("/api/transactions")) return Promise.resolve(handleTransactionsRequest(url, init));
+    if (url.startsWith("/api/jars")) return settle(() => handleJarsRequest(url, init, jarsPorts));
+    if (url.startsWith("/api/jar-ledger")) {
+      return settle(() =>
+        handleJarLedgerRequest(init, {
+          readConfig: () => store,
+          rowIds: () => rowIds,
+          txns: (cif) => mockTxnsFor(cif),
+          overCap: (next, cif) => overCap(next, cif),
+          commitLedger: (ledger) => (store = { ...store, ledger }),
+        }),
+      );
+    }
+    if (url.startsWith("/api/accounts")) return settle(() => handleAccountsRequest(url, init));
+    if (url.startsWith("/api/transactions")) return settle(() => handleTransactionsRequest(url, init));
     // The taxonomy stub reaches the hũ store through this port — a category write
     // is also a jar write server-side, and both must come back as one aggregate.
     const taxonomy = handleCategoriesRequest(url, init, {
@@ -286,7 +159,8 @@ export function installMockJarsApi(): void {
 /** Reset the in-memory jar set, taxonomy, accounts and labels — call in `beforeEach`. */
 export function resetMockJarsApi(): void {
   store = freshConfig();
-  accountsStore = {};
+  rowIds = new Set(store.jars.map((j) => j.id));
+  resetMockBank();
   resetMockCategories();
   resetMockCorrections();
 }

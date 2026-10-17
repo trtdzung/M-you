@@ -18,6 +18,18 @@ const SEED_JARS_PATH = path.join(ROOT, "data", "seed-jars.json");
 
 const NOW = new Date().toISOString();
 
+// Running-balance anchor for seeded jars (`jars.created_at` + their opening
+// deposits): the start of the current DEMO month in VN time (UTC+7), mirroring
+// `jarLedgerAnchorIso()` in src/lib/db-migrate-jar-ledger.ts (DEMO_NOW from
+// src/lib/demo-clock.ts; plain .mjs, no TS loader). Wall clock would put the
+// deposit outside the displayed month.
+const DEMO_NOW = new Date("2026-09-15T00:00:00.000Z");
+const VN_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+const JAR_ANCHOR = (() => {
+  const vn = new Date(DEMO_NOW.getTime() + VN_UTC_OFFSET_MS);
+  return new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), 1) - VN_UTC_OFFSET_MS).toISOString();
+})();
+
 const SEED_BENEFICIARIES = [
   // CIF_0001 — Minh, Lương ổn định (persona "stable")
   { id: "b_stable_lan", cif: "CIF_0001", name: "Nguyễn Thị Lan", accountNumber: "19012345678901", bankName: "MSB" },
@@ -47,7 +59,7 @@ const SEED_JARS = JSON.parse(readFileSync(SEED_JARS_PATH, "utf8"));
 // salaryBase per CIF, duplicated from src/providers/mock/personas.ts (same reason
 // as SEED_BENEFICIARIES: plain .mjs, no TS loader). scale = salaryBase / 25tr —
 // the SAME factor fixtures/generate.ts applies to the CASA balance (18tr × scale).
-// Scaling the seed by it keeps Σ budgetLimit tracking CASA per persona
+// Scaling the seed by it keeps Σ budgetLimit (= Σ opening balance) tracking CASA per persona
 // (Σ/CASA ≈ 0.94, dư về "Chờ phân bổ") and fixes CIF_0002 over-allocation.
 const SALARY_BASE_BY_CIF = {
   CIF_0001: 30_000_000,
@@ -127,6 +139,12 @@ if (catCols.length > 0 && !catCols.some((c) => c.name === "cif")) {
   db.exec("DROP TABLE categories");
   console.log("Dropped the legacy global `categories` table (now per-cif, re-seeded on first read)");
 }
+// Jar limit-vs-balance split: an older `jars` gets its `created_at` anchor column
+// BEFORE the schema (same step as src/lib/db-migrate-jar-ledger.ts).
+const jarCols = db.prepare("PRAGMA table_info(jars)").all();
+if (jarCols.length > 0 && !jarCols.some((c) => c.name === "created_at")) {
+  db.exec("ALTER TABLE jars ADD COLUMN created_at TEXT");
+}
 db.exec(readFileSync(SCHEMA_PATH, "utf8"));
 if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'manual_transactions'").get()) {
   db.transaction(() => {
@@ -159,14 +177,24 @@ try {
 }
 // Only the seeded personas' jars are replaced (K08) — any other cif's jars
 // (synthetic test personas, user-created data) survive a reseed.
+// Each seeded jar gets `created_at = JAR_ANCHOR` and — when it has a limit (0
+// included) — one opening deposit = that limit, so its running balance starts at
+// the plan. A NULL limit gets no deposit (balance unknown, invariant #6). The
+// cif's ledger is cleared first so a reseed never stacks a second opening row.
 const deleteJarsOfCif = db.prepare("DELETE FROM jars WHERE cif = ?");
+const deleteLedgerOfCif = db.prepare("DELETE FROM jar_ledger WHERE cif = ?");
 const insertJar = db.prepare(
-  `INSERT INTO jars (id, cif, label, category_ids, budget_limit, role, color, icon, sort_order)
-   VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @role, NULL, NULL, @sortOrder)`,
+  `INSERT INTO jars (id, cif, label, category_ids, budget_limit, role, color, icon, sort_order, created_at)
+   VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @role, NULL, NULL, @sortOrder, @createdAt)`,
+);
+const insertOpening = db.prepare(
+  `INSERT INTO jar_ledger (cif, id, jar_id, kind, amount, is_opening, created_at, source)
+   VALUES (@cif, @id, @jarId, 'deposit', @amount, 1, @createdAt, 'self_reported')`,
 );
 const insertAllJars = db.transaction(() => {
   for (const cif of CIFS) {
     deleteJarsOfCif.run(cif);
+    deleteLedgerOfCif.run(cif);
     const scale = SALARY_BASE_BY_CIF[cif] / SALARY_REF;
     SEED_JARS.forEach((jar, index) => {
       // Scale each jar's single number by the persona's factor; an unset limit
@@ -181,7 +209,11 @@ const insertAllJars = db.transaction(() => {
         budgetLimit: scaledLimit,
         role: jar.role,
         sortOrder: index,
+        createdAt: JAR_ANCHOR,
       });
+      if (scaledLimit !== null) {
+        insertOpening.run({ cif, id: `led-seed-${jar.id}`, jarId: jar.id, amount: scaledLimit, createdAt: JAR_ANCHOR });
+      }
     });
   }
 });

@@ -192,11 +192,12 @@ describe("JarConfigProvider — mutation errors (U20/S14/K02)", () => {
 
   it("shows the server's over-cap reason with its overBy amount", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+    // A limit edit no longer trips the balance-lens cap (plan 260923), so the 422
+    // is injected at the fetch boundary to pin the reason → message mapping.
+    interceptFetch((url, init) =>
+      isPatch(url, init) ? Promise.resolve(json({ error: "over CASA cap", overBy: 30_886_000 }, 422)) : null,
+    );
     const hook = await renderLoaded();
-    // BALANCE LENS: overBy = Σ new spendable − CASA. Setting food (limit 4tr, its
-    // spendable already reduced by this month's dining spend) to 50tr raises Σ
-    // spendable to 30,886,000 over CASA — less than the 45tr a pure-limit cap would
-    // report, because spent money no longer counts as claimed.
     await act(async () => {
       await hook.result.current.jars.updateJar("food", { budgetLimit: 50_000_000 });
     });
@@ -204,11 +205,125 @@ describe("JarConfigProvider — mutation errors (U20/S14/K02)", () => {
     expect(jarById(hook, "food")?.budgetLimit).toBe(4_000_000);
   });
 
-  it("updateJars rejects to its caller and leaves mutationError alone", async () => {
+  it("a LIMIT raise past CASA persists — limits move no balance (plan 260923)", async () => {
+    const hook = await renderLoaded();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.updateJar("food", { budgetLimit: 50_000_000 });
+    });
+    expect(ok).toBe(true);
+    expect(hook.result.current.jars.mutationError).toBeNull();
+    expect(jarById(hook, "food")?.budgetLimit).toBe(50_000_000);
+  });
+
+});
+
+const ledgerOf = (hook: Awaited<ReturnType<typeof renderLoaded>>) => hook.result.current.jars.config.ledger ?? [];
+
+describe("JarConfigProvider — balances (plan 260923)", () => {
+  it("addJar sends the opening balance; 0 is stored as a known 0 opening row", async () => {
+    const hook = await renderLoaded();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.addJar(
+        { id: "jar-travel", label: "Du lịch", categoryIds: [], budgetLimit: 2_000_000 },
+        0,
+      );
+    });
+    expect(ok).toBe(true);
+    expect(jarById(hook, "jar-travel")?.budgetLimit).toBe(2_000_000);
+    const opening = ledgerOf(hook).filter((e) => e.jarId === "jar-travel");
+    expect(opening).toEqual([expect.objectContaining({ kind: "deposit", amount: 0, isOpening: true })]);
+  });
+
+  it("postLedger writes a multi-jar batch that survives a reload (persisted, not session-only)", async () => {
+    const hook = await renderLoaded();
+    const before = ledgerOf(hook).length;
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.postLedger([
+        { jarId: "food", kind: "deposit", amount: 10_000 },
+        { jarId: "transport", kind: "deposit", amount: 20_000 },
+      ]);
+    });
+    expect(ok).toBe(true);
+    expect(hook.result.current.jars.mutationError).toBeNull();
+    expect(ledgerOf(hook)).toHaveLength(before + 2);
+    const stored = (await (await fetch("/api/jars?cif=CIF_0001")).json()) as JarConfig;
+    expect(stored.ledger?.filter((e) => !e.isOpening).map((e) => [e.jarId, e.amount])).toEqual([
+      ["food", 10_000],
+      ["transport", 20_000],
+    ]);
+  });
+
+  it("a withdraw over the balance is refused with 'Chỉ rút tối đa' and the WHOLE batch is dropped", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const hook = await renderLoaded();
+    const before = ledgerOf(hook).length;
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.postLedger([
+        { jarId: "food", kind: "deposit", amount: 10_000 },
+        { jarId: "transport", kind: "withdraw", amount: 900_000_000 },
+      ]);
+    });
+    expect(ok).toBe(false);
+    expect(hook.result.current.jars.mutationError).toMatch(/^Chỉ rút tối đa \d/);
+    expect(ledgerOf(hook)).toHaveLength(before);
+    const stored = (await (await fetch("/api/jars?cif=CIF_0001")).json()) as JarConfig;
+    expect(stored.ledger).toHaveLength(before);
+  });
+
+  it("maps an over-cap batch to the server's exact overBy", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    interceptFetch((url) =>
+      url.startsWith("/api/jar-ledger") ? Promise.resolve(json({ error: "over CASA cap", overBy: 1_250_000 }, 422)) : null,
+    );
     const hook = await renderLoaded();
     await act(async () => {
-      await expect(hook.result.current.jars.updateJars({ food: { budgetLimit: 90_000_000 } })).rejects.toThrow(/422/);
+      await hook.result.current.jars.postLedger([{ jarId: "food", kind: "deposit", amount: 5_000_000 }]);
     });
+    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 1\.250\.000/);
+  });
+});
+
+describe("JarConfigProvider — template replace guard (Red Team #11)", () => {
+  it("refuses applyTemplate without confirmation when it would delete funded jars", async () => {
+    const hook = await renderLoaded();
+    const puts = vi.fn();
+    interceptFetch((url, init) => {
+      if (url.startsWith("/api/jars") && init?.method === "PUT") puts();
+      return null;
+    });
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.applyTemplate("giaDinh");
+    });
+    expect(ok).toBe(false);
+    expect(puts).not.toHaveBeenCalled();
+    expect(hook.result.current.jars.mutationError).toMatch(/Áp mẫu sẽ xoá 5 hũ đang có số dư \(Thiết yếu, Ăn uống/);
+    expect(jarById(hook, "food")).toBeDefined();
+  });
+
+  it("applies it with confirmedBalanceLoss: new jars have no balance until a deposit", async () => {
+    const hook = await renderLoaded();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.applyTemplate("giaDinh", { confirmedBalanceLoss: true });
+    });
+    expect(ok).toBe(true);
+    expect(jarById(hook, "household")).toBeDefined();
+    expect(jarById(hook, "food")).toBeUndefined();
+    expect(ledgerOf(hook)).toEqual([]); // D3: no auto-seeded deposit
+  });
+
+  it("resetToSeed needs no confirmation when no funded jar is removed", async () => {
+    const hook = await renderLoaded();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await hook.result.current.jars.resetToSeed();
+    });
+    expect(ok).toBe(true);
     expect(hook.result.current.jars.mutationError).toBeNull();
   });
 });

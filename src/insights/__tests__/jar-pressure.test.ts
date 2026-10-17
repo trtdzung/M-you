@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Transaction } from "@/domain/models";
 import { currentMonthKey } from "@/lib/demo-clock";
 import { jarPressure } from "../detectors/jar-pressure";
 import { numbersIn, factValues } from "../narrate";
@@ -31,7 +32,7 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
               limitState: "set",
               status: "over",
               pct: 1.2,
-              remaining: -800_000,
+              balance: -800_000,
               thresholdHit: true,
             }),
           ],
@@ -60,7 +61,7 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
               limitState: "set",
               status: "near",
               pct: 0.9,
-              remaining: 100_000,
+              balance: 100_000,
               thresholdHit: true,
             }),
           ],
@@ -118,7 +119,7 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
                 limitState: "unset",
                 status: null,
                 pct: null,
-                remaining: null,
+                balance: null,
               }),
             ],
           }),
@@ -141,7 +142,7 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
                 limitState: "set",
                 status: "ok",
                 pct: 0.25,
-                remaining: 3_000_000,
+                balance: 3_000_000,
               }),
             ],
           }),
@@ -181,14 +182,24 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
     const covered = makeJarBudgetLine({
       huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000,
       limitState: "set", status: "over", pct: 1.2, rebalanceNet: 800_000,
-      remaining: 0, thresholdHit: true,
+      balance: 0, thresholdHit: true,
     });
     const short = makeJarBudgetLine({
       huId: "transport", label: "Đi lại", spent: 2_100_000, limit: 2_000_000,
-      limitState: "set", status: "over", pct: 1.05, remaining: -100_000, thresholdHit: true,
+      limitState: "set", status: "over", pct: 1.05, balance: -100_000, thresholdHit: true,
     });
+    // The covering rebalance the engine wrote for `covered` (pool → food, 800k).
+    const coverLeg = {
+      id: "reb-food", accountId: "acc", postedAt: "2026-09-10T10:00:00.000Z", amount: 800_000,
+      currency: "VND", direction: "debit", type: "transfer", merchantName: "Điều chỉnh hũ",
+      merchantNormalizedName: "dieu chinh hu", categoryId: "dieu-chinh-hu", status: "posted",
+      source: "self_reported", isRecurring: false, userEdited: false,
+      rebalance: { fromJarId: "pool", toJarId: "food", triggerTxnId: "trig", origin: "auto" },
+    } satisfies Transaction;
     const run = (lines: ReturnType<typeof makeJarBudgetLine>[]) =>
-      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines }) }));
+      jarPressure(
+        makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines }), jarRebalances: [coverLeg] }),
+      );
 
     it("hũ vượt kế hoạch nhưng đã được bù đủ tiền → nhường cho jarOverspendCovered, không bắn", () => {
       expect(run([covered])).toBeNull();
@@ -212,24 +223,79 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
       expect(facts.find((f) => f.label === "Cần bù")?.value).toBe(100_000);
     });
 
-    it("hũ còn tiền vẫn báo 'Còn lại' như cũ", () => {
+    it("hũ còn tiền báo 'Số dư' (trục số dư), không phải 'Còn lại' mơ hồ", () => {
       const nearLine = makeJarBudgetLine({
         huId: "fun", label: "Hưởng thụ", spent: 900_000, limit: 1_000_000,
-        limitState: "set", status: "near", pct: 0.9, remaining: 100_000, thresholdHit: true,
+        limitState: "set", status: "near", pct: 0.9, balance: 100_000, thresholdHit: true,
       });
       const insight = run([nearLine]);
-      expect(insight!.sourceFacts.find((f) => f.label === "Còn lại")?.value).toBe(100_000);
+      expect(insight!.sourceFacts.find((f) => f.label === "Số dư")?.value).toBe(100_000);
+      expect(insight!.sourceFacts.map((f) => f.label)).not.toContain("Còn lại");
       expect(insight!.sourceFacts.map((f) => f.label)).not.toContain("Cần bù");
     });
 
     it("hũ đã bù không che mất một hũ 'sắp chạm' khác", () => {
       const nearLine = makeJarBudgetLine({
         huId: "fun", label: "Hưởng thụ", spent: 900_000, limit: 1_000_000,
-        limitState: "set", status: "near", pct: 0.9, remaining: 100_000, thresholdHit: true,
+        limitState: "set", status: "near", pct: 0.9, balance: 100_000, thresholdHit: true,
       });
       const insight = run([covered, nearLine]);
       expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:fun`);
       expect(insight?.severity).toBe("attention");
+    });
+  });
+
+  describe("trục số dư tách khỏi trục hạn mức (plan 260923, Phase 05)", () => {
+    const run = (lines: ReturnType<typeof makeJarBudgetLine>[], extra: Parameters<typeof makeFinancials>[0] = {}) =>
+      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines }), ...extra }));
+
+    it("Case B: vượt hạn mức nhưng hũ vẫn còn số dư (nạp nhiều hơn hạn mức) → attention, fact 'Số dư' dương", () => {
+      const insight = run([
+        makeJarBudgetLine({
+          huId: "food", label: "Ăn uống", spent: 6_000_000, limit: 5_000_000,
+          limitState: "set", status: "over", pct: 1.2, balance: 1_000_000, thresholdHit: true,
+        }),
+      ]);
+      expect(insight?.title).toBe('Vượt hạn mức hũ "Ăn uống"');
+      expect(insight?.severity).toBe("attention");
+      expect(insight!.sourceFacts.find((f) => f.label === "Số dư")?.value).toBe(1_000_000);
+      expect(insight!.sourceFacts.map((f) => f.label)).not.toContain("Cần bù");
+      expect(insight!.explanation).toContain("Số dư hũ còn");
+      assertGrounded(insight!);
+    });
+
+    it("hũ hết số dư xếp trước hũ chỉ vượt hạn mức, dù pct thấp hơn", () => {
+      const insight = run([
+        makeJarBudgetLine({ huId: "a", label: "A", spent: 3_000_000, limit: 1_000_000, limitState: "set", status: "over", pct: 3, balance: 500_000 }),
+        makeJarBudgetLine({ huId: "b", label: "B", spent: 1_100_000, limit: 1_000_000, limitState: "set", status: "over", pct: 1.1, balance: -100_000 }),
+      ]);
+      expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:b`);
+      expect(insight?.severity).toBe("urgent");
+      expect(insight!.explanation).toContain("hết số dư");
+    });
+
+    it("số dư chưa biết (null) → không có fact số dư, không bao giờ hiện 0 (invariant #6)", () => {
+      const insight = run([
+        makeJarBudgetLine({ huId: "food", spent: 900_000, limit: 1_000_000, limitState: "set", status: "near", pct: 0.9, balance: null }),
+      ]);
+      const labels = insight!.sourceFacts.map((f) => f.label);
+      expect(labels).not.toContain("Số dư");
+      expect(labels).not.toContain("Cần bù");
+      expect(labels).not.toContain("Còn lại");
+      expect(insight?.severity).toBe("attention");
+    });
+
+    it("fact số dư mang provenance từ dòng số dư (envelope) — invariant #5", () => {
+      const insight = run(
+        [makeJarBudgetLine({ huId: "food", spent: 1_100_000, limit: 1_000_000, limitState: "set", status: "over", pct: 1.1, balance: -100_000 })],
+        {
+          jarEnvelope: {
+            ...makeFinancials().jarEnvelope,
+            jars: [{ jarId: "food", label: "Ăn uống", limit: 1_000_000, spent: 1_100_000, balance: -100_000, overLimit: true, inUse: true, source: "self_reported", freshness: null }],
+          },
+        },
+      );
+      expect(insight!.sourceFacts.find((f) => f.label === "Cần bù")?.source).toBe("self_reported");
     });
   });
 });
