@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Jar } from "@/domain/models";
 import { fitsCasaCap } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
-import { useCasaPool } from "@/state/use-casa-pool";
+import { useJarCapProbe } from "@/state/use-casa-pool";
 import { formatVnd } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { parseVndInput } from "./parse-vnd-input";
@@ -22,7 +22,7 @@ const toDraft = (limit: number | undefined) => (limit != null ? String(limit) : 
  */
 export function HuLimitField({ jar, jars }: { jar: Jar; jars: Jar[] }) {
   const { updateJar } = useJarConfig();
-  const casaPool = useCasaPool();
+  const { casa, spendableTotal } = useJarCapProbe();
   const persisted = jar.budgetLimit ?? undefined;
   const persistedRef = useRef(persisted);
   const [draft, setDraft] = useState(toDraft(persisted));
@@ -48,8 +48,13 @@ export function HuLimitField({ jar, jars }: { jar: Jar; jars: Jar[] }) {
       setDraft(toDraft(persisted)); // normalize "5.000.000" → stored form, no request
       return;
     }
-    if (next !== undefined) {
-      const cap = fitsCasaCap(jars, casaPool, { [jar.id]: next });
+    // BALANCE-lens preview (only a RAISE past CASA is blocked): compare Σ spendable
+    // before/after this one jar's new limit against the live CASA, the SAME rule the
+    // server applies. Skipped until the probe has loaded (spendableTotal null) — the
+    // server is the authority, so a not-yet-loaded preview never blocks.
+    if (next !== undefined && spendableTotal) {
+      const nextJars = jars.map((j) => (j.id === jar.id ? { ...j, budgetLimit: next } : j));
+      const cap = fitsCasaCap(spendableTotal(nextJars), spendableTotal(jars), casa);
       if (!cap.ok) {
         setError(
           cap.overBy == null
