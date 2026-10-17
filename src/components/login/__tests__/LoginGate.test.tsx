@@ -47,7 +47,6 @@ describe("LoginGate", () => {
     expect(within(combobox).getByRole("option", { name: "Ly Lã · CIF_0001" })).toBeInTheDocument();
     expect(within(combobox).getByRole("option", { name: "Toàn Trần · CIF_0002" })).toBeInTheDocument();
     expect(within(combobox).getByRole("option", { name: "Đào Nguyên · CIF_0003" })).toBeInTheDocument();
-    expect(within(combobox).getByRole("option", { name: "Tân Vũ · CIF_0004" })).toBeInTheDocument();
   });
 
   it("logs in with a correct CIF + password and switches to the matching persona", () => {

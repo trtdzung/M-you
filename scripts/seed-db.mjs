@@ -53,7 +53,6 @@ const SALARY_BASE_BY_CIF = {
   CIF_0001: 25_000_000,
   CIF_0002: 22_000_000,
   CIF_0003: 80_000_000,
-  CIF_0004: 20_000_000, // "fresh" demo persona — income only, jars seeded with NULL limits
 };
 const SALARY_REF = 25_000_000;
 const CIFS = Object.keys(SALARY_BASE_BY_CIF);
@@ -69,7 +68,6 @@ const PERSONA_ACCOUNTS = {
   CIF_0001: { personaId: "stable", seed: 1001, tier: "M-FIRST GOLD" },
   CIF_0002: { personaId: "irregular", seed: 2002, tier: "M-FIRST" },
   CIF_0003: { personaId: "wealthy", seed: 3003, tier: "M-FIRST PRIVATE" },
-  CIF_0004: { personaId: "fresh", seed: 4004, tier: "M-FIRST" },
 };
 const ACCT_SYNCED_AT = "2026-09-15T00:00:00.000Z";
 
@@ -172,11 +170,9 @@ const insertAllJars = db.transaction(() => {
     const scale = SALARY_BASE_BY_CIF[cif] / SALARY_REF;
     SEED_JARS.forEach((jar, index) => {
       // Scale each jar's single number by the persona's factor; an unset limit
-      // (savings) stays NULL — never coerced to 0 (invariant #6). The "fresh"
-      // persona seeds EVERY jar with a NULL limit — a new user who hasn't set
-      // any hạn mức yet.
+      // (savings) stays NULL — never coerced to 0 (invariant #6).
       const scaledLimit =
-        cif === "CIF_0004" || jar.budgetLimit === undefined ? null : Math.round(jar.budgetLimit * scale);
+        jar.budgetLimit === undefined ? null : Math.round(jar.budgetLimit * scale);
       insertJar.run({
         id: jar.id,
         cif,

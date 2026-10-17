@@ -13,7 +13,6 @@ export const LOGIN_DISPLAY_NAME: Record<string, string> = {
   CIF_0001: "Ly Lã",
   CIF_0002: "Toàn Trần",
   CIF_0003: "Đào Nguyên",
-  CIF_0004: "Tân Vũ",
 };
 
 /**

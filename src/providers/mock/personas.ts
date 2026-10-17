@@ -15,7 +15,7 @@ import type {
 } from "@/domain/models";
 import { budgetsFromJars, DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 
-export type PersonaId = "stable" | "irregular" | "wealthy" | "fresh";
+export type PersonaId = "stable" | "irregular" | "wealthy";
 export const DEFAULT_PERSONA: PersonaId = "stable";
 
 /** Tunables the transaction generator reads. */
@@ -140,32 +140,10 @@ const WEALTHY: PersonaMeta = {
   products: MSB_PRODUCTS,
 };
 
-/**
- * A brand-new account: monthly salary lands, nothing has been spent, and no jar
- * has a limit yet (seeded with NULL budgetLimit — see scripts/seed-db.mjs). No
- * hand-authored assets/liabilities/goals — a genuine zero state to walk the
- * onboarding + jar-allocation flow. `incomeOnly` drives the generator to emit
- * money-in only; `housingBase`/`discretionaryScale` are inert while it is set.
- */
-const FRESH: PersonaMeta = {
-  id: "fresh",
-  cif: "CIF_0004",
-  label: "Tân Vũ — Mới mở tài khoản",
-  description: "Chỉ có lương về hằng tháng, chưa chi tiêu, chưa đặt hạn mức hũ — dùng để thử luồng thiết lập từ đầu.",
-  tier: "M-FIRST",
-  params: { seed: 4004, salaryBase: 20_000_000, salaryVariance: 0.02, discretionaryScale: 1, extraIncomeChance: 0.1, housingBase: 0, incomeOnly: true },
-  assets: [],
-  liabilities: [],
-  budgets: [],
-  goals: [],
-  products: MSB_PRODUCTS,
-};
-
 export const PERSONAS: Record<PersonaId, PersonaMeta> = {
   stable: STABLE,
   irregular: IRREGULAR,
   wealthy: WEALTHY,
-  fresh: FRESH,
 };
 
-export const PERSONA_LIST: PersonaMeta[] = [STABLE, IRREGULAR, WEALTHY, FRESH];
+export const PERSONA_LIST: PersonaMeta[] = [STABLE, IRREGULAR, WEALTHY];
