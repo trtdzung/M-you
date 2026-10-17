@@ -17,7 +17,7 @@ export function GoalDetailHeader({ goal }: { goal: SavingsGoalView }) {
       <GoalProgressBar percent={goal.progress.percent} state={goal.progress.state} />
       <div className="flex items-center justify-between gap-2">
         <p className="text-[14px] text-muted">{goal.progress.percent}% hoàn thành</p>
-        <GoalMilestoneLabel milestone={goal.progress.milestone} />
+        {goal.currentAmount > 0 && <GoalMilestoneLabel milestone={goal.progress.milestone} />}
       </div>
       <p className="rounded-xl bg-surface-muted p-3 text-[14px] text-text">{goal.currentAmount >= goal.targetAmount ? "Bạn đã đạt số tiền mục tiêu!" : `Còn cần ${formatGoalMoney(goal.targetAmount - goal.currentAmount)} VND`}</p>
     </div>

@@ -46,7 +46,7 @@ describe("GoalStatusBadge", () => {
 describe("FlexibilityBadge", () => {
   it("labels fixed and flexible goals", () => {
     const { rerender } = render(<FlexibilityBadge flexibility="fixed" />);
-    expect(screen.getByText("Cứng")).toBeInTheDocument();
+    expect(screen.getByText("Hạn cố định")).toBeInTheDocument();
     rerender(<FlexibilityBadge flexibility="flexible" />);
     expect(screen.getByText("Có thể lùi")).toBeInTheDocument();
   });

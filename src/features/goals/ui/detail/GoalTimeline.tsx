@@ -9,7 +9,10 @@ import type { GoalLedgerEntry, SavingsGoalView } from "../../model/types";
 export function GoalTimeline({ goal, ledger }: { goal: SavingsGoalView; ledger: GoalLedgerEntry[] }) {
   const now = transferNow().getTime();
   const points = buildGoalTimeline(goal, ledger, new Date(now));
-  const dateLabel = (time: number) => new Date(time).toLocaleDateString("vi-VN", { month: "2-digit", year: "2-digit", timeZone: "Asia/Ho_Chi_Minh" });
+  const dateLabel = (time: number) => {
+    const date = new Date(time);
+    return `${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
+  };
   return <section className="rounded-2xl border border-border bg-surface p-4">
     <h2 className="text-[18px] font-semibold text-text">Hành trình tích lũy</h2>
     <p className="mt-1 text-[13px] leading-5 text-muted">So sánh số đã ghi nhận với kế hoạch đến hạn.</p>
@@ -21,12 +24,13 @@ export function GoalTimeline({ goal, ledger }: { goal: SavingsGoalView; ledger: 
           <XAxis dataKey="time" type="number" domain={['dataMin','dataMax']} tickFormatter={dateLabel} tick={{fontSize:11}} minTickGap={32} axisLine={false} tickLine={false} />
           <YAxis width={76} tickFormatter={formatVndCompact} tick={{fontSize:11}} axisLine={false} tickLine={false} />
           <Tooltip labelFormatter={time => new Date(Number(time)).toLocaleDateString("vi-VN")} formatter={(amount: number) => `${amount.toLocaleString('en-US')} VND`} contentStyle={{borderRadius:12,fontSize:13}} />
-          <ReferenceLine x={now} stroke="#94a3b8" strokeDasharray="3 3" label={{value:'Hôm nay',position:'insideTopRight',fontSize:11}} />
+          <ReferenceLine x={now} stroke="#94a3b8" strokeDasharray="3 3"  />
           <Line name="Kế hoạch" dataKey="plan" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
           <Line name="Thực tế" dataKey="actual" type="stepAfter" connectNulls stroke="var(--color-primary)" strokeWidth={3} dot={{r:4}} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
-    <p className="mt-2 text-[12px] leading-5 text-muted">Kế hoạch tích lũy đều, chưa tính lãi.{ledger.length === 0 ? " Góp khoản đầu tiên để bắt đầu đường thực tế." : " Chạm biểu đồ để xem từng mốc."}</p>
+    <p className="mt-2 text-[12px] leading-5 text-muted">Đường dọc đánh dấu hôm nay.</p>
+    <p className="mt-1 text-[12px] leading-5 text-muted">Kế hoạch tích lũy đều, chưa tính lãi.{ledger.length === 0 ? " Góp khoản đầu tiên để bắt đầu đường thực tế." : " Chạm biểu đồ để xem từng mốc."}</p>
   </section>;
 }

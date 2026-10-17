@@ -8,7 +8,7 @@ export function LedgerHistory({ entries }: { entries: GoalLedgerEntry[] }) {
     <section className="flex flex-col gap-1">
       <h3 className="mb-2 text-[18px] font-semibold text-text">{GOALS_COPY.detail.history}</h3>
       {entries.length === 0 ? (
-        <p className="py-4 text-[14px] leading-6 text-muted">Chưa có lần tích lũy nào. Bấm Góp để ghi nhận khoản đầu tiên.</p>
+        <p className="text-[14px] leading-6 text-muted">Chưa có lịch sử. Bấm Góp để ghi nhận khoản đầu tiên.</p>
       ) : (
         <ul className="divide-y divide-border">
           {entries.map((e) => (

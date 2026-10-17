@@ -52,7 +52,7 @@ export const GOALS_COPY = {
     surplusHint: "Chưa đủ dữ liệu giao dịch để tính. Nhập ước tính của bạn.",
   },
 
-  flexibility: { fixed: "Cứng", flexible: "Có thể lùi" } satisfies Record<GoalFlexibility, string>,
+  flexibility: { fixed: "Hạn cố định", flexible: "Có thể lùi" } satisfies Record<GoalFlexibility, string>,
   status: {
     active: "Đang chạy",
     paused: "Tạm dừng",
