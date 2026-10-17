@@ -53,11 +53,21 @@ function ready() {
 describe("streaming microphone lifecycle", () => {
   it("streams audio before stop, delivers revised partials and flushes the tail before stop", async () => {
     const cb = callbacks();
-    const speech = new StreamingSpeech(cb, ["hũ Ăn uống", "hũ Tiết kiệm"], "manual");
+    const speech = new StreamingSpeech(cb, {
+      keyterms: ["hũ Ăn uống", "hũ Tiết kiệm"],
+      endpointing: "manual",
+      entities: [{ id: "food", type: "budget_jar", label: "Ăn uống", aliases: ["hũ Ăn uống"] }],
+      intents: ["transfer_between_jars"],
+    });
     await speech.start();
     expect(fetch).toHaveBeenCalledWith("/api/stt/session", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ keyterms: ["hũ Ăn uống", "hũ Tiết kiệm"], endpointing: "manual" }),
+      body: JSON.stringify({
+        keyterms: ["hũ Ăn uống", "hũ Tiết kiệm"],
+        endpointing: "manual",
+        entities: [{ id: "food", type: "budget_jar", label: "Ăn uống", aliases: ["hũ Ăn uống"] }],
+        intents: ["transfer_between_jars"],
+      }),
     }));
     ready();
     expect(socket.url).not.toContain("ticket");
@@ -75,8 +85,17 @@ describe("streaming microphone lifecycle", () => {
     worklet.port.onmessage?.({ data: { type: "audio", pcm: tail } });
     worklet.port.onmessage?.({ data: { type: "flushed" } });
     expect(socket.send.mock.calls.slice(-2).map(([value]) => value)).toEqual([tail, JSON.stringify({ type: "stop" })]);
-    socket.receive({ type: "final", text: "Chi tiêu tháng này?" });
-    expect(cb.onTranscript).toHaveBeenLastCalledWith("Chi tiêu tháng này?", true);
+    socket.receive({
+      type: "final",
+      text: "Chi tiêu tháng này?",
+      raw_text: "chi tiêu tháng này",
+      refinement_status: "refined",
+      interpretation: null,
+    });
+    expect(cb.onTranscript).toHaveBeenLastCalledWith("Chi tiêu tháng này?", true, {
+      rawText: "chi tiêu tháng này",
+      refinementStatus: "refined",
+    });
     expect(cb.onState).toHaveBeenLastCalledWith("idle");
     expect(stopTrack).toHaveBeenCalled();
     expect(closeContext).toHaveBeenCalled();
@@ -101,7 +120,10 @@ describe("streaming microphone lifecycle", () => {
     expect(stopTrack).toHaveBeenCalled();
     expect(cb.onState).toHaveBeenLastCalledWith("finishing");
     socket.receive({ type: "final", text: "Số dư của tôi" });
-    expect(cb.onTranscript).toHaveBeenCalledWith("Số dư của tôi", true);
+    expect(cb.onTranscript).toHaveBeenCalledWith("Số dư của tôi", true, {
+      rawText: "Số dư của tôi",
+      refinementStatus: "disabled",
+    });
     expect(cb.onError).not.toHaveBeenCalled();
   });
   it("fails and releases the mic on backpressure or unexpected disconnect", async () => {

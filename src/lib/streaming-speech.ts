@@ -1,9 +1,35 @@
+import type {
+  SpeechFinalMetadata,
+  SpeechIntentInterpretation,
+  SpeechSessionOptions,
+  SpeechTranscriptCallback,
+} from "./speech-types";
+
 export type SpeechState = "idle" | "connecting" | "recording" | "finishing";
-export type SpeechEndpointing = "silence" | "manual";
 interface Callbacks {
   onState: (state: SpeechState) => void;
-  onTranscript: (text: string, final: boolean) => void;
+  onTranscript: SpeechTranscriptCallback;
   onError: (message: string) => void;
+}
+
+const REFINEMENT_STATUSES = new Set(["disabled", "refined", "unchanged", "fallback", "skipped"]);
+const INTERPRETATION_STATUSES = new Set(["complete", "incomplete", "ambiguous"]);
+
+function readInterpretation(value: unknown): SpeechIntentInterpretation | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const item = value as Partial<SpeechIntentInterpretation>;
+  if (
+    typeof item.intent !== "string" ||
+    !INTERPRETATION_STATUSES.has(String(item.status)) ||
+    typeof item.confidence !== "number" ||
+    typeof item.actionable !== "boolean" ||
+    typeof item.negated !== "boolean" ||
+    !Array.isArray(item.slots) ||
+    !Array.isArray(item.missing_slots) ||
+    !Array.isArray(item.ambiguous_slots) ||
+    (item.clarification !== null && typeof item.clarification !== "string")
+  ) return undefined;
+  return item as SpeechIntentInterpretation;
 }
 
 /** One mic activation = one bounded utterance. No audio or tokens are saved. */
@@ -21,8 +47,7 @@ export class StreamingSpeech {
 
   constructor(
     private callbacks: Callbacks,
-    private keyterms: string[] = [],
-    private endpointing: SpeechEndpointing = "silence",
+    private options: SpeechSessionOptions = {},
   ) {}
 
   private deadline(ms: number, message: string) {
@@ -50,7 +75,12 @@ export class StreamingSpeech {
       const response = await fetch("/api/stt/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyterms: this.keyterms, endpointing: this.endpointing }),
+        body: JSON.stringify({
+          keyterms: this.options.keyterms ?? [],
+          endpointing: this.options.endpointing ?? "silence",
+          entities: this.options.entities ?? [],
+          intents: this.options.intents ?? [],
+        }),
         signal: this.abort.signal,
       });
       const session = await response.json();
@@ -101,7 +131,20 @@ export class StreamingSpeech {
         this.deadline(35_000, "Phiên ghi âm đã hết thời gian. Hãy thử lại với câu ngắn hơn.");
       } else if (message.type === "partial" || message.type === "final") {
         if (typeof message.text !== "string") throw new Error("Invalid transcript");
-        this.callbacks.onTranscript(message.text, message.type === "final");
+        if (message.type === "partial") {
+          this.callbacks.onTranscript(message.text, false);
+        } else {
+          const refinementStatus = REFINEMENT_STATUSES.has(message.refinement_status)
+            ? message.refinement_status as SpeechFinalMetadata["refinementStatus"]
+            : "disabled";
+          const metadata: SpeechFinalMetadata = {
+            rawText: typeof message.raw_text === "string" ? message.raw_text : message.text,
+            refinementStatus,
+          };
+          const interpretation = readInterpretation(message.interpretation);
+          if (interpretation) metadata.interpretation = interpretation;
+          this.callbacks.onTranscript(message.text, true, metadata);
+        }
         if (message.type === "final") {
           this.finalReceived = true;
           this.cancel();

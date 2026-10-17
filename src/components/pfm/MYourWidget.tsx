@@ -8,7 +8,8 @@ import { cn } from "@/lib/cn";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
-import { jarSpeechKeyterms } from "@/lib/speech-context";
+import { jarSpeechContext } from "@/lib/speech-context";
+import type { SpeechFinalMetadata } from "@/lib/speech-types";
 import {
   getChatHistory,
   sendChatMessage,
@@ -63,8 +64,8 @@ export function MYourWidget() {
   const { persona } = usePersona();
   const { config: jarConfig } = useJarConfig();
   const cif = persona.cif;
-  const speechKeyterms = useMemo(
-    () => jarSpeechKeyterms(jarConfig.jars.map((jar) => jar.label)),
+  const speechContext = useMemo(
+    () => jarSpeechContext(jarConfig.jars.map((jar) => ({ id: jar.id, label: jar.label }))),
     [jarConfig.jars],
   );
   const router = useRouter();
@@ -79,6 +80,7 @@ export function MYourWidget() {
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [locked, setLocked] = useState(false);
+  const [voiceGuidance, setVoiceGuidance] = useState("");
   const idRef = useRef(0);
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,14 +88,20 @@ export function MYourWidget() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voicePrefix = useRef("");
 
-  const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean) => {
+  const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean, metadata?: SpeechFinalMetadata) => {
     // Partials are useful to the recognizer but are deliberately hidden from the
     // composer. The server emits `final` only after OpenAI refinement/fallback.
     if (!final) return;
     setInput(composeVoiceDraft(voicePrefix.current, text.trim()));
+    const interpretation = metadata?.interpretation;
+    setVoiceGuidance(
+      interpretation?.intent === "transfer_between_jars" && !interpretation.actionable
+        ? interpretation.clarification || "Mình chưa nghe đủ thông tin chuyển tiền. Bạn có thể bổ sung trước khi gửi."
+        : "",
+    );
   }, []);
 
-  const voice = useStreamingSpeech(acceptFinalVoiceTranscript, speechKeyterms, "silence");
+  const voice = useStreamingSpeech(acceptFinalVoiceTranscript, { ...speechContext, endpointing: "silence" });
   const voiceBusy = voice.state !== "idle";
   const cancelVoice = voice.cancel;
 
@@ -172,6 +180,7 @@ export function MYourWidget() {
     const replyId = `m${++idRef.current}`;
     setMessages((prev) => [...prev, { id: userId, role: "user", text }]);
     setInput("");
+    setVoiceGuidance("");
     setSending(true);
     try {
       const res = await sendChatMessage(text, cif);
@@ -303,7 +312,10 @@ export function MYourWidget() {
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  setVoiceGuidance("");
+                }}
                 onKeyDown={handleKey}
                 rows={1}
                 disabled={composerDisabled || voiceBusy}
@@ -316,6 +328,7 @@ export function MYourWidget() {
                   if (voiceBusy) voice.stop();
                   else {
                     voicePrefix.current = input.trim();
+                    setVoiceGuidance("");
                     voice.start();
                   }
                 }}
@@ -336,7 +349,7 @@ export function MYourWidget() {
                 <Send size={16} />
               </button>
             </div>
-            {(voiceBusy || voice.error) && (
+            {(voiceBusy || voice.error || voiceGuidance) && (
               <div
                 role={voice.error ? "alert" : "status"}
                 aria-live="polite"
@@ -344,7 +357,7 @@ export function MYourWidget() {
               >
                 {!voice.error && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />}
                 <span>
-                  {voice.error || (voice.state === "connecting"
+                  {voice.error || voiceGuidance || (voice.state === "connecting"
                     ? "Đang chuẩn bị micro…"
                     : voice.state === "recording"
                       ? "Mình đang nghe… Bấm dừng khi bạn nói xong."

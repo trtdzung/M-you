@@ -8,7 +8,8 @@ import { cn } from "@/lib/cn";
 import { usePersona } from "@/providers/context";
 import { sendChatMessage, isChartUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
-import { jarSpeechKeyterms } from "@/lib/speech-context";
+import { jarSpeechContext } from "@/lib/speech-context";
+import type { SpeechFinalMetadata } from "@/lib/speech-types";
 import { useJarConfig } from "@/state/jars";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
@@ -84,8 +85,8 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const { persona } = usePersona();
   const { config: jarConfig } = useJarConfig();
   const cif = persona.cif;
-  const speechKeyterms = useMemo(
-    () => jarSpeechKeyterms(jarConfig.jars.map((jar) => jar.label)),
+  const speechContext = useMemo(
+    () => jarSpeechContext(jarConfig.jars.map((jar) => ({ id: jar.id, label: jar.label }))),
     [jarConfig.jars],
   );
   const [sectionOpen, setSectionOpen] = useState(false);
@@ -110,12 +111,20 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     }
   }, [cif, sending, transcript]);
 
-  const voice = useStreamingSpeech((text, final) => {
+  const voice = useStreamingSpeech((text, final, metadata?: SpeechFinalMetadata) => {
     if (!final) return;
     const refinedText = text.trim();
     setTranscript(refinedText);
+    const interpretation = metadata?.interpretation;
+    if (interpretation?.intent === "transfer_between_jars" && !interpretation.actionable) {
+      setReply({
+        answer: interpretation.clarification || "Mình chưa nghe đủ thông tin chuyển tiền. Bạn vui lòng nói lại rõ hơn nhé.",
+        ui: null,
+      });
+      return;
+    }
     if (refinedText) void handleSend(refinedText);
-  }, speechKeyterms, "manual");
+  }, { ...speechContext, endpointing: "manual" });
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
 

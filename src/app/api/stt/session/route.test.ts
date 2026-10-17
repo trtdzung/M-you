@@ -3,11 +3,19 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
 
-function request(origin = "http://localhost:3000", keyterms?: unknown[], endpointing?: unknown) {
+function request(
+  origin = "http://localhost:3000",
+  keyterms?: unknown[],
+  endpointing?: unknown,
+  entities?: unknown[],
+  intents?: unknown[],
+) {
   return new NextRequest("http://localhost:3000/api/stt/session", {
     method: "POST",
     headers: { origin, "content-type": "application/json" },
-    body: keyterms || endpointing ? JSON.stringify({ keyterms, endpointing }) : undefined,
+    body: keyterms || endpointing || entities || intents
+      ? JSON.stringify({ keyterms, endpointing, entities, intents })
+      : undefined,
   });
 }
 beforeEach(() => {
@@ -27,7 +35,7 @@ describe("STT ticket proxy", () => {
     expect(JSON.stringify(body)).not.toContain("private-server-key");
     expect(fetchMock.mock.calls[0][1].headers["x-api-key"]).toBe("private-server-key");
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      origin: "http://localhost:3000", keyterms: [], endpointing: "silence",
+      origin: "http://localhost:3000", keyterms: [], endpointing: "silence", entities: [], intents: [],
     });
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -51,6 +59,21 @@ describe("STT ticket proxy", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).endpointing).toBe("manual");
     await POST(request("http://localhost:3000", [], "unexpected"));
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).endpointing).toBe("silence");
+  });
+  it("sanitizes and forwards dynamic entities plus supported intents", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({
+      token: "ticket", sample_rate: 16000, format: "pcm_s16le", channels: 1,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    await POST(request("http://localhost:3000", [], "manual", [
+      { id: "custom-trip", type: "budget_jar", label: " Du lịch Bali ", aliases: [" hũ Du lịch Bali "] },
+      { id: "bad id", type: "budget_jar", label: "Bỏ qua", aliases: [] },
+    ], ["transfer_between_jars", "unsupported"]));
+    const forwarded = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(forwarded.entities).toEqual([{
+      id: "custom-trip", type: "budget_jar", label: "Du lịch Bali", aliases: ["hũ Du lịch Bali"],
+    }]);
+    expect(forwarded.intents).toEqual(["transfer_between_jars"]);
   });
   it("rejects cross-origin requests before contacting STT", async () => {
     const fetchMock = vi.fn();

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
+import type { SpeechFinalMetadata, SpeechSessionOptions } from "@/lib/speech-types";
 
 // The overlay opens only via `?assistant=1` (VoiceFab's "Chuyển qua Chat" hand-off).
 vi.mock("next/navigation", () => ({
@@ -14,16 +15,16 @@ vi.mock("@/state/jars", () => ({
 }));
 
 const voice = vi.hoisted(() => ({
-  callbacks: null as null | { onState: (state: string) => void; onTranscript: (text: string, final: boolean) => void; onError: (message: string) => void },
+  callbacks: null as null | { onState: (state: string) => void; onTranscript: (text: string, final: boolean, metadata?: SpeechFinalMetadata) => void; onError: (message: string) => void },
   cancel: vi.fn(), stop: vi.fn(), keyterms: [] as string[],
-  endpointing: "" as string,
+  options: {} as SpeechSessionOptions,
 }));
 vi.mock("@/lib/streaming-speech", () => ({
   StreamingSpeech: class {
-    constructor(callbacks: typeof voice.callbacks, keyterms: string[], endpointing: string) {
+    constructor(callbacks: typeof voice.callbacks, options: SpeechSessionOptions) {
       voice.callbacks = callbacks;
-      voice.keyterms = keyterms;
-      voice.endpointing = endpointing;
+      voice.keyterms = options.keyterms ?? [];
+      voice.options = options;
     }
     start() { voice.callbacks!.onState("recording"); }
     stop = voice.stop;
@@ -51,7 +52,7 @@ describe("M-Your voice composer", () => {
     fireEvent.change(input, { target: { value: "Cho tôi biết" } });
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
     expect(voice.keyterms).toContain("hũ Ăn uống");
-    expect(voice.endpointing).toBe("silence");
+    expect(voice.options.endpointing).toBe("silence");
     act(() => voice.callbacks!.onTranscript("chi tiêu", false));
     act(() => voice.callbacks!.onTranscript("chi tiêu tháng này", false));
     expect(input).toHaveValue("Cho tôi biết");
@@ -80,5 +81,23 @@ describe("M-Your voice composer", () => {
     act(() => { voice.callbacks!.onError("Mất kết nối"); voice.callbacks!.onState("idle"); });
     expect(input).toHaveValue("Bản nháp");
     expect(screen.getByRole("alert")).toHaveTextContent("Mất kết nối");
+  });
+  it("keeps an incomplete command editable and shows the specific follow-up", async () => {
+    await openWidget();
+    fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
+    act(() => {
+      voice.callbacks!.onTranscript("Chuyển 500.000 VND sang hũ Ăn uống", true, {
+        rawText: "Chuyển năm trăm nghìn sang hũ ăn uống",
+        refinementStatus: "fallback",
+        interpretation: {
+          intent: "transfer_between_jars", status: "incomplete", confidence: 0.85,
+          actionable: false, negated: false, slots: [], missing_slots: ["source"],
+          ambiguous_slots: [], clarification: "Bạn muốn chuyển tiền từ hũ nào?",
+        },
+      });
+      voice.callbacks!.onState("idle");
+    });
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toHaveValue("Chuyển 500.000 VND sang hũ Ăn uống");
+    expect(screen.getByRole("status")).toHaveTextContent("Bạn muốn chuyển tiền từ hũ nào?");
   });
 });
