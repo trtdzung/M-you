@@ -1,0 +1,108 @@
+// Types shared by engine, server, API and UI of the goals feature.
+
+export type GoalFlexibility = "fixed" | "flexible";
+export type GoalStatus = "active" | "paused" | "archived";
+export type GoalLedgerKind = "deposit" | "withdraw";
+
+/** Persisted goal row (camelCase of `user_goals`). Amounts are integer VND. */
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  /** "YYYY-MM-DD". */
+  targetDate: string;
+  flexibility: GoalFlexibility;
+  /** null = not set (not the same as 0). */
+  monthlyContribution: number | null;
+  status: GoalStatus;
+  jarId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  source: "self_reported";
+}
+
+/** Persisted ledger row (camelCase of `user_goal_ledger`). */
+export interface GoalLedgerEntry {
+  id: string;
+  goalId: string;
+  kind: GoalLedgerKind;
+  amount: number;
+  /** Commitment phrase when withdrawing. */
+  note: string | null;
+  createdAt: string;
+  source: "self_reported";
+}
+
+export interface GoalCreateInput {
+  name: string;
+  targetAmount: number;
+  targetDate: string;
+  flexibility: GoalFlexibility;
+  monthlyContribution: number | null;
+  /** Amount already saved; recorded as the first deposit. */
+  openingAmount: number | null;
+}
+
+export interface GoalUpdateInput {
+  name?: string;
+  targetAmount?: number;
+  targetDate?: string;
+  flexibility?: GoalFlexibility;
+  monthlyContribution?: number | null;
+  status?: GoalStatus;
+}
+
+export interface LedgerEntryInput {
+  kind: GoalLedgerKind;
+  amount: number;
+  note: string | null;
+}
+
+/** Field name -> Vietnamese error message. */
+export type FieldErrors = Record<string, string>;
+
+export type ValidationResult<T> =
+  | { ok: true; value: T; errors: FieldErrors }
+  | { ok: false; value: null; errors: FieldErrors };
+
+export type GoalProgressState =
+  | "on_track"
+  | "ahead"
+  | "slightly_behind"
+  | "off_track";
+
+export interface GoalProgress {
+  /** 0-100, one decimal. */
+  percent: number;
+  milestone: 0 | 25 | 50 | 75 | 100;
+  state: GoalProgressState;
+  expectedAmount: number;
+}
+
+export type FeasibilityResult = "met" | "feasible" | "infeasible" | "unknown";
+
+export interface GoalFeasibility {
+  monthsLeft: number;
+  requiredMonthly: number;
+  surplus: number | "unknown";
+  result: FeasibilityResult;
+  source: "estimated" | "self_reported";
+}
+
+export type Lever =
+  | { kind: "extend_date"; newDate: string; months: number }
+  | { kind: "reduce_amount"; newTarget: number }
+  | {
+      kind: "cut_category";
+      categoryId: string;
+      cutPerMonth: number;
+      /** false = cutting this category alone is not enough. */
+      enough: boolean;
+    };
+
+/** Goal enriched with derived numbers; what list/detail screens render. */
+export interface SavingsGoalView extends SavingsGoal {
+  currentAmount: number;
+  progress: GoalProgress;
+  feasibility: GoalFeasibility;
+}
