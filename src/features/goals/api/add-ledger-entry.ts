@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { transferNow } from "@/lib/demo-clock";
 import { validateLedgerEntry } from "../model/validate-ledger";
-import { withCurrentAmount } from "../server/goal-amount";
+import { goalCashflowInput } from "../server/cashflow-input";
+import { loadGoalView } from "../server/goal-view";
 import { getGoal } from "../server/goals-repo";
 import { appendLedger, InsufficientGoalFundsError } from "../server/ledger-repo";
 import { cifOf, invalid, missingCif, notFound, readJson, type RouteCtx } from "./_http";
@@ -16,8 +17,9 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   if (!result.ok) return invalid(result.errors);
   if (!getGoal(cif, id)) return notFound();
   try {
-    const entry = appendLedger(cif, id, result.value, transferNow());
-    const goal = withCurrentAmount(cif, getGoal(cif, id)!);
+    const now = transferNow();
+    const entry = appendLedger(cif, id, result.value, now);
+    const goal = loadGoalView(cif, getGoal(cif, id)!, now, goalCashflowInput(cif, now));
     return NextResponse.json({ entry, goal }, { status: 201 });
   } catch (e) {
     if (e instanceof InsufficientGoalFundsError) return invalid({ amount: "Vượt số đã góp" });

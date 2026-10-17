@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { transferNow } from "@/lib/demo-clock";
 import { validateGoalUpdate } from "../model/validate-goal";
-import { withCurrentAmount } from "../server/goal-amount";
+import { goalCashflowInput } from "../server/cashflow-input";
+import { loadGoalView } from "../server/goal-view";
 import { updateGoal } from "../server/goals-repo";
 import { cifOf, invalid, missingCif, notFound, readJson, type RouteCtx } from "./_http";
 
@@ -16,5 +17,5 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
   if (!result.ok) return invalid(result.errors);
   const goal = updateGoal(cif, id, result.value, now);
   if (!goal) return notFound();
-  return NextResponse.json({ goal: withCurrentAmount(cif, goal) });
+  return NextResponse.json({ goal: loadGoalView(cif, goal, now, goalCashflowInput(cif, now)) });
 }
