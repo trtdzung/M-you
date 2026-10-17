@@ -8,6 +8,7 @@ vi.mock("../../../client/hooks/use-goal-coach", () => ({ useGoalCoach: () => ({
   ...coach, turns: [{ role: "customer", text: "Mua xe" }], question: null,
   answers: [], answer: vi.fn(),
 }) }));
+vi.mock("../../../client/hooks/use-goal-advisor", () => ({ useGoalAdvisor: () => ({ phase: "failed", analysis: null }) }));
 beforeEach(() => { coach.reset.mockReset(); coach.start.mockReset(); coach.phase = "need_info"; coach.draft = null; });
 
 it("requires confirmation before resetting the conversation from the menu", async () => {

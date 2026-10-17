@@ -5,12 +5,15 @@ import { MessageSquarePlus, MoreHorizontal, Sparkles } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
+import { useGoalAdvisor } from "../../client/hooks/use-goal-advisor";
+import { coachDraftToAnalyze } from "../../advisor/to-analyze-draft";
 import { draftToForm } from "../../coach/to-form";
 import { CoachFallback } from "../coach/CoachFallback";
 import { CoachInput } from "../coach/CoachInput";
 import { CoachOutOfScope } from "../coach/CoachOutOfScope";
 import { CoachQuestion } from "../coach/CoachQuestion";
 import { CoachTranscript } from "../coach/CoachTranscript";
+import { GoalAdvisorCard } from "../advisor/GoalAdvisorCard";
 import { GOALS_COPY } from "../copy";
 import { primaryButton, secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
@@ -18,6 +21,8 @@ import { CreateGoalFlow } from "./CreateGoalFlow";
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
 export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => void; active?: boolean }) {
   const coach = useGoalCoach();
+  const analyzeDraft = coach.draft ? coachDraftToAnalyze(coach.draft, transferNow()) : null;
+  const advisor = useGoalAdvisor(analyzeDraft, coach.requestId);
   const [reviewing, setReviewing] = useState(false);
   const [manual, setManual] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,7 +105,10 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           <button type="button" onClick={() => setConfirmNew(false)} className={secondaryButton}>Tiếp tục trò chuyện</button>
         </div>
       </Sheet>}
-      {coach.draft && !reviewing && <section className="rounded-2xl border border-border bg-surface p-5">
+      {coach.draft && !reviewing && analyzeDraft && advisor.phase !== "failed" && (
+        <GoalAdvisorCard draft={analyzeDraft} analysis={advisor.analysis} onReview={() => setReviewing(true)} />
+      )}
+      {coach.draft && !reviewing && (!analyzeDraft || advisor.phase === "failed") && <section className="rounded-2xl border border-border bg-surface p-5">
         <h3 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h3>
         <p className="mt-3 break-words text-[16px] font-medium">{coach.draft.name}</p>
         <p className="mt-2 text-[24px] font-semibold tabular-nums">{coach.draft.target_amount.toLocaleString("en-US")} <span className="text-[13px] font-normal text-muted">VND</span></p>

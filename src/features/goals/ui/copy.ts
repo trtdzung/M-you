@@ -36,6 +36,23 @@ export const GOALS_COPY = {
     unavailable: "Mình chưa hiểu được lúc này. Bạn có thể tự nhập mục tiêu.",
     manual: "Tự nhập",
     yourSentence: (text: string) => `Bạn đã nói: “${text}”`,
+    reviewAndCreate: "Kiểm tra và tạo mục tiêu",
+  },
+
+  advisor: {
+    stepsLabel: "Các bước phân tích",
+    step1: "Hiểu mục tiêu của bạn",
+    step2: "Đối chiếu dòng tiền của bạn",
+    step3: "Kết luận",
+    calculating: "Đang tính…",
+    unknownValue: "Chưa rõ",
+    sourceMock: (months: number) => `Dữ liệu mô phỏng, ${months} tháng`,
+    verdict: {
+      feasible: "Khả thi",
+      stretch: "Khả thi nhưng khá sát",
+      not_feasible: "Cần điều chỉnh",
+      unknown: "Chưa đủ dữ liệu",
+    },
   },
 
   form: {
