@@ -101,6 +101,16 @@ describe("validateGoalUpdate", () => {
 
   it("validates status", () => {
     expect(validateGoalUpdate({ status: "paused" }, NOW).value).toEqual({ status: "paused" });
-    expect(validateGoalUpdate({ status: "done" }, NOW).errors.status).toBeDefined();
+    expect(validateGoalUpdate({ status: "active" }, NOW).value).toEqual({ status: "active" });
+    expect(validateGoalUpdate({ status: "archived" }, NOW).value).toEqual({ status: "archived" });
+    expect(validateGoalUpdate({ status: "done" }, NOW).errors.status).toBe("Trạng thái không hợp lệ");
+    expect(validateGoalUpdate({ status: 1 }, NOW).errors.status).toBeDefined();
+  });
+
+  it("rejects a bad flexibility and an oversized monthly contribution", () => {
+    expect(validateGoalUpdate({ flexibility: "loose" }, NOW).errors.flexibility).toBeDefined();
+    expect(
+      validateGoalUpdate({ monthlyContribution: MAX_VND + 1 }, NOW).errors.monthlyContribution,
+    ).toBeDefined();
   });
 });
