@@ -115,7 +115,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     const refinedText = text.trim();
     setTranscript(refinedText);
     if (refinedText) void handleSend(refinedText);
-  }, speechKeyterms);
+  }, speechKeyterms, "manual");
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
 

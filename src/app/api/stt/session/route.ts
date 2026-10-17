@@ -24,8 +24,13 @@ export async function POST(req: NextRequest) {
   }
   try {
     let keyterms: string[] = [];
+    let endpointing: "silence" | "manual" = "silence";
     try {
       const payload: unknown = await req.json();
+      if (payload && typeof payload === "object") {
+        const requestedEndpointing = (payload as { endpointing?: unknown }).endpointing;
+        if (requestedEndpointing === "manual" || requestedEndpointing === "silence") endpointing = requestedEndpointing;
+      }
       if (payload && typeof payload === "object" && Array.isArray((payload as { keyterms?: unknown }).keyterms)) {
         const seen = new Set<string>();
         keyterms = (payload as { keyterms: unknown[] }).keyterms
@@ -51,7 +56,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         ...(process.env.STT_SERVICE_API_KEY ? { "x-api-key": process.env.STT_SERVICE_API_KEY } : {}),
       },
-      body: JSON.stringify({ origin, keyterms }),
+      body: JSON.stringify({ origin, keyterms, endpointing }),
       cache: "no-store",
       signal: AbortSignal.any([req.signal, AbortSignal.timeout(10_000)]),
       redirect: "error",

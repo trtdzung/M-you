@@ -16,12 +16,14 @@ vi.mock("@/state/jars", () => ({
 const voice = vi.hoisted(() => ({
   callbacks: null as null | { onState: (state: string) => void; onTranscript: (text: string, final: boolean) => void; onError: (message: string) => void },
   cancel: vi.fn(), stop: vi.fn(), keyterms: [] as string[],
+  endpointing: "" as string,
 }));
 vi.mock("@/lib/streaming-speech", () => ({
   StreamingSpeech: class {
-    constructor(callbacks: typeof voice.callbacks, keyterms: string[]) {
+    constructor(callbacks: typeof voice.callbacks, keyterms: string[], endpointing: string) {
       voice.callbacks = callbacks;
       voice.keyterms = keyterms;
+      voice.endpointing = endpointing;
     }
     start() { voice.callbacks!.onState("recording"); }
     stop = voice.stop;
@@ -49,6 +51,7 @@ describe("M-Your voice composer", () => {
     fireEvent.change(input, { target: { value: "Cho tôi biết" } });
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
     expect(voice.keyterms).toContain("hũ Ăn uống");
+    expect(voice.endpointing).toBe("silence");
     act(() => voice.callbacks!.onTranscript("chi tiêu", false));
     act(() => voice.callbacks!.onTranscript("chi tiêu tháng này", false));
     expect(input).toHaveValue("Cho tôi biết");

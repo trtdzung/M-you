@@ -93,7 +93,7 @@ export function MYourWidget() {
     setInput(composeVoiceDraft(voicePrefix.current, text.trim()));
   }, []);
 
-  const voice = useStreamingSpeech(acceptFinalVoiceTranscript, speechKeyterms);
+  const voice = useStreamingSpeech(acceptFinalVoiceTranscript, speechKeyterms, "silence");
   const voiceBusy = voice.state !== "idle";
   const cancelVoice = voice.cancel;
 

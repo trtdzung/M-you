@@ -1,4 +1,5 @@
 export type SpeechState = "idle" | "connecting" | "recording" | "finishing";
+export type SpeechEndpointing = "silence" | "manual";
 interface Callbacks {
   onState: (state: SpeechState) => void;
   onTranscript: (text: string, final: boolean) => void;
@@ -18,7 +19,11 @@ export class StreamingSpeech {
   private abort = new AbortController();
   private timer?: ReturnType<typeof setTimeout>;
 
-  constructor(private callbacks: Callbacks, private keyterms: string[] = []) {}
+  constructor(
+    private callbacks: Callbacks,
+    private keyterms: string[] = [],
+    private endpointing: SpeechEndpointing = "silence",
+  ) {}
 
   private deadline(ms: number, message: string) {
     clearTimeout(this.timer);
@@ -45,7 +50,7 @@ export class StreamingSpeech {
       const response = await fetch("/api/stt/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyterms: this.keyterms }),
+        body: JSON.stringify({ keyterms: this.keyterms, endpointing: this.endpointing }),
         signal: this.abort.signal,
       });
       const session = await response.json();

@@ -3,11 +3,11 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "./route";
 
-function request(origin = "http://localhost:3000", keyterms?: unknown[]) {
+function request(origin = "http://localhost:3000", keyterms?: unknown[], endpointing?: unknown) {
   return new NextRequest("http://localhost:3000/api/stt/session", {
     method: "POST",
     headers: { origin, "content-type": "application/json" },
-    body: keyterms ? JSON.stringify({ keyterms }) : undefined,
+    body: keyterms || endpointing ? JSON.stringify({ keyterms, endpointing }) : undefined,
   });
 }
 beforeEach(() => {
@@ -26,7 +26,9 @@ describe("STT ticket proxy", () => {
     expect(body).toEqual({ token: "short-ticket", websocket_url: "wss://speech.example.com/api/v1/transcriptions/stream", expires_in: 60 });
     expect(JSON.stringify(body)).not.toContain("private-server-key");
     expect(fetchMock.mock.calls[0][1].headers["x-api-key"]).toBe("private-server-key");
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ origin: "http://localhost:3000", keyterms: [] });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      origin: "http://localhost:3000", keyterms: [], endpointing: "silence",
+    });
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
   it("sanitizes and forwards the current jar vocabulary", async () => {
@@ -39,6 +41,16 @@ describe("STT ticket proxy", () => {
     ]));
     expect(response.status).toBe(200);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).keyterms).toEqual(["hũ Ăn uống", "hũ Tiết kiệm"]);
+  });
+  it("forwards manual endpointing only for the requesting voice surface", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({
+      token: "ticket", sample_rate: 16000, format: "pcm_s16le", channels: 1,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    await POST(request("http://localhost:3000", [], "manual"));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).endpointing).toBe("manual");
+    await POST(request("http://localhost:3000", [], "unexpected"));
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).endpointing).toBe("silence");
   });
   it("rejects cross-origin requests before contacting STT", async () => {
     const fetchMock = vi.fn();

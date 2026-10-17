@@ -20,11 +20,13 @@ const speech = vi.hoisted(() => ({
   stop: vi.fn(),
   cancel: vi.fn(),
   keyterms: [] as string[],
+  endpointing: "" as string,
 }));
 vi.mock("@/lib/use-streaming-speech", () => ({
-  useStreamingSpeech: (callback: (text: string, final: boolean) => void, keyterms: string[]) => {
+  useStreamingSpeech: (callback: (text: string, final: boolean) => void, keyterms: string[], endpointing: string) => {
     speech.callback = callback;
     speech.keyterms = keyterms;
+    speech.endpointing = endpointing;
     return {
       state: "idle",
       error: "",
@@ -47,6 +49,7 @@ describe("VoiceFab refined transcript hand-off", () => {
   it("hides partial text and sends only the refined final transcript", async () => {
     render(<VoiceFab />);
     expect(speech.keyterms).toContain("hũ Ăn uống");
+    expect(speech.endpointing).toBe("manual");
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-Your bằng giọng nói" }));
     const input = await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-Your để nói, hoặc gõ tại đây");
 
