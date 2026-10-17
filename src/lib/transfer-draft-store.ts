@@ -33,7 +33,16 @@ export interface StoredTransferDraft {
    * `donors` may include the "pool" sentinel (no jar patch; affects Σactual only);
    * `targetJarId` is the jar to credit, or `null` for a pool-source transfer.
    */
-  plannedReallocation?: { donors: import("@/domain/engine").DonorProposal[]; targetJarId: string | null };
+  plannedReallocation?: {
+    donors: import("@/domain/engine").DonorProposal[];
+    targetJarId: string | null;
+    /**
+     * Set when the donors are the AGENT's proposal the customer accepted
+     * (`lib/agent-rebalance.ts`). Only then does `/transfer-confirm` use them — after
+     * re-checking them against fresh numbers — instead of its own engine chain.
+     */
+    by?: "agent";
+  };
   /**
    * Category to record the resulting transaction under, when the draft
    * already carries one (currently only agent-proposed transfers, Feature 3 —

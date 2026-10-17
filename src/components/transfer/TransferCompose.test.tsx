@@ -28,6 +28,12 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), useSearchParams
 vi.mock("@/lib/transfer-draft-store", () => ({ putTransferDraft: putDraft }));
 vi.mock("@/providers/context", () => ({
   useProviders: () => providers,
+  usePersona: () => ({ persona: { cif: "CIF_TEST" } }),
+}));
+// The top-up popup asks the agent for a split; here there is no agent, so it must fall back to the engine chain.
+vi.mock("@/lib/agent-api", async (importActual) => ({
+  ...(await importActual<typeof import("@/lib/agent-api")>()),
+  requestJarCover: vi.fn().mockRejectedValue(new Error("no agent in tests")),
 }));
 vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config: h.jarConfig, loaded: h.jarsLoaded }) }));
 vi.mock("@/state/useFinancials", () => ({

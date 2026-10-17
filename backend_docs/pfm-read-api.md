@@ -370,6 +370,36 @@ Hưởng thụ (`spendable` 1.296.000) → `moves` như JSON trên. Sau khi
 (hết tiền nhưng **không âm**), còn `overLimit` vẫn `true` vì `spent` 5.500.000 > hạn mức
 4.000.000 — bù giữa hũ không xoá việc khách đã chi vượt kế hoạch.
 
+### Dùng trong luồng Chuyển tiền (khi bấm "Tiếp tục" mà hũ nguồn không đủ)
+
+Không phải form mới — vẫn là `rebalance_jars` ở trên, nhưng **không đi qua chat**: `pfm`
+gọi endpoint riêng của Agent `POST /jar-rebalance` (chế độ `cover`, không thread, không nhớ
+gì; xem `docs/jar-rebalance-endpoint.md` bên repo Agent) qua proxy
+`POST /api/agent/jar-rebalance`:
+
+```json
+{ "user_id": "CIF_0001", "mode": "cover", "target_jar_id": "food", "spend_amount": 14000000 }
+```
+
+Ở màn Chuyển tiền, khi khách chọn một hũ làm nguồn, nhập số tiền lớn hơn `spendable` của
+hũ đó rồi bấm "Tiếp tục", `pfm` mở popup "Hũ chưa đủ tiền" (phần thiếu do engine tính).
+"Chưa phân bổ" luôn được lấy trước: nếu pool đủ bù hết phần thiếu thì cách rót của engine
+(chỉ pool) chính là gợi ý và **không gọi Agent**. Chỉ khi phần thiếu **vượt quá pool**, `pfm`
+gọi endpoint trên với `spend_amount` = số khách nhập để Agent chia phần còn lại từ các hũ khác. Agent tự tính `shortfall` và trả
+`rebalance_jars` (~21 s, đã đo), nên popup hiện ngay cách rót của engine, ghi nhãn
+"Cách rót tạm tính" và dòng "M-Your đang phân tích…", rồi thay bằng đề xuất của Agent +
+`reason` khi về. Khi khách bấm "Đồng ý rót", `pfm` **kiểm lại** đề xuất với số hiện tại (các
+quy tắc cứng 1–4 ở trên, `shortfall` lấy theo engine) — không khớp / không có `ui` / lỗi /
+quá 60 s → dùng cách rót của engine. Lúc xác nhận chuyển tiền, `pfm` kiểm lại lần nữa với
+số mới nhất trước khi ghi các bản ghi bù (ghi với `origin: "manual"`). Nguồn "Chưa phân
+bổ" (pool) **không** hỏi Agent, vì `target_jar_id` phải là một hũ.
+
+**Lưu ý thứ tự nguồn:** endpoint này luôn ép "pool trước, rồi hũ nhiều tiền nhất". Khi
+"Chưa phân bổ" đủ bù thì đề xuất chỉ có `pool` (đã đo: CIF_0001, Ăn uống chi 14.000.000đ →
+12.187.000đ từ pool). Nếu sản phẩm muốn gợi ý **chia giữa các hũ** thay vì pool, cần Agent
+thêm tuỳ chọn cho `cover` (ví dụ `exclude_pool`/`prefer: "jars"`) — `pfm` chưa có cách nào
+ép điều đó qua endpoint hiện tại.
+
 ---
 
 # Phần C — Kỳ vọng từ Agent (đã kiểm với agent thật, 2026-09-21)

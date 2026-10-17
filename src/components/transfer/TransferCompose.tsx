@@ -20,7 +20,7 @@ import { TransferAccountPicker } from "./TransferAccountPicker";
 import { TransferBankEntry } from "./TransferBankEntry";
 import { TransferSaveRecipient } from "./TransferSaveRecipient";
 import { TransferAmountStep, POOL_SOURCE_LABEL, type TransferSource } from "./TransferAmountStep";
-import { JarTopupSuggestionSheet } from "./JarTopupSuggestionSheet";
+import { AgentTopupSheet } from "./AgentTopupSheet";
 
 type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
 
@@ -273,15 +273,17 @@ export function TransferCompose() {
           onContinue={continueToConfirm}
         />
         {topupOpen && assessment?.tier === "topup" && (
-          <JarTopupSuggestionSheet
+          <AgentTopupSheet
             assessment={assessment}
+            amount={numericAmount}
+            jarId={selectedJar?.id ?? null}
             targetLabel={selectedJar ? `Hũ ${selectedJar.label}` : POOL_SOURCE_LABEL}
+            jars={jarSpendables ?? []}
+            casaBalance={casaBalance(accounts)}
             onClose={() => setTopupOpen(false)}
-            onAccept={() => {
+            onAccept={(plannedReallocation) => {
               setTopupOpen(false);
-              writeDraftAndGo({
-                plannedReallocation: { donors: assessment.donors, targetJarId: assessment.targetJarId },
-              });
+              writeDraftAndGo({ plannedReallocation });
             }}
             onChooseAnother={() => setTopupOpen(false)}
           />

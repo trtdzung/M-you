@@ -14,6 +14,7 @@ import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
+import { applyAgentPlan } from "@/lib/agent-rebalance";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
 import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
 import type { FundingAssessment } from "@/domain/engine";
@@ -105,9 +106,12 @@ export function TransferConfirm() {
   // user reviews donor(s) + amount BEFORE confirming. Recomputed fresh at confirm.
   const preview = useMemo(() => {
     if (!fundable || !financials || !(amount > 0)) return null;
-    const { assessment, snapshot } = autoFund.assess({ postedAt: transferNow().toISOString(), sourceJarId: targetJarId, amount });
+    const assessed = autoFund.assess({ postedAt: transferNow().toISOString(), sourceJarId: targetJarId, amount });
+    const { snapshot } = assessed;
+    // An agent-suggested split the customer accepted shows here exactly as it will apply.
+    const { assessment } = applyAgentPlan(assessed.assessment, draft?.plannedReallocation, snapshot);
     return assessment.tier === "ok" && amount <= snapshot.casaBalance ? null : { assessment, casaBalance: snapshot.casaBalance };
-  }, [fundable, financials, amount, targetJarId, autoFund]);
+  }, [fundable, financials, amount, targetJarId, autoFund, draft?.plannedReallocation]);
 
   /** The primary record for this attempt (same id on a retry of the same transfer). */
   function primaryRecord(input: ManualTxnInput): Transaction {
@@ -132,9 +136,10 @@ export function TransferConfirm() {
     // RT-fix (C3) — ASSESS-THEN-COMMIT: resolve insufficient FIRST, on the
     // pre-commit snapshot, and only debit + write once coverage is guaranteed.
     let assessment: FundingAssessment | null = null;
+    let byAgent = false;
     if (fundable) {
       const assessed = autoFund.assess({ postedAt, sourceJarId: targetJarId, amount });
-      assessment = assessed.assessment;
+      ({ assessment, byAgent } = applyAgentPlan(assessed.assessment, draft?.plannedReallocation, assessed.snapshot));
       const overCasa = amount > assessed.snapshot.casaBalance;
       if (overCasa || assessment.tier === "insufficient") {
         return setError("Số dư không đủ để hoàn tất giao dịch. Vui lòng kiểm tra lại.");
@@ -200,7 +205,7 @@ export function TransferConfirm() {
           targetJarId,
           triggerTxnId: primaryTxnId,
           postedAt,
-          origin: "auto",
+          origin: byAgent ? "manual" : "auto",
         });
         if (createdIds.length > 0) {
           setFundResult({ status: "funded", donors: assessment.donors, shortfall: assessment.shortfall, createdIds, targetJarId, targetLabel, postedAt });

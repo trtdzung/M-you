@@ -249,3 +249,17 @@ export async function deleteChatHistory(cif: string): Promise<void> {
   const res = await fetch(`${PROXY_PATH}?user_id=${encodeURIComponent(cif)}`, { method: "DELETE" });
   await readJsonOrThrow(res);
 }
+
+/**
+ * Ask the agent how to fund a jar that is short for a planned spend
+ * (`POST /jar-rebalance`, mode `cover`) — no chat thread involved. `ui` is
+ * `rebalance_jars` or `null` (nothing to propose; `answer` says why).
+ */
+export async function requestJarCover(input: { cif: string; targetJarId: string; spendAmount: number }): Promise<ChatResponse> {
+  const res = await fetch("/api/agent/jar-rebalance", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: input.cif, target_jar_id: input.targetJarId, spend_amount: input.spendAmount }),
+  });
+  return readJsonOrThrow(res) as Promise<ChatResponse>;
+}
