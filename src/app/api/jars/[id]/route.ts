@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { healOrphanCategories, stripCategories } from "@/domain/jar-rules";
 import { assignableCategoryIds } from "@/lib/categories-store";
 import { getDb } from "@/lib/db";
+import { transferNow } from "@/lib/demo-clock";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
 import { deleteRebalanceLegsForJar } from "@/lib/manual-txns-store";
 import { capViolation, categoryViolation } from "../jar-write-guards";
@@ -17,6 +18,7 @@ import { capViolation, categoryViolation } from "../jar-write-guards";
  * PATCH /api/jars/:id?cif= — merge `{patch}` into one jar. Replacing
  * `categoryIds` takes those categories away from every other jar
  * (one-category-one-jar); `null` in the patch clears a field back to "chưa đặt".
+ * `budgetLimit` is capped at 10^12 VND but never by CASA (a limit is a plan).
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const cif = req.nextUrl.searchParams.get("cif");
@@ -38,11 +40,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   let jars = current.jars.map((j) => (j.id === id ? { ...prev, ...patch } : j));
   if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds, id);
 
-  // Only a write that RAISES Σ budgetLimit past CASA is rejected: clearing,
-  // lowering, re-saving or editing label/color/category always passes, even if a
-  // legacy config (or a CASA drop after a transfer) left it over cap.
-  const overCap = capViolation(cif, jars, current.jars);
-  if (overCap) return overCap;
+  // The limit is a monthly PLAN, not money: editing it (or label/color) never
+  // touches the CASA cap (plan 260923). Only a category move can change a
+  // balance — it re-attributes spend since each anchor — so only then is the
+  // balance-lens cap checked, on the same clock that stamps ledger rows.
+  if (patch.categoryIds) {
+    const overCap = capViolation(cif, { ...current, jars }, current, transferNow());
+    if (overCap) return overCap;
+  }
   return NextResponse.json(writeJarConfig(cif, { version: 3, jars }));
 }
 
@@ -52,7 +57,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
  * rebalance leg (`dieu-chinh-hu` manual txn) whose `rebalance.fromJarId` or
  * `toJarId` is this jar is deleted in the SAME DB transaction (S8) — a leg
  * pointing at a vanished jar would move money "from nowhere". Response: the
- * resulting `JarConfig` (unchanged contract); the number of legs removed is in
+ * resulting `JarConfig` (unchanged contract); the jar's `jar_ledger` rows go in
+ * the same transaction (`writeJarConfig`); the number of legs removed is in
  * the `X-Rebalance-Legs-Deleted` header.
  */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {

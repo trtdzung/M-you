@@ -15,7 +15,17 @@ import { account, allRebalances, db, installFetchMock, net, rebalancesFor, spend
 
 const h = vi.hoisted(() => ({ jarConfig: { version: 3, jars: [] } as JarConfig, accounts: [] as Account[] }));
 
-vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config: h.jarConfig, loaded: true }) }));
+// The static config reads as MIGRATED (opening deposit = limit at the demo month
+// start, like the seeded DB), memoised per config so its identity is stable.
+vi.mock("@/state/jars", async () => {
+  const { monthAnchor, withSeedDeposits } = await import("@/test-utils/jar-ledger-fixtures");
+  const seeded = new WeakMap<JarConfig, JarConfig>();
+  const migrated = (cfg: JarConfig) => {
+    if (!seeded.has(cfg)) seeded.set(cfg, withSeedDeposits(cfg, monthAnchor("2026-09")));
+    return seeded.get(cfg)!;
+  };
+  return { useJarConfig: () => ({ config: migrated(h.jarConfig), loaded: true }) };
+});
 vi.mock("@/state/useFinancials", async () => {
   const manual = await import("../manual-txns");
   return {

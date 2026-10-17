@@ -1,39 +1,56 @@
 import { currentMonthKey } from "@/lib/demo-clock";
+import type { Financials } from "@/state/useFinancials";
 import type { Detector } from "../types";
 import { buildInsight, fact, money } from "../narrate";
+import { balanceSourceOf, coversByJar } from "./jar-overspend-covered";
 
 /**
- * Per-hũ budget signal (BIDV wallet model, plan 260910-1626). Flags the most-
- * pressured jar with a SET monthly limit: over-limit first (urgent), then near
- * (attention). Reads `jarBudget` — the single budget truth (invariant #2); jars
- * with no limit are `status: null` and never warn (a chưa-đặt limit is unknown,
- * not a breach — invariant #6).
+ * Per-hũ budget signal (BIDV wallet model, plan 260910-1626; balance/limit split
+ * plan 260923, Phase 05). Flags the most-pressured jar with a SET monthly limit:
+ * over-limit first, then near. Reads `jarBudget` — the single budget truth
+ * (invariant #2); jars with no limit are `status: null` and never warn (a chưa-đặt
+ * limit is unknown, not a breach — invariant #6).
  *
- * Deterministic — no LLM. This is now the app's sole budget warning: the legacy
- * per-category `budgetPressure` was retired in phase 08 so the two systems never
- * double-warn (H3). H2 guard: only the current month, so a closed period never
- * raises a stale warning.
+ * Two axes, kept distinct in the copy:
+ *  - HẠN MỨC: `status` (spent vs the monthly limit) drives the title "vượt/sắp vượt
+ *    hạn mức".
+ *  - SỐ DƯ: `balance` drives severity + the balance fact. Over the limit AND out of
+ *    money (`balance < 0`) → `urgent`; over the limit but the jar still holds money
+ *    (deposited more than the plan) → `attention`. An unknown balance is omitted,
+ *    never shown as 0.
+ *
+ * A jar that broke its plan but was covered back to `balance ≥ 0` by a rebalance is
+ * ALREADY narrated by `jarOverspendCovered` — dropped here so the two never tell the
+ * same story twice (H3). Deterministic, no LLM. H2 guard: current month only.
  */
-/** "Còn lại" when the jar still holds money, "Cần bù" (positive) when it does not. */
-function balanceFact(remaining: number) {
-  return remaining < 0 ? fact("Cần bù", -remaining) : fact("Còn lại", remaining);
+
+type Line = Financials["jarBudget"]["lines"][number];
+
+/** Balance-axis fact: "Cần bù" (positive) when out of money, else "Số dư". Unknown → none. */
+function balanceFacts(f: Financials, line: Line) {
+  if (line.balance === null) return [];
+  const src = balanceSourceOf(f, line.huId);
+  return [line.balance < 0 ? fact("Cần bù", -line.balance, src) : fact("Số dư", line.balance, src)];
+}
+
+function balanceNote(balance: number | null): string {
+  if (balance === null) return "";
+  return balance < 0 ? ` Hũ đã hết số dư, cần bù ${money(-balance)}.` : ` Số dư hũ còn ${money(balance)}.`;
 }
 
 export const jarPressure: Detector = (f) => {
   if (f.monthKey !== currentMonthKey()) return null;
 
+  const covered = coversByJar(f.jarRebalances);
   const set = f.jarBudget.lines.filter((l) => l.limitState === "set" && l.limit !== null);
-  // Two axes since the balance/limit split: `status` is the PLAN axis (spent vs its
-  // own limit), `remaining` is the BALANCE axis. A jar that broke its plan but was
-  // refilled from another jar (`over` yet `remaining >= 0`, which can only happen
-  // via a covering rebalance) is ALREADY narrated by `jarOverspendCovered` — drop it
-  // here so the two never tell the same story twice (H3).
-  const stillShort = (l: (typeof set)[number]) => (l.remaining ?? 0) < 0;
-  const over = set
-    .filter((l) => l.status === "over" && stillShort(l))
-    .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0));
-  const near = set.filter((l) => l.status === "near").sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0));
-  const line = over[0] ?? near[0];
+  const coveredBack = (l: Line) => covered.has(l.huId) && l.balance !== null && l.balance >= 0;
+  const outOfMoney = (l: Line) => l.balance !== null && l.balance < 0;
+  const byPct = (a: Line, b: Line) => (b.pct ?? 0) - (a.pct ?? 0);
+  // Out-of-money breaches rank first (urgent), then over-limit jars that still hold money.
+  const over = set.filter((l) => l.status === "over" && !coveredBack(l));
+  const ranked = [...over.filter(outOfMoney).sort(byPct), ...over.filter((l) => !outOfMoney(l)).sort(byPct)];
+  const near = set.filter((l) => l.status === "near").sort(byPct);
+  const line = ranked[0] ?? near[0];
   if (!line) return null;
 
   const isOver = line.status === "over";
@@ -42,17 +59,13 @@ export const jarPressure: Detector = (f) => {
   return buildInsight({
     id: `jarPressure:${f.monthKey}:${line.huId}`,
     type: "jar_pressure",
-    severity: isOver ? "urgent" : "attention",
+    severity: isOver && outOfMoney(line) ? "urgent" : "attention",
     title: isOver ? `Vượt hạn mức hũ "${line.label}"` : `Sắp vượt hạn mức hũ "${line.label}"`,
-    explanation: `Hũ "${line.label}": đã tiêu ${money(line.spent)} trên hạn mức ${money(limit)} (${pct}%).`,
+    explanation: `Hũ "${line.label}": đã tiêu ${money(line.spent)} trên hạn mức ${money(limit)} (${pct}%).${balanceNote(line.balance)}`,
     facts: [
-      fact("Đã tiêu", line.spent),
+      fact("Đã tiêu", line.spent, { period: f.monthKey }),
       fact("Hạn mức", limit),
-      // A hũ cannot hold negative money, so "Còn lại" never carries a negative
-      // figure. An `over` jar here is always `stillShort` (remaining < 0), so its
-      // balance reads as a positive "Cần bù" instead — same rule the jar card,
-      // `JarEnvelopeCard` and the Ngân sách header already follow.
-      balanceFact(line.remaining ?? 0),
+      ...balanceFacts(f, line),
     ],
     confidence: 0.95,
     actionType: "review_jars",

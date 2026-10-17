@@ -21,6 +21,7 @@ import type {
 } from "@/domain/models";
 import {
   aggregateCashflow,
+  balanceAsOf,
   calculateNetWorth,
   casaBalanceOrUnknown,
   cashRunwayMonths,
@@ -32,6 +33,7 @@ import {
   evaluateJarBudget,
   evaluateJarEnvelope,
   financialHealth,
+  jarBalances,
   jarSpendable,
   monthPeriodFromKey,
   networthTrend,
@@ -101,15 +103,14 @@ export interface Financials {
   jarBudget: JarBudgetResult;
   /**
    * Envelope view for the Tổng quan "hũ" widget: "chờ phân bổ" (số dư CASA chưa
-   * earmark) + per-jar funded "còn lại trong hũ" (= đã phân bổ từ CASA − đã tiêu
-   * kỳ này). DERIVED from `jarBudget` spend + the CASA account balances, with
-   * inter-jar rebalance coverage (`categoryId: REBALANCE_CATEGORY` txns) folded into
-   * each jar's `remaining` — a jar carries no stored balance (invariant #1, RT-1/2).
+   * earmark) + per-jar `spent`/`limit` (this period) and running `balance` (from
+   * `jarBalances`: ledger + spend + inter-jar rebalance since the jar's anchor, as
+   * of `min(period.to, now)`) — derived, never stored (invariant #1, RT-1/2).
    */
   jarEnvelope: JarEnvelopeResult;
   /**
    * The virtual "Chưa phân bổ" pool = casaBalance(current) − Σ jar spendable
-   * (`max(0, remaining)`, the SAME number the overview + picker show). Derived
+   * (`max(0, balance)`, the SAME number the overview + picker show). Derived
    * (never stored), so every screen showing jar totals / CASA reads one truth —
    * including `overAllocated` ("Vượt phân bổ"), which must surface on every such
    * surface, not just the transfer sheet (Red Team #13). Negative `amount` is
@@ -119,7 +120,7 @@ export interface Financials {
   unallocatedPool: UnallocatedPoolResult;
   /**
    * The period's inter-jar rebalance txns (`categoryId: REBALANCE_CATEGORY`, posted,
-   * in-period) — the same tagged txns already folded into every jar's `remaining`.
+   * in-period) — the same tagged txns already folded into every jar's `balance`.
    * Surfaced so the jar-detail view (Phase 02) and the write-path/undo surfaces
    * (Phase 04/05) can render the "cho/nhận" pseudo-lines without re-scanning the txn
    * array. Excluded from spend/thu/chi (invariant #6); each carries `origin` (#5).
@@ -164,7 +165,11 @@ export interface Financials {
 }
 
 export interface ComposeOptions {
-  /** Reference "now" (defaults to the demo clock). */
+  /**
+   * Reference "now" — the ONE clock (Red Team #1). Real callers pass
+   * `transferNow()`, the same clock that stamps ledger rows, so a deposit made a
+   * moment ago is ≤ the balance `asOf`. Defaults to `DEMO_NOW` for pure tests.
+   */
   now?: Date;
   /**
    * Transactions to compute from — defaults to `raw.transactions`. The client
@@ -259,25 +264,28 @@ export function computeFinancials(
   // seed + user records (user assets/liabilities are context state, red-team #3).
   const networth = calculateNetWorth(assets, liabilities);
 
-  // Inter-jar rebalance net (Σ nhận − Σ cho) from the REBALANCE_CATEGORY-tagged
-  // txns already merged into `txns` — folded into both engines' `remaining` so every
-  // derived screen (overview, picker, pool) reflects a rebalance the instant it
-  // exists (Phase 03). `spent`/thu/chi stay untouched (excluded in netExpenseByCategory).
+  // Period rebalance net (Σ nhận − Σ cho) — the line's "nhận/cho tháng này" display.
+  // `spent`/thu/chi stay untouched (excluded in netExpenseByCategory).
   const rebalanceNet = rebalanceNetByJar(txns, period);
+  // Running balances — ONE `jarBalances` call shared by both engines, as of
+  // `min(period.to, now)` on the injected clock (Red Team #1). A period that ends
+  // before a jar's anchor yields `balance: null` for it (Red Team #2). Postings are
+  // folded to `period.to`, the same window as `spent` (see `jarBalances`).
+  const balances = jarBalances(jarConfig, txns, balanceAsOf(period, now), period.to);
 
   // Jar budget first — the envelope reuses its per-jar net expense as "đã tiêu
   // kỳ này" (DRY, invariant #2) instead of re-deriving spend.
-  const jarBudget = evaluateJarBudget(jarConfig, txns, period, prevPeriod, now, rebalanceNet);
+  const jarBudget = evaluateJarBudget(jarConfig, txns, period, prevPeriod, now, rebalanceNet, balances);
   const spentByJar = new Map(jarBudget.lines.map((l) => [l.huId, l.spent]));
-  const jarEnvelope = evaluateJarEnvelope(jarConfig, raw.accounts, spentByJar, period, rebalanceNet);
+  const jarEnvelope = evaluateJarEnvelope(jarConfig, raw.accounts, spentByJar, period, balances);
   // Unallocated pool: CASA (current-only, via the shared selector so it never
   // swallows savings/credit — RT#9) minus what jars actually claim (Σ derived
-  // spendable = Σ max(0, remaining), the same jarBudget.lines the overview +
+  // spendable = Σ max(0, balance), the same jarBudget.lines the overview +
   // picker read). Derived here once so every screen reads the same
   // `overAllocated` (RT#13).
   // No `current` account → "unknown" (D27), never a fabricated 0 → negative pool.
   // Same formula as `jarEnvelope.pending` (one definition, D26).
-  const spendableTotal = jarBudget.lines.reduce((sum, l) => sum + (jarSpendable(l.remaining) ?? 0), 0);
+  const spendableTotal = jarBudget.lines.reduce((sum, l) => sum + (jarSpendable(l.balance) ?? 0), 0);
   const unallocatedPool = computeUnallocatedPool({
     casaBalance: casaBalanceOrUnknown(raw.accounts),
     spendableTotal,

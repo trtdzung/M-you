@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { isDuplicateLabel } from "@/domain/engine";
 import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
+import type { CurrentJarFunds } from "@/state/use-current-jar-funds";
 import { Sheet } from "@/components/primitives";
 import { JAR_COLOR_OPTIONS, jarAccent } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
@@ -13,17 +14,28 @@ import { CategoryCreateSheet } from "./CategoryCreateSheet";
 import { HuCategoryPicker } from "./HuCategoryPicker";
 import { nextCategoryPatch } from "./hu-category-patch";
 import { HuLimitField } from "./HuLimitField";
+import { HuBalanceField } from "./HuBalanceField";
 import { HuDeleteSection } from "./HuDeleteSection";
 import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
- * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức/tháng (`HuLimitField`), màu,
+ * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức chi mỗi tháng (`HuLimitField`),
+ * số dư — nạp/rút (`HuBalanceField`, tách khỏi hạn mức, plan 260923), màu,
  * icon, danh mục trong hũ (`HuCategoryPicker` — chọn/bỏ chọn tại chỗ,
  * exactly-one), và xoá hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig`
  * — state (theo phản hồi server) là nguồn sự thật; lần ghi bị từ chối hiện ở
  * `JarMutationErrorNotice`.
  */
-export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () => void }) {
+export function HuEditorSheet({
+  jarId,
+  funds,
+  onClose,
+}: {
+  jarId: string;
+  /** Current-month balances + "Chờ phân bổ" (`useCurrentJarFunds`), owned by the tab. */
+  funds: CurrentJarFunds;
+  onClose: () => void;
+}) {
   const { config, updateJar } = useJarConfig();
   // Mẫu số của nhãn "(n/total)" là số danh mục chi ĐANG DÙNG của persona — người
   // dùng thêm/ẩn danh mục thì tổng này đổi theo, không phải hằng số 10 preset.
@@ -58,7 +70,9 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
           {dup && <span className="text-xs text-warning">⚠ Trùng tên với hũ khác</span>}
         </label>
 
-        <HuLimitField jar={jar} jars={config.jars} />
+        <HuLimitField jar={jar} />
+
+        <HuBalanceField jar={jar} funds={funds} />
 
         <Field label="Màu">
           <div className="flex flex-wrap gap-2">

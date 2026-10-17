@@ -6,7 +6,7 @@ import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 /**
  * The mock MSB confirm screen (OUTSIDE the AI facade). `confirm()` debits the
  * real source account and records self-reported txn(s); a jar has NO stored
- * balance, so its spendable = max(0, remaining) is DERIVED from those txns.
+ * balance, so its spendable = max(0, balance) is DERIVED by the engine.
  * These tests lock the financial rules and the red-team fixes: type-from-kind
  * (no phantom expense), the derived charge model (single txn ok/overspend,
  * per-contributor charges on an accepted top-up), single txn under double-tap
@@ -24,13 +24,13 @@ interface MockTxn {
 }
 
 /** Derived jar-budget lines the confirm screen reads spendable from. */
-function linesFrom(remaining: Record<string, number | null>) {
+function linesFrom(balance: Record<string, number | null>) {
   const meta = [
     { huId: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"] },
     { huId: "shop", label: "Mua sắm", categoryIds: ["shopping"] },
     { huId: "empty", label: "Rỗng", categoryIds: [] as string[] },
   ];
-  return { jarBudget: { lines: meta.map((m) => ({ ...m, remaining: remaining[m.huId] ?? null })) } };
+  return { jarBudget: { lines: meta.map((m) => ({ ...m, balance: balance[m.huId] ?? null })) } };
 }
 
 const h = vi.hoisted(() => {
@@ -224,7 +224,7 @@ describe("TransferConfirm — always create + categorize", () => {
     render(<TransferConfirm />);
     await completeTransfer();
 
-    // A jar source books the spend into its first category (drops derived remaining);
+    // A jar source books the spend into its first category (drops derived balance);
     // jar money lives in the CASA account → the account is debited too (legacy
     // fallback: no sourceAccountId, so the single current account is used).
     expect(h.applyAccountDebit).toHaveBeenCalledWith("acc1", AMOUNT, expect.objectContaining({ amount: AMOUNT, direction: "debit" }));
@@ -236,7 +236,7 @@ describe("TransferConfirm — always create + categorize", () => {
     expect(within(dialog).getByRole("button", { name: "Nhu yếu phẩm" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Mua sắm" })).not.toBeInTheDocument();
 
-    // Re-category is a pure category move (no jar bookkeeping — remaining re-routes
+    // Re-category is a pure category move (no jar bookkeeping — balance re-routes
     // via the category→jar map): only the txn's category changes.
     fireEvent.click(within(dialog).getByRole("button", { name: "Nhu yếu phẩm" }));
     expect(h.store[0]).toMatchObject({ categoryId: "groceries", type: "expense" });

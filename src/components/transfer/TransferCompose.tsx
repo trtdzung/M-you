@@ -124,7 +124,7 @@ export function TransferCompose() {
 
   // The single derived quantity every jar number keys off (invariant #1): the
   // engine's jar snapshot for the POSTED txn's month (`snapshotAt`, the same one
-  // Confirm assesses on — S10/U7). `spendable = max(0, remaining)`; null (no
+  // Confirm assesses on — S10/U7). `spendable = max(0, balance)`; null (no
   // limit) is non-fundable ("Chưa có số dư"), never a fabricated 0 (#6).
   const snapshot = useMemo(() => (financials ? autoFund.snapshotAt(postedAt) : null), [financials, autoFund, postedAt]);
   const jarSpendables = useMemo<JarSpendable[]>(() => snapshot?.spendables ?? [], [snapshot]);
@@ -132,8 +132,8 @@ export function TransferCompose() {
   const jars = useMemo(
     () =>
       jarConfig.jars.map((jar) => {
-        const remaining = snapshot?.lines.find((line) => line.huId === jar.id)?.remaining ?? null;
-        return { ...jar, remaining, spendable: jarSpendable(remaining) };
+        const balance = snapshot?.lines.find((line) => line.huId === jar.id)?.balance ?? null;
+        return { ...jar, balance, spendable: jarSpendable(balance) };
       }),
     [jarConfig, snapshot],
   );

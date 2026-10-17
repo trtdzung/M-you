@@ -10,7 +10,7 @@ import { JAR_TEMPLATES } from "../jar-defaults";
  *
  * They used to be two hand-maintained literals. Drift between them is invisible
  * until it shows up as money: a seeded jar with a different `budgetLimit` or a
- * category in a different hũ reports different `spent`/`remaining` than the same
+ * category in a different hũ reports different `spent`/`balance` than the same
  * template re-applied later, and nothing in the app would flag it. The script is
  * plain `.mjs` (no TS loader) so it cannot import the template directly — the
  * JSON file is the shared copy, and this test is the seam that keeps them equal.

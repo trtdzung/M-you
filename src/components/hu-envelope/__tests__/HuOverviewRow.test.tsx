@@ -6,6 +6,7 @@ import type { Financials } from "@/domain/engine/finance-compose";
 import type { JarEnvelopeResult, JarEnvelopeLine } from "@/domain/engine/jar-envelope";
 import type { JarConfig } from "@/domain/models";
 import { monthPeriod } from "@/domain/engine/types";
+import { currentMonthKey } from "@/lib/demo-clock";
 
 const JUNE = monthPeriod(2026, 5);
 
@@ -17,11 +18,11 @@ const config: JarConfig = {
     { id: "home", label: "Nhà cửa & Tiện ích", categoryIds: ["utilities"], color: "#0e7490", icon: "home" },
   ],
 };
-// The sheet (opened by "Chia ngay") reads config + the batch `updateJars` writer.
+// The sheet (opened by "Chia ngay") reads config + the atomic `postLedger` writer.
 // `jarError` mirrors `useJarConfig().error` (non-null when GET /api/jars failed, U10).
 let jarError: string | null = null;
 vi.mock("@/state/jars", () => ({
-  useJarConfig: () => ({ config, error: jarError, updateJars: vi.fn().mockResolvedValue(undefined) }),
+  useJarConfig: () => ({ config, error: jarError, postLedger: vi.fn().mockResolvedValue(true), mutationError: null }),
 }));
 // The labeling sheet reads the corrections hooks — stub them so the row is pure.
 vi.mock("@/state/corrections", () => ({
@@ -38,11 +39,6 @@ vi.mock("@/state/use-auto-fund", () => ({
 vi.mock("@/state/manual-txns", () => ({
   useManualTxns: () => ({ update: vi.fn(() => true) }),
 }));
-// The allocation sheet ("Chia ngay") tops up jar balances via the session store;
-// stub it so the row needs no JarTopupProvider.
-vi.mock("@/state/jar-topup", () => ({
-  useJarTopup: () => ({ addTopups: vi.fn() }),
-}));
 
 import { HuOverviewRow } from "../HuOverviewRow";
 
@@ -58,8 +54,8 @@ const render = (ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) =>
 
 function line(over: Partial<JarEnvelopeLine>): JarEnvelopeLine {
   return {
-    jarId: "food", label: "Ăn uống & Đi chợ", budgetLimit: 3_000_000, spent: 500_000,
-    remaining: 2_500_000, overLimit: false, inUse: true, source: "self_reported", freshness: null, ...over,
+    jarId: "food", label: "Ăn uống & Đi chợ", limit: 3_000_000, spent: 500_000,
+    balance: 2_500_000, overLimit: false, inUse: true, source: "self_reported", freshness: null, ...over,
   };
 }
 
@@ -74,8 +70,9 @@ function envelope(over: Partial<JarEnvelopeResult>): JarEnvelopeResult {
   };
 }
 
-function withEnvelope(env: JarEnvelopeResult, overAllocated = false): Financials {
+function withEnvelope(env: JarEnvelopeResult, overAllocated = false, monthKey = currentMonthKey()): Financials {
   return {
+    monthKey,
     jarEnvelope: env,
     unallocatedPool: { amount: overAllocated ? -1 : 0, overAllocated, source: "mock" },
   } as unknown as Financials;
@@ -114,20 +111,29 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("Chờ phân bổ")).toBeInTheDocument();
   });
 
-  it("renders a jar card with the label and 'còn lại trong hũ' when funded", () => {
+  it("renders a jar card with SỐ DƯ and the separate 'Đã chi / hạn mức' gauge", () => {
     render(<HuOverviewRow financials={withEnvelope(envelope({}))} />);
     expect(screen.getByText("Ăn uống & Đi chợ")).toBeInTheDocument();
-    expect(screen.getByText("còn lại trong hũ")).toBeInTheDocument();
+    expect(screen.getByText("Số dư")).toBeInTheDocument();
+    expect(screen.getByText("2,5 tr")).toBeInTheDocument();
+    expect(screen.getByText("Đã chi 500K / 3 tr hạn mức")).toBeInTheDocument();
   });
 
-  it("shows 'Chưa có số dư' for a jar with no budgetLimit, never a fabricated 0 (invariant #6)", () => {
+  it("a jar without a limit still shows its balance and 'Chưa đặt hạn mức'", () => {
+    const env = envelope({ jars: [line({ limit: null, spent: 200_000, balance: 1_000_000 })] });
+    render(<HuOverviewRow financials={withEnvelope(env)} />);
+    expect(screen.getByText("1 tr")).toBeInTheDocument();
+    expect(screen.getByText("Đã chi 200K · Chưa đặt hạn mức")).toBeInTheDocument();
+  });
+
+  it("shows 'Chưa có số dư' for an unfunded jar (balance null), never a fabricated 0 (invariant #6)", () => {
     const env = envelope({
       jars: [
         line({
           jarId: "home",
           label: "Nhà cửa & Tiện ích",
-          budgetLimit: null,
-          remaining: null,
+          limit: null,
+          balance: null,
           inUse: false,
           source: "mock",
         }),
@@ -137,15 +143,15 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("Chưa có số dư")).toBeInTheDocument();
   });
 
-  it("renders the balance for a jar with a budgetLimit (số dư gốc = hạn mức)", () => {
+  it("renders the running balance of a funded jar", () => {
     const env = envelope({
       jars: [
         line({
           jarId: "home",
           label: "Nhà cửa & Tiện ích",
-          budgetLimit: 2_000_000,
+          limit: 2_000_000,
           spent: 500_000,
-          remaining: 1_500_000,
+          balance: 1_500_000,
           source: "self_reported",
         }),
       ],
@@ -155,13 +161,34 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("1,5 tr")).toBeInTheDocument();
   });
 
-  it("floors an overspent jar at 0 and shows 'đã vượt X' — never a negative balance", () => {
-    const env = envelope({ jars: [line({ budgetLimit: 1_000_000, spent: 1_500_000, remaining: -500_000 })] });
+  it("shows a negative balance as such (hết tiền) in text-negative — no floor at 0", () => {
+    const env = envelope({ jars: [line({ limit: 1_000_000, spent: 1_500_000, balance: -500_000, overLimit: true })] });
     render(<HuOverviewRow financials={withEnvelope(env)} />);
-    expect(screen.getByText("đã vượt 500K")).toBeInTheDocument();
-    // A hũ can't hold negative money: the balance floors at 0, no "-500K".
-    expect(screen.getByText("0 ₫")).toBeInTheDocument();
-    expect(screen.queryByText("-500K")).not.toBeInTheDocument();
+    const negative = screen.getByText("-500K");
+    expect(negative).toHaveClass("text-negative");
+    expect(screen.queryByText("0 ₫")).not.toBeInTheDocument();
+    // The limit axis is independent of the balance axis.
+    expect(screen.getByText("Đã chi 1,5 tr / 1 tr hạn mức")).toBeInTheDocument();
+  });
+
+  it("Case A: limit 7tr, deposited 7tr, spent 3tr → Số dư 4 tr, 'Đã chi 3 tr / 7 tr hạn mức'", () => {
+    const env = envelope({ jars: [line({ limit: 7_000_000, spent: 3_000_000, balance: 4_000_000 })] });
+    render(<HuOverviewRow financials={withEnvelope(env)} />);
+    expect(screen.getByText("4 tr")).toBeInTheDocument();
+    expect(screen.getByText("Đã chi 3 tr / 7 tr hạn mức")).toBeInTheDocument();
+  });
+
+  it("Red Team #2: a past month hides 'Chờ phân bổ' (a current stock) but keeps the jar figures", () => {
+    const env = envelope({
+      jars: [line({}), line({ jarId: "home", label: "Nhà cửa & Tiện ích", limit: 2_000_000, spent: 300_000, balance: null })],
+    });
+    render(<HuOverviewRow financials={withEnvelope(env, false, "2026-01")} />);
+    expect(screen.queryByText("Chờ phân bổ")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Chia ngay/ })).not.toBeInTheDocument();
+    // Pre-anchor month: no balance yet, but Đã chi / hạn mức stay visible.
+    expect(screen.getByText("Chưa có số dư")).toBeInTheDocument();
+    expect(screen.getByText("Đã chi 300K / 2 tr hạn mức")).toBeInTheDocument();
+    expect(screen.getByText("Đã chi 500K / 3 tr hạn mức")).toBeInTheDocument();
   });
 
   it("opens the real jar view (Ngân sách) when a jar card is tapped", () => {
@@ -208,6 +235,7 @@ describe("HuOverviewRow", () => {
 
   function withUnlabeled(count: number, amount: number, jars = [line({})]): Financials {
     return {
+      monthKey: currentMonthKey(),
       jarEnvelope: envelope({ jars }),
       unallocatedPool: { amount: 0, overAllocated: false, source: "mock" },
       unlabeled: { count, amount, source: "mock" },

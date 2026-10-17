@@ -1,38 +1,49 @@
 import { Money } from "@/components/primitives";
-import { jarSpendable } from "@/domain/engine";
-import { formatVnd } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
 /**
- * The SỐ DƯ line of a jar card — the balance axis, deliberately separate from the
- * đã-tiêu/hạn-mức bar above it (the plan axis). An inter-jar transfer moves this
- * number and nothing else, so the note on the right explains where the difference
- * came from instead of quietly rewriting the jar's limit.
+ * The SỐ DƯ line of a jar card — the running balance, deliberately separate from
+ * the đã-chi/hạn-mức bar above it (plan 260923: limit = monthly plan, balance =
+ * money in the jar, carried across months). An inter-jar transfer moves this
+ * number and nothing else; it is not itemised on the card — the "Điều chỉnh hũ"
+ * rows in Giao dịch carry it.
  *
- * A hũ is a money container: it CANNOT hold negative money, so the displayed
- * balance is floored at 0 via the engine's own `jarSpendable` — the same rule
- * `JarEnvelopeCard` (Tổng quan) and the header's "Còn lại|Vượt" already follow, so
- * one jar never reads "0 ₫" on one screen and "−300.000 ₫" on another. The
- * uncovered part is NOT dropped: `ManualCoverNotice` renders directly below on
- * exactly the same condition (`remaining < 0`) and carries it as "Cần bù".
+ * A negative balance (hết tiền) is shown as such in `text-negative` — the same
+ * figure `JarEnvelopeCard` shows on Tổng quan; `ManualCoverNotice` below carries
+ * the action. `null` (no deposit yet, or a month before the jar existed) reads
+ * "Chưa có số dư", never 0 (invariant #6); in the current month it offers
+ * "Chia ngay" (`onAllocate`) to fund the jar from "Chờ phân bổ".
  *
- * Presentation-only: `balance` is `JarBudgetLine.remaining` and `net` is
- * `rebalanceNet`, both already computed by the engine (invariant #2).
+ * Presentation-only: `balance` is `JarBudgetLine.balance`, computed by the
+ * engine (invariant #2).
  */
-export function JarBalanceRow({ balance, net }: { balance: number | null; net: number }) {
-  const shown = jarSpendable(balance);
-  if (shown === null) return null;
-  const note =
-    net > 0
-      ? `Đã nhận ${formatVnd(net)} từ hũ khác`
-      : net < 0
-        ? `Đã chuyển ${formatVnd(-net)} sang hũ khác`
-        : null;
+export function JarBalanceRow({
+  balance,
+  onAllocate,
+}: {
+  balance: number | null;
+  /** Current month only: open the allocation sheet for an unfunded jar. */
+  onAllocate?: () => void;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-2 text-xs">
       <span className="text-muted">
-        Số dư <Money amount={shown} className="ml-1 font-semibold text-text" />
+        Số dư{" "}
+        {balance === null ? (
+          <span className="ml-1 font-semibold text-text">Chưa có số dư</span>
+        ) : (
+          <Money amount={balance} className={cn("ml-1 font-semibold", balance < 0 ? "text-negative" : "text-text")} />
+        )}
       </span>
-      {note && <span className="truncate text-muted">{note}</span>}
+      {balance === null && onAllocate && (
+        <button
+          type="button"
+          onClick={onAllocate}
+          className="inline-flex min-h-[32px] items-center rounded-full bg-surface-tint px-3 text-[12px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        >
+          Chia ngay
+        </button>
+      )}
     </div>
   );
 }

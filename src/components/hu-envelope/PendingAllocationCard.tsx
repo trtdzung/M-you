@@ -3,12 +3,11 @@ import { formatVndCompact } from "@/lib/format";
 import type { Amount } from "@/domain/engine";
 
 /**
- * "Chờ phân bổ" card: the CASA money no jar's hạn mức claims yet
- * (`CASA − Σ budgetLimit`) — the LIMIT lens, so this number is exactly the
- * "Còn lại để chia" the "Chia ngay →" CTA opens onto (`AllocationSheet`) and
- * exactly what the cap accepts (`fitsCasaCap`). It is deliberately NOT the
- * transfer picker's "Chưa phân bổ" (`CASA − Σ spendable`), which frees đã-chi
- * money back into the pool and would promise headroom the sheet rejects.
+ * "Chờ phân bổ" card: the CASA money no jar's SỐ DƯ claims yet
+ * (`CASA − Σ max(0, balance)`) — exactly the "Còn lại để chia" the "Chia ngay →"
+ * CTA opens onto (`AllocationSheet`), the transfer picker's "Chưa phân bổ" and
+ * what the cap accepts (`fitsCasaCap`), one definition everywhere (D26). A current
+ * stock: the parent renders it only for the current month (Red Team #2).
  * The amount comes from `Financials.jarEnvelope.pending` (engine-derived); an
  * "unknown" amount (no CASA account) renders "—", never 0₫ (invariant #6).
  */

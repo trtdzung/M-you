@@ -45,7 +45,7 @@ const EMPTY_JAR_BUDGET: JarBudgetResult = {
     totalSpent: 0,
     totalSpentSet: 0,
     totalRebalanceNet: 0,
-    totalRemaining: null,
+    totalBalance: null,
     pctUsed: null,
     daysLeft: 0,
     setCount: 0,
@@ -73,10 +73,10 @@ export function makeJarBudgetResult(over: Partial<JarBudgetResult> = {}): JarBud
 /**
  * A single jarBudget line, defaulted to an unset (no-limit) jar with no spend.
  *
- * `remaining` (the BALANCE axis) defaults to what the engine would derive —
- * `limit − spent + rebalanceNet` — instead of `null`, so a fixture cannot describe a
- * jar the engine can never produce (e.g. `status: "over"` with a null balance). Pass
- * it explicitly to model a jar that a rebalance moved off that identity.
+ * `balance` (the BALANCE axis) defaults to a migrated jar's current-month balance
+ * (opening deposit = limit at the month start → `limit − spent + rebalanceNet`)
+ * instead of `null`, so a limited fixture reads as funded. Pass it explicitly to
+ * model any other ledger history (or `null` for an unfunded jar).
  */
 export function makeJarBudgetLine(over: Partial<JarBudgetLine> = {}): JarBudgetLine {
   const limit = over.limit ?? null;
@@ -93,7 +93,8 @@ export function makeJarBudgetLine(over: Partial<JarBudgetLine> = {}): JarBudgetL
     limit,
     limitState: over.limitState ?? "unset",
     rebalanceNet,
-    remaining: over.remaining ?? (limit !== null ? limit - spent + rebalanceNet : null),
+    // `in`, not `??`: an explicit `balance: null` (unfunded jar) must stay null.
+    balance: "balance" in over ? (over.balance as number | null) : limit !== null ? limit - spent + rebalanceNet : null,
     pct: over.pct ?? null,
     status: over.status ?? null,
     thresholdHit: over.thresholdHit ?? false,

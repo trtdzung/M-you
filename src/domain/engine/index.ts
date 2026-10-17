@@ -11,6 +11,7 @@ export * from "./category-dedupe";
 export * from "./pressure";
 export * from "./budget";
 export * from "./jar-budget";
+export * from "./jar-balance";
 export * from "./jar-spendable";
 export * from "./jar-spendable-total";
 export * from "./jar-rebalance";

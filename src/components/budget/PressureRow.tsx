@@ -32,6 +32,8 @@ export function PressureRow({
   statusLabel,
   rightLabel,
   limitLabel,
+  usedPrefix,
+  limitSuffix,
   accent,
 }: {
   label: string;
@@ -46,6 +48,10 @@ export function PressureRow({
   rightLabel?: string | null;
   /** Denominator label when `limit` is null (e.g. "chưa xác định TN"). */
   limitLabel?: string;
+  /** Text before the used amount (e.g. "Đã chi "). */
+  usedPrefix?: string;
+  /** Text after the Money denominator (e.g. " hạn mức"). */
+  limitSuffix?: string;
   /** Optional colour-dot node before the label (jar palette, M9). */
   accent?: ReactNode;
 }) {
@@ -67,11 +73,13 @@ export function PressureRow({
       </div>
       <div className="mt-1 flex items-center justify-between text-xs text-muted">
         <span>
+          {usedPrefix}
           <Money amount={used} className="text-text" />
           {limit !== null ? (
             <>
               {" / "}
               <Money amount={limit} />
+              {limitSuffix}
             </>
           ) : limitLabel ? (
             <> / {limitLabel}</>

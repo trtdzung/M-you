@@ -14,6 +14,7 @@ import type {
   Goal,
   Jar,
   JarConfig,
+  JarLedgerInput,
   Liability,
   MockProduct,
   MonthlySnapshot,
@@ -130,17 +131,28 @@ export interface Providers
    * over the CASA cap with `overBy`).
    */
   getJarConfig(): Promise<JarConfig>;
-  /** Create a new jar. Returns the full updated config. */
-  createJar(jar: Jar): Promise<JarConfig>;
-  /** Patch an existing jar's fields. Returns the full updated config. */
+  /**
+   * Create a new jar with its REQUIRED monthly limit (`jar.budgetLimit`) and
+   * opening balance (`balance` ≥ 0 — 0 is a known 0, not "chưa có số dư"). The
+   * server writes the jar and its opening ledger row atomically and rejects (422)
+   * an opening balance that would raise Σ spendable past CASA (`overBy`).
+   * Returns the full updated config.
+   */
+  createJar(jar: Jar, balance: number): Promise<JarConfig>;
+  /**
+   * Patch an existing jar's fields (label, limit, colour, icon, categories). A
+   * limit is a monthly PLAN, never money: editing it is not CASA-capped.
+   * Returns the full updated config.
+   */
   updateJar(id: string, patch: Partial<Omit<Jar, "id">>): Promise<JarConfig>;
   /**
-   * Patch several jars ATOMICALLY in one transaction — used by "Chia ngay" to set
-   * every jar's `budgetLimit` in a single write (no `Promise.all` race). The
-   * server enforces `fitsCasaCap` on the resulting set and rejects (422) if Σ
-   * budgetLimit would exceed CASA. Returns the full updated config.
+   * Deposit into / withdraw from jar balances — ONE atomic batch
+   * (`POST /api/jar-ledger`, 1–50 entries, all-or-nothing). A display partition
+   * of CASA: no money moves, no OTP (invariant #3). Rejects with an `ApiError`:
+   * 404 unknown jar, 422 `jar not persisted`, `over balance` (+ `maxWithdraw`),
+   * `over CASA cap` (+ `overBy`). Returns the full updated config (with ledger).
    */
-  updateJars(patches: Record<string, Partial<Omit<Jar, "id">>>): Promise<JarConfig>;
+  postJarLedger(entries: JarLedgerInput[]): Promise<JarConfig>;
   /**
    * Remove a jar (its categories move to "Khác"; the server also deletes every
    * "điều chỉnh hũ" rebalance leg from/to it). Returns the full updated config.

@@ -61,8 +61,8 @@ describe("jarOverspendCovered — COVERED shape (a jar that received a covering 
               spent: 4_800_000,
               limit: 4_000_000,
               limitState: "set",
-              status: "ok", // already folded post-rebalance — remaining is non-negative
-              remaining: 0,
+              status: "ok", // already folded post-rebalance — balance is non-negative
+              balance: 0,
             }),
           ],
         }),
@@ -76,8 +76,13 @@ describe("jarOverspendCovered — COVERED shape (a jar that received a covering 
     expect(insight!.id).toBe("jarOverspendCovered:2026-06:food");
     expect(insight!.severity).toBe("attention");
     expect(insight!.actionType).toBe("review_jars");
-    expect(insight!.title).toBe('Vượt hũ "Ăn uống" đã được bù');
+    expect(insight!.title).toBe('Hũ "Ăn uống" đã được bù số dư');
     expect(insight!.explanation).toContain("800.000");
+    // Two axes kept apart: the covered money (balance) and the plan breach (limit).
+    expect(insight!.sourceFacts.find((f) => f.label === "Đã bù")?.value).toBe(800_000);
+    expect(insight!.sourceFacts.find((f) => f.label === "Vượt hạn mức")?.value).toBe(800_000);
+    expect(insight!.sourceFacts.find((f) => f.label === "Số dư")?.value).toBe(0);
+    expect(insight!.explanation).toContain("vượt hạn mức");
     assertGrounded(insight!);
 
     // Donor provenance (invariant #5, Minor-1): the origin is carried in the facts,
@@ -92,7 +97,7 @@ describe("jarOverspendCovered — COVERED shape (a jar that received a covering 
       makeFinancials({
         monthKey: "2026-06",
         jarBudget: makeJarBudgetResult({
-          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 5_500_000, limit: 4_000_000, remaining: 0 })],
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 5_500_000, limit: 4_000_000, balance: 0 })],
         }),
         jarRebalances: [
           rebalanceTxn({ id: "r1", fromJarId: "buf", toJarId: "food", amount: 1_000_000, origin: "auto" }),
@@ -114,7 +119,7 @@ describe("jarOverspendCovered — COVERED shape (a jar that received a covering 
       makeFinancials({
         monthKey: "2026-06",
         jarBudget: makeJarBudgetResult({
-          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 1_000_000, limit: 4_000_000, remaining: 3_000_000 })],
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 1_000_000, limit: 4_000_000, balance: 3_000_000 })],
         }),
         jarRebalances: [rebalanceTxn({ fromJarId: "food", toJarId: "pool", amount: 200_000, origin: "auto" })],
       }),
@@ -137,7 +142,7 @@ describe("jarOverspendCovered — C5 RESIDUAL shape (over-budget jar with NO cov
               limit: 4_000_000,
               limitState: "set",
               status: "over",
-              remaining: -800_000,
+              balance: -800_000,
             }),
           ],
         }),
@@ -161,7 +166,7 @@ describe("jarOverspendCovered — C5 RESIDUAL shape (over-budget jar with NO cov
       makeFinancials({
         monthKey: "2026-06",
         jarBudget: makeJarBudgetResult({
-          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, remaining: 0 })],
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, balance: 0 })],
         }),
         jarRebalances: [rebalanceTxn({ fromJarId: "buf", toJarId: "food", amount: 800_000, origin: "auto" })],
       }),
@@ -175,7 +180,7 @@ describe("jarOverspendCovered — C5 RESIDUAL shape (over-budget jar with NO cov
       makeFinancials({
         monthKey: "2026-06",
         jarBudget: makeJarBudgetResult({
-          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 1_000_000, limit: null, limitState: "unset", remaining: null })],
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 1_000_000, limit: null, limitState: "unset", balance: null })],
         }),
         jarRebalances: [],
       }),
@@ -188,12 +193,57 @@ describe("jarOverspendCovered — C5 RESIDUAL shape (over-budget jar with NO cov
       makeFinancials({
         monthKey: "2026-06",
         jarBudget: makeJarBudgetResult({
-          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 1_000_000, limit: 4_000_000, remaining: 3_000_000 })],
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 1_000_000, limit: 4_000_000, balance: 3_000_000 })],
         }),
         jarRebalances: [],
       }),
     );
     expect(insights).toBeNull();
+  });
+});
+
+describe("jarOverspendCovered — balance vs limit axes (plan 260923, Phase 05)", () => {
+  it("Case C: limit 7tr, balance ran out (−1tr) and a 1tr cover → covered, NO 'Vượt hạn mức' fact (spent ≤ limit)", () => {
+    const insights = jarOverspendCovered(
+      makeFinancials({
+        monthKey: "2026-09",
+        jarBudget: makeJarBudgetResult({
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 6_000_000, limit: 7_000_000, limitState: "set", status: "near", balance: 0 })],
+        }),
+        jarRebalances: [rebalanceTxn({ fromJarId: "pool", toJarId: "food", amount: 1_000_000 })],
+      }),
+    );
+    const covered = insights!.find((i) => i.type === "jar_overspend_covered")!;
+    expect(covered.sourceFacts.find((f) => f.label === "Đã bù")?.value).toBe(1_000_000);
+    expect(covered.sourceFacts.some((f) => f.label === "Vượt hạn mức")).toBe(false);
+    expect(covered.explanation).not.toContain("vượt hạn mức");
+    assertGrounded(covered);
+  });
+
+  it("over the limit but still holding money (balance ≥ 0, no cover) is NOT a residual — that is jarPressure's plan-axis story", () => {
+    const insights = jarOverspendCovered(
+      makeFinancials({
+        jarBudget: makeJarBudgetResult({
+          lines: [makeJarBudgetLine({ huId: "food", spent: 6_000_000, limit: 5_000_000, limitState: "set", status: "over", balance: 1_000_000 })],
+        }),
+      }),
+    );
+    expect(insights).toBeNull();
+  });
+
+  it("a funded jar with NO limit that ran out of money still needs a manual cover (balance axis only)", () => {
+    const insights = jarOverspendCovered(
+      makeFinancials({
+        jarBudget: makeJarBudgetResult({
+          lines: [makeJarBudgetLine({ huId: "fun", label: "Hưởng thụ", spent: 600_000, limit: null, limitState: "unset", balance: -100_000 })],
+        }),
+      }),
+    );
+    const residual = insights!.find((i) => i.type === "jar_needs_manual_cover")!;
+    expect(residual.sourceFacts.find((f) => f.label === "Cần bù")?.value).toBe(100_000);
+    expect(residual.sourceFacts.some((f) => f.label === "Hạn mức")).toBe(false);
+    expect(residual.explanation).toContain("hết số dư");
+    assertGrounded(residual);
   });
 });
 
@@ -204,7 +254,7 @@ describe("jarOverspendCovered — pool cover leg (S2/G01/M05)", () => {
         monthKey: "2026-06",
         jarBudget: makeJarBudgetResult({
           lines: [
-            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 150_000, limit: 100_000, limitState: "set", remaining: 0 }),
+            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 150_000, limit: 100_000, limitState: "set", balance: 0 }),
           ],
         }),
         jarRebalances: [rebalanceTxn({ fromJarId: "pool", toJarId: "food", amount: 50_000, origin: "auto" })],
@@ -223,7 +273,7 @@ describe("jarOverspendCovered — pool cover leg (S2/G01/M05)", () => {
     const insights = jarOverspendCovered(
       makeFinancials({
         jarBudget: makeJarBudgetResult({
-          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 150_000, limit: 100_000, limitState: "set", remaining: 0 })],
+          lines: [makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 150_000, limit: 100_000, limitState: "set", balance: 0 })],
         }),
         jarRebalances: [rebalanceTxn({ fromJarId: "gone-123", toJarId: "food", amount: 50_000 })],
       }),

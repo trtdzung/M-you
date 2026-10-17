@@ -21,6 +21,7 @@ import {
   slugCategoryId,
   uniqueCategoryId,
 } from "@/domain/models/category-rules";
+import { jsonResponse } from "./mock-json-response";
 
 interface Row extends StoredCategory {
   custom: boolean;
@@ -45,10 +46,6 @@ function rowsFor(cif: string): Row[] {
 /** Drop `custom` — a write-door concern, not part of the taxonomy contract. */
 function toPublic({ custom: _custom, ...category }: Row): StoredCategory {
   return category;
-}
-
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
 /** The persona's taxonomy as `GET /api/categories` would return it. */

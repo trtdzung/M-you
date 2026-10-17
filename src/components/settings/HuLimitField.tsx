@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Jar } from "@/domain/models";
-import { fitsCasaCap } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
-import { useJarCapProbe } from "@/state/use-casa-pool";
 import { formatVnd } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { parseVndInput } from "./parse-vnd-input";
@@ -12,17 +10,15 @@ import { parseVndInput } from "./parse-vnd-input";
 const toDraft = (limit: number | undefined) => (limit != null ? String(limit) : "");
 
 /**
- * "Hạn mức/tháng" of one jar. Blank = chưa đặt (cleared, never 0 — invariant
- * #6). Input goes through the strict `parseVndInput` (U19); an unchanged value
- * sends nothing (U24); the CASA-cap preview uses the SAME rule as the server —
- * only a RAISE that lands above CASA is blocked, lowering/clearing/re-saving
- * always passes even when Σ is already over the live balance (U9). A refused
- * write snaps the field back to the persisted value (the reason shows in the
- * sheet's error notice).
+ * "Hạn mức chi mỗi tháng" of one jar — the monthly PLAN, not money (plan 260923):
+ * it resets each month and is never checked against CASA (only deposits are; see
+ * `HuBalanceField`). Blank = chưa đặt (cleared, never 0 — invariant #6). Input
+ * goes through the strict `parseVndInput` (U19); an unchanged value sends nothing
+ * (U24). A refused write snaps the field back to the persisted value (the reason
+ * shows in the sheet's error notice).
  */
-export function HuLimitField({ jar, jars }: { jar: Jar; jars: Jar[] }) {
+export function HuLimitField({ jar }: { jar: Jar }) {
   const { updateJar } = useJarConfig();
-  const { casa, spendableTotal } = useJarCapProbe();
   const persisted = jar.budgetLimit ?? undefined;
   const persistedRef = useRef(persisted);
   const [draft, setDraft] = useState(toDraft(persisted));
@@ -48,22 +44,6 @@ export function HuLimitField({ jar, jars }: { jar: Jar; jars: Jar[] }) {
       setDraft(toDraft(persisted)); // normalize "5.000.000" → stored form, no request
       return;
     }
-    // BALANCE-lens preview (only a RAISE past CASA is blocked): compare Σ spendable
-    // before/after this one jar's new limit against the live CASA, the SAME rule the
-    // server applies. Skipped until the probe has loaded (spendableTotal null) — the
-    // server is the authority, so a not-yet-loaded preview never blocks.
-    if (next !== undefined && spendableTotal) {
-      const nextJars = jars.map((j) => (j.id === jar.id ? { ...j, budgetLimit: next } : j));
-      const cap = fitsCasaCap(spendableTotal(nextJars), spendableTotal(jars), casa);
-      if (!cap.ok) {
-        setError(
-          cap.overBy == null
-            ? "Chưa có số dư tài khoản để tăng hạn mức."
-            : `Vượt số dư tài khoản ${formatVnd(cap.overBy)}. Nhập hạn mức thấp hơn.`,
-        );
-        return;
-      }
-    }
     void updateJar(jar.id, { budgetLimit: next }).then((ok) => {
       if (!ok) setDraft(toDraft(persistedRef.current));
     });
@@ -80,7 +60,7 @@ export function HuLimitField({ jar, jars }: { jar: Jar; jars: Jar[] }) {
 
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-text">Hạn mức/tháng</span>
+      <span className="text-sm font-medium text-text">Hạn mức chi mỗi tháng</span>
       <input
         inputMode="numeric"
         value={draft}

@@ -13,9 +13,11 @@ import "server-only";
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
-import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
+import { dedupeCategories, healOrphanCategories, isJarAmount } from "@/domain/jar-rules";
 import { assignableCategoryIds } from "./categories-store";
 import { getDb } from "./db";
+import { transferNow } from "./demo-clock";
+import { deleteLedgerExcept, readJarLedger } from "./jar-ledger-store";
 
 interface JarRow {
   id: string;
@@ -26,6 +28,8 @@ interface JarRow {
   color: string | null;
   icon: string | null;
   sort_order: number;
+  /** Running-balance anchor (ISO). NULL only on a not-yet-migrated legacy row. */
+  created_at: string | null;
 }
 
 /** Stored JSON text → category id array; a corrupt cell degrades to `[]`. */
@@ -49,12 +53,13 @@ function toJar(row: JarRow): Jar {
   if (row.budget_limit !== null) jar.budgetLimit = row.budget_limit;
   if (row.color !== null) jar.color = row.color;
   if (row.icon !== null) jar.icon = row.icon;
+  if (row.created_at !== null) jar.createdAt = row.created_at;
   return jar;
 }
 
-/** A whole-VND, non-negative, safe-integer limit (S15/A24/A25/A09). */
+/** A whole-VND, non-negative, safe-integer limit ≤ `MAX_JAR_AMOUNT` (S15/A24/A25/A09, RT#12). */
 function isValidLimit(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+  return isJarAmount(value);
 }
 
 /**
@@ -115,6 +120,33 @@ export function sanitizeJarPatch(input: unknown): Partial<Omit<Jar, "id">> | nul
   return patch;
 }
 
+/**
+ * Guard for a `POST /api/jars` body (plan 260923, D2): the jar must pass
+ * `sanitizeJar` AND carry a `budgetLimit`, and `balance` (the opening deposit) is
+ * REQUIRED — both whole-VND in `[0, MAX_JAR_AMOUNT]`. A missing balance is never
+ * defaulted to 0 (invariant #6); the caller answers 422 with `error`.
+ */
+export function sanitizeJarCreate(
+  body: unknown,
+): { jar: Jar & { budgetLimit: number }; balance: number } | { error: string } {
+  const b = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const jar = sanitizeJar(b.jar);
+  if (!jar) return { error: "jar is invalid" };
+  if (jar.budgetLimit === undefined) return { error: "jar.budgetLimit is required" };
+  if (!isJarAmount(b.balance)) return { error: "balance is required (whole VND, 0 to 10^12)" };
+  return { jar: { ...jar, budgetLimit: jar.budgetLimit }, balance: b.balance };
+}
+
+/**
+ * Ids of the persona's jars that have a REAL `jars` row — i.e. excluding the
+ * synthetic "Khác" `readJarConfig` heals in on the fly. Ledger writes are allowed
+ * only for these (Red Team #5): a row-less jar has no anchor to hold a balance.
+ */
+export function readJarRowIds(cif: string): Set<string> {
+  const rows = getDb().prepare("SELECT id FROM jars WHERE cif = ?").all(cif) as { id: string }[];
+  return new Set(rows.map((r) => r.id));
+}
+
 /** Same guard over a list; a single bad element rejects the whole list (a partial replace would silently drop jars). */
 export function sanitizeJars(input: unknown): Jar[] | null {
   if (!Array.isArray(input)) return null;
@@ -144,7 +176,8 @@ export function sanitizeJars(input: unknown): Jar[] | null {
 export function readJarConfig(cif: string): JarConfig {
   const rows = getDb().prepare("SELECT * FROM jars WHERE cif = ? ORDER BY sort_order ASC").all(cif) as JarRow[];
   const config = dedupeCategories({ version: 3, jars: rows.map(toJar) });
-  return healOrphanCategories(config, assignableCategoryIds(cif));
+  // Ledger attached AFTER dedupe/heal — both rebuild the config object.
+  return { ...healOrphanCategories(config, assignableCategoryIds(cif)), ledger: readJarLedger(cif) };
 }
 
 /**
@@ -152,15 +185,28 @@ export function readJarConfig(cif: string): JarConfig {
  * return the config as it now reads back from the database (so the response is
  * the stored truth, not the in-memory hope). Atomic — a failed insert rolls the
  * delete back rather than leaving the persona with no jars.
+ *
+ * `created_at` is server-owned: an existing jar keeps its stored anchor across
+ * the DELETE+INSERT (read by id first); a new id gets `nowIso`. Any `createdAt`
+ * or `ledger` on the incoming config is ignored. Ledger rows of a jar that left
+ * the config are deleted in the same transaction (a reused id must not inherit a
+ * stale balance).
  */
-export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
+export function writeJarConfig(
+  cif: string,
+  config: JarConfig,
+  nowIso: string = transferNow().toISOString(),
+): JarConfig {
   const db = getDb();
+  const readAnchors = db.prepare("SELECT id, created_at FROM jars WHERE cif = ?");
   const del = db.prepare("DELETE FROM jars WHERE cif = ?");
   const insert = db.prepare(
-    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, color, icon, sort_order)
-     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @color, @icon, @sortOrder)`,
+    `INSERT INTO jars (id, cif, label, category_ids, budget_limit, color, icon, sort_order, created_at)
+     VALUES (@id, @cif, @label, @categoryIds, @budgetLimit, @color, @icon, @sortOrder, @createdAt)`,
   );
   const replaceAll = db.transaction((jars: Jar[]) => {
+    const rows = readAnchors.all(cif) as Pick<JarRow, "id" | "created_at">[];
+    const anchors = new Map(rows.map((r) => [r.id, r.created_at]));
     del.run(cif);
     jars.forEach((jar, index) => {
       insert.run({
@@ -174,8 +220,10 @@ export function writeJarConfig(cif: string, config: JarConfig): JarConfig {
         color: jar.color ?? null,
         icon: jar.icon ?? null,
         sortOrder: index,
+        createdAt: anchors.get(jar.id) ?? nowIso,
       });
     });
+    deleteLedgerExcept(cif, jars.map((j) => j.id));
   });
   replaceAll(config.jars);
   return readJarConfig(cif);

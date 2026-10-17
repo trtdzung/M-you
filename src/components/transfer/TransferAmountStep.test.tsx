@@ -14,9 +14,9 @@ const savings: Account = {
 };
 const recipient: SelectedRecipient = { name: "Nguyen Van A", accountMasked: "****6677", accountNumber: "0281000556677", source: "saved_beneficiary", isNewPayee: false, bankName: "MSB" };
 
-type PickerJar = Jar & { remaining: number | null; spendable: number | null };
-const jarWithLimit: PickerJar = { id: "j1", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 3_000_000, remaining: 1_210_000, spendable: 1_210_000 };
-const jarNoLimit: PickerJar = { id: "j2", label: "Giải trí", categoryIds: ["entertainment"], remaining: null, spendable: null };
+type PickerJar = Jar & { balance: number | null; spendable: number | null };
+const jarWithLimit: PickerJar = { id: "j1", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 3_000_000, balance: 1_210_000, spendable: 1_210_000 };
+const jarNoLimit: PickerJar = { id: "j2", label: "Giải trí", categoryIds: ["entertainment"], balance: null, spendable: null };
 
 function renderStep(overrides: Partial<Parameters<typeof TransferAmountStep>[0]> = {}) {
   const onChangeRecipient = vi.fn();
@@ -132,9 +132,9 @@ describe("TransferAmountStep", () => {
     expect(onSourceChange).toHaveBeenCalledWith({ kind: "jar", id: "j1" });
   });
 
-  it("a jar with a set limit shows its derived còn lại (= max(0, remaining)), no spending-limit wording, and is selectable", () => {
+  it("a jar with a set limit shows its derived còn lại (= max(0, balance)), no spending-limit wording, and is selectable", () => {
     const funded: PickerJar = {
-      id: "j3", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 8_000_000, remaining: 8_000_000, spendable: 8_000_000,
+      id: "j3", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 8_000_000, balance: 8_000_000, spendable: 8_000_000,
     };
     const { onSourceChange } = renderStep({ jars: [funded] });
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));

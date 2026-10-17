@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS beneficiaries (
 CREATE INDEX IF NOT EXISTS idx_beneficiaries_cif ON beneficiaries (cif);
 -- Spending jars ("hũ"), per persona (`cif`). A jar is a GROUP of expense
 -- categories with an optional monthly limit (`budget_limit`); NULL means "chưa
--- đặt" — never a silent 0 (invariant #6). A jar has NO stored balance: its
--- spendable = max(0, remaining) is DERIVED from txn history (invariant #1).
--- Every expense category belongs to exactly one jar, enforced server-side by the
--- /api/jars route handlers.
+-- đặt" — never a silent 0 (invariant #6). The limit is the monthly PLAN, not the
+-- balance: a jar's running balance is DERIVED (invariant #1) from `jar_ledger`
+-- plus spend since `created_at` (its anchor). Every expense category belongs to
+-- exactly one jar, enforced server-side by the /api/jars route handlers.
 CREATE TABLE IF NOT EXISTS jars (
   id TEXT NOT NULL,
   cif TEXT NOT NULL,
@@ -29,10 +29,34 @@ CREATE TABLE IF NOT EXISTS jars (
   color TEXT,
   icon TEXT,
   sort_order INTEGER NOT NULL,     -- display order (a jar added later sorts last)
+  created_at TEXT,                 -- ISO; running-balance anchor. Nullable only for ALTER compat (db.ts backfills)
   PRIMARY KEY (cif, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_jars_cif ON jars (cif);
+
+-- Per-jar deposit/withdraw ledger, per persona (`cif`). A DISPLAY partition of
+-- CASA — never money movement (invariant #3) and always `self_reported` (#5).
+-- Every amount is > 0 except the ONE opening deposit per jar (`is_opening = 1`),
+-- which may be 0 so a jar created with balance 0 reads 0, not unknown (#6).
+-- Inter-jar moves are NOT stored here (they stay `dieu-chinh-hu` txns). Rows of a
+-- jar removed from the config are deleted with it (`writeJarConfig`).
+CREATE TABLE IF NOT EXISTS jar_ledger (
+  cif TEXT NOT NULL,
+  id TEXT NOT NULL,
+  jar_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('deposit', 'withdraw')),
+  amount INTEGER NOT NULL CHECK (amount >= 0),
+  is_opening INTEGER NOT NULL DEFAULT 0 CHECK (is_opening IN (0, 1)),
+  created_at TEXT NOT NULL,        -- ISO 8601
+  source TEXT NOT NULL DEFAULT 'self_reported' CHECK (source = 'self_reported'),
+  CHECK (amount > 0 OR is_opening = 1),
+  CHECK (is_opening = 0 OR kind = 'deposit'),
+  PRIMARY KEY (cif, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_jar_ledger_cif_jar ON jar_ledger (cif, jar_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_jar_ledger_opening ON jar_ledger (cif, jar_id) WHERE is_opening = 1;
 
 -- Bank accounts per persona (`cif`) — the CASA source of truth. Previously pure
 -- in-memory fixtures + a localStorage debit overlay; now a real table so a
@@ -131,9 +155,9 @@ CREATE TABLE IF NOT EXISTS transaction_corrections (
   PRIMARY KEY (cif, txn_id)
 );
 
--- NOTE: the legacy `jar_allocations` table was retired with the single-number
--- ("một con số") jar model — a jar's `budget_limit` IS its allocation now, so
--- there is no separate earmark ledger. `db.ts` drops the old table on connect.
+-- NOTE: the legacy `jar_allocations` table is retired (`db.ts` drops it on
+-- connect). A jar's balance now comes from `jar_ledger` deposits/withdrawals;
+-- `budget_limit` is only the monthly spending limit.
 
 -- Proactive insights per persona (`cif`). Stores the history and state of
 -- generated insights and their copies to avoid duplicate notifications.

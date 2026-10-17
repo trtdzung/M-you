@@ -19,7 +19,7 @@ import { CATEGORY, categoryLabel } from "@/domain/models";
  * the category of the ONE self-reported (primary) txn recorded on confirm (never
  * money movement — invariant #3). No jar bookkeeping is needed here: a jar's
  * spendable is DERIVED from txn history (invariant #1), so changing the txn's
- * category alone re-routes `spent`/`remaining` between jars via
+ * category alone re-routes `spent`/`balance` between jars via
  * `evaluateJarBudget`'s category→jar map — no double count, nothing to refund.
  *
  * AI category layer: while the transfer is still unclassified, the AI (or the

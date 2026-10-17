@@ -3,15 +3,20 @@ import type { Account, Asset, JarConfig, Liability, Transaction } from "@/domain
 import { REBALANCE_CATEGORY } from "@/domain/models";
 import { getProviders, type PersonaId } from "@/providers";
 import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
+import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
+import { monthAnchor, withSeedDeposits } from "@/test-utils/jar-ledger-fixtures";
 import {
   aggregateCashflow,
+  balanceAsOf,
   calculateNetWorth,
   detectRecurring,
   evaluateBudget,
   evaluateJarBudget,
   financialHealth,
+  jarBalances,
   jarSpendable,
   monthPeriodFromKey,
+  rebalanceNetByJar,
   selectUnlabeledSpend,
   spendingByCategory,
   upcomingObligations,
@@ -120,21 +125,38 @@ describe("computeFinancials", () => {
 
   it("threads a supplied jarConfig through to jarBudget, matching evaluateJarBudget directly", async () => {
     const raw = await loadRaw("stable");
-    const jarConfig: JarConfig = {
-      version: 3,
-      jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 5_000_000 }],
-    };
+    const jarConfig: JarConfig = withSeedDeposits(
+      { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 5_000_000 }] },
+      monthAnchor(MONTH),
+    );
     const f = computeFinancials(raw, MONTH, { jarConfig });
 
     const period = monthPeriodFromKey(MONTH);
     const prevPeriod = monthPeriodFromKey(prevMonthKey(MONTH));
+    const net = rebalanceNetByJar(raw.transactions, period);
+    const balances = jarBalances(jarConfig, raw.transactions, balanceAsOf(period, DEMO_NOW), period.to);
 
     expect(f.jarBudget).toEqual(
-      evaluateJarBudget(jarConfig, raw.transactions, period, prevPeriod, DEMO_NOW),
+      evaluateJarBudget(jarConfig, raw.transactions, period, prevPeriod, DEMO_NOW, net, balances),
     );
+    expect(f.jarBudget.lines[0].balance).not.toBeNull();
     expect(f.jarBudget.lines).toHaveLength(1);
     expect(f.jarBudget.lines[0].huId).toBe("food");
     expect(f.jarBudget.lines[0].limit).toBe(5_000_000);
+  });
+
+  it("migrated personas: current-month balance equals the pre-split `limit − spent + rebalanceNet`", async () => {
+    for (const persona of ["stable", "irregular", "wealthy"] as PersonaId[]) {
+      const raw = await loadRaw(persona);
+      const jarConfig = withSeedDeposits(DEFAULT_JAR_CONFIG, monthAnchor(MONTH));
+      const f = computeFinancials(raw, MONTH, { jarConfig });
+      for (const line of f.jarBudget.lines) {
+        const legacy = line.limit !== null ? line.limit - line.spent + line.rebalanceNet : null;
+        expect(line.balance).toBe(legacy);
+      }
+      const env = new Map(f.jarEnvelope.jars.map((l) => [l.jarId, l.balance]));
+      for (const line of f.jarBudget.lines) expect(env.get(line.huId)).toBe(line.balance);
+    }
   });
 
   it("[red-team #3] merges user assets/liabilities into net worth without double-counting seed", async () => {
@@ -209,6 +231,9 @@ describe("computeFinancials", () => {
 
 const REBALANCE_MONTH = "2026-06";
 
+/** A jar config as the jar-ledger migration leaves it for REBALANCE_MONTH (opening = limit). */
+const migrated = (cfg: JarConfig) => withSeedDeposits(cfg, monthAnchor(REBALANCE_MONTH));
+
 function currentAccount(id: string, availableBalance: number): Account {
   return {
     id,
@@ -251,7 +276,7 @@ function rebalanceTxn(over: Partial<Transaction> = {}): Transaction {
 }
 
 describe("computeFinancials — double-entry correctness (rebalance never inflates spend-by-category)", () => {
-  it("a `dieu-chinh-hu` rebalance leaves categorySpend/cashflow untouched but reconciles both jars' remaining", () => {
+  it("a `dieu-chinh-hu` rebalance leaves categorySpend/cashflow untouched but reconciles both jars' balance", () => {
     const jarConfig: JarConfig = {
       version: 3,
       jars: [
@@ -261,7 +286,7 @@ describe("computeFinancials — double-entry correctness (rebalance never inflat
     };
     const realSpend = txn({ id: "spend-1", categoryId: "dining", amount: 4_500_000, postedAt: "2026-06-05T10:00:00.000Z" });
     const raw = makeRaw({ transactions: [realSpend, rebalanceTxn()], accounts: [currentAccount("cur", 20_000_000)] });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
 
     // The REAL spend keeps its REAL category at its full amount — the rebalance
     // never spreads into "buf"'s (the donor's) category, and never double-counts.
@@ -273,9 +298,9 @@ describe("computeFinancials — double-entry correctness (rebalance never inflat
     const byId = new Map(f.jarBudget.lines.map((l) => [l.huId, l]));
     expect(byId.get("food")!.spent).toBe(4_500_000);
     expect(byId.get("buf")!.spent).toBe(0);
-    // ...while `remaining` reconciles the rebalance: food was 500k over, now covered.
-    expect(byId.get("food")!.remaining).toBe(0);
-    expect(byId.get("buf")!.remaining).toBe(2_500_000); // 3M − 0 − 500k given away
+    // ...while `balance` reconciles the rebalance: food was 500k over, now covered.
+    expect(byId.get("food")!.balance).toBe(0);
+    expect(byId.get("buf")!.balance).toBe(2_500_000); // 3M − 0 − 500k given away
 
     // The rebalance is surfaced on `jarRebalances` (not lost, not silently folded).
     expect(f.jarRebalances).toHaveLength(1);
@@ -288,7 +313,7 @@ describe("computeFinancials — double-entry correctness (rebalance never inflat
   });
 });
 
-describe("computeFinancials — C1 pool identity: pool + Σ spendable == CASA (never pool + Σ remaining)", () => {
+describe("computeFinancials — C1 pool identity: pool + Σ spendable == CASA (never pool + Σ balance)", () => {
   it("holds in the ordinary funded case", () => {
     const jarConfig: JarConfig = {
       version: 3,
@@ -301,15 +326,15 @@ describe("computeFinancials — C1 pool identity: pool + Σ spendable == CASA (n
       transactions: [txn({ categoryId: "dining", amount: 1_000_000 })],
       accounts: [currentAccount("cur", 12_000_000)],
     });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
-    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
+    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.balance) ?? 0), 0);
     expect((f.unallocatedPool.amount as number) + spendableTotal).toBe(12_000_000);
     expect(f.unallocatedPool.overAllocated).toBe(false);
   });
 
-  it("holds even when a donor's remaining is floored at 0 by an overspend (donor-crosses-0) — pool + Σremaining would NOT", () => {
-    // food is 2M over its 4M limit (remaining −2M, spendable floored at 0); bills is
-    // untouched. The identity must still use Σ spendable, never the raw Σ remaining.
+  it("holds even when a donor's balance is floored at 0 by an overspend (donor-crosses-0) — pool + Σbalance would NOT", () => {
+    // food is 2M over its 4M limit (balance −2M, spendable floored at 0); bills is
+    // untouched. The identity must still use Σ spendable, never the raw Σ balance.
     const jarConfig: JarConfig = {
       version: 3,
       jars: [
@@ -321,14 +346,14 @@ describe("computeFinancials — C1 pool identity: pool + Σ spendable == CASA (n
       transactions: [txn({ categoryId: "dining", amount: 6_000_000 })], // 2M over
       accounts: [currentAccount("cur", 12_000_000)],
     });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
     const byId = new Map(f.jarBudget.lines.map((l) => [l.huId, l]));
-    expect(byId.get("food")!.remaining).toBe(-2_000_000); // true (un-floored) shortfall
+    expect(byId.get("food")!.balance).toBe(-2_000_000); // true (un-floored) shortfall
 
-    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
-    const remainingTotal = f.jarBudget.lines.reduce((s, l) => s + (l.remaining ?? 0), 0);
+    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.balance) ?? 0), 0);
+    const balanceTotal = f.jarBudget.lines.reduce((s, l) => s + (l.balance ?? 0), 0);
     expect((f.unallocatedPool.amount as number) + spendableTotal).toBe(12_000_000); // C1 identity holds
-    expect((f.unallocatedPool.amount as number) + remainingTotal).not.toBe(12_000_000); // the false identity does NOT
+    expect((f.unallocatedPool.amount as number) + balanceTotal).not.toBe(12_000_000); // the false identity does NOT
   });
 
   it("surfaces the over-allocated residual (Σ budget > CASA) — bounded fundability, never a silent auto-eliminate", () => {
@@ -341,8 +366,8 @@ describe("computeFinancials — C1 pool identity: pool + Σ spendable == CASA (n
       ],
     };
     const raw = makeRaw({ transactions: [], accounts: [currentAccount("cur", 12_000_000)] });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
-    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
+    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.balance) ?? 0), 0);
 
     expect(spendableTotal).toBe(20_000_000); // both jars fully claim their unspent limit
     expect(f.unallocatedPool.amount).toBe(-8_000_000); // CASA − 20M, kept truthfully negative (never clamped)
@@ -362,8 +387,8 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
       transactions: [txn({ categoryId: "dining", amount: 500_000 })],
       accounts: [currentAccount("cur", 8_000_000)],
     });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
-    // food limit 3tr, spent 500k → remaining/spendable 2,5tr. CASA 8tr → 5,5tr free.
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
+    // food limit 3tr, spent 500k → balance/spendable 2,5tr. CASA 8tr → 5,5tr free.
     expect(f.unallocatedPool.amount).toBe(5_500_000);
     // jarEnvelope.pending is now the SAME balance lens (D26) — no longer the limit lens.
     expect(f.jarEnvelope.pending.amount).toBe(5_500_000);
@@ -374,7 +399,7 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
 
   it("D27: no current account → both are 'unknown', never a fabricated negative", () => {
     const raw = makeRaw({ transactions: [], accounts: [] });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
     expect(f.unallocatedPool.amount).toBe("unknown");
     expect(f.unallocatedPool.overAllocated).toBe(false);
     expect(f.jarEnvelope.pending.amount).toBe("unknown");
@@ -382,7 +407,7 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
 
   it("S2: a pool cover leg (pool → jar) refills the jar's balance and keeps the C1 identity", () => {
     // CASA 8tr (already debited). food limit 3tr, spent 3.5tr → 500k over plan; the
-    // pool refilled the BALANCE with a `fromJarId: "pool"` leg → food remaining 0, no
+    // pool refilled the BALANCE with a `fromJarId: "pool"` leg → food balance 0, no
     // longer "cần bù" — but the overspend against its own 3tr plan still stands.
     const cover = txn({
       type: "transfer",
@@ -394,13 +419,13 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
       transactions: [txn({ categoryId: "dining", amount: 3_500_000 }), cover],
       accounts: [currentAccount("cur", 8_000_000)],
     });
-    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
+    const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig: migrated(jarConfig) });
     const food = f.jarBudget.lines[0];
-    expect(food.remaining).toBe(0); // balance axis: healed
+    expect(food.balance).toBe(0); // balance axis: healed
     expect(food.limit).toBe(3_000_000); // plan axis: untouched by the cover
     expect(food.status).toBe("over"); // 3.5tr spent on a 3tr plan
     expect(f.jarEnvelope.jars[0].overLimit).toBe(true);
-    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
+    const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.balance) ?? 0), 0);
     expect((f.unallocatedPool.amount as number) + spendableTotal).toBe(8_000_000); // C1 identity
     expect(f.unallocatedPool.amount).toBe(8_000_000); // pool not debited twice by the leg
   });

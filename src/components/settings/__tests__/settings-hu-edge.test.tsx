@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { JarConfigProvider } from "@/state/jars";
 import { CategoryTaxonomyProvider } from "@/state/categories";
+import { FinancialsTestProviders } from "@/test-utils/financials-test-providers";
 import { buildManualTxn, ManualTxnsProvider, useManualTxns } from "@/state/manual-txns";
 import { REBALANCE_CATEGORY, type Account } from "@/domain/models";
 
@@ -29,9 +30,11 @@ function wrapper({ children }: { children: ReactNode }) {
     <PersonaProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
-          <CategoryTaxonomyProvider>  
-          {children}
-            <LegProbe />
+          <CategoryTaxonomyProvider>
+            <FinancialsTestProviders>
+              {children}
+              <LegProbe />
+            </FinancialsTestProviders>
           </CategoryTaxonomyProvider>
         </JarConfigProvider>
       </ManualTxnsProvider>
@@ -132,8 +135,8 @@ describe("HuEditorSheet — limit input (U19/U24)", () => {
   });
 });
 
-describe("HuEditorSheet — CASA cap uses 'only raises are capped' (U9)", () => {
-  it("lets a limit be LOWERED when Σ is already over the live balance, blocks a raise", async () => {
+describe("HuEditorSheet — limit edits are not CASA-capped (U9 → plan 260923)", () => {
+  it("lets a limit be LOWERED and RAISED while CASA is 0 — limits move no balance", async () => {
     // Spend CIF_0001's current accounts down to 0 → Σ limits (17tr) > CASA.
     const accounts = (await (await fetch("/api/accounts?cif=CIF_0001")).json()) as Account[];
     for (const a of accounts.filter((x) => x.type === "current")) {
@@ -151,10 +154,13 @@ describe("HuEditorSheet — CASA cap uses 'only raises are capped' (U9)", () => 
     expect(patches).toHaveLength(1);
     expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
 
+    // Raising back: pre-split this tripped "Vượt số dư"; the cap now reads
+    // Σ max(0, balance), which a limit edit never changes.
     fireEvent.change(limit, { target: { value: "4000000" } });
     fireEvent.blur(limit);
-    expect(await within(dialog).findByText(/Vượt số dư tài khoản/)).toBeInTheDocument();
-    expect(patches).toHaveLength(1);
+    await waitFor(() => expect(limit.value).toBe("4000000"));
+    expect(patches).toHaveLength(2);
+    expect(within(dialog).queryByText(/Vượt số dư tài khoản/)).not.toBeInTheDocument();
   });
 });
 

@@ -18,10 +18,12 @@ import type { Account, JarConfig, Transaction } from "@/domain/models";
 import { REBALANCE_CATEGORY, REBALANCE_CATEGORY_LABEL } from "@/domain/models";
 import {
   addMonthsToKey,
+  balanceAsOf,
   casaBalance,
   categoryToJarMap,
   dateToMonthKey,
   evaluateJarBudget,
+  jarBalances,
   jarSpendable,
   monthPeriodFromKey,
   POOL_DONOR_ID,
@@ -29,6 +31,7 @@ import {
   type DonorProposal,
   type JarBudgetLine,
   type JarSpendable,
+  type Period,
 } from "@/domain/engine";
 import type { ManualTxnInput } from "@/state/manual-txns";
 
@@ -72,14 +75,27 @@ export function snapshotForDate(
       return patch ? { ...t, ...patch } : t;
     });
   const net = rebalanceNetByJar(txns, period);
-  const { lines } = evaluateJarBudget(deps.jarConfig, txns, period, prev, deps.now, net);
+  // Running balance as of the trigger instant (`postedAt`, stamped by callers with
+  // `transferNow()` — the SAME clock that stamps ledger rows, Red Team #1): ledger
+  // rows written after the trigger are not yet in the jar. Posted txns fold to the
+  // trigger month's end — the same window as the display path and `spent`, so the
+  // snapshot never disagrees with the balance the user sees (see `jarBalances`).
+  // Carries across months: an October trigger sees September's leftover balance.
+  const balances = jarBalances(deps.jarConfig, txns, balanceAsOfTrigger(postedAt, period, deps.now), period.to);
+  const { lines } = evaluateJarBudget(deps.jarConfig, txns, period, prev, deps.now, net, balances);
   const spendables = lines.map((l) => ({
     id: l.huId,
     label: l.label,
     categoryIds: l.categoryIds,
-    spendable: jarSpendable(l.remaining),
+    spendable: jarSpendable(l.balance),
   }));
   return { month, spendables, lines, casaBalance: casaBalance(deps.accounts) };
+}
+
+/** `postedAt` as the balance `asOf`; an unparseable one falls back to `min(period.to, now)` (J06). */
+function balanceAsOfTrigger(postedAt: string, period: Period, now: Date): string {
+  const ms = Date.parse(postedAt);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : balanceAsOf(period, now);
 }
 
 /** The jar a category currently routes into (null when unmapped — transfer/rebalance). */
@@ -87,11 +103,15 @@ export function jarIdForCategory(jarConfig: JarConfig, categoryId: string): stri
   return categoryToJarMap(jarConfig).get(categoryId) ?? null;
 }
 
-/** How far a jar is over its limit in the snapshot (0 when within budget / unset). */
+/**
+ * The jar's shortfall on the BALANCE axis (`balance < 0` → hết số dư), 0 when the
+ * balance is non-negative or unknown (`null` — never a fabricated shortfall, #6).
+ * Being over the monthly LIMIT (`spent > limit`) alone never triggers a cover.
+ */
 export function overspendOf(lines: JarBudgetLine[], jarId: string): number {
   const line = lines.find((l) => l.huId === jarId);
-  if (!line || line.remaining == null) return 0;
-  return line.remaining < 0 ? -line.remaining : 0;
+  if (!line || line.balance == null) return 0;
+  return line.balance < 0 ? -line.balance : 0;
 }
 
 /**

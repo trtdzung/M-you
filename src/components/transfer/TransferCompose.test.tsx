@@ -35,7 +35,17 @@ vi.mock("@/lib/agent-api", async (importActual) => ({
   ...(await importActual<typeof import("@/lib/agent-api")>()),
   requestJarCover: vi.fn().mockRejectedValue(new Error("no agent in tests")),
 }));
-vi.mock("@/state/jars", () => ({ useJarConfig: () => ({ config: h.jarConfig, loaded: h.jarsLoaded }) }));
+// The static config reads as MIGRATED (opening deposit = limit at the demo month
+// start, like the seeded DB), memoised per config so its identity is stable.
+vi.mock("@/state/jars", async () => {
+  const { monthAnchor, withSeedDeposits } = await import("@/test-utils/jar-ledger-fixtures");
+  const seeded = new WeakMap<JarConfig, JarConfig>();
+  const migrated = (cfg: JarConfig) => {
+    if (!seeded.has(cfg)) seeded.set(cfg, withSeedDeposits(cfg, monthAnchor("2026-09")));
+    return seeded.get(cfg)!;
+  };
+  return { useJarConfig: () => ({ config: migrated(h.jarConfig), loaded: h.jarsLoaded }) };
+});
 vi.mock("@/state/useFinancials", () => ({
   useFinancials: () => ({
     loading: false,

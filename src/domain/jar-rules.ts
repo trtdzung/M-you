@@ -13,9 +13,9 @@
  *    claimed twice (the engine would double-count its spend) and never dropped
  *    (an orphan is healed into the "Khác" jar).
  *
- * A jar carries NO stored balance: its spendable = max(0, remaining) is DERIVED
- * from txn history (invariant #1), so there is no `actualAmount` backfill/resync
- * here any more — `budgetLimit` is the only user-set number.
+ * A jar carries NO stored balance: its balance is DERIVED by the engine from the
+ * `jar_ledger` rows + txn history since its anchor (`jar-balance.ts`, invariant #1),
+ * and spendable = max(0, balance). `budgetLimit` is the monthly plan, not money.
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
@@ -30,6 +30,18 @@ import { POOL_DONOR_ID } from "@/domain/engine/jar-funding";
  * replace (PUT) must be able to round-trip it.
  */
 const ALWAYS_RESERVED_JAR_IDS: ReadonlySet<string> = new Set([POOL_DONOR_ID, UNCLASSIFIED, REBALANCE_CATEGORY]);
+
+/**
+ * Ceiling for any single jar money figure (limit, opening balance, ledger entry)
+ * and for a ledger batch total: 10^12 VND. Far above any real persona, low enough
+ * that sums of a few stay exact safe integers (Red Team #12).
+ */
+export const MAX_JAR_AMOUNT = 1_000_000_000_000;
+
+/** A whole-VND safe integer in `[0, MAX_JAR_AMOUNT]`. */
+export function isJarAmount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_JAR_AMOUNT;
+}
 
 /** True when `id` is a sentinel a user jar cannot use (`creating` also reserves "khac"). */
 export function isReservedJarId(id: string, creating: boolean): boolean {
@@ -121,4 +133,16 @@ export function dedupeCategories(config: JarConfig): JarConfig {
       categoryIds: j.categoryIds.filter((c) => (seen.has(c) ? false : (seen.add(c), true))),
     })),
   };
+}
+
+/**
+ * Ids of the jars a full-set replace (`PUT /api/jars` — template apply / restore
+ * defaults) would DELETE while they still hold ≥ 1 ledger row (Red Team #11). The
+ * replace drops those rows with the jar, so the user must confirm the balance loss
+ * first. In `config.jars` order; empty when nothing funded is removed.
+ */
+export function jarsLosingBalance(config: JarConfig, nextJars: readonly Jar[]): string[] {
+  const kept = new Set(nextJars.map((j) => j.id));
+  const funded = new Set((config.ledger ?? []).map((e) => e.jarId));
+  return config.jars.filter((j) => !kept.has(j.id) && funded.has(j.id)).map((j) => j.id);
 }

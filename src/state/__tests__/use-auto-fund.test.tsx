@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Account, JarConfig, Transaction } from "@/domain/models";
+import { monthAnchor, withSeedDeposits } from "@/test-utils/jar-ledger-fixtures";
 import { PersonaProvider } from "@/providers/context";
 import { ManualTxnsProvider, useManualTxns } from "../manual-txns";
 import { useAutoFund } from "../use-auto-fund";
@@ -28,9 +29,17 @@ const h = vi.hoisted(() => ({
   accounts: [] as Account[],
 }));
 
-vi.mock("@/state/jars", () => ({
-  useJarConfig: () => ({ config: h.jarConfig, loaded: true }),
-}));
+// The static config reads as MIGRATED (opening deposit = limit at the demo month
+// start, like the seeded DB), memoised per config so its identity is stable.
+vi.mock("@/state/jars", async () => {
+  const { monthAnchor, withSeedDeposits } = await import("@/test-utils/jar-ledger-fixtures");
+  const seeded = new WeakMap<JarConfig, JarConfig>();
+  const migrated = (cfg: JarConfig) => {
+    if (!seeded.has(cfg)) seeded.set(cfg, withSeedDeposits(cfg, monthAnchor("2026-09")));
+    return seeded.get(cfg)!;
+  };
+  return { useJarConfig: () => ({ config: migrated(h.jarConfig), loaded: true }) };
+});
 
 vi.mock("@/state/useFinancials", async () => {
   const manual = await import("../manual-txns");
@@ -303,13 +312,17 @@ describe("useAutoFund — H3: refund reconciliation shrinks/removes the rebalanc
 
 describe("useAutoFund — H4: reconcile derives its snapshot from the TRIGGER's own month, not the viewed/current month", () => {
   it("an August trigger funds against August spend only, even though a September spend exists in the same jar", async () => {
-    h.jarConfig = {
-      version: 3,
-      jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
-        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000 },
-      ],
-    };
+    // Funded since August (an August trigger needs a balance that existed then).
+    h.jarConfig = withSeedDeposits(
+      {
+        version: 3,
+        jars: [
+          { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+          { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000 },
+        ],
+      },
+      monthAnchor("2026-08"),
+    );
     h.accounts = [account("cur", 6_000_000)];
 
     const { result } = renderHook(() => useHarness(), { wrapper });

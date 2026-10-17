@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { JarConfigProvider } from "@/state/jars";
 import { CategoryTaxonomyProvider } from "@/state/categories";
+import { FinancialsTestProviders } from "@/test-utils/financials-test-providers";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 import { CategoryManager } from "../CategoryManager";
@@ -38,7 +39,9 @@ function wrapper({ children }: { children: ReactNode }) {
     <PersonaProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
-          <CategoryTaxonomyProvider>{children}</CategoryTaxonomyProvider>
+          <CategoryTaxonomyProvider>
+            <FinancialsTestProviders>{children}</FinancialsTestProviders>
+          </CategoryTaxonomyProvider>
         </JarConfigProvider>
       </ManualTxnsProvider>
     </PersonaProvider>

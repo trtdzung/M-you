@@ -9,9 +9,9 @@ import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/st
 import { AllocationSheet } from "@/components/hu-envelope/AllocationSheet";
 import { useFinancials } from "@/state/useFinancials";
 import { useJarConfig } from "@/state/jars";
+import { currentMonthKey } from "@/lib/demo-clock";
 import { BudgetSummaryCard } from "./BudgetSummaryCard";
 import { HuBudgetCard } from "./HuBudgetCard";
-import { makeJarLabelResolver } from "./JarRebalanceLines";
 
 /**
  * Ngân sách tab (BIDV wallet model): a total gauge (đã tiêu vs tổng hạn mức) + a
@@ -22,6 +22,11 @@ import { makeJarLabelResolver } from "./JarRebalanceLines";
  *
  * A failed jar load (`useJarConfig().error`, U10) renders an error state — never
  * the "Chưa có hũ nào" empty state, which would misreport the user's jars.
+ *
+ * Each card shows "Đã chi / hạn mức" for the picked month and the jar's running
+ * SỐ DƯ (a month before the jar existed → "Chưa có số dư"). Funding actions
+ * ("Nạp thêm vào hũ", "Chia ngay" → `AllocationSheet`) exist ONLY for the current
+ * month: "Chờ phân bổ" is a current stock (Red Team #2).
  */
 export function BudgetTab() {
   const { loading, error, financials } = useFinancials();
@@ -53,12 +58,9 @@ export function BudgetTab() {
   const { lines, summary } = financials.jarBudget;
   const setLines = lines.filter((l) => l.limitState === "set");
   const unsetLines = lines.filter((l) => l.limitState === "unset");
-  // The period's inter-jar rebalance txns — rendered as read-only "cho/nhận"
-  // pseudo-lines on each jar card (Phase 02). Same engine-excluded txns already
-  // folded into every jar's `remaining`; `?? []` guards partial-`Financials` fixtures.
-  const rebalances = financials.jarRebalances ?? [];
-  const labelOf = makeJarLabelResolver(lines);
-  const cardProps = { onEdit: openEditor, onCover: () => setCoverOpen(true), rebalances, labelOf };
+  const isCurrentMonth = financials.monthKey === currentMonthKey();
+  const openCover = isCurrentMonth ? () => setCoverOpen(true) : undefined;
+  const cardProps = { onEdit: openEditor, onCover: openCover, onAllocate: openCover };
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,7 +129,7 @@ export function BudgetTab() {
         </>
       )}
 
-      {coverOpen && financials.jarEnvelope && (
+      {coverOpen && isCurrentMonth && financials.jarEnvelope && (
         <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setCoverOpen(false)} />
       )}
     </div>

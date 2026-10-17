@@ -73,8 +73,8 @@ const INCOME_LABEL = "Tiền vào";
  * System category tagging an inter-jar REBALANCE transaction (plan 260918-1120,
  * Phase 03). A rebalance is ONE `Transaction` with this `categoryId` carrying
  * `rebalance` meta `{ fromJarId, toJarId, triggerTxnId, origin }`; the engine reads
- * the meta to move `−amount` off the donor jar's remaining and `+amount` onto the
- * target jar's remaining. Like `UNCLASSIFIED`/`INCOME` it is deliberately kept OUT
+ * the meta to move `−amount` off the donor jar's balance and `+amount` onto the
+ * target jar's balance. Like `UNCLASSIFIED`/`INCOME` it is deliberately kept OUT
  * of `CATEGORIES`/`CATEGORY_BY_ID`: it belongs to no jar and is never an AI
  * suggestion target. It is EXCLUDED from thu/chi + spend-by-category exactly like a
  * `type:"transfer"` txn (see `netExpenseByCategory`), so a rebalance never inflates

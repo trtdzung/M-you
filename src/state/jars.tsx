@@ -17,71 +17,26 @@
  *
  * Failures are surfaced, never swallowed (U10/U20): `error` for the initial
  * load, `mutationError` (Vietnamese, server reason kept — e.g. over-cap) for a
- * refused write. A jar has NO stored balance (spendable is derived from txn
- * history, invariant #1), so there is no balance mutator here.
+ * refused write.
+ *
+ * Balances (plan 260923): a jar's SỐ DƯ is derived by the engine from the stored
+ * ledger (invariant #1). `postLedger` is the ONE balance mutator — deposits and
+ * withdrawals go through `POST /api/jar-ledger` as one atomic batch on the same
+ * queue + persona guard as every other jar write (a display partition of CASA,
+ * never money movement — invariant #3).
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Jar, JarConfig } from "@/domain/models";
-import { DEFAULT_JAR_CONFIG, JAR_TEMPLATES, type JarTemplate } from "@/domain/models/jar-defaults";
+import { jarsLosingBalance } from "@/domain/jar-rules";
+import { DEFAULT_JAR_CONFIG, JAR_TEMPLATES } from "@/domain/models/jar-defaults";
 import { useProviders } from "@/providers/context";
 import type { Providers } from "@/providers";
-import { JAR_LOAD_ERROR, jarMutationErrorMessage } from "./jars-error-message";
+import { balanceLossPrompt, JAR_LOAD_ERROR, jarMutationErrorMessage } from "./jars-error-message";
 import { useSerialRequestQueue } from "./serial-request-queue";
+import type { JarConfigContextValue, ReplaceJarsOptions } from "./jar-config-types";
 
-type JarPatch = Partial<Omit<Jar, "id">>;
-
-export interface JarConfigContextValue {
-  config: JarConfig;
-  /**
-   * False until the first fetch for the current persona resolves. The transfer
-   * flow must not compute the unallocated pool or classify "insufficient" while
-   * jars are still empty-by-loading (would misread `jars: []` — RT#14).
-   */
-  loaded: boolean;
-  /** Non-null (VN copy) when the load for the current persona failed; reset on persona switch/retry. */
-  error: string | null;
-  /** Re-run the load for the current persona (clears `error`). */
-  retry: () => void;
-  /** VN reason of the latest failed write (incl. the server's 422 over-cap); null once a write succeeds. */
-  mutationError: string | null;
-  clearMutationError: () => void;
-  /** Mutators resolve `true` when the write was applied, `false` when it failed (see `mutationError`). */
-  addJar: (jar: Jar) => Promise<boolean>;
-  updateJar: (id: string, patch: JarPatch) => Promise<boolean>;
-  /**
-   * Patch several jars in ONE atomic write ("Chia ngay"). REJECTS on failure so
-   * the caller (AllocationSheet) keeps its draft and shows its own error — it
-   * does not set `mutationError`.
-   */
-  updateJars: (patches: Record<string, JarPatch>) => Promise<void>;
-  /** Remove a jar; its categories move to "Khác" and its rebalance legs are deleted server-side. */
-  removeJar: (id: string) => Promise<boolean>;
-  /** Move a category into `jarId`. `jarId === null` is a no-op (exactly-one). */
-  assignCategory: (categoryId: string, jarId: string | null) => Promise<boolean>;
-  /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
-  applyTemplate: (templateId: JarTemplate["id"]) => Promise<boolean>;
-  resetToSeed: () => Promise<boolean>;
-  /**
-   * Opaque marker of the config currently held: capture it BEFORE issuing a write
-   * on another resource and hand it back to `applyServerConfig` below. Two configs
-   * carry no version we could compare, so this counter is the only "newer" test.
-   */
-  configToken: () => number;
-  /**
-   * Apply a `JarConfig` returned by a write on ANOTHER resource — a category
-   * create/delete re-homes categories, so `/api/categories*` answers with the
-   * whole aggregate. It runs through the SAME serial queue and the SAME persona
-   * guard as a jar write, so a second copy of the jar config can never be painted
-   * on out of band (that is how a category ends up in two hũ client-side and
-   * `evaluateJarBudget` double-counts its spend — Σ-conservation, invariant #6).
-   *
-   * `since` is the `configToken()` taken when the other write was ISSUED. If any
-   * jar response has been applied since then, that one is newer and this copy is
-   * DROPPED rather than clobbering it. Resolves once the decision is made.
-   */
-  applyServerConfig: (config: JarConfig, since?: number) => Promise<void>;
-}
+export type { JarConfigContextValue, ReplaceJarsOptions } from "./jar-config-types";
 
 const EMPTY_CONFIG: JarConfig = { version: 3, jars: [] };
 
@@ -152,6 +107,20 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
     [enqueue, generation, providers, applyConfig],
   );
 
+  /** Template apply / restore defaults, guarded against an unconfirmed balance loss. */
+  const replaceGuarded = useCallback(
+    (nextJars: Jar[], opts?: ReplaceJarsOptions): Promise<boolean> => {
+      const losing = jarsLosingBalance(config, nextJars);
+      if (losing.length > 0 && !opts?.confirmedBalanceLoss) {
+        const labels = losing.map((id) => config.jars.find((j) => j.id === id)?.label ?? id);
+        setMutationError(balanceLossPrompt(labels));
+        return Promise.resolve(false);
+      }
+      return mutate((p) => p.replaceJars(nextJars));
+    },
+    [config, mutate],
+  );
+
   const value = useMemo<JarConfigContextValue>(
     () => ({
       config,
@@ -160,20 +129,14 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
       retry: () => setReloadKey((k) => k + 1),
       mutationError,
       clearMutationError: () => setMutationError(null),
-      addJar: (jar) => mutate((p) => p.createJar(jar)),
+      addJar: (jar, balance) => mutate((p) => p.createJar(jar, balance)),
       updateJar: (id, patch) => mutate((p) => p.updateJar(id, patch)),
-      updateJars: (patches) => {
-        // Same queue + persona guard, but the rejection is handed to the caller.
-        const gen = generation();
-        return enqueue(() => providers.updateJars(patches)).then((next) => {
-          if (gen === generation()) applyConfig(next);
-        });
-      },
+      postLedger: (entries) => mutate((p) => p.postJarLedger(entries)),
       removeJar: (id) => mutate((p) => p.removeJar(id)),
       assignCategory: (categoryId, jarId) =>
         jarId === null ? Promise.resolve(false) : mutate((p) => p.assignCategory(categoryId, jarId)),
-      applyTemplate: (templateId) => mutate((p) => p.replaceJars(JAR_TEMPLATES[templateId].jars)),
-      resetToSeed: () => mutate((p) => p.replaceJars(DEFAULT_JAR_CONFIG.jars)),
+      applyTemplate: (templateId, opts) => replaceGuarded(JAR_TEMPLATES[templateId].jars, opts),
+      resetToSeed: (opts) => replaceGuarded(DEFAULT_JAR_CONFIG.jars, opts),
       configToken: () => revRef.current,
       applyServerConfig: (next, since) => {
         const gen = generation();
@@ -186,7 +149,7 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
         });
       },
     }),
-    [config, loaded, error, mutationError, mutate, enqueue, generation, providers, applyConfig],
+    [config, loaded, error, mutationError, mutate, replaceGuarded, enqueue, generation, applyConfig],
   );
 
   return <JarConfigContext.Provider value={value}>{children}</JarConfigContext.Provider>;

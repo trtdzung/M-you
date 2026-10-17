@@ -24,7 +24,7 @@ export const POOL_SOURCE_LABEL = "Chưa phân bổ";
 
 /**
  * A transfer source: a real account, a jar (a jar with a derived spendable
- * balance = `max(0, remaining)`), or the virtual "Chưa phân bổ" pool (the CASA
+ * balance = `max(0, balance)`), or the virtual "Chưa phân bổ" pool (the CASA
  * money no jar claims — a no-jar transfer debits the account and lets the derived
  * pool shrink).
  */
@@ -52,8 +52,8 @@ export function TransferAmountStep({
 }: {
   recipient: SelectedRecipient;
   accounts: Account[];
-  /** A jar with a set limit is selectable as a source (its derived `spendable = max(0, remaining)`); one with no limit (`remaining == null`) stays view-only. */
-  jars?: (Jar & { remaining: number | null; spendable: number | null })[];
+  /** A jar with a running balance is selectable as a source (its derived `spendable = max(0, balance)`); one with none (`balance == null`) stays view-only. */
+  jars?: (Jar & { balance: number | null; spendable: number | null })[];
   /** The virtual "Chưa phân bổ" pool (null/omitted while jars are still loading — RT#14). */
   pool?: UnallocatedPoolResult | null;
   source: TransferSource | null;
@@ -263,7 +263,7 @@ export function TransferAmountStep({
                 {jars.map((jar) => {
                   const Icon = jarIcon(jar.icon);
                   const accent = jarAccent(jar);
-                  const fundable = jar.remaining != null;
+                  const fundable = jar.balance != null;
                   const row = (
                     <>
                       <span
@@ -276,7 +276,7 @@ export function TransferAmountStep({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[15px] font-semibold text-text">{jar.label}</p>
                         {fundable ? (
-                          // Source picker → the derived "còn lại" (= max(0, remaining)),
+                          // Source picker → the derived "còn lại" (= max(0, balance)),
                           // the SAME number the Tổng quan overview shows for this jar.
                           <Money
                             amount={jar.spendable}

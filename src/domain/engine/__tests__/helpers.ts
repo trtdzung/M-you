@@ -1,6 +1,7 @@
 /** Test helpers: build canonical transactions concisely. */
 
 import type { Transaction } from "@/domain/models";
+import { REBALANCE_CATEGORY } from "@/domain/models";
 
 let seq = 0;
 
@@ -25,4 +26,24 @@ export function txn(overrides: Partial<Transaction> = {}): Transaction {
     transferGroupId: overrides.transferGroupId,
     ...(overrides.rebalance ? { rebalance: overrides.rebalance } : {}),
   };
+}
+
+/**
+ * A net-rebalance map (`jarId → Σ nhận − Σ cho`) as real pool legs — positive = a
+ * pool→jar cover, negative = a jar→pool give-back — so `jarBalances` derives the
+ * same net the engine would fold (tests stay on the real engine path).
+ */
+export function rebalanceLegs(net: Map<string, number> | undefined, postedAt: string): Transaction[] {
+  return [...(net ?? [])]
+    .filter(([, amount]) => Number.isFinite(amount) && amount !== 0)
+    .map(([jarId, amount]) => {
+      const [fromJarId, toJarId] = amount > 0 ? ["pool", jarId] : [jarId, "pool"];
+      return txn({
+        type: "transfer",
+        categoryId: REBALANCE_CATEGORY,
+        amount: Math.abs(amount),
+        postedAt,
+        rebalance: { fromJarId, toJarId, triggerTxnId: "trigger", origin: "auto" },
+      });
+    });
 }

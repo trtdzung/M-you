@@ -16,7 +16,7 @@ export function AllocationJarRow({
 }: {
   label: string;
   accent: string;
-  /** The jar's current SỐ DƯ (`remaining`); `null` = chưa có số dư. */
+  /** The jar's current SỐ DƯ (`balance`); `null` = chưa có số dư. */
   currentBalance: number | null;
   value: number;
   onChange: (next: number) => void;

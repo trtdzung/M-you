@@ -2,9 +2,9 @@
  * Rebalance-as-Transaction fold (plan 260918-1120, Phase 03). An inter-jar
  * coverage move is ONE `Transaction` tagged `categoryId: REBALANCE_CATEGORY`
  * carrying `rebalance` meta. The engine reads that meta and reconciles each jar's
- * remaining:
+ * running balance (`jar-balance.ts`):
  *
- *   remaining(jar) += Σ nhận (amount whose `toJarId` is this jar)
+ *   balance(jar) += Σ nhận (amount whose `toJarId` is this jar)
  *                   − Σ cho  (amount whose `fromJarId` is this jar)
  *
  * `spent` is UNCHANGED — the rebalance amount is excluded from spend/thu/chi
@@ -16,7 +16,7 @@
  * credited/debited here. The pool is the residual `casaBalance − Σ spendable`, so a
  * jar→pool move already lifts the pool through the donor's reduced spendable — the
  * C1 identity `pool + Σ spendable = CASA` stays tautological. Only real jar ids get
- * a net (do NOT reintroduce a `pool + Σ remaining` assumption anywhere).
+ * a net (do NOT reintroduce a `pool + Σ balance` assumption anywhere).
  */
 
 import type { Transaction } from "@/domain/models";
@@ -48,7 +48,7 @@ export function rebalanceNetByJar(txns: Transaction[], period: Period): Map<stri
   for (const t of txns) {
     if (!isActiveRebalance(t, period)) continue;
     // F08b: a non-finite or ≤ 0 amount is dirty data — ignored, never allowed to
-    // invert direction (donor gaining) or leak NaN/Infinity into `remaining`.
+    // invert direction (donor gaining) or leak NaN/Infinity into `balance`.
     if (!Number.isFinite(t.amount) || t.amount <= 0) continue;
     const meta = t.rebalance!;
     bump(meta.toJarId, t.amount); // nhận (+)

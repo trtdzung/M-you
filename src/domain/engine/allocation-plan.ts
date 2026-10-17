@@ -1,13 +1,13 @@
 /**
- * Jar cap validator for the single-number ("một con số") model. "Chia ngay" and
- * Cài đặt both just set a jar's `budgetLimit`, but the money a jar actually holds
- * is its DERIVED spendable balance (`max(0, remaining)`), so the one rule the
+ * Jar cap validator. A jar's `budgetLimit` is only its monthly plan; the money a
+ * jar actually holds is its DERIVED spendable balance (`max(0, balance)`, from the
+ * `jar_ledger` + spend since its anchor — `jarBalances`), so the one rule the
  * engine enforces is **Σ spendable ≤ CASA pool** — the same balance lens the
  * overview "Chờ phân bổ", the transfer picker "Chưa phân bổ" and the allocation
  * sheet all read (`pool + Σ spendable = CASA`, D26).
  *
  * Kept in the engine layer (not the component) so the check is deterministic and
- * unit-tested (invariant #1). No money movement (invariant #3) — a budgetLimit is
+ * unit-tested (invariant #1). No money movement (invariant #3) — a jar balance is
  * a display partition of money already in the account. Enforced on BOTH write
  * doors (client UX via the sheet's leftToSplit + server 422). The caller computes
  * the two Σ spendable via `evaluateJarEnvelope` (`pending.allocated`), so this

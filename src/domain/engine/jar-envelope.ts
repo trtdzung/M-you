@@ -6,37 +6,32 @@
  * partition of money already in the account — it moves no real money and never
  * touches a transfer/OTP (invariant #3).
  *
- * ONE number per jar (`budgetLimit`): số phân bổ = trần chi = số dư gốc. There is
- * no separate "đã phân bổ" ledger — a jar shows a balance the moment it has a
- * `budgetLimit`. Two outputs, scoped to one period (OverviewTab pins the current
- * month for `spent`; the pool is a running stock, not a per-period flow):
+ * TWO numbers per jar (plan 260923-jar-limit-vs-balance-split): the monthly
+ * HẠN MỨC (`limit`, resets each month) and the running SỐ DƯ (`balance`, from
+ * `jarBalances` — ledger deposits/withdrawals, spend and rebalance since the jar's
+ * anchor). Two outputs, scoped to one period (OverviewTab pins the current month
+ * for `spent`; the pool is a running stock, not a per-period flow):
  *
  *  1. "Chờ phân bổ" — the CASA money no jar's **số dư (spendable)** claims yet:
- *     `CASA − Σ spendable` where `spendable(jar) = max(0, remaining)`. This is the
- *     SPENDABLE/BALANCE lens — the SAME number as the transfer picker's "Chưa phân
- *     bổ" (`Financials.unallocatedPool`) and the write-path cap (`fitsCasaCap`,
- *     now `Σ spendable ≤ CASA`). One definition of "unallocated" everywhere
- *     (D26): the card, the allocation sheet's "Còn lại để chia", the picker and
- *     the cap all read `CASA − Σ spendable`.
- *
- *     Why balance, not limit: because CASA is the LIVE balance (a confirmed
- *     transfer lowers it), `CASA − Σ spendable` is invariant to spending — money
- *     spent leaves CASA and shrinks that jar's `remaining` by the same amount, so
- *     the leftover stays the true "chưa gán vào hũ nào". The old limit lens
- *     (`CASA − Σ budgetLimit`) drifted negative after any spend and is retired.
- *  2. Per-jar SỐ DƯ "còn lại trong hũ" = `budgetLimit − spent + (Σ nhận − Σ cho)`.
- *     `spent` reuses the jar-budget net expense (DRY, invariant #2). An inter-jar
- *     transfer moves this balance and NOTHING else — `overLimit = spent > budgetLimit`
- *     stays on the plan axis, so being covered never erases "đã vượt hạn mức".
+ *     `CASA − Σ spendable` where `spendable(jar) = max(0, balance)`. The SAME
+ *     number as the transfer picker's "Chưa phân bổ" (`Financials.unallocatedPool`)
+ *     and the write-path cap (`fitsCasaCap`, `Σ spendable ≤ CASA`) — one definition
+ *     of "unallocated" everywhere (D26). Because CASA is the LIVE balance, money
+ *     spent leaves CASA and shrinks that jar's balance by the same amount, so the
+ *     leftover stays the true "chưa gán vào hũ nào".
+ *  2. Per-jar line: `spent` (reused from jar-budget, DRY, invariant #2) vs `limit`
+ *     → `overLimit`; and `balance`. An inter-jar transfer moves the balance and
+ *     NOTHING else, so being covered never erases "đã vượt hạn mức".
  *
  * Invariants honoured:
  *  - Engine is the sole source of these numbers (invariant #1); the UI renders.
  *  - No CASA account → pool/pending are genuinely "unknown", never a fabricated 0
- *    (invariant #6). A jar with no `budgetLimit` → `remaining` is `null`
- *    ("chưa có số dư"), never 0.
+ *    (invariant #6). An unfunded jar (no ledger entry ≤ asOf, or a period before its
+ *    anchor) → `balance` is `null` ("chưa có số dư"), never 0.
  */
 
 import type { Account, DataSource, JarConfig } from "@/domain/models";
+import type { JarBalanceFacts } from "./jar-balance";
 import { validBudgetLimit } from "./jar-budget";
 import { jarSpendable } from "./jar-spendable";
 import { coverageOf, UNKNOWN, type AggregateMeta, type Amount, type Period } from "./types";
@@ -68,7 +63,7 @@ export interface PendingAllocation {
   overAllocated: boolean;
   /** Tổng pool CASA (Σ availableBalance các tài khoản current); "unknown" khi không có. */
   pool: Amount;
-  /** Tổng số dư các hũ đang giữ (Σ spendable = Σ max(0, remaining)) — the amount subtracted from the pool. */
+  /** Tổng số dư các hũ đang giữ (Σ spendable = Σ max(0, balance)) — the amount subtracted from the pool. */
   allocated: number;
   meta: AggregateMeta;
 }
@@ -76,16 +71,16 @@ export interface PendingAllocation {
 export interface JarEnvelopeLine {
   jarId: string;
   label: string;
-  /** Con số duy nhất của hũ: số phân bổ = trần chi = số dư gốc; `null` = chưa đặt. */
-  budgetLimit: number | null;
+  /** Hạn mức tháng (kế hoạch, reset mỗi tháng); `null` = chưa đặt. */
+  limit: number | null;
   /** Net expense over this jar's categories this period (from jar-budget). */
   spent: number;
   /**
-   * SỐ DƯ hũ = `budgetLimit − spent + (Σ nhận − Σ cho)`; `null` when no budgetLimit.
-   * May be negative (hết tiền — a separate axis from `overLimit`).
+   * SỐ DƯ hũ (running, from `jarBalances`); `null` = chưa có số dư. May be negative
+   * (hết tiền — a separate axis from `overLimit`).
    */
-  remaining: number | null;
-  /** True khi chi vượt HẠN MỨC GỐC (`budgetLimit != null && spent > budgetLimit`). */
+  balance: number | null;
+  /** True khi chi vượt HẠN MỨC (`limit != null && spent > limit`). */
   overLimit: boolean;
   /** True when the jar has spending this period (spent > 0). */
   inUse: boolean;
@@ -102,40 +97,35 @@ export interface JarEnvelopeResult {
 function buildLine(
   jarId: string,
   label: string,
-  budgetLimit: number | null,
+  limit: number | null,
   spent: number,
-  rebalanceNet: number,
+  facts: JarBalanceFacts | undefined,
 ): JarEnvelopeLine {
-  // `budgetLimit` là hạn mức tháng, cũng là số dư gốc đầu kỳ. Chưa đặt → "chưa có
-  // số dư" (null, không phải 0 — invariant #6). HAI TRỤC TÁCH BẠCH: rebalance
-  // (Σ nhận − Σ cho) chỉ dịch chuyển `remaining` (SỐ DƯ); `overLimit` vẫn đo `spent`
-  // với `budgetLimit` GỐC, nên một hũ đã được bù tiền vẫn là "vượt kế hoạch".
-  const hasLimit = budgetLimit !== null;
-  const remaining = hasLimit ? budgetLimit - spent + rebalanceNet : null;
+  // HAI TRỤC TÁCH BẠCH: `overLimit` đo `spent` với hạn mức tháng; `balance` là số dư
+  // chạy (ledger + chi + điều chỉnh từ mốc). Chưa có số dư → null, không phải 0
+  // (invariant #6). Provenance theo số dư: ledger là self_reported.
   return {
     jarId,
     label,
-    budgetLimit,
+    limit,
     spent,
-    remaining,
-    overLimit: hasLimit && spent > budgetLimit,
+    balance: facts?.balance ?? null,
+    overLimit: limit !== null && spent > limit,
     inUse: spent > 0,
-    // A budgetLimit is user-entered (self_reported); an empty jar carries the baseline.
-    source: hasLimit ? "self_reported" : "mock",
+    source: facts?.source ?? "mock",
     freshness: null,
   };
 }
 
 /**
- * Per-jar envelope lines. Reads `jar.budgetLimit` directly from config; `spentByJar`
- * reuses jar-budget's net expense per jar (huId → spent), so this never re-derives
- * spend (DRY, invariant #2). A jar with no `budgetLimit` stays `null` ("chưa có số
- * dư"), never a fabricated 0 (invariant #6).
+ * Per-jar envelope lines. Reads the limit from config; `spentByJar` reuses
+ * jar-budget's net expense per jar (huId → spent, DRY, invariant #2); `balances`
+ * comes from `jarBalances`. An unfunded jar stays `null`, never 0 (invariant #6).
  */
 export function jarEnvelopeLines(
   config: JarConfig,
   spentByJar: Map<string, number>,
-  rebalanceNetByJar?: Map<string, number>,
+  balances?: Map<string, JarBalanceFacts>,
 ): JarEnvelopeLine[] {
   return config.jars.map((jar) =>
     buildLine(
@@ -143,7 +133,7 @@ export function jarEnvelopeLines(
       jar.label,
       validBudgetLimit(jar.budgetLimit),
       spentByJar.get(jar.id) ?? 0,
-      rebalanceNetByJar?.get(jar.id) ?? 0,
+      balances?.get(jar.id),
     ),
   );
 }
@@ -151,7 +141,7 @@ export function jarEnvelopeLines(
 /**
  * Compose the full envelope result for `period`. Deterministic. `spentByJar` is
  * jar-budget's per-jar net expense (huId → spent); `accounts` supplies the CASA
- * pool. "Chờ phân bổ" is the SPENDABLE lens (`CASA − Σ max(0, remaining)`) — the
+ * pool. "Chờ phân bổ" is the SPENDABLE lens (`CASA − Σ max(0, balance)`) — the
  * SAME number as `Financials.unallocatedPool`, the allocation sheet and the cap,
  * so every "unallocated" surface reads one truth (D26).
  */
@@ -160,14 +150,14 @@ export function evaluateJarEnvelope(
   accounts: Account[],
   spentByJar: Map<string, number>,
   period: Period,
-  /** Net inter-jar rebalance per jar (`Σ nhận − Σ cho`); absent → all zero. */
-  rebalanceNetByJar?: Map<string, number>,
+  /** Running balances from `jarBalances` (same `now`); absent → every balance `null`. */
+  balances?: Map<string, JarBalanceFacts>,
 ): JarEnvelopeResult {
-  const jars = jarEnvelopeLines(config, spentByJar, rebalanceNetByJar);
-  // Balance lens: Σ spendable = Σ max(0, remaining) — a jar with no limit (remaining
-  // null) or an overspent jar (remaining < 0) claims 0. Same Σ the unallocated pool
-  // and the cap use, so every "unallocated" number agrees (D26).
-  const allocated = jars.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
+  const jars = jarEnvelopeLines(config, spentByJar, balances);
+  // Balance lens: Σ spendable = Σ max(0, balance) — an unfunded jar (balance null)
+  // or an overspent jar (balance < 0) claims 0. Same Σ the unallocated pool and the
+  // cap use, so every "unallocated" number agrees (D26).
+  const allocated = jars.reduce((s, l) => s + (jarSpendable(l.balance) ?? 0), 0);
   const { amount: pool, sources, freshness } = casaPool(accounts);
   // No CASA account → genuinely unknown, never a fabricated 0 that would read as a
   // negative headroom (invariant #6, D27).

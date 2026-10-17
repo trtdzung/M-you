@@ -3,18 +3,17 @@ import { formatVnd } from "@/lib/format";
 
 /**
  * The durable "Cần bù thủ công" notice on a jar card (RT-fix C5) — a jar whose
- * post-rebalance remaining is still negative. U15: the copy promises an action,
- * so it carries one: "Chia lại hạn mức" opens the allocation sheet where the user
- * hands this jar more hạn mức from the leftover pool (or accepts the overspend by
- * closing it). Moves no real money (invariant #3). `onCover` absent → text-only
- * (no dead button).
+ * post-rebalance balance is still negative. U15: the copy promises an action,
+ * so it carries one: "Nạp thêm vào hũ" opens the allocation sheet where the user
+ * deposits into this jar's SỐ DƯ from "Chờ phân bổ" (or accepts the shortfall by
+ * closing it) — never a limit change. Moves no real money (invariant #3).
+ * `onCover` absent (not the current month) → text-only (no dead button).
  *
- * `shortfall` is the BALANCE axis (`−remaining`, the part no rebalance covered) —
+ * `shortfall` is the BALANCE axis (`−balance`, the part no rebalance covered) —
  * NOT the plan-axis overspend (`spent − limit`, which the "Đã vượt X" badge above
  * carries). The two differ whenever `rebalanceNet ≠ 0`, so this copy must never
  * call it "vượt hạn mức": that would print two different numbers under one label
- * on the same card. Since `JarBalanceRow` floors the displayed balance at 0, this
- * notice is the ONLY place the uncovered amount is shown — it must stay exact.
+ * on the same card.
  */
 export function ManualCoverNotice({ shortfall, onCover }: { shortfall: number; onCover?: () => void }) {
   return (
@@ -31,7 +30,7 @@ export function ManualCoverNotice({ shortfall, onCover }: { shortfall: number; o
             onClick={onCover}
             className="mt-1.5 inline-flex min-h-[32px] items-center rounded-full bg-surface px-3 text-[12px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
-            Chia lại hạn mức
+            Nạp thêm vào hũ
           </button>
         )}
       </div>
