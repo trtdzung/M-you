@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
 import { draftToForm } from "../../coach/to-form";
@@ -14,7 +15,7 @@ import { secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
 
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
-export function GoalCoachPanel({ onCreated }: { onCreated: () => void }) {
+export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => void; active?: boolean }) {
   const coach = useGoalCoach();
   const [manual, setManual] = useState(false);
   const busy = coach.phase === "asking" || coach.phase === "answering";
@@ -24,7 +25,7 @@ export function GoalCoachPanel({ onCreated }: { onCreated: () => void }) {
   };
 
   let body;
-  if (coach.phase === "idle") body = <CoachInput onSubmit={coach.start} />;
+  if (coach.phase === "idle") body = <CoachInput active={active} onSubmit={coach.start} />;
   else if (coach.phase === "out_of_scope") body = <CoachOutOfScope onRestart={restart} />;
   else if (coach.phase === "failed") {
     body = <CoachFallback request={coach.request} onManual={() => setManual(true)} onRestart={restart} />;
@@ -53,8 +54,8 @@ export function GoalCoachPanel({ onCreated }: { onCreated: () => void }) {
     restart();
   };
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-[18px] leading-6 font-semibold text-text">M-You</h2>
+    <section className={`flex flex-col gap-4 ${coach.phase === "idle" ? "pb-44" : ""}`}>
+      <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles size={18} aria-hidden="true" /></span><h2 className="text-[16px] leading-6 font-semibold text-text">M-You</h2></div>
       {coach.phase === "idle" && <div className="rounded-2xl rounded-tl-sm bg-surface-tint p-4">
         <p className="text-[16px] leading-6 font-medium text-text">Bạn đang muốn dành tiền cho điều gì?</p>
         <p className="mt-2 text-[14px] leading-6 text-muted">Kể mình nghe, mình sẽ giúp bạn xác định số tiền và thời gian.</p>

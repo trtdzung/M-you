@@ -108,7 +108,7 @@ export function GoalsListScreen() {
         <CreateGoalFlow key={formKey} inline onClose={() => {}} onCreated={created} />
       </div>
       <div role="tabpanel" id="goals-panel-chat" aria-labelledby="goals-tab-chat" hidden={activeTab !== "chat"}>
-        <GoalCoachPanel onCreated={created} />
+        <GoalCoachPanel active={activeTab === "chat"} onCreated={created} />
       </div>
     </div>
   );
