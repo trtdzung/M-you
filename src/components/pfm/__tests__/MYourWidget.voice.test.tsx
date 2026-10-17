@@ -4,11 +4,10 @@ import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
 
-// `?assistant=1` (Feature 5's VoiceFab hand-off) needs a router/search-params
-// context; this suite doesn't exercise that param, so a static empty one is enough.
+// The overlay opens only via `?assistant=1` (VoiceFab's "Chuyển qua Chat" hand-off).
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams("assistant=1"),
 }));
 
 const voice = vi.hoisted(() => ({
@@ -35,7 +34,6 @@ afterEach(() => {
 
 async function openWidget() {
   render(<PersonaProvider><MYourWidget /></PersonaProvider>);
-  fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý M-Your" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Nhập bằng giọng nói" })).toBeEnabled());
 }
 describe("M-Your voice composer", () => {

@@ -21,13 +21,13 @@ function CalmBg() {
 
 /**
  * Chrome for `/pfm/*`: the calm surface, a `PfmHeader` back-arrow sub-app header,
- * and the BIDV-style wallet `PfmBottomNav` (4 tabs + center ＋ FAB). This
+ * and the BIDV-style wallet `PfmBottomNav` (4 tabs). This
  * SUPERSEDES the no-bottom-nav decision of plan 260908 (the 3 segmented top-tabs)
- * — the user chose the 4-tab + FAB IA. `shell-calm` retints the status ink to
+ * — the user chose the 4-tab IA. `shell-calm` retints the status ink to
  * navy; `shell-main--pfm` reserves bottom-nav clearance for the panel content.
- * `MYourWidget` rides the `fab` slot (same corner as the festive `AssistantFab`,
- * which self-hides inside `/pfm`) so the M-Your chat entry point floats above
- * the bottom nav on every PFM screen without touching the center ＋ FAB.
+ * `MYourWidget` rides the `fab` slot: it is only the full-screen chat overlay
+ * (opened via `?assistant=1` from `VoiceFab`'s "Chuyển qua Chat"), no button of
+ * its own. The agent icon in `/pfm` is the center one in `PfmBottomNav`.
  */
 export default function PfmLayout({
   children,

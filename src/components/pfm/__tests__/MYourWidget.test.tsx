@@ -4,15 +4,16 @@ import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
 
-// `?assistant=1` (Feature 5's VoiceFab hand-off) needs a router/search-params
-// context; this suite doesn't exercise that param, so a static empty one is enough.
+// The overlay opens only via `?assistant=1` (VoiceFab's "Chuyển qua Chat"
+// hand-off), so the mocked search params decide whether it is open.
+const nav = vi.hoisted(() => ({ search: "assistant=1", replace: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: nav.replace }),
+  useSearchParams: () => new URLSearchParams(nav.search),
 }));
 
 /**
- * The floating M-Your chat button lives on every /pfm screen (mounted via the
+ * The M-Your chat overlay lives on every /pfm screen (mounted via the
  * PhoneShell `fab` slot). It is wired to the real agent (`src/lib/agent-api.ts`)
  * — opening the overlay loads real history and gates the composer until that
  * finishes; sending/deleting call the real endpoints. `cif` comes from the
@@ -26,10 +27,6 @@ function renderWidget() {
   );
 }
 
-function open() {
-  fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý M-Your" }));
-}
-
 beforeAll(() => {
   // Recharts' ResponsiveContainer needs ResizeObserver (absent in jsdom).
   globalThis.ResizeObserver = class {
@@ -40,6 +37,8 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  nav.search = "assistant=1";
+  nav.replace.mockClear();
   vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({ thread_id: "CIF_0001", messages: [] });
   vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({ answer: "Trả lời từ M-Your", thread_id: "CIF_0001" });
   vi.spyOn(agentApi, "deleteChatHistory").mockResolvedValue(undefined);
@@ -51,11 +50,17 @@ afterEach(() => {
 });
 
 describe("MYourWidget", () => {
-  it("hides the chat overlay until the floating button is tapped", async () => {
-    renderWidget();
+  it("hides the chat overlay until ?assistant=1 is set", async () => {
+    nav.search = "";
+    const view = renderWidget();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    open();
+    nav.search = "assistant=1";
+    view.rerender(
+      <PersonaProvider>
+        <MYourWidget />
+      </PersonaProvider>,
+    );
 
     expect(screen.getByRole("dialog", { name: "M-Your" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
@@ -63,7 +68,6 @@ describe("MYourWidget", () => {
 
   it("shows a short intro line above the M-Your title", async () => {
     renderWidget();
-    open();
 
     expect(screen.getByText("Trợ lý Tài chính của bạn")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
@@ -71,7 +75,6 @@ describe("MYourWidget", () => {
 
   it("loads real history for the active persona's CIF on open and gates the composer until it's ready", async () => {
     renderWidget();
-    open();
 
     expect(agentApi.getChatHistory).toHaveBeenCalledWith("CIF_0001");
     expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeDisabled();
@@ -88,7 +91,6 @@ describe("MYourWidget", () => {
       ],
     });
     renderWidget();
-    open();
 
     expect(await screen.findByText("Tháng này tôi chi bao nhiêu?")).toBeInTheDocument();
     expect(screen.getByText("Bạn đã chi 4.000.000đ.")).toBeInTheDocument();
@@ -97,7 +99,6 @@ describe("MYourWidget", () => {
   it("keeps the composer and voice input available when history fails to load", async () => {
     vi.spyOn(agentApi, "getChatHistory").mockRejectedValueOnce(new Error("boom"));
     renderWidget();
-    open();
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("Không tải được lịch sử M-Your. Bạn vẫn có thể thử nhập bằng giọng nói.")).toBeInTheDocument();
@@ -112,7 +113,6 @@ describe("MYourWidget", () => {
 
   it("sends a message via the real agent and shows the real reply", async () => {
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Xin chào" } });
@@ -130,7 +130,6 @@ describe("MYourWidget", () => {
       thread_id: "CIF_0001",
     });
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Tôi có bao nhiêu hũ" } });
@@ -155,7 +154,6 @@ describe("MYourWidget", () => {
       },
     });
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "So sánh chi tiêu" } });
@@ -189,7 +187,6 @@ describe("MYourWidget", () => {
       },
     });
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Chi tiêu theo danh mục" } });
@@ -212,7 +209,6 @@ describe("MYourWidget", () => {
       ui: { type: "create_jar", jar_name: "Du lịch", allocation_amount: 1000000, reason: "reason" } as agentApi.UiPayload,
     });
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Tạo hũ mới" } });
@@ -226,7 +222,6 @@ describe("MYourWidget", () => {
   it("shows an inline error on the reply bubble when sending fails", async () => {
     vi.spyOn(agentApi, "sendChatMessage").mockRejectedValueOnce(new Error("network down"));
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Xin chào" } });
@@ -238,7 +233,6 @@ describe("MYourWidget", () => {
   it("deletes history via the real agent, clears the transcript, and locks the composer for 30s", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
 
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-Your…"), { target: { value: "Xin chào" } });
@@ -262,14 +256,13 @@ describe("MYourWidget", () => {
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
   });
 
-  it("closes the overlay with the close button", async () => {
+  it("closes the overlay with the close button by clearing ?assistant", async () => {
     renderWidget();
-    open();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-Your…")).toBeEnabled());
     expect(screen.getByRole("dialog", { name: "M-Your" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Đóng" }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(nav.replace).toHaveBeenCalledWith("/pfm?", { scroll: false });
   });
 });

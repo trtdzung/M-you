@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/cn";
 import { useRouter } from "next/navigation";
 import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBankByName } from "@/lib/transfer-banks";
@@ -44,7 +45,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * SAME screen and steps as a human-initiated transfer apply (source-account
  * pick, "Tiếp tục", confirm) — no separate/short-circuited screen.
  */
-export function AgentTransferFormCard({ form }: { form: TransferFormUi }) {
+export function AgentTransferFormCard({ form, fullWidth = false }: { form: TransferFormUi; fullWidth?: boolean }) {
   const router = useRouter();
   const providers = useProviders();
   const [status, setStatus] = useState<"loading" | "not_found" | "ready">("loading");
@@ -88,7 +89,7 @@ export function AgentTransferFormCard({ form }: { form: TransferFormUi }) {
 
   if (status === "loading") {
     return (
-      <div className="shadow-card mt-2 max-w-[85%] rounded-2xl bg-surface p-3.5">
+      <div className={cn("shadow-card rounded-2xl bg-surface p-3.5", fullWidth ? "w-full" : "mt-2 max-w-[85%]")}>
         <p className="text-xs text-muted">Đang tải thông tin người nhận…</p>
       </div>
     );
@@ -96,7 +97,7 @@ export function AgentTransferFormCard({ form }: { form: TransferFormUi }) {
 
   if (status === "not_found" || !beneficiary) {
     return (
-      <div className="shadow-card mt-2 max-w-[85%] rounded-2xl bg-surface p-3.5">
+      <div className={cn("shadow-card rounded-2xl bg-surface p-3.5", fullWidth ? "w-full" : "mt-2 max-w-[85%]")}>
         <p className="text-xs text-negative">Không tìm thấy người nhận đã lưu này.</p>
       </div>
     );
@@ -106,7 +107,7 @@ export function AgentTransferFormCard({ form }: { form: TransferFormUi }) {
   const bank = findBankByName(beneficiary.bankName);
 
   return (
-    <div className="shadow-card mt-2 flex w-[85%] flex-col gap-2 rounded-2xl bg-surface p-3.5">
+    <div className={cn("shadow-card flex flex-col gap-2 rounded-2xl bg-surface p-3.5", fullWidth ? "w-full" : "mt-2 w-[85%]")}>
       <p className="text-[11px] font-semibold text-muted">Đề xuất chuyển tiền</p>
 
       <div className="flex items-center gap-2.5">

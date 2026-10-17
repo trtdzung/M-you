@@ -53,12 +53,11 @@ function sharedWordPrefix(left: string[], right: string[]) {
 }
 
 /**
- * Floating "M-Your" chat button + full-screen overlay for `/pfm/*`, mounted via
- * the `PhoneShell` `fab` slot so it stays visible above the bottom nav on every
- * PFM tab without overlapping the center mic FAB (`VoiceFab`, in the bottom
- * nav — a different `PhoneShell` slot, not in this component's own tree).
- * `VoiceFab` opens this overlay via `?assistant=1` (both a plain tap and a
- * press-and-hold do — same idiom as `HuCategoryTab`'s `?hu=`). Wired to the
+ * Full-screen "M-Your" chat overlay for `/pfm/*`, mounted via the `PhoneShell`
+ * `fab` slot. It has no entry button of its own any more: `VoiceFab` (the center
+ * agent tab of the bottom nav) opens its voice section first, and that section's
+ * "Chuyển qua Chat" button opens this overlay via `?assistant=1` (same idiom as
+ * `HuCategoryTab`'s `?hu=`). Wired to the
  * real agent (`src/lib/agent-api.ts`, proxied through `src/app/api/agent/chat`
  * so the client never sees `AGENT_API_KEY`) — `cif` is the active persona's
  * CIF. Opening the overlay always reloads real history from the agent (it has
@@ -72,8 +71,7 @@ export function MYourWidget() {
   const params = useSearchParams();
   const assistantParam = params?.get("assistant") === "1";
 
-  const [open, setOpen] = useState(false);
-  const isOpen = open || assistantParam;
+  const isOpen = assistantParam;
   const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">("loading");
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -185,12 +183,9 @@ export function MYourWidget() {
 
   function close() {
     cancelVoice();
-    setOpen(false);
-    if (assistantParam) {
-      const next = new URLSearchParams(params?.toString());
-      next.delete("assistant");
-      router.replace(`/pfm?${next.toString()}`, { scroll: false });
-    }
+    const next = new URLSearchParams(params?.toString());
+    next.delete("assistant");
+    router.replace(`/pfm?${next.toString()}`, { scroll: false });
   }
 
   useEffect(() => {
@@ -244,20 +239,6 @@ export function MYourWidget() {
 
   return (
     <>
-      <div className="shell-fab pointer-events-none absolute right-5 z-20 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Mở trợ lý M-Your"
-          className="pointer-events-auto flex h-[68px] w-[68px] items-center justify-center overflow-hidden rounded-full bg-surface shadow-nav ring-2 ring-white/80 transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2"
-        >
-          {/* width/height reserve the box before CSS loads — avoids a flash at
-              the source image's native 1254×1254 size on a cold page load. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon_agent.png" alt="" width={68} height={68} className="h-full w-full object-cover" />
-        </button>
-      </div>
-
       {isOpen && (
         <div
           role="dialog"
