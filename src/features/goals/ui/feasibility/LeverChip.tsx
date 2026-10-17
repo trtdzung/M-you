@@ -7,7 +7,7 @@ function leverLabel(lever: Lever): string {
   const c = GOALS_COPY.feasibility;
   if (lever.kind === "extend_date") return c.extendDate(formatDate(lever.newDate));
   if (lever.kind === "reduce_amount") return c.reduceAmount(formatVnd(lever.newTarget));
-  const text = c.cutCategory(formatVnd(lever.cutPerMonth));
+  const text = c.cutCategory(lever.categoryLabel, formatVnd(lever.cutPerMonth));
   return lever.enough ? text : `${text}. ${c.cutNotEnough}`;
 }
 

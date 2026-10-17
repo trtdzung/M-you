@@ -2,6 +2,7 @@ import "server-only";
 
 import { liveTxns } from "@/app/api/jars/jar-write-guards";
 import { aggregateCashflow, inPeriod } from "@/domain/engine/cashflow";
+import { readCategories } from "@/lib/categories-store";
 import { addMonthsToKey, dateToMonthKey, monthPeriodFromKey } from "@/domain/engine/types";
 import type { CategoryAverage } from "../engine/levers/cut-category";
 import type { MonthCashflow } from "../engine/surplus";
@@ -33,8 +34,13 @@ export function goalCashflowInput(cif: string, now: Date): GoalCashflowInput {
   }
 
   const monthsUsed = months.filter((m) => m.txnCount > 0).length;
+  const labels = new Map(readCategories(cif, { includeArchived: true }).map((c) => [c.id, c.label]));
   const categoryAverages = [...categoryTotals]
     .filter(([, total]) => total > 0 && monthsUsed > 0)
-    .map(([categoryId, total]) => ({ categoryId, average: Math.round(total / monthsUsed) }));
+    .map(([categoryId, total]) => ({
+      categoryId,
+      label: labels.get(categoryId) ?? null,
+      average: Math.round(total / monthsUsed),
+    }));
   return { months, categoryAverages };
 }

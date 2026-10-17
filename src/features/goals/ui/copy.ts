@@ -82,7 +82,8 @@ export const GOALS_COPY = {
     levers: "Gợi ý điều chỉnh",
     extendDate: (date: string) => `Lùi hạn đến ${date}`,
     reduceAmount: (amount: string) => `Giảm mục tiêu còn ${amount}`,
-    cutCategory: (amount: string) => `Giảm chi ${amount}/tháng`,
+    cutCategory: (label: string | null, amount: string) =>
+      label ? `Giảm chi ${label} ${amount}/tháng` : `Giảm chi ${amount}/tháng`,
     cutNotEnough: "Cần kết hợp thêm cách khác.",
   },
 

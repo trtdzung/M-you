@@ -44,11 +44,12 @@ describe("extend / reduce / cut levers", () => {
     expect(
       cutCategoryLever(16_666_667, 12_000_000, [
         { categoryId: "rent", average: 3_000_000 },
-        { categoryId: "food", average: 8_000_000 },
+        { categoryId: "food", label: "Ăn uống", average: 8_000_000 },
       ]),
     ).toEqual({
       kind: "cut_category",
       categoryId: "food",
+      categoryLabel: "Ăn uống",
       cutPerMonth: 4_666_667,
       enough: true,
     });
@@ -78,12 +79,12 @@ describe("buildLevers", () => {
       targetAmount: 600_000_000,
       currentAmount: 0,
       now: NOW,
-      categoryAverages: [{ categoryId: "food", average: 8_000_000 }],
+      categoryAverages: [{ categoryId: "food", label: "Ăn uống", average: 8_000_000 }],
     });
     expect(levers).toEqual([
       { kind: "extend_date", newDate: "2030-11-15", months: 50 },
       { kind: "reduce_amount", newTarget: 432_000_000 },
-      { kind: "cut_category", categoryId: "food", cutPerMonth: 4_666_667, enough: true },
+      { kind: "cut_category", categoryId: "food", categoryLabel: "Ăn uống", cutPerMonth: 4_666_667, enough: true },
     ]);
   });
 

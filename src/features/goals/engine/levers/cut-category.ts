@@ -3,6 +3,8 @@ import type { Lever } from "../../model/types";
 export interface CategoryAverage {
   categoryId: string;
   average: number;
+  /** Display name; absent/null when unknown. */
+  label?: string | null;
 }
 
 /** Cut the biggest spending category; null when there is no category data. */
@@ -17,6 +19,7 @@ export function cutCategoryLever(
   return {
     kind: "cut_category",
     categoryId: biggest.categoryId,
+    categoryLabel: biggest.label ?? null,
     cutPerMonth,
     enough: cutPerMonth <= biggest.average,
   };

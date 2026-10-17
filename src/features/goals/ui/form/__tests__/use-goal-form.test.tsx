@@ -92,6 +92,7 @@ describe("useGoalForm", () => {
       applied = result.current.applyLever({
         kind: "cut_category",
         categoryId: "food",
+        categoryLabel: "Ăn uống",
         cutPerMonth: 4_666_667,
         enough: true,
       });

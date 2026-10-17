@@ -12,6 +12,10 @@ vi.mock("@/app/api/jars/jar-write-guards", () => ({
   },
 }));
 
+vi.mock("@/lib/categories-store", () => ({
+  readCategories: () => [{ id: "food", label: "Ăn uống" }],
+}));
+
 import { goalCashflowInput } from "../cashflow-input";
 
 const NOW = new Date("2026-09-15T00:00:00.000Z");
@@ -60,8 +64,8 @@ describe("goalCashflowInput", () => {
       { monthKey: "2026-08", income: 16_000_000, expense: 1_999_500, txnCount: 4 },
     ]);
     expect(result.categoryAverages).toEqual([
-      { categoryId: "food", average: 5_000_000 },
-      { categoryId: "rent", average: 1_500_000 },
+      { categoryId: "food", label: "Ăn uống", average: 5_000_000 },
+      { categoryId: "rent", label: null, average: 1_500_000 },
     ]);
   });
 

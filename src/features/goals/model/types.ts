@@ -95,6 +95,7 @@ export type Lever =
   | {
       kind: "cut_category";
       categoryId: string;
+      categoryLabel: string | null;
       cutPerMonth: number;
       /** false = cutting this category alone is not enough. */
       enough: boolean;

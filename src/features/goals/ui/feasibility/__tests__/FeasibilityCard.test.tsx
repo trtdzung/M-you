@@ -23,7 +23,7 @@ function response(
 }
 
 const extend: Lever = { kind: "extend_date", newDate: "2030-11-15", months: 50 };
-const cut: Lever = { kind: "cut_category", categoryId: "food", cutPerMonth: 4_666_667, enough: true };
+const cut = { kind: "cut_category", categoryId: "food", categoryLabel: "Ăn uống", cutPerMonth: 4_666_667, enough: true } satisfies Lever;
 
 function renderCard(
   data: FeasibilityResponse | null,
@@ -105,7 +105,7 @@ describe("FeasibilityCard", () => {
     fireEvent.click(screen.getByRole("button", { name: label }));
     expect(onApplyLever).toHaveBeenCalledWith(extend);
 
-    const cutLabel = GOALS_COPY.feasibility.cutCategory(formatVnd(cut.cutPerMonth));
+    const cutLabel = GOALS_COPY.feasibility.cutCategory(cut.categoryLabel, formatVnd(cut.cutPerMonth));
     expect(screen.getByText(cutLabel).tagName).toBe("SPAN");
     expect(screen.queryByRole("button", { name: cutLabel })).not.toBeInTheDocument();
   });

@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));
 vi.mock("@/lib/demo-clock", () => ({
   transferNow: () => new Date("2026-09-15T00:00:00.000Z"),
 }));
+vi.mock("@/lib/categories-store", () => ({ readCategories: () => [] }));
 vi.mock("@/app/api/jars/jar-write-guards", () => ({ liveTxns: () => [] }));
 
 import { POST as addLedger } from "../add-ledger-entry";
