@@ -22,6 +22,22 @@ export const GOALS_COPY = {
   notFoundDescription: "Mục tiêu này không tồn tại hoặc đã bị xóa.",
   backToList: "Về danh sách mục tiêu",
 
+  coach: {
+    title: "Nói mục tiêu của bạn",
+    placeholder: "Ví dụ: mua xe 600 triệu trong 3 năm",
+    inputLabel: "Mục tiêu bạn muốn đạt",
+    send: "Gửi",
+    thinking: "Đang tìm hiểu mục tiêu của bạn…",
+    freeTextPlaceholder: "Hoặc nhập câu trả lời khác",
+    answerLabel: "Câu trả lời của bạn",
+    restart: "Bắt đầu lại",
+    draftReady: "Mình đã điền sẵn mục tiêu, bạn kiểm tra rồi bấm Lưu nhé.",
+    notAGoal: "Mình chỉ giúp đặt mục tiêu tiết kiệm. Bạn thử nói mục tiêu như “mua xe 600 triệu trong 3 năm” nhé.",
+    unavailable: "Mình chưa hiểu được lúc này. Bạn có thể tự nhập mục tiêu.",
+    manual: "Tự nhập",
+    yourSentence: (text: string) => `Bạn đã nói: “${text}”`,
+  },
+
   form: {
     name: "Tên mục tiêu",
     namePlaceholder: "Ví dụ: Mua nhà",

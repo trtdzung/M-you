@@ -11,6 +11,7 @@ import { GoalList } from "../list/GoalList";
 import { GoalListEmpty } from "../list/GoalListEmpty";
 import { secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
+import { GoalCoachPanel } from "./GoalCoachPanel";
 
 export function GoalsListScreen() {
   const router = useRouter();
@@ -47,9 +48,10 @@ export function GoalsListScreen() {
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
+      <GoalCoachPanel onCreated={refresh} />
       {body}
       {creating && <CreateGoalFlow onClose={() => setCreating(false)} onCreated={refresh} />}
-    </>
+    </div>
   );
 }

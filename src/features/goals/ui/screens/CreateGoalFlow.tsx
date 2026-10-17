@@ -8,16 +8,28 @@ import { FeasibilityCard } from "../feasibility/FeasibilityCard";
 import { feasibilityInputOf } from "../form/feasibility-input";
 import { GoalFormSheet } from "../form/GoalFormSheet";
 import { useGoalForm } from "../form/use-goal-form";
+import type { GoalFormValues } from "../form/form-parse";
+import { GOALS_COPY } from "../copy";
+import { hint } from "../styles";
 
 /** Create-goal sheet with live feasibility; unmounting it resets the form. */
 export function CreateGoalFlow({
   onClose,
   onCreated,
+  prefill,
+  requestKey,
+  suggestion,
 }: {
   onClose: () => void;
   onCreated: () => void;
+  /** Values the Goal Coach filled in. */
+  prefill?: Partial<GoalFormValues>;
+  /** Idempotency key sent with the create call. */
+  requestKey?: string;
+  /** The customer's own sentence, shown as a hint above the form. */
+  suggestion?: string;
 }) {
-  const form = useGoalForm();
+  const form = useGoalForm(undefined, prefill);
   const [estimate, setEstimate] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const feasibility = useFeasibility(feasibilityInputOf(form.values, estimate));
@@ -25,7 +37,7 @@ export function CreateGoalFlow({
 
   async function submit(input: unknown) {
     setFormError(null);
-    const res = await create(input as GoalCreateInput);
+    const res = await create({ ...(input as GoalCreateInput), ...(requestKey ? { requestKey } : {}) });
     if (!res) return;
     if (res.ok) {
       onCreated();
@@ -44,13 +56,16 @@ export function CreateGoalFlow({
       onSubmit={submit}
       onClose={onClose}
       slot={
-        <FeasibilityCard
-          data={feasibility.data}
-          loading={feasibility.loading}
-          estimate={estimate}
-          onEstimateChange={setEstimate}
-          onApplyLever={form.applyLever}
-        />
+        <>
+          {suggestion && <p className={hint}>{GOALS_COPY.coach.yourSentence(suggestion)}</p>}
+          <FeasibilityCard
+            data={feasibility.data}
+            loading={feasibility.loading}
+            estimate={estimate}
+            onEstimateChange={setEstimate}
+            onApplyLever={form.applyLever}
+          />
+        </>
       }
     />
   );

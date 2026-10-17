@@ -24,9 +24,11 @@ function fromGoal(goal: SavingsGoal): GoalFormValues {
 }
 
 /** State + validation of the create/edit goal form (no API calls). */
-export function useGoalForm(initial?: SavingsGoal) {
+export function useGoalForm(initial?: SavingsGoal, prefill?: Partial<GoalFormValues>) {
   const mode = initial ? "update" : "create";
-  const [values, setValues] = useState<GoalFormValues>(initial ? fromGoal(initial) : EMPTY_FORM);
+  const [values, setValues] = useState<GoalFormValues>(
+    initial ? fromGoal(initial) : { ...EMPTY_FORM, ...prefill },
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const set = <K extends keyof GoalFormValues>(field: K, value: GoalFormValues[K]) => {
