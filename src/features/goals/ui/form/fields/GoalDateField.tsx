@@ -63,6 +63,7 @@ export function GoalDateField({
             <button type="button" aria-label="Chọn năm" aria-expanded={view === "years"} onClick={() => { setYearStart(Math.max(minYear, year - 5)); setView(view === "years" ? "days" : "years"); }} className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-medium ${view === "years" ? "bg-primary/10 text-primary" : "bg-surface-muted text-text"}`}>{year}<ChevronDown size={16} /></button>
             <button type="button" aria-label="Tháng sau" onClick={() => shift(1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-muted"><ChevronRight size={20} /></button>
           </div>
+          <div className="h-[328px] overflow-y-auto">
           {view === "months" && <div className="grid grid-cols-3 gap-2" aria-label="Chọn tháng">
             {Array.from({length: 12}, (_, i) => {
               const next = `${year}-${String(i + 1).padStart(2, "0")}`;
@@ -91,6 +92,7 @@ export function GoalDateField({
               return <button key={date} type="button" aria-label={date.split("-").reverse().join("/")} aria-pressed={selected === date} disabled={date < min} onClick={() => setSelected(date)} className={`min-h-11 rounded-xl text-[15px] disabled:opacity-25 ${selected === date ? "bg-primary font-semibold text-primary-fg" : "text-text hover:bg-surface-muted"}`}>{i+1}</button>;
             })}
           </div>}
+          </div>
           <button type="button" disabled={!selected || selected < min} className={`${primaryButton} mt-5 w-full`} onClick={() => { onChange(selected); setOpen(false); }}>Chọn ngày này</button>
         </Sheet>}
       </> : <input
