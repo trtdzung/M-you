@@ -77,8 +77,9 @@ export function HuOverviewRow({
 
   // Pending + jar cards only make sense once jars exist (the unlabeled card can
   // stand alone — RT#11); with no jars the pending pool has no allocation target.
-  // `pending.amount` is the ONE unallocated number (CASA − Σ spendable), identical
-  // to the transfer picker's "Chưa phân bổ" (D26/S12/U14); ≤ 0 → card hidden.
+  // `pending.amount` is the allocation headroom (CASA − Σ hạn mức), identical to
+  // the sheet's opening "Còn lại để chia" so "Chia ngay" never promises money the
+  // cap rejects. NOT the picker's "Chưa phân bổ" (spendable lens); ≤ 0 → hidden.
   const hasJars = jars.length > 0;
   const showPending = hasJars && (pending.amount === "unknown" || pending.amount > 0);
 

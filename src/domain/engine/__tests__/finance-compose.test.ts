@@ -350,15 +350,19 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
     jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 3_000_000 }],
   };
 
-  it("overview pending === picker pool (CASA − Σ spendable), after spend", () => {
+  it("the two lenses diverge by Σ đã chi: picker pool = CASA − Σ spendable, overview pending = CASA − Σ hạn mức", () => {
     const raw = makeRaw({
       transactions: [txn({ categoryId: "dining", amount: 500_000 })],
       accounts: [currentAccount("cur", 8_000_000)],
     });
     const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
+    // Spendable lens: spending frees the 500k back into the transferable pool.
     expect(f.unallocatedPool.amount).toBe(5_500_000);
-    expect(f.jarEnvelope.pending.amount).toBe(f.unallocatedPool.amount);
-    expect(f.jarEnvelope.pending.overAllocated).toBe(f.unallocatedPool.overAllocated);
+    // Limit lens: the 3tr hạn mức still stands, so the allocation headroom is 5tr —
+    // exactly what the sheet shows as "Còn lại để chia" and what `fitsCasaCap` accepts.
+    expect(f.jarEnvelope.pending.amount).toBe(5_000_000);
+    expect(f.jarEnvelope.pending.allocated).toBe(3_000_000);
+    expect(f.jarEnvelope.pending.overAllocated).toBe(false);
   });
 
   it("D27: no current account → both are 'unknown', never a fabricated negative", () => {

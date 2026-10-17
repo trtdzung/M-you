@@ -79,11 +79,13 @@ describe("HuOverviewRow", () => {
     expect(screen.getByText("Vượt phân bổ")).toBeInTheDocument();
   });
 
-  it("D26/U14: the pending card shows the unallocated pool (CASA − Σ spendable) with the shared wording", () => {
-    const env = envelope({ pending: { amount: 5_500_000, overAllocated: false, pool: 8_000_000, allocated: 3_000_000, meta } });
+  it("the pending card shows the allocation headroom (pool − Σ hạn mức), i.e. the sheet's 'Còn lại để chia'", () => {
+    // NOT the picker's spendable-lens pool (which, after spend, is larger) — the
+    // card is the CTA into the sheet, so it must show what the sheet accepts.
+    const env = envelope({ pending: { amount: 5_000_000, overAllocated: false, pool: 8_000_000, allocated: 3_000_000, meta } });
     render(<HuOverviewRow financials={withEnvelope(env)} />);
-    expect(screen.getByText("5,5 tr")).toBeInTheDocument();
-    expect(screen.getByText("số dư chưa thuộc hũ nào")).toBeInTheDocument();
+    expect(screen.getByText("5 tr")).toBeInTheDocument();
+    expect(screen.getByText("số dư chưa đặt vào hũ nào")).toBeInTheDocument();
   });
   it("renders the 'Chờ phân bổ' card with the pending amount", () => {
     render(<HuOverviewRow financials={withEnvelope(envelope({}))} />);
