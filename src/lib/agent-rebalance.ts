@@ -1,18 +1,25 @@
 /**
- * The "Agent suggests how to top up a jar" step of the transfer flow (Chuyển tiền):
- * the customer picks a jar as the source, enters more than it holds and taps
- * "Tiếp tục" — the engine already knows the jar is short (`evaluateFunding`), and
- * here the M-You agent is ASKED how to cover the gap from other jars / the pool.
+ * The "Agent decides the rest" step of the transfer flow (Chuyển tiền): the customer
+ * picks a jar as the source, enters more than it holds and taps "Tiếp tục" — the
+ * engine already knows the jar is short (`evaluateFunding`).
  *
- * The agent only proposes (`rebalance_jars`, contract in `backend_docs/pfm-read-api.md`
- * B4). Its numbers are never trusted: `checkDonorPlan` re-validates the plan against
- * the engine's jar snapshot, and `/transfer-confirm` runs the SAME check again on
- * fresh numbers before writing any leg — a plan that no longer fits is dropped and
- * the engine's own donor chain applies instead. Nothing here moves money (#3).
+ * Only "Chưa phân bổ" is the engine's own: the pool gives what it can FIRST. Whatever
+ * the pool cannot cover is the M-You agent's to propose, through `POST /jar-rebalance`
+ * — the endpoint takes ONE source jar and an amount (contract 2026-09-24,
+ * `agent_backend_docs/jars/endpoints.md`), so one call per jar the engine's chain draws
+ * from (`topupAsks`), each pinned to the short jar with `to_jar_ids`. Until the agent
+ * has answered, the popup shows the pool alone and "Đồng ý rót" stays off; if the agent
+ * cannot answer (error, timeout, no proposal, a different move) the engine's own chain
+ * stands in so a transfer is never stranded.
+ *
+ * The agent's numbers are never trusted: `checkDonorPlan` re-validates the plan against
+ * the engine's jar snapshot, and `/transfer-confirm` runs the SAME check again on fresh
+ * numbers before writing any leg — a plan that no longer fits is dropped and the engine's
+ * chain applies instead. Nothing here moves money (#3).
  */
 
 import { computeUnallocatedPool, POOL_DONOR_ID, POOL_DONOR_LABEL, type DonorProposal, type JarSpendable } from "@/domain/engine";
-import { isRebalanceJarsUi, requestJarCover, type RebalanceJarsUi } from "@/lib/agent-api";
+import { isRebalanceJarsUi, requestJarRebalance } from "@/lib/agent-api";
 
 /** How long the customer waits for the agent before the engine's chain is all there is. */
 export const AGENT_TOPUP_TIMEOUT_MS = 60_000;
@@ -69,34 +76,68 @@ export function checkDonorPlan(input: {
   return { ok: true, donors };
 }
 
+/** One call to the agent: this jar gives this much to the short jar. */
+export interface TopupAsk {
+  donorJarId: string;
+  amount: number;
+}
+
+/** More jars than this and the engine's chain is used as is — each ask is a 10–25 s model call. */
+export const MAX_TOPUP_ASKS = 3;
+
 /**
- * Ask the agent how to cover a short jar for a planned spend, through its
- * conversation-free `/jar-rebalance` endpoint (`cover` mode — nothing is written to
- * the customer's chat). Resolves the proposal (`rebalance_jars` for exactly this jar)
- * with the customer-facing `reason`, or `null` for anything else — no proposal, a
- * malformed one, another jar, an error or the timeout. The caller then simply keeps
- * the engine's chain.
+ * What to ask the agent: one move per JAR the engine's chain draws from (the pool
+ * part is never asked). `null` when the chain is pool-only — nothing left for the
+ * agent — or draws from more than `MAX_TOPUP_ASKS` jars.
+ */
+export function topupAsks(donors: readonly DonorProposal[]): TopupAsk[] | null {
+  const asks = donors.filter((d) => d.jarId !== POOL_DONOR_ID && d.take > 0).map((d) => ({ donorJarId: d.jarId, amount: d.take }));
+  return asks.length > 0 && asks.length <= MAX_TOPUP_ASKS ? asks : null;
+}
+
+/**
+ * Ask the agent to propose moving `amount` from `fromJarId` into `toJarId`, through
+ * its conversation-free `/jar-rebalance` endpoint (nothing is written to the
+ * customer's chat). Resolves the customer-facing `reason` when the agent proposes
+ * exactly that move (`rebalance_jars`, this source, this one receiver, this amount),
+ * or `null` for anything else — no proposal, a different move, a malformed one, an
+ * error or the timeout. The caller then keeps the engine's chain.
  */
 export async function askAgentForTopup(input: {
   cif: string;
+  fromJarId: string;
+  toJarId: string;
   amount: number;
-  jarId: string;
-}): Promise<RebalanceJarsUi | null> {
+}): Promise<string | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const reply = await Promise.race([
-      requestJarCover({ cif: input.cif, targetJarId: input.jarId, spendAmount: input.amount }),
+      requestJarRebalance({ cif: input.cif, fromJarId: input.fromJarId, amount: input.amount, toJarIds: [input.toJarId] }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error("timeout")), AGENT_TOPUP_TIMEOUT_MS);
       }),
     ]);
     const ui = reply.ui ?? null;
-    return isRebalanceJarsUi(ui) && ui.target_jar_id === input.jarId ? ui : null;
+    if (!isRebalanceJarsUi(ui) || ui.from_jar_id !== input.fromJarId) return null;
+    const [only] = ui.allocations;
+    return ui.allocations.length === 1 && only.to_jar_id === input.toJarId && only.amount === input.amount ? ui.reason : null;
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Ask for every move of `asks` at once (they are independent calls). Resolves the
+ * agent's `reason` per move, in order, only when EVERY move came back as asked —
+ * otherwise `null`, and the caller falls back to the engine's chain.
+ */
+export async function askAgentForTopups(input: { cif: string; toJarId: string; asks: readonly TopupAsk[] }): Promise<string[] | null> {
+  const reasons = await Promise.all(
+    input.asks.map((ask) => askAgentForTopup({ cif: input.cif, fromJarId: ask.donorJarId, toJarId: input.toJarId, amount: ask.amount })),
+  );
+  return reasons.every((r): r is string => r !== null) ? reasons : null;
 }
 
 /**

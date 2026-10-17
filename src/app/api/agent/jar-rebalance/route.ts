@@ -1,35 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AGENT_BASE_URL, agentAuthHeaders } from "@/lib/agent-proxy-auth";
+import { forwardToAgent, idList } from "@/lib/agent-proxy-auth";
 
 /**
- * Same-origin proxy to the agent's `POST /jar-rebalance` — the endpoint for screens
- * that know what they need and have no conversation (no thread, no memory; see the
- * agent repo's `docs/jar-rebalance-endpoint.md`). The transfer screen uses `cover`
- * to ask how to fund a jar that is short for the amount being sent.
+ * Same-origin proxy to the agent's `POST /jar-rebalance` — "how should this jar's
+ * balance move to other jars?" for a screen that knows the source jar and the amount
+ * and has no conversation (`agent_backend_docs/jars/endpoints.md`). The transfer
+ * screen uses it to explain the top-up of a jar that is short for the amount being sent.
  *
- * Only the fields `cover` needs are forwarded, with their types checked here, so the
- * browser cannot pick another mode or smuggle other fields through the proxy.
+ * Only `{user_id, from_jar_id, amount, to_jar_ids?}` are forwarded, each type-checked
+ * here, so the browser cannot smuggle other fields (the agent answers `422` to
+ * unknown ones — the old `mode`/`target_jar_id`/`spend_amount` included).
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const userId = body?.user_id;
-  const targetJarId = body?.target_jar_id;
-  const spendAmount = body?.spend_amount;
+  const fromJarId = body?.from_jar_id;
+  const amount = body?.amount;
+  const toJarIds = body?.to_jar_ids === undefined ? undefined : idList(body.to_jar_ids);
   if (
     typeof userId !== "string" || !userId ||
-    typeof targetJarId !== "string" || !targetJarId ||
-    typeof spendAmount !== "number" || !Number.isFinite(spendAmount) || spendAmount <= 0
+    typeof fromJarId !== "string" || !fromJarId ||
+    typeof amount !== "number" || !Number.isFinite(amount) || Math.round(amount) <= 0 ||
+    (body?.to_jar_ids !== undefined && (!toJarIds || toJarIds.includes(fromJarId)))
   ) {
-    return NextResponse.json({ error: "user_id, target_jar_id and spend_amount (> 0) are required" }, { status: 422 });
+    return NextResponse.json(
+      { error: "user_id, from_jar_id, amount (> 0) and, if present, a to_jar_ids list without from_jar_id are required" },
+      { status: 422 },
+    );
   }
-
-  const res = await fetch(`${AGENT_BASE_URL}/jar-rebalance`, {
-    method: "POST",
-    headers: await agentAuthHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ user_id: userId, mode: "cover", target_jar_id: targetJarId, spend_amount: Math.round(spendAmount) }),
+  return forwardToAgent("/jar-rebalance", {
+    user_id: userId,
+    from_jar_id: fromJarId,
+    amount: Math.round(amount),
+    ...(toJarIds ? { to_jar_ids: toJarIds } : {}),
   });
-  if (!res.ok) {
-    return NextResponse.json({ error: `Agent API error ${res.status}` }, { status: 502 });
-  }
-  return NextResponse.json(await res.json());
 }

@@ -33,7 +33,7 @@ vi.mock("@/providers/context", () => ({
 // The top-up popup asks the agent for a split; here there is no agent, so it must fall back to the engine chain.
 vi.mock("@/lib/agent-api", async (importActual) => ({
   ...(await importActual<typeof import("@/lib/agent-api")>()),
-  requestJarCover: vi.fn().mockRejectedValue(new Error("no agent in tests")),
+  requestJarRebalance: vi.fn().mockRejectedValue(new Error("no agent in tests")),
 }));
 // The static config reads as MIGRATED (opening deposit = limit at the demo month
 // start, like the seeded DB), memoised per config so its identity is stable.

@@ -40,9 +40,14 @@ const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.l
  * 422 is shown in Vietnamese (`mutationError`). An edit changes limit, name and
  * categories only — it never moves balance. No money moves, no OTP (invariant #3).
  *
- * Duplicates are verified AT THE CLICK, against a fresh read of the jar list
- * (`providers.getJarConfig()`): the name may have been taken and a category
- * assigned since (another tab, the settings screen, an earlier proposal). An
+ * Categories: any of them can be picked, also one another jar holds — the card says
+ * it will move from that jar and the server takes it out of the old one in the same
+ * write (one category, one jar). The agent's `reason` is deliberately NOT shown: the
+ * chat bubble above already says why, the card is only the form to review.
+ *
+ * The duplicate name is verified AT THE CLICK, against a fresh read of the jar list
+ * (`providers.getJarConfig()`): it may have been taken since (another tab, the
+ * settings screen, an earlier proposal). An
  * applied proposal is remembered for the tab, so the card is safe to render from
  * chat history; an unchanged edit reads "Không có thay đổi".
  */
@@ -112,11 +117,8 @@ export function AgentJarFormCard({ form, fullWidth = false }: { form: CreateJarU
     if (isEdit && !freshJar) return fail("Hũ này không còn tồn tại. Hỏi lại M-You để có đề xuất mới.");
 
     const draft = { isEdit, jarId: jar?.id, name, limit: amount, balanceRaw, selected };
-    const found = validateAgentJarForm(fresh, draft, funds, labels);
-    if (!found.ok) {
-      if (found.drop) setPicked(selected.filter((id) => !found.drop!.includes(id)));
-      return fail(found.error);
-    }
+    const found = validateAgentJarForm(fresh, draft, funds);
+    if (!found.ok) return fail(found.error);
 
     // A create always carries the parsed opening balance — never a defaulted 0 (#6).
     if (!isEdit && found.balance === null) return fail("Nhập số dư ban đầu (nhập 0 nếu chưa nạp).");
@@ -180,7 +182,6 @@ export function AgentJarFormCard({ form, fullWidth = false }: { form: CreateJarU
 
       <AgentJarCategoryPicker isEdit={isEdit} disabled={done} model={cats} onToggle={toggle} />
 
-      <p className="text-xs text-muted">{form.reason}</p>
       {shownError && <p role="alert" className="text-xs text-negative">{shownError}</p>}
 
       <button

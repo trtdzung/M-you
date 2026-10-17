@@ -69,21 +69,38 @@ export interface EditJarUi {
   reason: string;
 }
 
-export interface RebalanceMove {
-  /** A jar id, or `"pool"` for the derived "Chưa phân bổ". */
-  from_jar_id: string;
+/** One receiving jar of a `rebalance_jars` / `distribute_amount` proposal. */
+export interface JarAllocation {
+  /** A jar id from `jar-summary` (never `"pool"`). */
+  to_jar_id: string;
+  /** Whole VND added to that jar's BALANCE (never its limit). */
   amount: number;
 }
 
+/**
+ * `rebalance_jars` (contract 2026-09-24, `agent_backend_docs/jars/rebalance-jars.md`):
+ * ONE source jar gives BALANCE to one or more other jars. The pre-2026-09-24 shape
+ * (`target_jar_id` + `shortfall` + `moves[]`, a `"pool"` source) is gone.
+ */
 export interface RebalanceJarsUi {
   type: "rebalance_jars";
-  target_jar_id: string;
-  shortfall: number;
-  moves: RebalanceMove[];
+  from_jar_id: string;
+  allocations: JarAllocation[];
   reason: string;
 }
 
-export type JarUi = CreateJarUi | EditJarUi | RebalanceJarsUi;
+/**
+ * `distribute_amount` (`agent_backend_docs/jars/distribute-amount.md`): hand out
+ * money from "Chưa phân bổ" into one or more jars as BALANCE. Same allocation
+ * list as `rebalance_jars`, no source jar — the source is always the unallocated pool.
+ */
+export interface DistributeAmountUi {
+  type: "distribute_amount";
+  allocations: JarAllocation[];
+  reason: string;
+}
+
+export type JarUi = CreateJarUi | EditJarUi | RebalanceJarsUi | DistributeAmountUi;
 
 /**
  * "Hỏi lại bằng nút bấm" (cross-cutting, `agent_backend_docs/clarify-options.md`):
@@ -226,30 +243,44 @@ export function isEditJarUi(ui: UiPayload | null | undefined, expenseIds?: Reado
 }
 
 /**
- * `rebalance_jars` shape — the checks that need no live data (contract "quy tắc
- * cứng" 1–2): fields well-typed, Σ `moves[].amount` equals `shortfall`, no source
- * equals the target or repeats, target is not `"pool"`. Caps against real balances
- * are checked by `AgentRebalanceCard` (it needs the jar snapshot).
+ * A non-empty list of `{to_jar_id, amount}` — each jar once, never `"pool"`, each
+ * amount a positive whole number of VND, and no jar in `excluded`. Shape only:
+ * whether the jars exist and the amounts fit is checked by the cards against live data.
+ */
+function validAllocations(list: unknown, excluded?: string): list is JarAllocation[] {
+  if (!Array.isArray(list) || list.length === 0) return false;
+  const seen = new Set<string>();
+  for (const a of list as Partial<JarAllocation>[]) {
+    if (!a || !nonEmpty(a.to_jar_id) || a.to_jar_id === "pool" || a.to_jar_id === excluded) return false;
+    if (!positive(a.amount) || !Number.isInteger(a.amount) || seen.has(a.to_jar_id)) return false;
+    seen.add(a.to_jar_id);
+  }
+  return true;
+}
+
+/**
+ * `rebalance_jars` shape (contract 2026-09-24): `from_jar_id` (not `"pool"`),
+ * `allocations` (each receiving jar once, none equal to the source, whole VND > 0)
+ * and a `reason`. Caps against real balances are checked by `AgentRebalanceCard`
+ * (it needs the jar snapshot). The old `{target_jar_id, shortfall, moves}` payload
+ * fails here and falls back to `answer`.
  */
 export function isRebalanceJarsUi(ui: UiPayload | null | undefined): ui is RebalanceJarsUi {
   if (!ui || ui.type !== "rebalance_jars") return false;
   const f = ui as Partial<RebalanceJarsUi>;
-  if (!nonEmpty(f.target_jar_id) || f.target_jar_id === "pool" || !positive(f.shortfall) || !nonEmpty(f.reason)) return false;
-  if (!Array.isArray(f.moves) || f.moves.length === 0) return false;
-  const seen = new Set<string>();
-  let sum = 0;
-  for (const m of f.moves) {
-    if (!m || !nonEmpty(m.from_jar_id) || !positive(m.amount)) return false;
-    if (m.from_jar_id === f.target_jar_id || seen.has(m.from_jar_id)) return false;
-    seen.add(m.from_jar_id);
-    sum += m.amount;
-  }
-  return Math.abs(sum - f.shortfall) < 0.5;
+  return nonEmpty(f.from_jar_id) && f.from_jar_id !== "pool" && validAllocations(f.allocations, f.from_jar_id) && nonEmpty(f.reason);
 }
 
-/** Any of the three jar proposals (create / edit / rebalance). */
+/** `distribute_amount` shape: `allocations` (each jar once, never `"pool"`, whole VND > 0) and a `reason`. */
+export function isDistributeAmountUi(ui: UiPayload | null | undefined): ui is DistributeAmountUi {
+  if (!ui || ui.type !== "distribute_amount") return false;
+  const f = ui as Partial<DistributeAmountUi>;
+  return validAllocations(f.allocations) && nonEmpty(f.reason);
+}
+
+/** Any of the four jar proposals (create / edit / rebalance / distribute). */
 export function isJarUi(ui: UiPayload | null | undefined, expenseIds?: ReadonlySet<string>): ui is JarUi {
-  return isCreateJarUi(ui, expenseIds) || isEditJarUi(ui, expenseIds) || isRebalanceJarsUi(ui);
+  return isCreateJarUi(ui, expenseIds) || isEditJarUi(ui, expenseIds) || isRebalanceJarsUi(ui) || isDistributeAmountUi(ui);
 }
 
 /**
@@ -317,15 +348,39 @@ export async function deleteChatHistory(cif: string): Promise<void> {
 }
 
 /**
- * Ask the agent how to fund a jar that is short for a planned spend
- * (`POST /jar-rebalance`, mode `cover`) — no chat thread involved. `ui` is
- * `rebalance_jars` or `null` (nothing to propose; `answer` says why).
+ * Ask the agent how to split an unallocated amount across jars
+ * (`POST /jar-distribute`, no chat thread). `ui` is `distribute_amount` or `null`
+ * (nothing to propose; `answer` says why). Takes 10–25 s — callers show a waiting state.
  */
-export async function requestJarCover(input: { cif: string; targetJarId: string; spendAmount: number }): Promise<ChatResponse> {
+export async function requestJarDistribute(input: { cif: string; amount: number; jarIds?: string[] }): Promise<ChatResponse> {
+  const res = await fetch("/api/agent/jar-distribute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: input.cif, amount: input.amount, ...(input.jarIds ? { jar_ids: input.jarIds } : {}) }),
+  });
+  return readJsonOrThrow(res) as Promise<ChatResponse>;
+}
+
+/**
+ * Ask the agent how a jar's balance should move to other jars
+ * (`POST /jar-rebalance`, no chat thread). `toJarIds` limits the receivers.
+ * `ui` is `rebalance_jars` or `null`. Takes 10–25 s.
+ */
+export async function requestJarRebalance(input: {
+  cif: string;
+  fromJarId: string;
+  amount: number;
+  toJarIds?: string[];
+}): Promise<ChatResponse> {
   const res = await fetch("/api/agent/jar-rebalance", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: input.cif, target_jar_id: input.targetJarId, spend_amount: input.spendAmount }),
+    body: JSON.stringify({
+      user_id: input.cif,
+      from_jar_id: input.fromJarId,
+      amount: input.amount,
+      ...(input.toJarIds ? { to_jar_ids: input.toJarIds } : {}),
+    }),
   });
   return readJsonOrThrow(res) as Promise<ChatResponse>;
 }

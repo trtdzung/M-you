@@ -275,7 +275,6 @@ export function TransferCompose() {
         {topupOpen && assessment?.tier === "topup" && (
           <AgentTopupSheet
             assessment={assessment}
-            amount={numericAmount}
             jarId={selectedJar?.id ?? null}
             targetLabel={selectedJar ? `Hũ ${selectedJar.label}` : POOL_SOURCE_LABEL}
             jars={jarSpendables ?? []}

@@ -80,3 +80,12 @@ export function usePersona(): Omit<PersonaContextValue, "providers"> {
   const { providers: _providers, ...rest } = usePersonaContext();
   return rest;
 }
+
+/**
+ * The active persona's CIF, or `null` outside a `<PersonaProvider>` — for optional
+ * features (e.g. asking the agent) that simply stay hidden when there is no persona,
+ * instead of throwing like `usePersona`.
+ */
+export function usePersonaCif(): string | null {
+  return useContext(PersonaContext)?.persona.cif ?? null;
+}

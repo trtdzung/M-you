@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { InsufficientData } from "@/components/states";
 import type { JarEnvelopeResult } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
 import { jarAccent } from "@/lib/category-colors";
 import { formatVndCompact } from "@/lib/format";
+import { askAgentToDistribute } from "@/lib/agent-distribute";
+import { usePersonaCif } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { AllocationJarRow } from "./AllocationJarRow";
 
@@ -32,6 +35,10 @@ import { AllocationJarRow } from "./AllocationJarRow";
  * (button off, "Đang lưu…"), error (`role="alert"` with the server reason, e.g.
  * over-cap `overBy`; the WHOLE draft is kept), success (closes). Current month only
  * — callers render the sheet only when the viewed month is the current one.
+ *
+ * "Gợi ý cách chia từ M-You" (only with a persona and something left to split) asks the
+ * agent's `/jar-distribute` how to split the WHOLE leftover and only PRE-FILLS the
+ * draft — the customer still edits and saves (`lib/agent-distribute.ts`).
  */
 export function AllocationSheet({
   envelope,
@@ -48,6 +55,10 @@ export function AllocationSheet({
   /** This sheet's last batch was refused — only then is `mutationError` ours to show. */
   const [refused, setRefused] = useState(false);
   const { pending } = envelope;
+  const cif = usePersonaCif();
+  const [suggest, setSuggest] = useState<
+    { status: "idle" } | { status: "loading" } | { status: "done"; text: string }
+  >({ status: "idle" });
   // Every jar opens at 0 — the input is the amount to ADD to that jar's balance,
   // not its new total, so the user distributes the leftover rather than rewriting
   // each full total.
@@ -78,6 +89,19 @@ export function AllocationSheet({
   // (nothing added) is a no-op.
   const canSubmit = poolKnown && leftToSplit >= 0 && added > 0 && !saving;
 
+  async function askAgent() {
+    if (!cif || suggest.status === "loading" || pool <= 0) return;
+    setSuggest({ status: "loading" });
+    const answer = await askAgentToDistribute({ cif, amount: pool, jarIds: jars.map((j) => j.id) });
+    if (answer.kind === "plan") {
+      // Pre-fill only: every other jar goes back to 0 so the draft is exactly the proposal.
+      setDraft(Object.fromEntries(jars.map((j) => [j.id, answer.additions[j.id] ?? 0])));
+      setSuggest({ status: "done", text: answer.reason });
+    } else {
+      setSuggest({ status: "done", text: answer.text });
+    }
+  }
+
   async function submit() {
     // Only the jars the user added to; a jar left at 0 is untouched (skipped). Each
     // deposit raises that jar's SỐ DƯ and never touches its `budgetLimit`.
@@ -105,6 +129,24 @@ export function AllocationSheet({
               {formatVndCompact(leftToSplit)}
             </span>
           </div>
+
+          {cif && pool > 0 && (
+            <div className="mb-2 flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => void askAgent()}
+                disabled={suggest.status === "loading" || saving}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                {suggest.status === "loading" ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
+                {suggest.status === "loading" ? "M-You đang phân tích…" : "Gợi ý cách chia từ M-You"}
+              </button>
+              {suggest.status === "loading" && (
+                <p role="status" className="text-xs text-muted">Có thể mất chừng 20 giây. Bạn vẫn nhập tay được trong lúc chờ.</p>
+              )}
+              {suggest.status === "done" && <p className="text-xs text-text">{suggest.text}</p>}
+            </div>
+          )}
 
           <div className="divide-y divide-border">
             {jars.map((jar) => (

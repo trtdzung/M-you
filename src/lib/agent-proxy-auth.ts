@@ -48,3 +48,31 @@ export async function agentAuthHeaders(extra?: Record<string, string>): Promise<
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
+
+/**
+ * Forward a small JSON body to one of the agent's conversation-free endpoints
+ * (`/jar-distribute`, `/jar-rebalance`) and relay its answer. The browser only ever
+ * sees the route's own status: an agent-side failure (auth, `502` unreadable
+ * `jar-summary`, `503` model timeout…) becomes `502` here, never the raw upstream detail.
+ */
+export async function forwardToAgent(path: string, body: Record<string, unknown>): Promise<Response> {
+  let res: Response;
+  try {
+    res = await fetch(`${AGENT_BASE_URL}${path}`, {
+      method: "POST",
+      headers: await agentAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return Response.json({ error: "Agent API unreachable" }, { status: 502 });
+  }
+  if (!res.ok) return Response.json({ error: `Agent API error ${res.status}` }, { status: 502 });
+  return Response.json(await res.json());
+}
+
+/** A non-empty, duplicate-free array of non-empty strings — or `undefined` when absent / malformed. */
+export function idList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  if (!value.every((v) => typeof v === "string" && v.trim() !== "")) return undefined;
+  return new Set(value).size === value.length ? (value as string[]) : undefined;
+}

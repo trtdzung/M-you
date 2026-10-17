@@ -10,8 +10,6 @@
  */
 
 import type { JarConfig } from "@/domain/models";
-import { categoryLabel } from "@/domain/models";
-import { KHAC_JAR_ID } from "@/domain/engine";
 import { isJarAmount } from "@/domain/jar-rules";
 import { formatVnd } from "@/lib/format";
 import { allocatableFromPool, type CurrentJarFunds } from "@/state/use-current-jar-funds";
@@ -30,7 +28,7 @@ export interface AgentJarFormDraft {
 
 export type AgentJarFormResult =
   | { ok: true; label: string; limit: number; balance: number | null }
-  | { ok: false; error: string; drop?: string[] };
+  | { ok: false; error: string };
 
 /** What a create may take from the pool now, or `null` when unknown/not loaded. */
 function availableOf(funds: CurrentJarFunds): number | null {
@@ -60,7 +58,6 @@ export function validateAgentJarForm(
   cfg: JarConfig,
   draft: AgentJarFormDraft,
   funds: CurrentJarFunds,
-  labels?: ReadonlyMap<string, string>,
 ): AgentJarFormResult {
   const label = draft.name.trim();
   if (!label) return { ok: false, error: "Nhập tên hũ." };
@@ -68,21 +65,6 @@ export function validateAgentJarForm(
     (j) => j.id !== draft.jarId && j.label.trim().toLowerCase() === label.toLowerCase(),
   );
   if (sameName) return { ok: false, error: `Đã có hũ tên "${sameName.label}". Đặt tên khác.` };
-
-  if (!draft.isEdit) {
-    // A create must not take a category out of another jar.
-    const taken = draft.selected.flatMap((id) => {
-      const owner = cfg.jars.find((j) => j.categoryIds.includes(id));
-      return owner && owner.id !== KHAC_JAR_ID ? [{ id, owner: owner.label }] : [];
-    });
-    if (taken.length > 0) {
-      return {
-        ok: false,
-        error: `${taken.map((t) => `${categoryLabel(t.id, labels)} đã thuộc hũ ${t.owner}`).join("; ")} nên đã bỏ khỏi lựa chọn. Kiểm tra lại rồi bấm Tạo hũ.`,
-        drop: taken.map((t) => t.id),
-      };
-    }
-  }
 
   if (!Number.isFinite(draft.limit) || draft.limit <= 0) return { ok: false, error: "Hạn mức phải lớn hơn 0." };
   if (!isJarAmount(draft.limit)) return { ok: false, error: "Hạn mức phải là số tiền nguyên, không quá lớn." };

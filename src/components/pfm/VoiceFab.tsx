@@ -328,7 +328,10 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
 
           <div className="flex w-full flex-1 flex-col items-center justify-center gap-2 overflow-y-auto rounded-2xl border border-dashed border-border bg-surface-tint p-3">
             {voice.error ? (
-              <span role="alert" className="text-xs text-negative">{voice.error}</span>
+              <>
+                <VoiceWaveform animated={false} />
+                <span role="alert" className="text-center text-xs text-negative">{voice.error}</span>
+              </>
             ) : voice.state === "connecting" ? (
               <>
                 <VoiceWaveform />
@@ -372,7 +375,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               )
             ) : (
               <>
-                <VoiceWaveform />
+                <VoiceWaveform animated={false} />
                 <span className="text-xs text-muted">M-You sẵn sàng hỗ trợ bạn</span>
               </>
             )}

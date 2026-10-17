@@ -10,6 +10,7 @@
  *  - `assess` / `snapshotAt`  pre-commit verdict / snapshot on the trigger-date month.
  *  - `commit` / `commitPersisted`  write one rebalance txn per donor (the latter
  *                    AWAITS persistence and rolls back on failure — H14/U1).
+ *  - `commitFanOut`  the mirror image: ONE source jar → several receivers.
  *  - `fundJar`       Case 2: fund a jar that just went over-budget from a label,
  *                    capped at the trigger's own contribution (U5); partial
  *                    cover + residual when full cover is impossible.
@@ -129,6 +130,36 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
     [addPersisted, remove],
   );
 
+  /**
+   * One source jar giving to SEVERAL jars (the agent's `rebalance_jars`): one
+   * `dieu-chinh-hu` leg per receiver, written ONE AFTER ANOTHER and awaited. Sequential on
+   * purpose — the server caps each leg at what the source still holds, counting the legs
+   * already persisted, so parallel writes could each pass the cap and together overdraw the
+   * source. A failure removes the legs that did land and rejects, like `commitPersisted`.
+   */
+  const commitFanOut = useCallback(
+    async (p: {
+      fromJarId: string;
+      moves: readonly { toJarId: string; amount: number }[];
+      triggerTxnId: string;
+      postedAt: string;
+      origin: Origin;
+    }): Promise<string[]> => {
+      const created: string[] = [];
+      try {
+        for (const move of p.moves) {
+          const [input] = rebalanceInputsFor([{ jarId: p.fromJarId, label: p.fromJarId, take: move.amount }], move.toJarId, p.triggerTxnId, p.postedAt, p.origin);
+          if (input) created.push(await addPersisted(input));
+        }
+      } catch (err) {
+        created.forEach(remove);
+        throw err instanceof Error ? err : new Error("rebalance write failed");
+      }
+      return created;
+    },
+    [addPersisted, remove],
+  );
+
   /** Plan + write a cover for one trigger against `d` (lets a batch thread its own legs). */
   const fundWith = useCallback(
     (
@@ -213,8 +244,8 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
   );
 
   return useMemo(
-    () => ({ assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, removeByTrigger, jarConfig }),
-    [assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, removeByTrigger, jarConfig],
+    () => ({ assess, snapshotAt, commit, commitPersisted, commitFanOut, fundJar, reconcile, reconcileLabels, removeByTrigger, jarConfig }),
+    [assess, snapshotAt, commit, commitPersisted, commitFanOut, fundJar, reconcile, reconcileLabels, removeByTrigger, jarConfig],
   );
 }
 
