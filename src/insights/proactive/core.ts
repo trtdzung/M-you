@@ -66,10 +66,10 @@ export function jarPlanCandidates(
 ): ProactiveCandidate[] {
   if (dateToMonthKey(now) !== monthKey) return [];
   return jarBudget.lines.flatMap((line) => {
-    if (line.limitState !== "set" || line.limit === null || line.remaining === null) return [];
-    if (![line.limit, line.spent, line.remaining, line.rebalanceNet].every(Number.isSafeInteger) ||
+    if (line.limitState !== "set" || line.limit === null || line.balance === null) return [];
+    if (![line.limit, line.spent, line.balance, line.rebalanceNet].every(Number.isSafeInteger) ||
         line.limit < 0 || !Number.isSafeInteger(jarBudget.summary.daysLeft) || jarBudget.summary.daysLeft < 0) return [];
-    const unfunded = line.remaining < 0;
+    const unfunded = line.balance < 0;
     const over = line.spent > line.limit;
     const near = line.limit > 0 && line.spent / line.limit >= 0.8;
     if (!unfunded && !over && !near) return [];
@@ -86,7 +86,7 @@ export function jarPlanCandidates(
         jar_label: line.label,
         budget_limit: line.limit,
         spent: line.spent,
-        remaining: line.remaining,
+        remaining: line.balance,
         rebalance_net: line.rebalanceNet,
         days_left: jarBudget.summary.daysLeft,
         source: line.source,

@@ -52,12 +52,15 @@ describe("financial snapshot", () => {
     expect(s.candidates.some((c) => c.id === "spending:month")).toBe(true);
   });
   it("session topup reduces pool and raises jar balance without adding spending", () => {
-    const j = { version: 3, jars: [{ id: "food", label: "Food", categoryIds: ["dining"], budgetLimit: 1000000 }] } as JarConfig;
+    const anchor = "2026-09-01T00:00:00Z";
+    const j: JarConfig = { version: 3,
+      jars: [{ id: "food", label: "Food", categoryIds: ["dining"], budgetLimit: 1000000, createdAt: anchor }],
+      ledger: [{ id: "open-food", jarId: "food", kind: "deposit", amount: 1000000, isOpening: true, createdAt: anchor, source: "self_reported" }] };
     const r = { ...raw(), transactions: [txn("spent", 900000)] };
     const before = make(r, profile, j);
     const after = make(r, profile, j, [txn("topup", 200000, undefined, { type: "transfer", categoryId: REBALANCE_CATEGORY,
       rebalance: { fromJarId: "pool", toJarId: "food", origin: "manual", triggerTxnId: "x" } })]);
-    expect(after.jars[0].remaining).toBe((before.jars[0].remaining ?? 0) + 200000);
+    expect(after.jars[0].balance).toBe((before.jars[0].balance ?? 0) + 200000);
     expect(after.cashflow.monthToDate.expense).toBe(before.cashflow.monthToDate.expense);
     expect(after.unallocated.amount).toBe((before.unallocated.amount as number) - 200000);
   });

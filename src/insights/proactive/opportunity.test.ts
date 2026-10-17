@@ -19,7 +19,7 @@ function input(): OpportunityInput {
       monthKey: "2026-09",
       cashflow: { expense: 5_000_000 }, prevCashflow: { expense: 5_000_000 },
       jarBudget: { lines: [{ categoryIds: ["housing"], limitState: "set", limit: 8_000_000,
-        spent: 3_000_000, remaining: 5_000_000 }] },
+        spent: 3_000_000, balance: 5_000_000 }] },
     } as unknown as Financials,
   };
 }
