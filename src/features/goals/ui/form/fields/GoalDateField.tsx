@@ -28,6 +28,7 @@ export function GoalDateField({
 }) {
   const id = useId();
   const min = tomorrow();
+  const today = todayVn(transferNow());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"days" | "months" | "years">("days");
   const minYear = Number(min.slice(0, 4));
@@ -65,6 +66,10 @@ export function GoalDateField({
             </div>
             <button type="button" aria-label="Tháng sau" onClick={() => shift(1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-muted"><ChevronRight size={20} /></button>
           </div>
+          <div className="mb-3 flex h-9 items-center justify-between">
+            <span className="text-xs text-muted">Hôm nay: {today.split("-").reverse().join("/")}</span>
+            <button type="button" onClick={() => { setMonth(today.slice(0, 7)); setView("days"); }} className="min-h-9 rounded-lg px-3 text-sm font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">Hôm nay</button>
+          </div>
           <div className="h-[328px] overflow-y-auto">
           {view === "months" && <div className="grid grid-cols-3 gap-2" aria-label="Chọn tháng">
             {Array.from({length: 12}, (_, i) => {
@@ -91,7 +96,7 @@ export function GoalDateField({
             {Array.from({length:offset}, (_, i) => <span key={`blank-${i}`} />)}
             {Array.from({length:days}, (_, i) => {
               const date = `${month}-${String(i+1).padStart(2,"0")}`;
-              return <button key={date} type="button" aria-label={date.split("-").reverse().join("/")} aria-pressed={selected === date} disabled={date < min} onClick={() => setSelected(date)} className={`min-h-11 rounded-xl text-[15px] disabled:opacity-25 ${selected === date ? "bg-primary font-semibold text-primary-fg" : "text-text hover:bg-surface-muted"}`}>{i+1}</button>;
+              return <button key={date} type="button" aria-label={date.split("-").reverse().join("/")} aria-current={date === today ? "date" : undefined} aria-pressed={selected === date} disabled={date < min} onClick={() => setSelected(date)} className={`min-h-11 rounded-xl text-[15px] ${date === today ? "border border-primary bg-primary/10 font-semibold text-primary" : "disabled:opacity-25"} ${selected === date ? "bg-primary font-semibold text-primary-fg" : date === today ? "" : "text-text hover:bg-surface-muted"}`}>{i+1}</button>;
             })}
           </div>}
           </div>
