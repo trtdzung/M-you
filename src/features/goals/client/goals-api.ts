@@ -7,6 +7,7 @@ import type {
   LedgerEntryInput,
   SavingsGoalView,
 } from "../model/types";
+import type { Analysis, AnalyzeDraft } from "../advisor/analysis-types";
 import type { CoachAnswer, CoachResponse } from "../coach/contracts";
 import { fetchJson, jsonInit } from "./http";
 
@@ -43,3 +44,8 @@ export const seedDemoGoals = (cif: string) =>
 
 export const coachGoal = (cif: string, input: { request: string; answers: CoachAnswer[] }) =>
   fetchJson<CoachResponse>("/api/goals/coach", jsonInit("POST", { cif, ...input }));
+
+export const analyzeGoal = (
+  cif: string,
+  input: { draft: AnalyzeDraft; overrides?: { targetDate?: string; targetAmount?: number } },
+) => fetchJson<Analysis>("/api/goals/advisor", jsonInit("POST", { cif, ...input }));
