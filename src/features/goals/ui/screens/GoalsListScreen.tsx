@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
@@ -51,11 +52,15 @@ export function GoalsListScreen() {
   if (hasGoals && !creating) return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2>
+          <button type="button" aria-label="Tạo mục tiêu mới" className={`${primaryButton} h-11 shrink-0 gap-1.5 px-3 text-[14px]`} onClick={() => setCreating(true)}>
+            <Plus size={18} aria-hidden="true" />Tạo mới
+          </button>
+        </div>
         <p className="mt-1 text-[14px] leading-5 text-muted">Theo dõi tiến độ tích lũy cho những điều bạn muốn.</p>
       </div>
       {body}
-      <button type="button" className={`${primaryButton} w-full text-[15px]`} onClick={() => setCreating(true)}>Tạo mục tiêu mới</button>
     </section>
   );
 
