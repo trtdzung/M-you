@@ -40,7 +40,6 @@ interface ChatBubble {
 
 const GREETING = "Xin chào 👋 Mình là M-You. Bạn cần hỏi gì về tài chính của mình?";
 const SEND_ERROR = "Không gửi được tin nhắn, vui lòng thử lại.";
-const DELETE_LOCK_MS = 30_000;
 
 /**
  * The `clarify_options` bubble right before `idx` that this one is chained to
@@ -121,10 +120,8 @@ export function MYourWidget() {
   }, [isOpen, insightParam, cif]);
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [locked, setLocked] = useState(false);
   const idRef = useRef(0);
   const titleId = useId();
-  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voicePrefix = useRef("");
@@ -207,13 +204,7 @@ export function MYourWidget() {
     router.replace(`/pfm?${next.toString()}`, { scroll: false });
   }
 
-  useEffect(() => {
-    return () => {
-      if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
-    };
-  }, []);
-
-  const composerDisabled = historyStatus !== "ready" || sending || deleting || locked;
+  const composerDisabled = historyStatus !== "ready" || sending || deleting;
   const [expandedClarify, setExpandedClarify] = useState<Set<string>>(new Set());
   const [reopenedIndex, setReopenedIndex] = useState<number | null>(null);
 
@@ -267,13 +258,13 @@ export function MYourWidget() {
   }
 
   async function handleDelete() {
-    if (deleting || locked || voiceBusy) return;
+    if (deleting || voiceBusy) return;
     setDeleting(true);
     try {
       await deleteChatHistory(cif);
+      // The server confirmed the delete — the transcript is empty as of this response,
+      // so the chat is usable again right away (no arbitrary cooldown, plan 260927).
       setMessages([]);
-      setLocked(true);
-      lockTimerRef.current = setTimeout(() => setLocked(false), DELETE_LOCK_MS);
     } catch {
       // Nothing was actually deleted server-side — leave the transcript as is.
     } finally {
@@ -319,7 +310,7 @@ export function MYourWidget() {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleting || locked || voiceBusy}
+                disabled={deleting || voiceBusy}
                 aria-label="Xóa hội thoại"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40"
               >

@@ -245,8 +245,7 @@ describe("MYourWidget", () => {
     expect(await screen.findByText(/Không gửi được tin nhắn/)).toBeInTheDocument();
   });
 
-  it("deletes history via the real agent, clears the transcript, and locks the composer for 30s", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it("deletes history via the real agent, clears the transcript, and re-enables the composer right away (no cooldown, plan 260927)", async () => {
     renderWidget();
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
 
@@ -258,17 +257,24 @@ describe("MYourWidget", () => {
     await waitFor(() => expect(agentApi.deleteChatHistory).toHaveBeenCalledWith("CIF_0001"));
 
     expect(screen.queryByText("Xin chào")).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeDisabled();
-
-    act(() => {
-      vi.advanceTimersByTime(29_000);
-    });
-    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeDisabled();
-
-    act(() => {
-      vi.advanceTimersByTime(1_001);
-    });
+    // The server's response IS the confirmation the delete is done — no cooldown after it.
     await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+  });
+
+  it("a failed delete leaves the transcript and composer untouched", async () => {
+    vi.spyOn(agentApi, "deleteChatHistory").mockRejectedValueOnce(new Error("boom"));
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Xin chào" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+    await waitFor(() => expect(screen.getByText("Xin chào")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Xóa hội thoại" }));
+    await waitFor(() => expect(agentApi.deleteChatHistory).toHaveBeenCalledWith("CIF_0001"));
+
+    expect(screen.getByText("Xin chào")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled();
   });
 
   it("closes the overlay with the close button by clearing ?assistant", async () => {
