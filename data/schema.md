@@ -191,7 +191,9 @@ category, like `type:"transfer"`) plus a `rebalance` meta
 `{ fromJarId, toJarId, triggerTxnId, origin: "auto"|"manual" }`. Because `payload`
 is the full JSON Transaction, the meta persists with no column change; the engine
 folds `Σ nhận − Σ cho` into each jar's `remaining`. The `rebalance` whitelist entry
-above is what keeps a PATCH from silently dropping the meta.
+above is what keeps a PATCH from silently dropping the meta. A rebalance never
+touches `jars.budget_limit` — it moves the derived balance only, never the plan;
+see "Two independent axes" in `data/jars/schema.md`.
 
 ## `jars`
 

@@ -15,11 +15,21 @@ itself holds no constraints beyond its primary key and `NOT NULL` columns:
   (`stripCategories`/`healOrphanCategories`/`dedupeCategories`).
 - **Single-number model, single DERIVED balance:** a jar's `budget_limit` IS its
   allocation and ceiling. The jar has NO stored balance — its spendable
-  `= max(0, remaining)` where `remaining = budget_limit − đã tiêu` is DERIVED
-  from txn history (invariant #1), the SAME number the Overview envelope and the
-  Chuyển-tiền source picker show. There is no separate allocation ledger and no
-  `actual_amount` column (both retired): a jar-sourced transfer books a
-  self-reported expense txn, which drops the derived `remaining` — nothing else.
+  `= max(0, remaining)` where `remaining = budget_limit − đã tiêu + (Σ nhận − Σ cho
+  trong kỳ)` is DERIVED from txn history (invariant #1), the SAME number the
+  Overview envelope and the Chuyển-tiền source picker show. There is no separate
+  allocation ledger and no `actual_amount` column (both retired): a jar-sourced
+  transfer books a self-reported expense txn, which drops the derived `remaining`
+  — nothing else.
+- **Two independent axes (plan `260920-1317-jar-transfer-balance-not-limit`):**
+  `budget_limit` is the PLAN — it is never mutated by an inter-jar transfer
+  (`dieu-chinh-hu` txn), only by a user editing the jar (`PATCH /api/jars/:id` or
+  the batch `PUT`/`PATCH /api/jars`). A rebalance leg moves only the derived
+  `remaining` (the BALANCE); the plan/verdict (`spent > budget_limit`) stays
+  whatever it was before the transfer. `remaining` does not carry forward across
+  periods — the next period's rebalance window resets (`inPeriod`-filtered), so a
+  jar's balance opens back at exactly `budget_limit` at the start of the next
+  month, regardless of what a transfer moved this month.
 
 | column | type | notes |
 |---|---|---|
