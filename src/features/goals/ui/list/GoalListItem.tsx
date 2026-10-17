@@ -1,6 +1,6 @@
 import { Card } from "@/components/primitives";
 import { ChevronRight, CalendarDays } from "lucide-react";
-import { formatVndCompact } from "@/lib/format";
+import { formatGoalMoney } from "../shared/format-goal-money";
 import type { SavingsGoalView } from "../../model/types";
 import { GoalProgressBar } from "../shared/GoalProgressBar";
 import { GoalStatusBadge } from "../shared/GoalStatusBadge";
@@ -24,21 +24,17 @@ export function GoalListItem({
           <ChevronRight size={20} className="shrink-0 text-muted" aria-hidden="true" />
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular-nums">
-          <span className="text-[26px] leading-8 font-semibold tracking-tight text-text">{formatVndCompact(goal.currentAmount).replace(/\s*₫$/, "")}</span>
-          <span className="text-[14px] text-muted">/ {formatVndCompact(goal.targetAmount).replace(/\s*₫$/, "")} VND</span>
+          <span className="text-[26px] leading-8 font-semibold tracking-tight text-text">{formatGoalMoney(goal.currentAmount)}</span>
+          <span className="text-[14px] text-muted">/ {formatGoalMoney(goal.targetAmount)} VND</span>
         </div>
         <GoalProgressBar percent={goal.progress.percent} state={goal.progress.state} />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <GoalStatusBadge status={goal.status} state={goal.progress.state} />
+          {goal.status !== "active" ? <GoalStatusBadge status={goal.status} state={goal.progress.state} /> : <span className="text-[13px] text-muted">{goal.progress.percent >= 100 ? "Đã đạt mục tiêu" : goal.currentAmount === 0 ? "Bắt đầu với khoản góp đầu tiên" : "Đang tích lũy"}</span>}
           <span className="text-[13px] font-medium tabular-nums text-muted">{Math.round(goal.progress.percent)}%</span>
         </div>
-        <div className="flex flex-col gap-2 border-t border-border/60 pt-3 text-[14px] leading-5 text-muted">
-          <p className="flex items-center gap-2"><CalendarDays size={16} aria-hidden="true" />{goal.targetDate.split("-").reverse().join("/")}</p>
-          {goal.status === "active" && (
-            <p className="flex flex-wrap justify-between gap-x-3 gap-y-1 tabular-nums">
-              <span>{goal.monthlyContribution !== null ? "Góp mỗi tháng" : "Cần góp mỗi tháng"}</span><span className="font-medium text-text">{formatVndCompact(goal.monthlyContribution ?? goal.feasibility.requiredMonthly)}</span>
-            </p>
-          )}
+        <div className="grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-[13px] leading-5">
+          <div><p className="mb-1 flex items-center gap-1.5 text-muted"><CalendarDays size={14} aria-hidden="true" />Đến hạn</p><p className="font-medium text-text">{goal.targetDate.split("-").reverse().join("/")}</p></div>
+          {goal.status === "active" && goal.currentAmount < goal.targetAmount && <div className="text-right"><p className="mb-1 text-muted">{goal.monthlyContribution !== null ? "Dự định mỗi tháng" : "Cần góp mỗi tháng"}</p><p className="font-medium tabular-nums text-text">{formatGoalMoney(goal.monthlyContribution ?? goal.feasibility.requiredMonthly)} <span className="text-[11px] font-normal text-muted">VND</span></p><p className="text-[11px] text-muted">{goal.monthlyContribution !== null ? "Bạn tự đặt" : "Ước tính, chưa tính lãi"}</p></div>}
         </div>
       </Card>
     </button>
