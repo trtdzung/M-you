@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, UserCircle2, Info, LogOut, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Info, LogOut, CheckCircle2 } from "lucide-react";
 import { ScreenHeader } from "@/components/shell/ScreenHeader";
 import { Card, SectionHeader } from "@/components/primitives";
-import { PersonaSwitcher } from "@/components/persona/PersonaSwitcher";
 import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
 
 const SCOPE_LABEL: Record<ConsentScope, string> = {
@@ -16,8 +15,8 @@ const SCOPE_LABEL: Record<ConsentScope, string> = {
 };
 
 /**
- * Hồ sơ & Cài đặt (vào từ account card — quyết định #6). Gom Quyền dữ liệu
- * (xem scope + thu hồi đồng ý — PFM-094), Hồ sơ demo (persona), Về ứng dụng.
+ * Cài đặt (vào từ account card — quyết định #6). Gom Quyền dữ liệu
+ * (xem scope + thu hồi đồng ý — PFM-094) và Về ứng dụng.
  * Thu hồi đồng ý reachable ≤2 chạm. Logic consent giữ nguyên `lib/consent`.
  */
 export default function SettingsPage() {
@@ -35,7 +34,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <ScreenHeader title="Cài đặt" subtitle="Hồ sơ, quyền dữ liệu & thông tin ứng dụng" />
+      <ScreenHeader title="Cài đặt" subtitle="Quyền dữ liệu & thông tin ứng dụng" />
 
       <div className="flex flex-col gap-6">
         <section>
@@ -67,14 +66,6 @@ export default function SettingsPage() {
             <p className="text-[11px] text-muted">
               Thu hồi sẽ xóa đồng ý đã lưu và đưa bạn về màn hình giới thiệu.
             </p>
-          </Card>
-        </section>
-
-        <section>
-          <SectionHeader title="Hồ sơ" />
-          <Card className="flex items-start gap-3">
-            <UserCircle2 size={20} className="mt-1 shrink-0 text-primary" />
-            <PersonaSwitcher className="flex-1" />
           </Card>
         </section>
 
