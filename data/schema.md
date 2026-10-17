@@ -190,7 +190,7 @@ separate ledger. A rebalance is one row whose `payload` Transaction carries
 category, like `type:"transfer"`) plus a `rebalance` meta
 `{ fromJarId, toJarId, triggerTxnId, origin: "auto"|"manual" }`. Because `payload`
 is the full JSON Transaction, the meta persists with no column change; the engine
-folds `Σ nhận − Σ cho` into each jar's `remaining`. The `rebalance` whitelist entry
+folds `Σ nhận − Σ cho` (since the jar's anchor) into each jar's running `balance`. The `rebalance` whitelist entry
 above is what keeps a PATCH from silently dropping the meta. A rebalance never
 touches `jars.budget_limit` — it moves the derived balance only, never the plan;
 see "Two independent axes" in `data/jars/schema.md`.
@@ -198,4 +198,49 @@ see "Two independent axes" in `data/jars/schema.md`.
 ## `jars`
 
 See `data/jars/schema.md` — documented in its own file/folder rather than
-here, since it's a separate, independently-evolving table.
+here, since it's a separate, independently-evolving table. Since plan
+`260923-jar-limit-vs-balance-split` a jar also has `created_at` (TEXT, ISO) — the
+anchor of its running BALANCE, server-owned (`writeJarConfig` keeps an existing
+jar's value across its DELETE+INSERT; a client-sent `createdAt` is ignored).
+
+## `jar_ledger`
+
+Per-jar deposit/withdraw rows, scoped by `cif`, feeding a jar's running balance
+(`Σ deposit − Σ withdraw − spend since created_at ± rebalances`, computed by the
+engine — invariant #1). A display partition of CASA, never money movement (#3).
+
+| column | type | notes |
+|---|---|---|
+| `cif` | TEXT PK¹ | owner |
+| `id` | TEXT PK¹ | server-generated; `led-mig-<jarId>` for a migration opening row, `led-seed-<jarId>` for a seeded one |
+| `jar_id` | TEXT | the jar (`jars.id`); rows of a jar removed from the config are deleted with it |
+| `kind` | TEXT | `deposit` / `withdraw` |
+| `amount` | INTEGER | whole VND, `> 0` — only an opening row may be `0` (CHECK); the write doors also cap it at `10^12` (`MAX_JAR_AMOUNT`) |
+| `is_opening` | INTEGER | `1` = the jar's opening deposit (at most one per `(cif, jar_id)`, always a `deposit`) |
+| `created_at` | TEXT | ISO timestamp |
+| `source` | TEXT | always `self_reported` (#5) |
+
+¹ Composite primary key `(cif, id)`. A partial unique index enforces one opening
+row per jar; CHECKs enforce `kind`, `amount > 0 OR is_opening = 1`, an opening row
+being a `deposit`, and `source = 'self_reported'`.
+
+Writers: `POST /api/jars` (the jar row + its opening row, one transaction) and
+`POST /api/jar-ledger` (atomic batch of 1–50 non-opening rows, Σ ≤ 10^12, CASA cap
+checked once on the whole batch). `PUT /api/jars` (template apply / reset) writes
+no rows — a new id's balance is unknown until the user deposits. Rows are never
+updated; they are only deleted with their jar. See `data/jars/schema.md`.
+
+### Migration and restoring a pre-migration backup
+
+On the first `getDb()` against a DB whose `jars` rows lack `created_at`
+(`src/lib/db-migrate-jar-ledger.ts`), the server FIRST copies the file to
+`data/pfm.sqlite3.bak-<YYYYMMDD-HHmmss>` (after a WAL checkpoint; a failed copy
+aborts startup), then adds the column and, in one transaction, gives every such
+jar `created_at` = start of the current demo month plus an opening deposit equal
+to its `budget_limit` (0 included; a NULL limit gets none, so its balance stays
+unknown). Later starts find nothing to migrate and take no backup. Backups are
+git-ignored (`data/*.bak-*`).
+
+To restore: stop the dev server, delete `data/pfm.sqlite3` together with
+`data/pfm.sqlite3-wal` / `data/pfm.sqlite3-shm`, then rename the `.bak-*` file
+back to `data/pfm.sqlite3`. (The next start migrates it again.)
