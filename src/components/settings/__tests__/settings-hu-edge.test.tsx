@@ -159,13 +159,16 @@ describe("HuEditorSheet — CASA cap uses 'only raises are capped' (U9)", () => 
 });
 
 describe("HuEditorSheet — failed writes are visible (U20)", () => {
-  it("shows an alert when a role PATCH fails and keeps the persisted role", async () => {
+  it("shows an alert when a colour PATCH fails and keeps the persisted colour", async () => {
     interceptFetch((url, init) => (isJarPatch(url, init) ? Promise.resolve(json({ error: "db" }, 500)) : null));
     const { dialog } = await openEditor();
-    fireEvent.click(within(dialog).getByRole("button", { name: /^Mục tiêu/ }));
+    const swatches = within(dialog).getAllByRole("button", { name: /^Màu / });
+    const before = swatches.find((b) => b.getAttribute("aria-pressed") === "true");
+    const target = swatches.find((b) => b.getAttribute("aria-pressed") === "false")!;
+    fireEvent.click(target);
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/Không lưu được/);
-    expect(within(dialog).getByRole("button", { name: /^Tùy ý/ })).toHaveAttribute("aria-pressed", "true");
-    expect(within(dialog).getByRole("button", { name: /^Mục tiêu/ })).toHaveAttribute("aria-pressed", "false");
+    expect(target).toHaveAttribute("aria-pressed", "false");
+    if (before) expect(before).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows the server's over-cap reason and snaps the limit back to the stored value", async () => {

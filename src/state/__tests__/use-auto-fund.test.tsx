@@ -126,17 +126,17 @@ beforeEach(() => {
   installFetchMock();
 });
 
-describe("useAutoFund — fundJar (role waterfall commit)", () => {
-  it("funds a jar's overspend from the top-priority role donor (buffer before essential, goal excluded)", async () => {
+describe("useAutoFund — fundJar (donor commit)", () => {
+  it("funds a jar's overspend from the largest donor jar", async () => {
     // food's OWN limit is excluded from CASA, so the pool stays 0 the instant food
     // overspends (claimed drops by exactly the floored amount) — isolating the
-    // role-waterfall choice to the real jar donors.
+    // donor choice to the real jar donors.
     h.jarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000, role: "buffer" },
-        { id: "ess", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 5_000_000, role: "essential" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000 },
+        { id: "ess", label: "Thiết yếu", categoryIds: ["housing"], budgetLimit: 5_000_000 },
       ],
     };
     h.accounts = [account("cur", 11_000_000)]; // buf(6M) + ess(5M)
@@ -174,69 +174,16 @@ describe("useAutoFund — fundJar (role waterfall commit)", () => {
   });
 });
 
-describe("useAutoFund — C5: a declined goal-only shortfall is a durable 'needs manual cover' state, never silent", () => {
-  const setup = () => {
+describe("useAutoFund — no protected jars", () => {
+  it("a savings-style jar funds the overspend directly, with no confirm step", async () => {
     h.jarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-        { id: "goal", label: "Mục tiêu", categoryIds: ["goal-save"], budgetLimit: 5_000_000, role: "goal" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+        { id: "goal", label: "Mục tiêu", categoryIds: ["goal-save"], budgetLimit: 5_000_000 },
       ],
     };
     h.accounts = [account("cur", 5_000_000)]; // only goal's limit — food's own limit excluded
-  };
-
-  it("fundJar returns needs-goal and writes NOTHING when only a protected `goal` jar can cover", async () => {
-    setup();
-    const { result } = renderHook(() => useHarness(), { wrapper });
-    let triggerId = "";
-    act(() => {
-      triggerId = result.current.addTxn({
-        amount: 4_800_000,
-        direction: "debit",
-        categoryId: "dining",
-        type: "expense",
-        merchantName: "Nhà hàng",
-        postedAt: "2026-09-05T10:00:00.000Z",
-      });
-    });
-
-    let r1: ReturnType<typeof result.current.fundJar> | undefined;
-    act(() => {
-      r1 = result.current.fundJar({ targetJarId: "food", triggerTxnId: triggerId, postedAt: "2026-09-05T10:00:00.000Z", origin: "auto" });
-    });
-    expect(r1?.status).toBe("needs-goal");
-    expect(r1?.goalDonors).toEqual([{ jarId: "goal", label: "Hũ Mục tiêu", take: 800_000 }]);
-    expect(r1?.createdIds).toEqual([]);
-    expect(rebalancesFor(result.current.manualTxns, triggerId)).toHaveLength(0);
-
-    // Decline (caller never calls includeGoal) — retrying without confirmation
-    // STAYS needs-goal, never silently resolves or auto-writes on its own.
-    let r2: ReturnType<typeof result.current.fundJar> | undefined;
-    act(() => {
-      r2 = result.current.fundJar({ targetJarId: "food", triggerTxnId: triggerId, postedAt: "2026-09-05T10:00:00.000Z", origin: "auto" });
-    });
-    expect(r2?.status).toBe("needs-goal");
-    expect(rebalancesFor(result.current.manualTxns, triggerId)).toHaveLength(0); // still nothing written
-  });
-
-  // REGRESSION — pins a REAL bug found while writing this suite (reported to the
-  // orchestrator, not silently worked around): `fundJar`'s tier check
-  // (`use-auto-fund.ts`) is `if (assessment.requiresManualGoal && !p.includeGoal)
-  // return needs-goal; if (assessment.tier === "insufficient") return insufficient;`.
-  // But `jar-funding.ts`'s `assess()` NEVER sets `requiresManualGoal: true` on any
-  // tier other than `"insufficient"` (see `evaluateFunding` — the flag is only ever
-  // set inside the `tier: "insufficient"` branch). So the SECOND check is always hit
-  // for a requiresManualGoal case even after an explicit confirm, and `commit()` is
-  // unreachable — a confirmed "Xác nhận rút" in `TransferCategorizeSection.tsx` /
-  // `UnlabeledSpendSheet.tsx` (both call `reconcile(..., includeGoal: true)` →
-  // `fundJar(..., includeGoal: true)`) silently reports "insufficient" / "cần bù thủ
-  // công" instead of committing the confirmed goal donor. This test encodes the
-  // DOCUMENTED/intended contract and is expected to fail until `fundJar` is fixed
-  // (e.g. gate the second check on `!assessment.requiresManualGoal` too, mirroring
-  // `TransferConfirm.tsx`'s own correct `tier === "insufficient" && !requiresManualGoal`).
-  it("an explicit confirm (includeGoal) commits the goal chain and resolves the shortfall", async () => {
-    setup();
     const { result } = renderHook(() => useHarness(), { wrapper });
     let triggerId = "";
     act(() => {
@@ -252,19 +199,13 @@ describe("useAutoFund — C5: a declined goal-only shortfall is a durable 'needs
 
     let r: ReturnType<typeof result.current.fundJar> | undefined;
     act(() => {
-      r = result.current.fundJar({
-        targetJarId: "food",
-        triggerTxnId: triggerId,
-        postedAt: "2026-09-05T10:00:00.000Z",
-        origin: "manual",
-        includeGoal: true,
-      });
+      r = result.current.fundJar({ targetJarId: "food", triggerTxnId: triggerId, postedAt: "2026-09-05T10:00:00.000Z", origin: "auto" });
     });
     expect(r?.status).toBe("funded");
     const rebs = rebalancesFor(result.current.manualTxns, triggerId);
     expect(rebs).toHaveLength(1);
     expect(rebs[0]).toMatchObject({ amount: 800_000 });
-    expect(rebs[0].rebalance).toMatchObject({ fromJarId: "goal", toJarId: "food", origin: "manual" });
+    expect(rebs[0].rebalance).toMatchObject({ fromJarId: "goal", toJarId: "food", origin: "auto" });
   });
 });
 
@@ -273,8 +214,8 @@ describe("useAutoFund — H3: refund reconciliation shrinks/removes the rebalanc
     h.jarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000, role: "buffer" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000 },
       ],
     };
     h.accounts = [account("cur", 6_000_000)]; // buf's limit only — food's own limit excluded (pool stays 0)
@@ -365,8 +306,8 @@ describe("useAutoFund — H4: reconcile derives its snapshot from the TRIGGER's 
     h.jarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000, role: "buffer" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000 },
       ],
     };
     h.accounts = [account("cur", 6_000_000)];
@@ -412,8 +353,8 @@ describe("useAutoFund — reconcile re-entrancy: an already-settled trigger is a
     h.jarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000, role: "buffer" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+        { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 6_000_000 },
       ],
     };
     h.accounts = [account("cur", 6_000_000)];

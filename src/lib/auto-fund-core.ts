@@ -77,7 +77,6 @@ export function snapshotForDate(
     id: l.huId,
     label: l.label,
     categoryIds: l.categoryIds,
-    role: l.role,
     spendable: jarSpendable(l.remaining),
   }));
   return { month, spendables, lines, casaBalance: casaBalance(deps.accounts) };

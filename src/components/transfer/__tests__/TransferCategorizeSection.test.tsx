@@ -33,12 +33,10 @@ interface MockTxn {
 
 type MockDonor = { jarId: string; label: string; take: number };
 // Loose shape of what `useAutoFund().reconcile` returns, widened across every
-// status this suite drives (default "covered", plus the H1 latch test's
-// "needs-goal" → "funded" sequence) so `mockImplementationOnce` type-checks.
+// status so `mockImplementationOnce` type-checks.
 type MockReconcileResult = {
-  status: "covered" | "needs-goal" | "funded" | "insufficient";
+  status: "covered" | "funded" | "insufficient";
   donors: MockDonor[];
-  goalDonors?: MockDonor[];
   targetLabel: string;
 };
 
@@ -242,43 +240,4 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
     expect(h.store[0].transferPurpose).toBeUndefined(); // stale purpose cleared, not lingering
   });
 
-  // RT-fix H1: the `inFlight` ref latch (TransferCategorizeSection.tsx `applyCategory`)
-  // must drop a re-entrant tap that arrives WHILE the first confirm is still
-  // executing (i.e. before the `finally` resets the latch) — never double-commit a
-  // rebalance for the same label. Modeled by having the mocked `autoFund.reconcile`
-  // itself fire a second "Xác nhận rút" click synchronously mid-call, simulating a
-  // real double-tap landing inside the first commit's synchronous execution window.
-  it("H1: a re-entrant 'Xác nhận rút' tap while the first confirm is still in-flight is dropped by the latch", async () => {
-    h.store = [seedTxn({ note: "tien nha" })]; // rent → housing (spending)
-    h.reconcile
-      .mockImplementationOnce(() => ({
-        status: "needs-goal" as const,
-        donors: [],
-        goalDonors: [{ jarId: "goal", label: "Hũ Mục tiêu", take: 500_000 }],
-        targetLabel: "Nhà ở",
-      }))
-      .mockImplementationOnce(() => {
-        // A second tap arrives while this (first legitimate) confirm call is still
-        // on the stack — `inFlight.current` is still true (the `finally` in the
-        // outer `applyCategory` call hasn't run yet).
-        fireEvent.click(screen.getByRole("button", { name: "Xác nhận rút" }));
-        return {
-          status: "funded" as const,
-          donors: [{ jarId: "goal", label: "Hũ Mục tiêu", take: 500_000 }],
-          targetLabel: "Nhà ở",
-        };
-      });
-
-    render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
-    await screen.findByText("Tiền nhà");
-    fireEvent.click(screen.getByRole("button", { name: "Đồng ý" })); // 1st reconcile call → needs-goal
-
-    const confirmBtn = await screen.findByRole("button", { name: "Xác nhận rút" });
-    fireEvent.click(confirmBtn); // 2nd reconcile call (legitimate) → the re-entrant tap fires from inside it
-
-    // Exactly 2 calls total: the initial needs-goal assessment + the ONE legitimate
-    // confirm. The re-entrant tap never reaches a 3rd `reconcile` call — the latch
-    // dropped it before it could double-commit a second rebalance for "housing".
-    expect(h.reconcile).toHaveBeenCalledTimes(2);
-  });
 });

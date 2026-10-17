@@ -34,8 +34,8 @@ const EXPENSE_LABELS = CATEGORIES.filter((c) => c.kind === "expense").map((c) =>
 // owns dining + groceries ("Ăn uống"/"Nhu yếu phẩm"), "transport" owns
 // "transport" ("Di chuyển"). "housing" is deliberately left unclaimed by
 // either jar (orphan) to exercise the "Khác" fallback.
-const foodJar: Jar = { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], role: "spending" };
-const transportJar: Jar = { id: "transport", label: "Di chuyển", categoryIds: ["transport"], role: "spending" };
+const foodJar: Jar = { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"] };
+const transportJar: Jar = { id: "transport", label: "Di chuyển", categoryIds: ["transport"] };
 const normalJars: Jar[] = [foodJar, transportJar];
 
 /** A controllable promise: resolve it whenever the test decides to. */

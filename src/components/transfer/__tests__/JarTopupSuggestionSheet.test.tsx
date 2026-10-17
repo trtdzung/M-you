@@ -17,8 +17,6 @@ const assessment: FundingAssessment = {
     { jarId: "pool", label: "Chưa phân bổ", take: 300_000 },
     { jarId: "lifestyle", label: "Hũ Hưởng thụ", take: 200_000 },
   ],
-  goalDonors: [],
-  requiresManualGoal: false,
   targetJarId: "food",
   source: "mock",
 };

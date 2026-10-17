@@ -48,7 +48,7 @@ const h = vi.hoisted(() => {
     financials: null as ReturnType<typeof linesFrom> | null,
     // The shared auto-fund unit is mocked (its own logic is tested against the engine
     // separately). `assess` returns this verdict; `commit` returns these rebalance ids.
-    assessment: { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: null, source: "mock" } as Record<string, unknown>,
+    assessment: { tier: "ok", shortfall: 0, donors: [], targetJarId: null, source: "mock" } as Record<string, unknown>,
     createdIds: [] as string[],
     casaBalance: 100_000_000,
     commit: vi.fn(),
@@ -140,7 +140,7 @@ vi.mock("@/state/use-auto-fund", () => ({
     undo: () => ({ status: "undone" }),
     changeSource: () => ({ status: "nothing", ids: [], shortfall: 0 }),
     swapOptions: () => ({ shortfall: 0, options: [] }),
-    fundJar: () => ({ status: "covered", donors: [], goalDonors: [], shortfall: 0, createdIds: [], targetJarId: null, targetLabel: "", postedAt: "" }),
+    fundJar: () => ({ status: "covered", donors: [], shortfall: 0, createdIds: [], targetJarId: null, targetLabel: "", postedAt: "" }),
     removeByTrigger: () => [],
     jarConfig: h.jarConfig,
   }),
@@ -209,7 +209,7 @@ beforeEach(() => {
     h.commit(...args);
     return h.createdIds;
   });
-  h.assessment = { tier: "ok", shortfall: 0, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: null, source: "mock" };
+  h.assessment = { tier: "ok", shortfall: 0, donors: [], targetJarId: null, source: "mock" };
   h.createdIds = [];
   h.update.mockImplementation((id: string, patch: Partial<MockTxn>) => {
     if (!h.store.some((t) => t.id === id)) return false;
@@ -337,7 +337,7 @@ describe("TransferConfirm — always create + categorize", () => {
  */
 describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
   it("insufficient blocks: no debit, no txn, error shown (C3)", async () => {
-    h.assessment = { tier: "insufficient", shortfall: 500_000, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: "food", source: "mock" };
+    h.assessment = { tier: "insufficient", shortfall: 500_000, donors: [], targetJarId: "food", source: "mock" };
     h.draft = jarDraft();
     render(<TransferConfirm />);
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
@@ -349,7 +349,7 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
 
   it("topup: books the FULL amount into the jar category, then commits the rebalance", async () => {
     h.assessment = {
-      tier: "topup", shortfall: 1_000_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      tier: "topup", shortfall: 1_000_000, targetJarId: "food", source: "mock",
       donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 1_000_000 }],
     };
     h.createdIds = ["reb-1"];
@@ -369,27 +369,6 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
     expect(screen.queryByRole("button", { name: /Hoàn tác/ })).not.toBeInTheDocument();
   });
 
-  it("requiresManualGoal: prompts BEFORE booking, and confirm proceeds (no silent goal raid)", async () => {
-    h.assessment = {
-      tier: "insufficient", shortfall: 1_000_000, requiresManualGoal: true, targetJarId: "food", source: "mock",
-      donors: [], goalDonors: [{ jarId: "goalJar", label: "Hũ Mục tiêu", take: 1_000_000 }],
-    };
-    h.createdIds = ["reb-goal"];
-    h.draft = jarDraft();
-    render(<TransferConfirm />);
-
-    // First tap surfaces the goal-confirm — nothing booked yet (C3).
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
-    expect(await screen.findByText(/Cần rút từ hũ Mục tiêu/)).toBeInTheDocument();
-    expect(h.applyAccountDebit).not.toHaveBeenCalled();
-    expect(h.adopt).not.toHaveBeenCalled();
-
-    // Explicit confirm proceeds: books the primary + commits the goal chain.
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận rút" }));
-    await screen.findByText("Chuyển tiền thành công");
-    expect(h.adopt).toHaveBeenCalledTimes(1);
-    expect(h.commit).toHaveBeenCalledTimes(1);
-  });
 });
 
 /**
@@ -422,7 +401,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
 
   it("H14/U1: a failed rebalance leg after the debit is surfaced on the receipt, never 'Đã bù'", async () => {
     h.assessment = {
-      tier: "topup", shortfall: 200_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      tier: "topup", shortfall: 200_000, targetJarId: "food", source: "mock",
       donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 200_000 }],
     };
     h.commitPersisted.mockRejectedValueOnce(new Error("leg 500"));
@@ -452,7 +431,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
 
   it("H11/U16: amount above CASA shows the plain 'Số dư không đủ' state — never an empty donor list", async () => {
     h.casaBalance = 680_000;
-    h.assessment = { tier: "insufficient", shortfall: 820_000, donors: [], goalDonors: [], requiresManualGoal: false, targetJarId: "food", source: "mock" };
+    h.assessment = { tier: "insufficient", shortfall: 820_000, donors: [], targetJarId: "food", source: "mock" };
     h.draft = jarDraft();
     render(<TransferConfirm />);
     fireEvent.change(screen.getByDisplayValue(String(AMOUNT)), { target: { value: "1500000" } });
@@ -464,7 +443,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
 
   it("H11: a topup with donors still lists them (list only when there are donors)", async () => {
     h.assessment = {
-      tier: "topup", shortfall: 300_000, requiresManualGoal: false, goalDonors: [], targetJarId: "food", source: "mock",
+      tier: "topup", shortfall: 300_000, targetJarId: "food", source: "mock",
       donors: [{ jarId: "shop", label: "Hũ Mua sắm", take: 300_000 }],
     };
     h.draft = jarDraft();

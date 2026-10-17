@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS jars (
   label TEXT NOT NULL,
   category_ids TEXT NOT NULL,      -- JSON array of category id strings
   budget_limit REAL,               -- NULL = "chưa đặt" (Đã set), never 0
-  role TEXT,                       -- donor-waterfall role (buffer/spending/essential/goal); NULL → treated as spending
   color TEXT,
   icon TEXT,
   sort_order INTEGER NOT NULL,     -- display order (a jar added later sorts last)

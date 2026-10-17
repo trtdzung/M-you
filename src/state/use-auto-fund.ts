@@ -12,7 +12,7 @@
  *                    AWAITS persistence and rolls back on failure — H14/U1).
  *  - `fundJar`       Case 2: fund a jar that just went over-budget from a label,
  *                    capped at the trigger's own contribution (U5); partial
- *                    non-goal cover + residual when full cover is impossible.
+ *                    cover + residual when full cover is impossible.
  *  - `reconcile`     H3/H5: unwind + re-evaluate a changed trigger txn.
  *  - `reconcileLabels` S7/U4: batch-fund background auto-labels, each fund seeing
  *                    the legs written before it (no double-funding in a batch).
@@ -36,13 +36,12 @@ import { useFinancials } from "./useFinancials";
 import { useJarConfig } from "./jars";
 import { buildManualTxn, useManualTxns } from "./manual-txns";
 
-export type FundStatus = "covered" | "funded" | "needs-goal" | "insufficient";
+export type FundStatus = "covered" | "funded" | "insufficient";
 
 export interface FundResult {
   status: FundStatus;
-  /** The donors actually written (`funded`/partial `insufficient`), or the proposal (`needs-goal`). */
+  /** The donors actually written (`funded`/partial `insufficient`). */
   donors: DonorProposal[];
-  goalDonors: DonorProposal[];
   /** VND still uncovered for `insufficient` (after any partial cover); the gap otherwise. */
   shortfall: number;
   createdIds: string[];
@@ -57,15 +56,9 @@ export interface CommitInput {
   triggerTxnId: string;
   postedAt: string;
   origin: "auto" | "manual";
-  includeGoal?: boolean;
 }
 
 type Origin = "auto" | "manual";
-
-/** The donor chain a commit writes (goal donors only on explicit confirm). */
-function donorsOf(p: CommitInput): DonorProposal[] {
-  return p.includeGoal ? [...p.assessment.donors, ...p.assessment.goalDonors] : p.assessment.donors;
-}
 
 /** Hook body, fed an already-loaded txn view (so a provider that already calls
  *  `useFinancials` — e.g. auto-categorize — doesn't start a second data fetch). */
@@ -110,7 +103,7 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
 
   /** Write one `dieu-chinh-hu` rebalance txn per donor from an assessment (optimistic). */
   const commit = useCallback(
-    (p: CommitInput): string[] => writeLegs(donorsOf(p), p.targetJarId, p.triggerTxnId, p.postedAt, p.origin).ids,
+    (p: CommitInput): string[] => writeLegs(p.assessment.donors, p.targetJarId, p.triggerTxnId, p.postedAt, p.origin).ids,
     [writeLegs],
   );
 
@@ -121,7 +114,7 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
    */
   const commitPersisted = useCallback(
     async (p: CommitInput): Promise<string[]> => {
-      const inputs = rebalanceInputsFor(donorsOf(p), p.targetJarId, p.triggerTxnId, p.postedAt, p.origin);
+      const inputs = rebalanceInputsFor(p.assessment.donors, p.targetJarId, p.triggerTxnId, p.postedAt, p.origin);
       const settled = await Promise.allSettled(inputs.map((input) => addPersisted(input)));
       const ok = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
       const failed = settled.find((r): r is PromiseRejectedResult => r.status === "rejected");
@@ -138,20 +131,16 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
   const fundWith = useCallback(
     (
       d: AutoFundDeps,
-      p: { targetJarId: string; triggerTxnId: string; postedAt: string; origin: Origin; includeGoal?: boolean; partialOnNeedsGoal?: boolean } & SnapshotOpts,
+      p: { targetJarId: string; triggerTxnId: string; postedAt: string; origin: Origin } & SnapshotOpts,
     ): { result: FundResult; legs: Transaction[] } => {
       const opts = { excludeIds: p.excludeIds, overrides: p.overrides };
       const snapshot = snapshotForDate(d, p.postedAt, opts);
       const targetLabel = snapshot.lines.find((l) => l.huId === p.targetJarId)?.label ?? "hũ";
       const cap = triggerContribution(d, p.triggerTxnId, p.targetJarId, opts);
-      const plan = planCover(snapshot, p.targetJarId, cap, { includeGoal: p.includeGoal, partialOnNeedsGoal: p.partialOnNeedsGoal });
-      const base = { targetJarId: p.targetJarId, targetLabel, postedAt: p.postedAt, goalDonors: plan.goalDonors };
+      const plan = planCover(snapshot, p.targetJarId, cap);
+      const base = { targetJarId: p.targetJarId, targetLabel, postedAt: p.postedAt };
       if (plan.status === "covered") return { result: { ...base, status: "covered", donors: [], shortfall: 0, createdIds: [] }, legs: [] };
-      if (plan.status === "needs-goal") {
-        return { result: { ...base, status: "needs-goal", donors: plan.donors, shortfall: plan.shortfall, createdIds: [] }, legs: [] };
-      }
-      const origin: Origin = p.includeGoal ? "manual" : p.origin;
-      const { ids, legs } = writeLegs(plan.donors, p.targetJarId, p.triggerTxnId, p.postedAt, origin);
+      const { ids, legs } = writeLegs(plan.donors, p.targetJarId, p.triggerTxnId, p.postedAt, p.origin);
       const shortfall = plan.status === "funded" ? plan.shortfall : plan.residual;
       return { result: { ...base, status: plan.status, donors: plan.donors, shortfall, createdIds: ids }, legs };
     },
@@ -160,12 +149,11 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
 
   /**
    * Case 2 / reconcile core: fund a jar over-budget in the trigger-period snapshot,
-   * capped at the trigger's own contribution (U5). `needs-goal` writes nothing
-   * (caller prompts, re-calls with `includeGoal`); `insufficient` writes the best
-   * PARTIAL non-goal cover and reports the residual (C5 "cần bù thủ công").
+   * capped at the trigger's own contribution (U5). `insufficient` writes the best
+   * PARTIAL cover and reports the residual (C5 "cần bù thủ công").
    */
   const fundJar = useCallback(
-    (p: { targetJarId: string; triggerTxnId: string; postedAt: string; origin: Origin; includeGoal?: boolean } & SnapshotOpts): FundResult => {
+    (p: { targetJarId: string; triggerTxnId: string; postedAt: string; origin: Origin } & SnapshotOpts): FundResult => {
       return fundWith(deps, p).result;
     },
     [deps, fundWith],
@@ -173,7 +161,7 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
 
   /** H3/H5: unwind a changed trigger's legs, then re-fund against its CURRENT category. */
   const reconcile = useCallback(
-    (p: { triggerTxnId: string; categoryId: string; postedAt: string; origin?: Origin; includeGoal?: boolean; override?: Partial<Transaction> }): FundResult | null => {
+    (p: { triggerTxnId: string; categoryId: string; postedAt: string; origin?: Origin; override?: Partial<Transaction> }): FundResult | null => {
       const removed = removeByTrigger(p.triggerTxnId);
       const targetJarId = jarIdForCategory(jarConfig, p.categoryId);
       if (!targetJarId) return null; // transfer/rebalance category maps to no jar
@@ -182,7 +170,6 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
         triggerTxnId: p.triggerTxnId,
         postedAt: p.postedAt,
         origin: p.origin ?? "auto",
-        includeGoal: p.includeGoal,
         excludeIds: new Set(removed),
         overrides: p.override ? new Map([[p.triggerTxnId, p.override]]) : undefined,
       });
@@ -194,9 +181,8 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
    * S7/U4: background labels just landed (not yet re-rendered). Fund each labelled
    * txn's jar in date order; every fund sees the category `overrides` AND the legs
    * already written earlier in this batch, so two labels in one jar never both
-   * claim the same overspend or the same donor money. Goal jars are never raided
-   * (no prompt in the background) — the non-goal part is covered, the rest stays a
-   * visible "cần bù thủ công" residual.
+   * claim the same overspend or the same donor money. What can't be covered stays
+   * a visible "cần bù thủ công" residual.
    */
   const reconcileLabels = useCallback(
     (labels: { txnId: string; categoryId: string }[]): FundResult[] => {
@@ -215,7 +201,7 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
         removeByTrigger(l.txnId).forEach((id) => excludeIds.add(id));
         const d = { ...deps, transactions: [...extra, ...deps.transactions] };
         const postedAt = byId.get(l.txnId)!.postedAt;
-        const { result, legs } = fundWith(d, { targetJarId, triggerTxnId: l.txnId, postedAt, origin: "auto", partialOnNeedsGoal: true, excludeIds, overrides });
+        const { result, legs } = fundWith(d, { targetJarId, triggerTxnId: l.txnId, postedAt, origin: "auto", excludeIds, overrides });
         extra = [...legs, ...extra];
         if (result.status !== "covered") results.push(result);
       }

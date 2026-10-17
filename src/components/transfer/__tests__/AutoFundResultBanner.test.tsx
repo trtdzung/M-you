@@ -57,10 +57,10 @@ beforeEach(() => {
   h.jarConfig = {
     version: 3,
     jars: [
-      { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-      { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 1_000_000, role: "buffer" },
-      { id: "fun", label: "Hưởng thụ", categoryIds: ["fun-cat"], budgetLimit: 1_000_000, role: "spending" },
-      { id: "health", label: "Sức khỏe", categoryIds: ["health-cat"], budgetLimit: 1_000_000, role: "goal" },
+      { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+      { id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: 1_000_000 },
+      { id: "fun", label: "Hưởng thụ", categoryIds: ["fun-cat"], budgetLimit: 1_000_000 },
+      { id: "health", label: "Sức khỏe", categoryIds: ["health-cat"], budgetLimit: 1_000_000 },
     ],
   };
   h.accounts = [account("cur", 3_000_000)]; // buf + fun + health → pool 0

@@ -17,7 +17,7 @@
  *  - Every line carries provenance (source + freshness) over its own spend.
  */
 
-import type { DataSource, JarConfig, JarRole, Transaction } from "@/domain/models";
+import type { DataSource, JarConfig, Transaction } from "@/domain/models";
 import { inPeriod, netExpenseByCategory } from "./cashflow";
 import { categoryToJarMap } from "./category-jars";
 import { NEAR_THRESHOLD, daysLeftIn, type PressureStatus } from "./pressure";
@@ -31,12 +31,6 @@ export interface JarBudgetLine {
   huId: string;
   label: string;
   categoryIds: string[];
-  /**
-   * Donor-waterfall role from `JarConfig` (see `JarRole`), threaded through so the
-   * transfer picker's `JarSpendable` carries the REAL role (not a `spending`
-   * fallback). Optional for a legacy jar stored without one.
-   */
-  role?: JarRole;
   /** Net expense over this jar's categories for the period (whole VND). */
   spent: number;
   /** Net expense last period — the MoM comparison base. */
@@ -212,7 +206,6 @@ export function evaluateJarBudget(
       huId: jar.id,
       label: jar.label,
       categoryIds: jar.categoryIds,
-      role: jar.role,
       spent,
       prevSpent,
       momDelta,

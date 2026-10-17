@@ -72,9 +72,6 @@ export function TransferConfirm() {
   const [fundResult, setFundResult] = useState<FundResult | null>(null);
   // A rebalance write that failed AFTER the debit (shown on the receipt, H14).
   const [fundError, setFundError] = useState<string | null>(null);
-  // A goal-only shortfall needs an explicit confirm (requiresManualGoal) BEFORE any
-  // spend is booked (C3) — never a silent goal raid. Holds the pending assessment.
-  const [goalPrompt, setGoalPrompt] = useState<FundingAssessment | null>(null);
   // Latches true the moment a txn is committed. A `useState` flag can't stop a
   // synchronous double-tap (both handlers read the same stale state) — the ref
   // does (Red Team F#3). Set only after validation so a failed attempt can retry.
@@ -122,7 +119,7 @@ export function TransferConfirm() {
     return txn;
   }
 
-  async function runConfirm(goalOk: boolean) {
+  async function runConfirm() {
     // In-flight / already-done guard: a double-tap or re-entry must never create
     // a second txn or debit twice (Red Team F#3, RT-fix H1 idempotency).
     if (committedRef.current || submitting || done) return;
@@ -132,25 +129,17 @@ export function TransferConfirm() {
     setError(null);
 
     const postedAt = transferNow().toISOString();
-    // RT-fix (C3) — ASSESS-THEN-COMMIT: resolve insufficient / goal FIRST, on the
+    // RT-fix (C3) — ASSESS-THEN-COMMIT: resolve insufficient FIRST, on the
     // pre-commit snapshot, and only debit + write once coverage is guaranteed.
     let assessment: FundingAssessment | null = null;
     if (fundable) {
       const assessed = autoFund.assess({ postedAt, sourceJarId: targetJarId, amount });
       assessment = assessed.assessment;
       const overCasa = amount > assessed.snapshot.casaBalance;
-      if (overCasa || (assessment.tier === "insufficient" && !assessment.requiresManualGoal)) {
+      if (overCasa || assessment.tier === "insufficient") {
         return setError("Số dư không đủ để hoàn tất giao dịch. Vui lòng kiểm tra lại.");
       }
-      if (assessment.requiresManualGoal && !goalOk) {
-        // Only a protected `goal` jar can close the gap — explicit confirm BEFORE
-        // any spend is booked. Re-enters via the prompt's "Xác nhận rút".
-        setGoalPrompt(assessment);
-        return;
-      }
     }
-    setGoalPrompt(null);
-    const includeGoal = Boolean(assessment?.requiresManualGoal && goalOk);
 
     committedRef.current = true; // latch before any await — blocks a synchronous re-entry
     setSubmitting(true);
@@ -211,12 +200,10 @@ export function TransferConfirm() {
           targetJarId,
           triggerTxnId: primaryTxnId,
           postedAt,
-          origin: includeGoal ? "manual" : "auto",
-          includeGoal,
+          origin: "auto",
         });
         if (createdIds.length > 0) {
-          const donors = includeGoal ? [...assessment.donors, ...assessment.goalDonors] : assessment.donors;
-          setFundResult({ status: "funded", donors, goalDonors: assessment.goalDonors, shortfall: assessment.shortfall, createdIds, targetJarId, targetLabel, postedAt });
+          setFundResult({ status: "funded", donors: assessment.donors, shortfall: assessment.shortfall, createdIds, targetJarId, targetLabel, postedAt });
         }
       } catch {
         const where = targetJarId ? `hũ ${targetLabel}` : targetLabel;
@@ -343,34 +330,9 @@ export function TransferConfirm() {
 
       {error && <p className="text-sm text-negative">{error}</p>}
 
-      {goalPrompt && (
-        <Card className="bg-warning-soft" role="alertdialog" aria-label="Xác nhận rút hũ Mục tiêu">
-          <p className="text-sm font-semibold text-warning">Cần rút từ hũ Mục tiêu</p>
-          <p className="mt-1 text-xs text-warning">
-            Chỉ còn hũ Mục tiêu đủ để bù {formatVnd(goalPrompt.shortfall)} cho giao dịch này. Bạn xác nhận rút?
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => runConfirm(true)}
-              className="flex-1 rounded-full bg-primary px-3 py-2 text-sm font-semibold text-white"
-            >
-              Xác nhận rút
-            </button>
-            <button
-              type="button"
-              onClick={() => setGoalPrompt(null)}
-              className="flex-1 rounded-full border border-border bg-surface px-3 py-2 text-sm font-semibold text-text"
-            >
-              Để sau
-            </button>
-          </div>
-        </Card>
-      )}
-
       <button
         type="button"
-        onClick={() => runConfirm(false)}
+        onClick={() => runConfirm()}
         disabled={submitting}
         className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
       >

@@ -172,11 +172,7 @@ export function TransferCompose() {
   }, [source?.kind, fundingSourceJarId, jarsLoaded, financials, numericAmount, accounts, jarSpendables]);
 
   const accountSourceValid = source?.kind === "account" && Boolean(selectedAccount && numericAmount <= selectedAccount.balance);
-  // H07/H08/U6: a goal-only shortfall is NOT "không đủ số dư" — CASA covers the
-  // amount and a protected goal jar can close the gap on explicit confirm (Confirm
-  // prompts). Only a true shortfall (nothing, incl. goal, can cover) blocks.
-  const needsGoal = assessment?.requiresManualGoal === true;
-  const insufficient = assessment?.tier === "insufficient" && !needsGoal;
+  const insufficient = assessment?.tier === "insufficient";
   // Continue is allowed when: an account source has the balance, OR a jar/pool
   // source is `ok`, `topup` (popup), or goal-coverable (confirmed on Confirm).
   const canContinue = Boolean(
@@ -226,7 +222,7 @@ export function TransferCompose() {
     if (!recipient || !canContinue) return;
     // Account source, or a jar/pool source that already has enough → straight to
     // confirm. A `topup` opens the suggestion popup; `insufficient` is blocked.
-    if (source?.kind === "account" || assessment?.tier === "ok" || needsGoal) {
+    if (source?.kind === "account" || assessment?.tier === "ok") {
       writeDraftAndGo();
     } else if (assessment?.tier === "topup") {
       setTopupOpen(true);
@@ -259,11 +255,6 @@ export function TransferCompose() {
         {insufficient && (
           <p role="alert" className="mx-4 mb-2 text-sm text-negative">
             Không đủ số dư để chuyển số tiền này.
-          </p>
-        )}
-        {needsGoal && assessment && (
-          <p role="status" className="mx-4 mb-2 rounded-xl bg-warning-soft p-3 text-sm text-warning">
-            Chỉ hũ Mục tiêu còn đủ để bù {formatVnd(assessment.shortfall)}. Bạn sẽ xác nhận việc rút ở bước sau.
           </p>
         )}
         <TransferAmountStep

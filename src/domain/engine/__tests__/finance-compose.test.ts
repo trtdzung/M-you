@@ -255,8 +255,8 @@ describe("computeFinancials — double-entry correctness (rebalance never inflat
     const jarConfig: JarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" },
-        { id: "buf", label: "Dự phòng", categoryIds: ["savings-cat"], budgetLimit: 3_000_000, role: "buffer" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 },
+        { id: "buf", label: "Dự phòng", categoryIds: ["savings-cat"], budgetLimit: 3_000_000 },
       ],
     };
     const realSpend = txn({ id: "spend-1", categoryId: "dining", amount: 4_500_000, postedAt: "2026-06-05T10:00:00.000Z" });

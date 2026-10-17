@@ -3,41 +3,35 @@
     "id": "essentials",
     "label": "Thiết yếu",
     "categoryIds": ["housing", "utilities", "insurance", "subscriptions"],
-    "role": "essential",
     "budgetLimit": 8000000
   },
   {
     "id": "food",
     "label": "Ăn uống",
     "categoryIds": ["dining", "groceries"],
-    "role": "spending",
     "budgetLimit": 4000000
   },
   {
     "id": "transport",
     "label": "Di chuyển",
     "categoryIds": ["transport"],
-    "role": "spending",
     "budgetLimit": 1500000
   },
   {
     "id": "lifestyle",
     "label": "Hưởng thụ",
     "categoryIds": ["entertainment", "shopping"],
-    "role": "spending",
     "budgetLimit": 2500000
   },
   {
     "id": "health",
     "label": "Sức khỏe",
     "categoryIds": ["health"],
-    "role": "spending",
     "budgetLimit": 1000000
   },
   {
     "id": "savings",
     "label": "Tiết kiệm",
-    "categoryIds": [],
-    "role": "buffer"
+    "categoryIds": []
   }
 ]

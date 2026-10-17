@@ -42,11 +42,8 @@ export function HuCategoryTab() {
 
   function addAndEdit() {
     const id = `jar-${Date.now()}`;
-    // Minor-2: a new jar gets an EXPLICIT donor-waterfall role at creation
-    // ("Tùy ý"/spending), never a silent engine fallback — the user refines it in
-    // the editor's "Vai trò khi bù hũ" selector.
     setEditing(id);
-    void addJar({ id, label: "Hũ mới", categoryIds: [], role: "spending" }).then((ok) => {
+    void addJar({ id, label: "Hũ mới", categoryIds: [] }).then((ok) => {
       if (!ok) setEditing((cur) => (cur === id ? null : cur)); // reason shows in the notice
     });
   }

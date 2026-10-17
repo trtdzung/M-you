@@ -56,7 +56,7 @@ function txn(over: Partial<Transaction> = {}): Transaction {
 
 const JAR_CONFIG: JarConfig = {
   version: 3,
-  jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000, role: "spending" }],
+  jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 4_000_000 }],
 };
 
 describe("snapshotForDate — H4: the snapshot is pinned to postedAt's month, never 'now' or the viewed month", () => {

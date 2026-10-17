@@ -44,11 +44,7 @@ itself holds no constraints beyond its primary key and `NOT NULL` columns:
 
 Primary key `(cif, id)`.
 
-**`role` (plan 260918-1120):** the `Jar.role` donor-waterfall field
-(`buffer`/`spending`/`essential`/`goal`) is modelled in code (Phase 01) and threaded
-through the engine onto `JarBudgetLine`/`JarSpendable` (Phase 03). Its DB `role`
-column + seed lands in **Phase 04** (write path); until then a stored jar without one
-is treated as `spending` by the engine. Inter-jar rebalances are NOT stored here —
+Inter-jar rebalances are NOT stored here —
 they ride the `transactions` table as `self_reported`, `dieu-chinh-hu`-tagged txns (see
 `data/schema.md`).
 

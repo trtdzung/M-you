@@ -28,15 +28,13 @@ export function getDb(): Database.Database {
   addTransactionsSourceColumn(db);
   db.exec(readFileSync(schemaPath, "utf8"));
   mergeManualTransactions(db);
-  // Migration: `jars.role` (donor-waterfall role, plan 260918-1120 Phase 04) is a
-  // new column. CREATE TABLE IF NOT EXISTS won't add it to a pre-existing DB, so
-  // add it defensively — `ADD COLUMN` throws "duplicate column" once present,
-  // which we swallow (idempotent). Existing rows read back NULL → treated as
-  // `spending` by the engine, never a crash.
+  // Migration: the `jars.role` donor-waterfall column was retired (donors are now
+  // ordered by balance alone). Drop it from an older DB file; `DROP COLUMN` throws
+  // once it is gone, which we swallow (idempotent).
   try {
-    db.exec("ALTER TABLE jars ADD COLUMN role TEXT");
+    db.exec("ALTER TABLE jars DROP COLUMN role");
   } catch {
-    // column already exists — nothing to do
+    // column already gone — nothing to do
   }
   instance = db;
   return db;

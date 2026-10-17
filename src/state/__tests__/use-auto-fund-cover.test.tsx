@@ -24,9 +24,9 @@ vi.mock("@/state/useFinancials", async () => {
 });
 
 const SEP = "2026-09-05T10:00:00.000Z";
-const food = { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], budgetLimit: 4_000_000, role: "spending" as const };
-const buf = (limit: number) => ({ id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: limit, role: "buffer" as const });
-const goal = { id: "goal", label: "Mục tiêu", categoryIds: ["goal-save"], budgetLimit: 5_000_000, role: "goal" as const };
+const food = { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], budgetLimit: 4_000_000 };
+const buf = (limit: number) => ({ id: "buf", label: "Dự phòng", categoryIds: ["buffer-cat"], budgetLimit: limit });
+const goal = { id: "goal", label: "Mục tiêu", categoryIds: ["goal-save"], budgetLimit: 5_000_000 };
 
 beforeEach(() => {
   db.clear();
@@ -82,21 +82,6 @@ describe("U5 — a trigger funds only its own contribution; partial cover when f
     expect(rebalancesFor(result.current.manualTxns, trigger)[0]).toMatchObject({ amount: 1_000_000 });
   });
 
-  it("keeps the goal-confirm gate: a goal-only gap still returns needs-goal and writes nothing", () => {
-    h.jarConfig = { version: 3, jars: [food, goal] };
-    h.accounts = [account("cur", 5_000_000)];
-    const { result } = renderHook(() => useHarness(), { wrapper });
-    let trigger = "";
-    act(() => {
-      trigger = result.current.addTxn(spend(4_800_000, "dining"));
-    });
-    let r: ReturnType<typeof result.current.fundJar> | undefined;
-    act(() => {
-      r = result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" });
-    });
-    expect(r?.status).toBe("needs-goal");
-    expect(rebalancesFor(result.current.manualTxns, trigger)).toHaveLength(0);
-  });
 });
 
 describe("S7/U4 — reconcileLabels funds background labels once, never double-funding within a batch", () => {
@@ -122,21 +107,6 @@ describe("S7/U4 — reconcileLabels funds background labels once, never double-f
     expect(results.map((r) => r.status)).toEqual(["funded"]);
   });
 
-  it("never raids a goal jar in the background (no legs; residual stays visible)", () => {
-    h.jarConfig = { version: 3, jars: [food, goal] };
-    h.accounts = [account("cur", 5_000_000)];
-    const { result } = renderHook(() => useHarness(), { wrapper });
-    let a = "";
-    act(() => {
-      a = result.current.addTxn(spend(4_800_000, "unclassified"));
-    });
-    let results: ReturnType<typeof result.current.reconcileLabels> = [];
-    act(() => {
-      results = result.current.reconcileLabels([{ txnId: a, categoryId: "dining" }]);
-    });
-    expect(allRebalances(result.current.manualTxns)).toHaveLength(0);
-    expect(results[0]).toMatchObject({ status: "insufficient", shortfall: 800_000, createdIds: [] });
-  });
 });
 
 describe("H14/U1 — commitPersisted awaits every leg", () => {
@@ -144,8 +114,6 @@ describe("H14/U1 — commitPersisted awaits every leg", () => {
     tier: "topup" as const,
     shortfall: 500_000,
     donors: [{ jarId: "buf", label: "Hũ Dự phòng", take: 500_000 }],
-    goalDonors: [],
-    requiresManualGoal: false,
     targetJarId: "food",
     source: "mock" as const,
   };

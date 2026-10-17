@@ -44,16 +44,15 @@ export function UnlabeledSpendSheet({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [labeledNote, setLabeledNote] = useState(false);
   const [fundNote, setFundNote] = useState<string | null>(null);
-  const [goalPending, setGoalPending] = useState<{ txn: Transaction; categoryId: string } | null>(null);
   // RT-fix (H1): commit-latch so a double-tap can't create two rebalances per label.
   const inFlight = useRef(false);
 
   /**
    * Label a spend, then auto-fund the target jar if the label pushes it over-budget
    * (Case 2). H4: the funding snapshot is the TRIGGER txn's period (`txn.postedAt`),
-   * not the viewed month. `requiresManualGoal` prompts (C5 durable state on decline).
+   * not the viewed month.
    */
-  function labelSpend(txn: Transaction, categoryId: string, goalOk = false) {
+  function labelSpend(txn: Transaction, categoryId: string) {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
@@ -65,16 +64,10 @@ export function UnlabeledSpendSheet({
         categoryId,
         postedAt: txn.postedAt,
         origin: "manual",
-        includeGoal: goalOk,
         override: { categoryId, type: typeForCategory(categoryId, categoryById) },
       });
-      if (!result) return;
-      if (result.status === "needs-goal") setGoalPending({ txn, categoryId });
-      else {
-        // funded / partial cover + residual (U5) / covered — one shared copy.
-        setGoalPending(null);
-        setFundNote(fundOutcomeNote(result));
-      }
+      // funded / partial cover + residual (U5) / covered — one shared copy.
+      if (result) setFundNote(fundOutcomeNote(result));
     } finally {
       inFlight.current = false;
     }
@@ -117,31 +110,6 @@ export function UnlabeledSpendSheet({
           {fundNote}
         </p>
       )}
-      {goalPending && (
-        <div className="mb-3 rounded-row border border-warning/40 bg-warning-soft/50 px-3 py-2.5" role="alertdialog">
-          <p className="text-[13px] font-semibold text-warning">Cần rút từ hũ Mục tiêu để bù</p>
-          <div className="mt-1.5 flex gap-2">
-            <button
-              type="button"
-              onClick={() => labelSpend(goalPending.txn, goalPending.categoryId, true)}
-              className="flex-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white"
-            >
-              Xác nhận rút
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setGoalPending(null);
-                setFundNote("Chưa bù — hũ đang vượt hạn mức, cần bù thủ công.");
-              }}
-              className="flex-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text"
-            >
-              Để sau
-            </button>
-          </div>
-        </div>
-      )}
-
       {items.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">Đã gắn nhãn hết 🎉</p>
       ) : (

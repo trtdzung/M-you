@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { type JarRole } from "@/domain/models";
 import { isDuplicateLabel } from "@/domain/engine";
 import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
@@ -18,24 +17,12 @@ import { HuDeleteSection } from "./HuDeleteSection";
 import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
 
 /**
- * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức/tháng (`HuLimitField`), vai
- * trò, màu, icon, danh mục trong hũ (`HuCategoryPicker` — chọn/bỏ chọn tại chỗ,
+ * Trình sửa một hũ (mô hình ngân sách): tên, hạn mức/tháng (`HuLimitField`), màu,
+ * icon, danh mục trong hũ (`HuCategoryPicker` — chọn/bỏ chọn tại chỗ,
  * exactly-one), và xoá hũ (`HuDeleteSection`). Mọi thay đổi ghi qua `useJarConfig`
  * — state (theo phản hồi server) là nguồn sự thật; lần ghi bị từ chối hiện ở
  * `JarMutationErrorNotice`.
  */
-/**
- * Donor-waterfall roles (plan 260918-1120): the order auto-fund drains jars when
- * another is short — `buffer` → `spending` → `essential`, with `goal` PROTECTED
- * (never auto-raided; a goal-only shortfall needs explicit confirm). VN labels.
- */
-const ROLE_OPTIONS: { value: JarRole; label: string; hint: string }[] = [
-  { value: "buffer", label: "Dự phòng", hint: "Ưu tiên rót khi hũ khác thiếu" },
-  { value: "spending", label: "Tùy ý", hint: "Chi tiêu linh hoạt" },
-  { value: "essential", label: "Thiết yếu", hint: "Chỉ rót khi bất đắc dĩ" },
-  { value: "goal", label: "Mục tiêu", hint: "Được bảo vệ — cần xác nhận mới rút" },
-];
-
 export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () => void }) {
   const { config, updateJar } = useJarConfig();
   // Mẫu số của nhãn "(n/total)" là số danh mục chi ĐANG DÙNG của persona — người
@@ -72,29 +59,6 @@ export function HuEditorSheet({ jarId, onClose }: { jarId: string; onClose: () =
         </label>
 
         <HuLimitField jar={jar} jars={config.jars} />
-
-        <Field label="Vai trò khi bù hũ">
-          <div className="grid grid-cols-2 gap-2">
-            {ROLE_OPTIONS.map((opt) => {
-              const active = (jar.role ?? "spending") === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => updateJar(jarId, { role: opt.value })}
-                  className={cn(
-                    "flex flex-col gap-0.5 rounded-row border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                    active ? "border-primary bg-primary/10" : "border-border bg-surface",
-                  )}
-                >
-                  <span className="text-sm font-medium text-text">{opt.label}</span>
-                  <span className="text-[11px] text-muted">{opt.hint}</span>
-                </button>
-              );
-            })}
-          </div>
-        </Field>
 
         <Field label="Màu">
           <div className="flex flex-wrap gap-2">

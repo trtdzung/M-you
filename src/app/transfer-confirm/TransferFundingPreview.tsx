@@ -6,8 +6,7 @@ import type { FundingAssessment } from "@/domain/engine";
 
 /**
  * RT-fix (H6): the anticipated auto-fund, reviewed BEFORE the user confirms.
- * H11/U16: when the amount exceeds CASA (or nothing — not even a goal jar — can
- * cover it) this is the plain "Số dư không đủ" state; a donor list is shown ONLY
+ * H11/U16: when the amount exceeds CASA (or no jar can cover it) this is the plain "Số dư không đủ" state; a donor list is shown ONLY
  * when there are donors, never an empty "rót từ:" list.
  */
 export function TransferFundingPreview({
@@ -23,10 +22,7 @@ export function TransferFundingPreview({
   poolSource: boolean;
 }) {
   const overCasa = amount > casaBalance;
-  if (
-    overCasa ||
-    (assessment.tier === "insufficient" && !assessment.requiresManualGoal)
-  ) {
+  if (overCasa || assessment.tier === "insufficient") {
     return (
       <div role="alert" aria-label="Số dư không đủ">
         <Card className="bg-negative-soft">
@@ -40,16 +36,9 @@ export function TransferFundingPreview({
       </div>
     );
   }
-  const donors = [
-    ...assessment.donors,
-    ...(assessment.requiresManualGoal ? assessment.goalDonors : []),
-  ];
+  const donors = assessment.donors;
   if (donors.length === 0) return null;
-  const heading = assessment.requiresManualGoal
-    ? "Chỉ còn hũ Mục tiêu để bù"
-    : poolSource
-      ? "Tiền chưa phân bổ không đủ — lấy thêm từ hũ"
-      : "Sẽ tự bù cho hũ nguồn";
+  const heading = poolSource ? "Tiền chưa phân bổ không đủ — lấy thêm từ hũ" : "Sẽ tự bù cho hũ nguồn";
   return (
     <section aria-label="Dự kiến bù hũ">
       <Card className="bg-surface-tint">

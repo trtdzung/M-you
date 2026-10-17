@@ -250,19 +250,6 @@ export interface Budget {
  * unknown limit, NEVER a silent 0 (invariant #6). A limit is set at onboarding /
  * settings. The legacy balance-lens `allocation` share was dropped in phase 08.
  */
-/**
- * A jar's donation role — the DETERMINISTIC donor-waterfall order (invariant #1),
- * replacing the old `isJarFixed` derivation from `categoryIds` (RT#5). When a
- * transfer is short, auto-donation drains jars in this order:
- *   `buffer` (dự phòng/tiết kiệm) → `spending` (chi tiêu linh hoạt) →
- *   `essential` (thiết yếu, last resort). `goal` is PROTECTED: it is never in the
- *   auto chain — a shortfall that only a `goal` jar can close requires explicit
- *   human confirmation (the engine surfaces `requiresManualGoal`).
- * Self-reported config metadata (invariant #5); a missing role defaults to
- * `spending` in the engine (never crashes on a legacy jar without one).
- */
-export type JarRole = "buffer" | "spending" | "essential" | "goal";
-
 export interface Jar {
   id: string;
   label: string;
@@ -270,12 +257,6 @@ export interface Jar {
   categoryIds: string[];
   /** Monthly spending limit in VND. `undefined` = chưa đặt (unknown, never 0). */
   budgetLimit?: number;
-  /**
-   * Donor-waterfall role (see `JarRole`). Optional for back-compat with stored
-   * jars; seeds always set it. A missing role is treated as `spending` by the
-   * engine — a `goal` jar is the only role protected from auto-donation.
-   */
-  role?: JarRole;
   /** Optional presentation overrides (settings). Absent = derive from category. */
   color?: string;
   icon?: string;

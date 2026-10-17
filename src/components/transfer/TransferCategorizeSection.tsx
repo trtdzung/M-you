@@ -61,7 +61,6 @@ export function TransferCategorizeSection({
   const [pickError, setPickError] = useState<string | null>(null);
   // Auto-fund feedback for Case 2 (categorize-later routes the spend into a jar).
   const [fundNote, setFundNote] = useState<string | null>(null);
-  const [goalPending, setGoalPending] = useState<{ categoryId: string; postedAt: string } | null>(null);
   // RT-fix (H1): a commit-latch so a double-tap can't create two rebalances for one label.
   const inFlight = useRef(false);
 
@@ -96,7 +95,7 @@ export function TransferCategorizeSection({
    * Set category (+ optional purpose). The category change alone re-routes this
    * txn's spend between jars (derived model, invariant #1) — no jar bookkeeping.
    */
-  function applyCategory(categoryId: string, purposeId?: string, goalOk = false) {
+  function applyCategory(categoryId: string, purposeId?: string) {
     if (inFlight.current) return; // H1 latch — one label, one rebalance
     inFlight.current = true;
     try {
@@ -124,20 +123,12 @@ export function TransferCategorizeSection({
         categoryId,
         postedAt,
         origin: "manual",
-        includeGoal: goalOk,
         override: { categoryId, type: nextType },
       });
-      if (!result) return;
-      if (result.status === "needs-goal") {
-        // Only a protected `goal` jar can cover — prompt before raiding it (C5).
-        setGoalPending({ categoryId, postedAt });
-      } else {
-        // funded / partial-insufficient (U5: covered part + residual) / covered.
-        // C5 durable state: an uncovered residual keeps the jar over-budget and
-        // re-surfaces as "cần bù thủ công" on its card — never a silent loss.
-        setGoalPending(null);
-        setFundNote(fundOutcomeNote(result));
-      }
+      // funded / partial-insufficient (U5: covered part + residual) / covered.
+      // C5 durable state: an uncovered residual keeps the jar over-budget and
+      // re-surfaces as "cần bù thủ công" on its card — never a silent loss.
+      if (result) setFundNote(fundOutcomeNote(result));
     } finally {
       inFlight.current = false;
     }
@@ -200,32 +191,6 @@ export function TransferCategorizeSection({
         {pickError && <p className="text-xs text-negative">{pickError}</p>}
         {fundNote && <p className="text-xs text-muted">{fundNote}</p>}
 
-        {goalPending && (
-          <div className="rounded-row border border-warning/40 bg-warning-soft/50 p-2.5" role="alertdialog">
-            <p className="text-xs font-semibold text-warning">Cần rút từ hũ Mục tiêu để bù</p>
-            <div className="mt-1.5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => applyCategory(goalPending.categoryId, undefined, true)}
-                className="flex-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white"
-              >
-                Xác nhận rút
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  // Decline = durable "cần bù thủ công" state (C5): the jar stays
-                  // over-budget and re-surfaces on its card until resolved.
-                  setGoalPending(null);
-                  setFundNote("Chưa bù — hũ đang vượt hạn mức, cần bù thủ công.");
-                }}
-                className="flex-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text"
-              >
-                Để sau
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {pickerOpen && (

@@ -21,7 +21,7 @@ export const CATEGORIES_DDL = `CREATE TABLE categories (
 
 export const JARS_DDL = `CREATE TABLE jars (
   id TEXT NOT NULL, cif TEXT NOT NULL, label TEXT NOT NULL, category_ids TEXT NOT NULL,
-  budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL, role TEXT,
+  budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL,
   PRIMARY KEY (cif, id)
 );
 ${CATEGORIES_DDL}`;

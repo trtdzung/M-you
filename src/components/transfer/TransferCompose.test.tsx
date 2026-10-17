@@ -133,28 +133,27 @@ describe("TransferCompose — jar funding verdicts", () => {
   beforeEach(() => {
     h.jarsLoaded = true;
     h.financialsLoaded = true;
-    h.accounts = [casa(6_000_000)]; // = food 1M + goal 5M → pool 0
+    h.accounts = [casa(6_000_000)]; // = food 1M + Du lịch 5M → pool 0
     h.jarConfig = {
       version: 3,
       jars: [
-        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 1_000_000, role: "spending" },
-        { id: "goal", label: "Du lịch", categoryIds: ["travel"], budgetLimit: 5_000_000, role: "goal" },
+        { id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 1_000_000 },
+        { id: "goal", label: "Du lịch", categoryIds: ["travel"], budgetLimit: 5_000_000 },
       ],
     };
   });
   afterEach(() => vi.useRealTimers());
 
-  it("H07/U6: a goal-only shortfall is not 'không đủ số dư' — Continue reaches Confirm", async () => {
+  it("a shortfall another jar can cover opens the top-up popup with that jar as donor", async () => {
     await pickJarSource(/Ăn uống/);
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "3000000" } });
-    expect(await screen.findByText(/Chỉ hũ Mục tiêu còn đủ để bù 2\.000\.000/)).toBeInTheDocument();
+    const continueButton = await screen.findByRole("button", { name: /Tiếp tục/ });
+    await waitFor(() => expect(continueButton).toBeEnabled());
     expect(screen.queryByText("Không đủ số dư để chuyển số tiền này.")).not.toBeInTheDocument();
-    const continueButton = screen.getByRole("button", { name: /Tiếp tục/ });
-    expect(continueButton).toBeEnabled();
     fireEvent.click(continueButton);
-    expect(putDraft).toHaveBeenCalledWith(expect.objectContaining({ amount: 3_000_000, sourceJarId: "food", sourceKind: "jar" }));
-    expect(putDraft.mock.calls[0][0].plannedReallocation).toBeUndefined(); // the goal draw is confirmed on Confirm
-    expect(push).toHaveBeenCalledWith(expect.stringMatching(/^\/transfer-confirm\?draftId=/));
+    const sheet = await screen.findByRole("dialog");
+    expect(within(sheet).getByText(/còn thiếu 2\.000\.000/)).toBeInTheDocument();
+    expect(within(sheet).getByText("Hũ Du lịch")).toBeInTheDocument();
   });
 
   it("still blocks a true shortfall (above CASA) with 'Không đủ số dư'", async () => {
@@ -172,7 +171,11 @@ describe("TransferCompose — jar funding verdicts", () => {
     h.accounts = [casa(5_000_000)]; // the spend left CASA → pool stays 0
     await pickJarSource(/Ăn uống/);
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "500000" } });
-    expect(await screen.findByText(/Chỉ hũ Mục tiêu còn đủ để bù 500\.000/)).toBeInTheDocument();
+    const continueButton = await screen.findByRole("button", { name: /Tiếp tục/ });
+    await waitFor(() => expect(continueButton).toBeEnabled());
+    fireEvent.click(continueButton);
+    // September's drained jar → short by the full 500k (an October view would be `ok`).
+    expect(within(await screen.findByRole("dialog")).getByText(/còn thiếu 500\.000/)).toBeInTheDocument();
   });
 
   it("shows the pool as 'Chưa rõ' (never a fabricated 0) when there is no CASA account", async () => {

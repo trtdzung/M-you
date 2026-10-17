@@ -90,18 +90,18 @@ describe("JarConfigProvider — ordering (U13/K04, K03)", () => {
       const d = delays[n++] ?? 0;
       return sleep(d).then(() => real(url, init));
     });
-    const roles = ["goal", "essential", "spending", "buffer"] as const;
+    const labels = ["A", "B", "C", "D"] as const;
     let done: Promise<boolean[]> = Promise.resolve([]);
     act(() => {
-      done = Promise.all(roles.map((role) => hook.result.current.jars.updateJar("food", { role })));
+      done = Promise.all(labels.map((label) => hook.result.current.jars.updateJar("food", { label })));
     });
     await act(async () => {
       expect(await done).toEqual([true, true, true, true]);
     });
-    expect(jarById(hook, "food")?.role).toBe("buffer");
+    expect(jarById(hook, "food")?.label).toBe("D");
     // The server (store) agrees with the UI — writes reached it in click order.
     const stored = await (await fetch("/api/jars?cif=CIF_0001")).json();
-    expect(stored.jars.find((j: { id: string }) => j.id === "food").role).toBe("buffer");
+    expect(stored.jars.find((j: { id: string }) => j.id === "food").label).toBe("D");
   });
 
   it("drops a mutation response that belongs to the previous persona", async () => {
@@ -175,19 +175,19 @@ describe("JarConfigProvider — mutation errors (U20/S14/K02)", () => {
     interceptFetch((url, init) => (fail && isPatch(url, init) ? Promise.resolve(json({ error: "db down" }, 500)) : null));
     let ok = true;
     await act(async () => {
-      ok = await hook.result.current.jars.updateJar("food", { role: "goal" });
+      ok = await hook.result.current.jars.updateJar("food", { label: "Ăn ngoài" });
     });
     expect(ok).toBe(false);
     expect(hook.result.current.jars.mutationError).toMatch(/Không lưu được/);
-    expect(jarById(hook, "food")?.role).toBe("spending");
+    expect(jarById(hook, "food")?.label).toBe("Ăn uống");
 
     fail = false;
     await act(async () => {
-      ok = await hook.result.current.jars.updateJar("food", { role: "goal" });
+      ok = await hook.result.current.jars.updateJar("food", { label: "Ăn ngoài" });
     });
     expect(ok).toBe(true);
     expect(hook.result.current.jars.mutationError).toBeNull();
-    expect(jarById(hook, "food")?.role).toBe("goal");
+    expect(jarById(hook, "food")?.label).toBe("Ăn ngoài");
   });
 
   it("shows the server's over-cap reason with its overBy amount", async () => {
