@@ -38,41 +38,46 @@ function open(pool: number | "unknown" = 18_000_000) {
   render(<AllocationSheet envelope={envelope(pool)} jars={config.jars} onClose={onClose} />);
 }
 
-describe("AllocationSheet — số tổng mới (đặt hạn mức)", () => {
-  it("prefills each jar input with its current budgetLimit and shows 'hạn mức hiện tại'", () => {
+describe("AllocationSheet — chia lại toàn bộ số dư", () => {
+  it("mở sheet: mọi ô về 0 và 'Còn lại để chia' là TOÀN BỘ số dư, không còn phần dư lẻ", () => {
+    open(18_000_000);
+    // 0 hiển thị là ô trống với placeholder "0" (không phải "8000000" như prefill cũ).
+    for (const label of ["Hạn mức mới cho hũ Ăn uống", "Hạn mức mới cho hũ Hóa đơn"]) {
+      const input = screen.getByLabelText(label) as HTMLInputElement;
+      expect(input.value).toBe("");
+      expect(input.placeholder).toBe("0");
+    }
+    // 18 tr, KHÔNG phải 5 tr (18 − 13) như kiểu prefill cũ.
+    expect(within(screen.getByText("Còn lại để chia").parentElement!).getByText("18 tr")).toBeInTheDocument();
+  });
+
+  it("hạn mức cũ vẫn hiện bên cạnh làm tham chiếu", () => {
     open();
-    expect((screen.getByLabelText("Hạn mức mới cho hũ Ăn uống") as HTMLInputElement).value).toBe("8000000");
-    expect((screen.getByLabelText("Hạn mức mới cho hũ Hóa đơn") as HTMLInputElement).value).toBe("5000000");
     expect(screen.getAllByText(/hạn mức hiện tại/).length).toBeGreaterThan(0);
   });
 
-  it("editing ONE jar only patches that jar — it never wipes the others (red-team C1)", () => {
+  it("chia cho một hũ: hũ đó được đặt, hũ từng có hạn mức mà bỏ trống thì về chưa đặt", () => {
     open();
     fireEvent.change(screen.getByLabelText("Hạn mức mới cho hũ Ăn uống"), { target: { value: "9000000" } });
     fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
     expect(updateJars).toHaveBeenCalledTimes(1);
-    expect(updateJars).toHaveBeenCalledWith({ food: { budgetLimit: 9_000_000 } });
+    // `savings` chưa từng có hạn mức và vẫn 0 → không gửi patch thừa.
+    expect(updateJars).toHaveBeenCalledWith({ food: { budgetLimit: 9_000_000 }, bills: { budgetLimit: undefined } });
   });
 
-  it("clearing a jar's input (0) clears its budgetLimit back to chưa đặt (undefined, not 0)", () => {
+  it("KHÔNG cho lưu khi chưa chia gì — mở rồi bấm Lưu không được phép xoá sạch hạn mức", () => {
     open();
-    fireEvent.change(screen.getByLabelText("Hạn mức mới cho hũ Hóa đơn"), { target: { value: "" } });
+    expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Lưu hạn mức" }));
-    expect(updateJars).toHaveBeenCalledWith({ bills: { budgetLimit: undefined } });
+    expect(updateJars).not.toHaveBeenCalled();
   });
 
   it("blocks submit when Σ hạn mức exceeds CASA (guardrail) and shows the over message", () => {
     open(18_000_000);
-    // food 8tr → 20tr ⇒ Σ = 25tr > 18tr
     fireEvent.change(screen.getByLabelText("Hạn mức mới cho hũ Ăn uống"), { target: { value: "20000000" } });
     expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
     expect(screen.getByText(/vượt quá số dư/i)).toBeInTheDocument();
     expect(updateJars).not.toHaveBeenCalled();
-  });
-
-  it("disables submit when nothing changed", () => {
-    open();
-    expect(screen.getByRole("button", { name: "Lưu hạn mức" })).toBeDisabled();
   });
 
   it("shows insufficient-data when the CASA pool is unknown", () => {

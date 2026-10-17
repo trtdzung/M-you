@@ -2,9 +2,11 @@ import { formatVndCompact } from "@/lib/format";
 
 /**
  * One jar's row inside the "Chia ngay" sheet: colour dot + label + its CURRENT
- * hạn mức, and a VND input for the jar's NEW total limit (prefilled with the
- * current one — this is a "số tổng mới" editor, not a top-up). Presentation + a
- * controlled input only; the cap/guardrail logic lives in `AllocationSheet`.
+ * hạn mức as reference text, and a VND input for the jar's NEW total limit. The
+ * sheet divides the whole balance again, so the input OPENS EMPTY (0 renders as
+ * a blank with a "0" placeholder) rather than prefilled with the current limit.
+ * Presentation + a controlled input only; the cap/guardrail logic lives in
+ * `AllocationSheet`.
  */
 export function AllocationJarRow({
   label,
