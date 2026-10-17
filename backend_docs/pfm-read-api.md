@@ -58,7 +58,6 @@ tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng
       "id": "food",
       "label": "Ăn uống",
       "categoryIds": ["dining", "groceries"],
-      "role": "spending",
       "budgetLimit": 4000000,
       "spent": 2187000,
       "remaining": 1813000,
@@ -69,14 +68,13 @@ tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng
       "id": "essentials",
       "label": "Thiết yếu",
       "categoryIds": ["housing", "utilities", "insurance", "subscriptions"],
-      "role": "essential",
       "budgetLimit": 8000000,
       "spent": 7949000,
       "remaining": 51000,
       "spendable": 51000,
       "overLimit": false
     },
-    { "id": "savings", "label": "Tiết kiệm", "categoryIds": [], "role": "buffer", "budgetLimit": null, "spent": 0, "remaining": null, "spendable": null, "overLimit": false }
+    { "id": "savings", "label": "Tiết kiệm", "categoryIds": [], "budgetLimit": null, "spent": 0, "remaining": null, "spendable": null, "overLimit": false }
   ]
 }
 ```
@@ -88,7 +86,6 @@ tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng
 | `id` | string | id hũ — Agent trả lại đúng id này trong `edit_jar` / `rebalance_jars` |
 | `label` | string | tên hiển thị |
 | `categoryIds` | string[] | category chi tiêu thuộc hũ (**1 category chỉ thuộc đúng 1 hũ**) |
-| `role` | `"buffer"` \| `"spending"` \| `"essential"` \| `"goal"`, có thể vắng mặt | vai trò khi hũ cho tiền (xem B4); vắng mặt = coi như `spending` |
 | `budgetLimit` | number \| `null` | **hạn mức đã set** (VND/tháng). `null` = chưa đặt — không phải `0` |
 | `spent` | number | đã chi trong `month` (chi tiêu ròng, đã trừ hoàn tiền) |
 | `remaining` | number \| `null` | **số dư hiện tại** (trục SỐ DƯ) = `budgetLimit − spent + (đã nhận − đã cho từ bù giữa hũ trong tháng)`. Có thể **âm** = hũ đã tiêu quá số dư và chưa được bù ("cần bù"). `null` nếu chưa đặt hạn mức. **Giao diện `pfm` không bao giờ hiện số dư âm** — hiện 0 (xem "Cách nói với khách") |
@@ -125,7 +122,7 @@ Các số tiền `null` nghĩa là **chưa biết** — đừng coi là 0. `500`
 
 | Endpoint | Dùng để |
 |---|---|
-| `GET /api/jars?cif=` | cấu hình hũ thô (`id`, `label`, `categoryIds`, `budgetLimit`, `role`) — `jar-summary` đã bao gồm |
+| `GET /api/jars?cif=` | cấu hình hũ thô (`id`, `label`, `categoryIds`, `budgetLimit`) — `jar-summary` đã bao gồm |
 | `GET /api/beneficiaries?cif=` | danh sách người nhận đã lưu — cần cho `transfer_form` (B1) |
 | `GET /api/accounts?cif=` | tài khoản; CASA = Σ `availableBalance` của `type: "current"` |
 | `GET /api/transactions?cif=&from=&to=` | giao dịch ngân hàng (chỉ đọc) |
@@ -190,7 +187,7 @@ vì tiền "Chưa phân bổ" có thể đã được dùng hết).
 - `jar_id` khách nhắc không có trong `jar-summary` → hỏi lại khách hũ nào;
 - tên hũ mới trùng `label` một hũ đang có (`create_jar`);
 - `allocationHeadroom` không đủ cho `create_jar`, hoặc không tăng được hạn mức;
-- các nguồn cộng lại vẫn không đủ để bù, hoặc chỉ hũ `goal` mới đủ (B4).
+- các nguồn cộng lại vẫn không đủ để bù (B4).
 
 **Nội dung `answer` đi kèm `ui`:** 1–3 câu, nêu con số chính lấy từ `jar-summary` (vd
 "hạn mức 4.000.000đ → 4.500.000đ", "hũ Ăn uống thiếu 1.500.000đ, lấy từ …"; không nói "số dư âm", xem "Cách nói với khách") và nhắc khách
@@ -307,15 +304,12 @@ với `transfer_form` (B1).
 3. Mỗi hũ cho chỉ cho tối đa **`spendable`** của nó (không đẩy hũ cho xuống âm). Hũ có
    `spendable: null` (chưa đặt hạn mức) **không được cho**.
 4. Nguồn `"pool"` chỉ cho tối đa `max(0, unallocated)`. (Chú ý: khác `allocationHeadroom`.)
-5. **Hũ `role: "goal"` không được có trong `moves`** (được bảo vệ). Nếu chỉ hũ `goal`
-   mới đủ bù, Agent nói trong `answer` để khách tự quyết, **không** đưa vào `ui`.
 
 **Thứ tự ưu tiên nên theo** (cùng thứ tự engine `pfm` dùng; là gợi ý, không phải quy
-tắc cứng): `pool` → hũ `buffer` (dự phòng/tiết kiệm) → hũ `spending` (vắng `role` =
-`spending`) → hũ `essential` (thiết yếu, cuối cùng). Trong cùng nhóm, hũ có
-`spendable` lớn nhất lấy trước. Mỗi nguồn lấy `min(spendable, phần còn thiếu)` rồi
-dừng khi đủ. Tổng mọi nguồn (trừ `goal`) vẫn không đủ → **không trả `ui`**, nói rõ
-trong `answer` là không đủ.
+tắc cứng): `pool` trước, sau đó các hũ còn lại theo `spendable` giảm dần (hũ nhiều
+tiền nhất lấy trước). Không có hũ nào được bảo vệ — hũ không có vai trò. Mỗi nguồn lấy
+`min(spendable, phần còn thiếu)` rồi dừng khi đủ. Tổng mọi nguồn vẫn không đủ →
+**không trả `ui`**, nói rõ trong `answer` là không đủ.
 
 **Khi khách xác nhận**, `pfm` (không phải Agent) ghi mỗi `moves[]` một bản ghi bù giữa
 hũ; số dư hai hũ tự cập nhật, còn `spent` và `budgetLimit` không đổi. Hiệu lực trong
@@ -326,7 +320,7 @@ tháng hiện tại — sang tháng sau `remaining` tính lại từ `budgetLimi
 "Chưa phân bổ" một mình đủ bù 1.500.000 và `moves` chỉ có 1 phần tử `pool`). Ăn uống
 `remaining` 1.813.000. Khách định chi 3.313.000 từ hũ này → `shortfall` = 3.313.000 −
 1.813.000 = 1.500.000. Lấy 1.000.000 từ "Chưa phân bổ" (giả định), phần còn lại 500.000 từ
-Hưởng thụ (`spendable` 1.296.000, hũ `spending` lớn nhất) → `moves` như JSON trên. Sau khi
+Hưởng thụ (`spendable` 1.296.000) → `moves` như JSON trên. Sau khi
 áp dụng và chi: Ăn uống `remaining` = 4.000.000 − (2.187.000 + 3.313.000) + 1.500.000 = 0
 (hết tiền nhưng **không âm**), còn `overLimit` vẫn `true` vì `spent` 5.500.000 > hạn mức
 4.000.000 — bù giữa hũ không xoá việc khách đã chi vượt kế hoạch.

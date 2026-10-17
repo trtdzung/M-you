@@ -54,15 +54,14 @@ export async function GET(req: NextRequest) {
       products: [],
     };
     const fin = computeFinancials(raw, month, { transactions, jarConfig });
-    const roleById = new Map(jarConfig.jars.map((j) => [j.id, j]));
+    const jarById = new Map(jarConfig.jars.map((j) => [j.id, j]));
 
     const jars = fin.jarEnvelope.jars.map((line) => {
-      const jar = roleById.get(line.jarId);
+      const jar = jarById.get(line.jarId);
       return {
         id: line.jarId,
         label: line.label,
         categoryIds: jar?.categoryIds ?? [],
-        ...(jar?.role ? { role: jar.role } : {}),
         budgetLimit: line.budgetLimit,
         spent: line.spent,
         remaining: line.remaining,
