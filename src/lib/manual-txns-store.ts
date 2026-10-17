@@ -82,7 +82,6 @@ export function upsertManualTxn(cif: string, txn: Transaction): void {
 export type ManualTxnPatch = {
   categoryId?: string;
   type?: Transaction["type"];
-  transferPurpose?: string | null;
   note?: string | null;
   /** Inter-jar rebalance meta (Phase 03). `null` over the wire ⇒ CLEAR the field. */
   rebalance?: Transaction["rebalance"] | null;
@@ -101,14 +100,11 @@ export function patchManualTxn(cif: string, id: string, patch: ManualTxnPatch): 
     if (!row) return null;
     const current = toTransaction(row);
     if (!current) return null;
-    // Controlled merge over the whitelist only: `null` CLEARS an optional field
-    // (parity with the client, where a plain category pick clears a stale
-    // transferPurpose); `undefined`/absent leaves it unchanged.
+    // Controlled merge over the whitelist only: `null` CLEARS an optional field;
+    // `undefined`/absent leaves it unchanged.
     const next: Transaction = { ...current, userEdited: true };
     if (patch.categoryId !== undefined) next.categoryId = patch.categoryId;
     if (patch.type !== undefined) next.type = patch.type;
-    if (patch.transferPurpose === null) delete next.transferPurpose;
-    else if (patch.transferPurpose !== undefined) next.transferPurpose = patch.transferPurpose;
     if (patch.note === null) delete next.note;
     else if (patch.note !== undefined) next.note = patch.note;
     if (patch.rebalance === null) delete next.rebalance;

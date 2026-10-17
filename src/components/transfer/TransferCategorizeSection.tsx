@@ -4,37 +4,30 @@ import { useMemo, useRef, useState } from "react";
 import { ChevronRight, Tag } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { CategoryOptionGrid } from "@/components/transactions/CategoryPickerSheet";
-import { TransferPurposeSuggestionBanner } from "./TransferPurposeSuggestionBanner";
+import { TransferCategorySuggestionBanner } from "./TransferCategorySuggestionBanner";
 import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { useManualTxns } from "@/state/manual-txns";
 import { useAutoFund } from "@/state/use-auto-fund";
-import { useTransferPurposeSuggestion } from "@/state/use-transfer-purpose-suggestion";
+import { useTransferCategorySuggestion } from "@/state/use-transfer-category-suggestion";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { fundOutcomeNote } from "./fund-outcome-note";
-import {
-  CATEGORY,
-  categoryLabel,
-  TRANSFER_PURPOSES,
-  isSpendingPurpose,
-  purposeCategoryId,
-  transferPurposeLabel,
-} from "@/domain/models";
+import { CATEGORY, categoryLabel } from "@/domain/models";
 
 /**
  * Optional "Phân loại giao dịch" section on the transfer success card. It edits
  * the category of the ONE self-reported (primary) txn recorded on confirm (never
- * money movement — invariant #3). No jar bookkeeping is needed here any more: a
- * jar's spendable is DERIVED from txn history (invariant #1), so changing the
- * txn's category alone re-routes `spent`/`remaining` between jars via
+ * money movement — invariant #3). No jar bookkeeping is needed here: a jar's
+ * spendable is DERIVED from txn history (invariant #1), so changing the txn's
+ * category alone re-routes `spent`/`remaining` between jars via
  * `evaluateJarBudget`'s category→jar map — no double count, nothing to refund.
  *
- * Transfer PURPOSE layer (separate taxonomy): while the transfer is still
- * unclassified, AI *suggests* a purpose (pending — invariant #6). Accepting a
- * `spending` purpose reclassifies into its mapped expense category (flipping the
- * txn to expense, via the same path as a manual pick); a non-spending purpose
- * stays `type:"transfer"` and only records `transferPurpose` metadata. Nothing
- * here mutates the record until the USER taps a choice.
+ * AI category layer: while the transfer is still unclassified, the AI (or the
+ * local heuristic) *suggests* one of the persona's spending categories — pending
+ * (invariant #6). A transfer is not automatically a spend, so accepting is the
+ * user's explicit "this transfer was really a purchase": it flips the txn
+ * transfer→expense (via the same path as a manual pick) and routes the spend to
+ * the owning jar. Nothing here mutates the record until the USER taps a choice.
  *
  * `sourceJarId` is the jar this transfer sourced from (null for an
  * account/pool-sourced transfer) — it constrains the category picker to that
@@ -51,13 +44,12 @@ export function TransferCategorizeSection({
 }) {
   const { config: jarConfig } = useJarConfig();
   // Taxonomy của persona: `byId` để hiện nhãn + suy ra `type`, `assignable` để
-  // chặn gán vào danh mục đã ẩn.
+  // chặn gán vào danh mục đã ẩn và để validate gợi ý của model.
   const { byId: categoryById, labels, assignable } = useCategories();
   const assignableIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const { manualTxns, update: updateManualTxn } = useManualTxns();
   const autoFund = useAutoFund();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [purposeOpen, setPurposeOpen] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
   // Auto-fund feedback for Case 2 (categorize-later routes the spend into a jar).
   const [fundNote, setFundNote] = useState<string | null>(null);
@@ -68,49 +60,39 @@ export function TransferCategorizeSection({
   // default (avoids drift with the real txn, Red Team F#7).
   const currentTxn = manualTxns.find((t) => t.id === txnId);
   const currentCategoryId = currentTxn?.categoryId ?? CATEGORY.transfer;
-  const currentPurposeId = currentTxn?.transferPurpose;
-  const isUnclassified = currentCategoryId === CATEGORY.transfer && !currentPurposeId;
-  // Prefer the purpose label for a non-spending purpose (categoryId stays
-  // transfer); otherwise show the category label.
-  const currentLabel =
-    currentPurposeId && currentCategoryId === CATEGORY.transfer
-      ? transferPurposeLabel(currentPurposeId)
-      : currentCategoryId === CATEGORY.transfer
-        ? "Chưa phân loại"
-        : // Một id không có trong taxonomy hiện hành hiện ra dạng thô chứ không
-          // bị gọi là "Chưa phân loại" — giao dịch ĐÃ có nhãn (invariant #5).
-          categoryLabel(currentCategoryId, labels);
+  const isUnclassified = currentCategoryId === CATEGORY.transfer;
+  // A still-transfer txn reads "Chưa phân loại"; any real category (incl. one no
+  // longer in the active taxonomy) renders its label — the txn IS labelled,
+  // never mislabelled "Chưa phân loại" (invariant #5).
+  const currentLabel = isUnclassified ? "Chưa phân loại" : categoryLabel(currentCategoryId, labels);
   const sourceJar = sourceJarId ? jarConfig.jars.find((j) => j.id === sourceJarId) ?? null : null;
 
-  // Pending AI/heuristic purpose guess, shown only while unclassified.
-  const { suggestion } = useTransferPurposeSuggestion({
+  // Pending AI/heuristic category guess, shown only while unclassified.
+  const { suggestion } = useTransferCategorySuggestion({
     txnId,
     recipientName: currentTxn?.merchantName ?? "",
     note: currentTxn?.note,
     amount,
+    assignableIds,
     enabled: Boolean(currentTxn) && isUnclassified,
   });
 
   /**
-   * Set category (+ optional purpose). The category change alone re-routes this
-   * txn's spend between jars (derived model, invariant #1) — no jar bookkeeping.
+   * Set the category. The change alone re-routes this txn's spend between jars
+   * (derived model, invariant #1) — no jar bookkeeping.
    */
-  function applyCategory(categoryId: string, purposeId?: string) {
+  function applyCategory(categoryId: string) {
     if (inFlight.current) return; // H1 latch — one label, one rebalance
     inFlight.current = true;
     try {
       const nextType = typeForCategory(categoryId, categoryById);
-      // Always send transferPurpose so a plain category pick (purposeId omitted)
-      // CLEARS a previously-accepted purpose — otherwise stale metadata lingers,
-      // the label stays wrong, and the txn never looks unclassified again.
-      const ok = updateManualTxn(txnId, { categoryId, type: nextType, transferPurpose: purposeId });
+      const ok = updateManualTxn(txnId, { categoryId, type: nextType });
       if (!ok) {
         setPickError("Không cập nhật được phân loại. Vui lòng thử lại.");
         return;
       }
       setPickError(null);
       setPickerOpen(false);
-      setPurposeOpen(false);
       setFundNote(null);
 
       // Case 2 (tiêu trước, phân loại sau): the new category may route this spend
@@ -134,29 +116,6 @@ export function TransferCategorizeSection({
     }
   }
 
-  function handlePick(categoryId: string) {
-    applyCategory(categoryId);
-  }
-
-  /**
-   * Apply a user-chosen PURPOSE. A spending purpose reclassifies into its mapped
-   * expense category (counts + jar sync); a non-spending one stays a transfer and
-   * only records metadata (invariant #6 — no number moves without this consent).
-   */
-  function applyPurpose(purposeId: string) {
-    const spending = isSpendingPurpose(purposeId);
-    // Mục đích "tính vào chi tiêu" nhưng danh mục đích đã bị ẩn ⇒ KHÔNG gán id
-    // ẩn đó (người dùng sẽ không thấy, không sửa được). Giữ nguyên transfer + ghi
-    // metadata mục đích: không có con số nào bị dịch chuyển lén (invariant #6).
-    const mapped = spending ? purposeCategoryId(purposeId, assignableIds) : undefined;
-    if (spending && !mapped && purposeCategoryId(purposeId) === undefined) {
-      // Dữ liệu hỏng thật: purpose spending mà không khai `mapsToCategoryId`.
-      setPickError("Không cập nhật được phân loại. Vui lòng thử lại.");
-      return;
-    }
-    applyCategory(mapped ?? CATEGORY.transfer, purposeId);
-  }
-
   return (
     <>
       <div className="flex flex-col gap-2 border-t border-border px-5 py-4">
@@ -166,12 +125,13 @@ export function TransferCategorizeSection({
         </div>
 
         {suggestion && (
-          <TransferPurposeSuggestionBanner
+          <TransferCategorySuggestionBanner
             suggestion={suggestion}
-            onAccept={() => applyPurpose(suggestion.purposeId)}
+            label={categoryLabel(suggestion.categoryId, labels)}
+            onAccept={() => applyCategory(suggestion.categoryId)}
             onChooseOther={() => {
               setPickError(null);
-              setPurposeOpen(true);
+              setPickerOpen(true);
             }}
           />
         )}
@@ -190,44 +150,20 @@ export function TransferCategorizeSection({
         </button>
         {pickError && <p className="text-xs text-negative">{pickError}</p>}
         {fundNote && <p className="text-xs text-muted">{fundNote}</p>}
-
       </div>
 
       {pickerOpen && (
         <Sheet title="Phân loại giao dịch" description="Tự khai báo" onClose={() => setPickerOpen(false)}>
           {sourceJar ? (
-            <CategoryOptionGrid selectedId={currentCategoryId} allowedCategoryIds={sourceJar.categoryIds} onSelect={handlePick} />
+            <CategoryOptionGrid selectedId={currentCategoryId} allowedCategoryIds={sourceJar.categoryIds} onSelect={applyCategory} />
           ) : (
             <CategoryOptionGrid
               selectedId={currentCategoryId}
               kind="expense"
               uncategorizedOption={{ id: CATEGORY.transfer, label: "Không phân loại" }}
-              onSelect={handlePick}
+              onSelect={applyCategory}
             />
           )}
-        </Sheet>
-      )}
-
-      {purposeOpen && (
-        <Sheet title="Mục đích chuyển tiền" description="Tự khai báo" onClose={() => setPurposeOpen(false)}>
-          <div className="flex flex-col gap-1.5 px-1 pb-2">
-            {TRANSFER_PURPOSES.map((p) => {
-              const selected = p.id === currentPurposeId;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => applyPurpose(p.id)}
-                  className={`flex min-h-11 items-center gap-2 rounded-row border px-3 py-2 text-left text-sm transition-colors ${
-                    selected ? "border-brand bg-brand/5 text-text" : "border-border bg-surface text-text hover:bg-surface-muted"
-                  }`}
-                >
-                  <span className="flex-1">{p.label}</span>
-                  {p.spending && <span className="text-[11px] text-muted">tính vào chi tiêu</span>}
-                </button>
-              );
-            })}
-          </div>
         </Sheet>
       )}
     </>

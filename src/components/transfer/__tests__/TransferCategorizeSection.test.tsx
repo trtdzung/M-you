@@ -4,29 +4,28 @@ import type { ReactElement } from "react";
 import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 
 /**
- * `TransferCategorizeSection` — the transfer-purpose suggestion + accept flow
+ * `TransferCategorizeSection` — the transfer CATEGORY suggestion + accept flow
  * (invariant #6-safe): a heuristic/AI suggestion is ALWAYS pending and must
  * NEVER by itself mutate the record; only the user tapping a choice does
- * ("Đồng ý" on the banner or a manual pick in the sheet). Accepting a
- * `spending` purpose flips the txn transfer→expense (the category change alone
- * re-routes spend to the owning jar — derived model, no separate bookkeeping);
- * a non-spending purpose stays `type:"transfer"` and only records
- * `transferPurpose` metadata (no number moves).
+ * ("Đồng ý" on the banner or a manual pick in the sheet). Accepting flips the
+ * txn transfer→expense (the category change alone re-routes spend to the owning
+ * jar — derived model, no separate bookkeeping); a transfer left untouched stays
+ * `type:"transfer"` and is excluded from spend.
  *
  * Mirrors the mocking pattern in `TransferConfirm.test.tsx`: `@/state/jars`
  * and `@/state/manual-txns` are mocked with an in-memory store so the test
  * is deterministic and never touches the real `/api/jars` network boundary.
- * `useTransferPurposeSuggestion` and its `localPurposeClassify` heuristic run
- * for REAL (no "ai" consent granted ⇒ no network, per `src/lib/consent.ts`
- * defaulting to no scopes) — this is the actual production classify path,
- * not a stub of the hook under test.
+ * `useTransferCategorySuggestion` and its local heuristic run for REAL (no "ai"
+ * consent granted ⇒ no network, per `src/lib/consent.ts` defaulting to no
+ * scopes) — this is the actual production classify path, not a stub of the hook.
+ * A recipient name matching a merchant keyword (e.g. "Shopee", "Winmart") gives
+ * the heuristic a deterministic hit; an ordinary personal name matches nothing.
  */
 
 interface MockTxn {
   id: string;
   categoryId: string;
   type: string;
-  transferPurpose?: string;
   merchantName: string;
   note?: string;
 }
@@ -137,77 +136,62 @@ beforeEach(() => {
   h.reconcile.mockImplementation(() => ({ status: "covered" as const, donors: [], targetLabel: "hũ" }));
 });
 
-describe("TransferCategorizeSection — pending suggestion never mutates on its own", () => {
+describe("TransferCategorizeSection — pending category suggestion never mutates on its own", () => {
   it("a matched heuristic suggestion renders pending and does NOT call update until the user acts", async () => {
-    h.store = [seedTxn({ note: "tra no thang 9" })]; // heuristic → "debt" (non-spending)
+    h.store = [seedTxn({ merchantName: "Shopee" })]; // heuristic → "shopping" (Mua sắm)
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
-    await screen.findByText("Trả nợ / cho vay");
+    await screen.findByText("Mua sắm");
     expect(screen.getByText(/Đề xuất tự động/)).toBeInTheDocument(); // heuristic, never "AI đề xuất" (no ai consent)
 
     // Suggestion is purely visual — the record itself is untouched.
     expect(h.update).not.toHaveBeenCalled();
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
-    expect(h.store[0].transferPurpose).toBeUndefined();
   });
 
-  it("no suggestion is shown for an unmatched memo (no fabrication)", async () => {
-    h.store = [seedTxn({ note: "chuyen tien" })];
+  it("no suggestion is shown for an unmatched recipient name (no fabrication)", async () => {
+    h.store = [seedTxn({ merchantName: "Nguyen Van A" })];
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
     // Give the async hook a tick to resolve.
     await screen.findByText("Chưa phân loại");
-    expect(screen.queryByText(/Gợi ý mục đích/)).toBeNull();
+    expect(screen.queryByText(/Gợi ý danh mục/)).toBeNull();
     expect(h.update).not.toHaveBeenCalled();
   });
 
-  it("accepting a NON-spending purpose ('Đồng ý') records metadata only — type stays transfer, no jar touched", async () => {
-    h.store = [seedTxn({ note: "tra no thang 9" })];
+  it("accepting a suggestion ('Đồng ý') flips type→expense (the category move re-routes spend)", async () => {
+    h.store = [seedTxn({ merchantName: "Winmart" })]; // heuristic → "groceries" (Nhu yếu phẩm)
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
-    await screen.findByText("Trả nợ / cho vay");
-    fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
-
-    expect(h.update).toHaveBeenCalledTimes(1);
-    expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "transfer", type: "transfer", transferPurpose: "debt" });
-  });
-
-  it("accepting a SPENDING purpose ('Đồng ý') flips type→expense (the category move re-routes spend)", async () => {
-    h.store = [seedTxn({ note: "tien nha" })]; // heuristic → "rent" (spending, maps to "housing")
-    render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
-
-    await screen.findByText("Tiền nhà");
-    expect(screen.getByText(/tính vào chi tiêu/)).toBeInTheDocument(); // spending purposes are labelled as such
+    await screen.findByText("Nhu yếu phẩm");
     fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
 
     // The category change alone re-routes the spend to the owning jar (derived
     // model) — no separate jar bookkeeping call.
-    expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "housing", type: "expense", transferPurpose: "rent" });
+    expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "groceries", type: "expense" });
     expect(h.update).toHaveBeenCalledTimes(1);
   });
 
-  it("'Chọn khác' opens the full purpose picker without mutating, and a manual pick applies the SAME rule", async () => {
-    h.store = [seedTxn({ note: "tra no thang 9" })];
+  it("'Chọn khác' opens the full category picker without mutating, and a manual pick applies", async () => {
+    h.store = [seedTxn({ merchantName: "Shopee" })]; // heuristic → "shopping"
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
-    await screen.findByText("Trả nợ / cho vay");
+    await screen.findByText("Mua sắm");
     fireEvent.click(screen.getByRole("button", { name: "Chọn khác" }));
     expect(h.update).not.toHaveBeenCalled(); // opening the picker is not itself a choice
 
     const dialog = await screen.findByRole("dialog");
-    // Every purpose in the taxonomy is offered, not just the suggested one.
-    expect(within(dialog).getByRole("button", { name: /Tiết kiệm \/ đầu tư/ })).toBeInTheDocument();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: /Kinh doanh/ }));
-    expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "transfer", type: "transfer", transferPurpose: "business" });
+    // The full expense taxonomy is offered, not just the suggested one.
+    fireEvent.click(within(dialog).getByRole("button", { name: /Giải trí/ }));
+    expect(h.update).toHaveBeenCalledWith("t1", { categoryId: "entertainment", type: "expense" });
   });
 
   it("a failed update surfaces an error and never optimistically charges the jar", async () => {
     h.update.mockReturnValue(false);
-    h.store = [seedTxn({ note: "tien nha" })];
+    h.store = [seedTxn({ merchantName: "Winmart" })];
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
-    await screen.findByText("Tiền nhà");
+    await screen.findByText("Nhu yếu phẩm");
     fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
 
     expect(screen.getByText(/Không cập nhật được phân loại/)).toBeInTheDocument();
@@ -215,29 +199,27 @@ describe("TransferCategorizeSection — pending suggestion never mutates on its 
   });
 
   it("no suggestion is offered once the txn is already classified (isUnclassified=false)", async () => {
-    h.store = [seedTxn({ categoryId: "dining", type: "expense", note: "tra no thang 9" })];
+    h.store = [seedTxn({ categoryId: "dining", type: "expense", merchantName: "Shopee" })];
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
     await screen.findByText("Ăn uống");
-    expect(screen.queryByText(/Gợi ý mục đích/)).toBeNull();
+    expect(screen.queryByText(/Gợi ý danh mục/)).toBeNull();
   });
 
-  // Regression (code-review #2): a plain category pick must CLEAR a previously
-  // accepted purpose, so the record looks unclassified again and can re-suggest.
-  it("reverting to 'Không phân loại' after accepting a purpose clears the stale purpose", async () => {
-    h.store = [seedTxn({ note: "tien nha" })]; // rent → housing (spending)
+  // A plain "Không phân loại" pick reverts a categorised transfer back to a plain
+  // transfer (excluded from spend), so the record looks unclassified again.
+  it("reverting to 'Không phân loại' after categorising clears the category back to transfer", async () => {
+    h.store = [seedTxn({ merchantName: "Winmart" })]; // heuristic → groceries
     render(<TransferCategorizeSection txnId="t1" sourceJarId={null} amount={AMOUNT} />);
 
-    await screen.findByText("Tiền nhà");
+    await screen.findByText("Nhu yếu phẩm");
     fireEvent.click(screen.getByRole("button", { name: "Đồng ý" }));
-    expect(h.store[0]).toMatchObject({ categoryId: "housing", type: "expense", transferPurpose: "rent" });
+    expect(h.store[0]).toMatchObject({ categoryId: "groceries", type: "expense" });
 
     // Open the plain picker (button now shows the mapped category label) and revert.
-    fireEvent.click(screen.getByRole("button", { name: "Nhà ở" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nhu yếu phẩm" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Không phân loại" }));
 
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
-    expect(h.store[0].transferPurpose).toBeUndefined(); // stale purpose cleared, not lingering
   });
-
 });

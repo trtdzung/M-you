@@ -68,8 +68,6 @@ function sanitizePatch(raw: Record<string, unknown>): ManualTxnPatch {
   const patch: ManualTxnPatch = {};
   if (typeof raw.categoryId === "string") patch.categoryId = raw.categoryId;
   if (typeof raw.type === "string") patch.type = raw.type as Transaction["type"];
-  if (raw.transferPurpose === null || typeof raw.transferPurpose === "string")
-    patch.transferPurpose = raw.transferPurpose as string | null;
   if (raw.note === null || typeof raw.note === "string") patch.note = raw.note as string | null;
   if (raw.rebalance === null || isRebalanceMeta(raw.rebalance))
     patch.rebalance = raw.rebalance as Transaction["rebalance"] | null;

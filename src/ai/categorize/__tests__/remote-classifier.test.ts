@@ -15,7 +15,7 @@ describe("createRemoteClassify", () => {
     vi.unstubAllGlobals();
   });
 
-  it("POSTs {user_id, items, mode} to /api/agent/categorize (default mode 'spending')", async () => {
+  it("POSTs {user_id, items} to /api/agent/categorize", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ results: [{ txnId: "a", categoryId: "dining", confidence: 0.9 }] }),
     );
@@ -27,23 +27,7 @@ describe("createRemoteClassify", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/agent/categorize");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({ user_id: "CIF_0001", items: inputs, mode: "spending" });
-  });
-
-  it("forwards mode 'transfer_purpose' when created for the purpose lens", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({ results: [{ txnId: "a", categoryId: "debt", confidence: 0.9 }] }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await createRemoteClassify("CIF_0001", "transfer_purpose")(inputs);
-
-    const [, init] = fetchMock.mock.calls[0];
-    expect(JSON.parse(init.body as string)).toEqual({
-      user_id: "CIF_0001",
-      items: inputs,
-      mode: "transfer_purpose",
-    });
+    expect(JSON.parse(init.body as string)).toEqual({ user_id: "CIF_0001", items: inputs });
   });
 
   it("returns shape-filtered ClassifyResult[] on a 200", async () => {

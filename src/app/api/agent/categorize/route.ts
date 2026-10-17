@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { CATEGORIZE_CHUNK_SIZE } from "@/ai/categorize/config";
 import { getLlmClient } from "@/ai/llm";
 import {
-  TRANSFER_PURPOSE_SYSTEM_PROMPT,
   buildCategorizeSystemPrompt,
   buildUserPrompt,
   parseCategorizeResults,
@@ -51,7 +50,7 @@ function toInput(raw: unknown): ClassifyInput | null {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { user_id?: unknown; items?: unknown; mode?: unknown };
+  let body: { user_id?: unknown; items?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -62,15 +61,13 @@ export async function POST(req: NextRequest) {
   if (!user_id || typeof user_id !== "string") {
     return NextResponse.json({ error: "user_id is required" }, { status: 400 });
   }
-  // "transfer_purpose" classifies transfers into the (fixed, system-owned)
-  // purpose taxonomy; default "spending" maps merchants into THIS persona's
-  // stored expense categories. The catalogue is read here, server-side, from the
-  // cif we already have — the browser never tells the prompt which categories
-  // exist, so it cannot widen the model's option set (invariant #2/#4).
-  const systemPrompt =
-    body.mode === "transfer_purpose"
-      ? TRANSFER_PURPOSE_SYSTEM_PROMPT
-      : buildCategorizeSystemPrompt(readCategories(user_id).filter((c) => c.kind === "expense"));
+  // Maps merchants into THIS persona's stored expense categories. The catalogue
+  // is read here, server-side, from the cif we already have — the browser never
+  // tells the prompt which categories exist, so it cannot widen the model's
+  // option set (invariant #2/#4).
+  const systemPrompt = buildCategorizeSystemPrompt(
+    readCategories(user_id).filter((c) => c.kind === "expense"),
+  );
   if (!Array.isArray(items)) {
     return NextResponse.json({ error: "items must be an array" }, { status: 400 });
   }

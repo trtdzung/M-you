@@ -56,7 +56,7 @@ export interface ManualTxnInput {
  * `status`, which the auto-fund reconciler reacts to — shrinking/growing/removing
  * the linked `dieu-chinh-hu` rebalance rather than blanket-deleting it.
  */
-type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "transferPurpose" | "note" | "rebalance" | "status" | "amount">>;
+type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "note" | "rebalance" | "status" | "amount">>;
 
 interface ManualTxnsContextValue {
   manualTxns: Transaction[];
@@ -168,12 +168,11 @@ async function apiCreate(cif: string, txn: Transaction): Promise<void> {
 }
 
 async function apiPatch(cif: string, id: string, patch: ManualTxnPatch): Promise<void> {
-  // JSON drops `undefined`, so an intended CLEAR (e.g. removing a stale
-  // transferPurpose) is sent as `null`; the store treats null as "clear".
+  // JSON drops `undefined`, so an intended CLEAR (e.g. clearing a note) is sent
+  // as `null`; the store treats null as "clear".
   const wire: Record<string, unknown> = {};
   if ("categoryId" in patch) wire.categoryId = patch.categoryId ?? null;
   if ("type" in patch) wire.type = patch.type ?? null;
-  if ("transferPurpose" in patch) wire.transferPurpose = patch.transferPurpose ?? null;
   if ("note" in patch) wire.note = patch.note ?? null;
   // Rebalance meta is an object; `null` over the wire ⇒ CLEAR (Phase 05 unwind).
   if ("rebalance" in patch) wire.rebalance = patch.rebalance ?? null;

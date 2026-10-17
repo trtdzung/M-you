@@ -23,15 +23,6 @@ export {
 } from "./categories";
 export type { CategoryDef, CategoryKind, StoredCategory } from "./categories";
 
-export {
-  TRANSFER_PURPOSES,
-  isTransferPurpose,
-  isSpendingPurpose,
-  purposeCategoryId,
-  transferPurposeLabel,
-} from "./transfer-purposes";
-export type { TransferPurposeDef } from "./transfer-purposes";
-
 /** Provenance of a record or value. Never present non-`msb` as bank-verified. */
 export type DataSource = "msb" | "self_reported" | "estimated" | "mock";
 
@@ -118,12 +109,6 @@ export interface Transaction {
    * for purpose suggestion, never an instruction. Absent when none was entered.
    */
   note?: string;
-  /**
-   * For a `type:"transfer"` txn: the user's declared PURPOSE (see
-   * `transfer-purposes.ts`), separate from `categoryId`. Pure metadata — the
-   * engine never reads it; it does not affect income/expense. Absent until set.
-   */
-  transferPurpose?: string;
   /**
    * Set ONLY on an inter-jar rebalance txn (`categoryId: REBALANCE_CATEGORY`). See
    * `RebalanceMeta`. The engine reads this to fold `Σ nhận − Σ cho` into each jar's

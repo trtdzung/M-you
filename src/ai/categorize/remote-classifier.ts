@@ -21,14 +21,12 @@ interface RawResult {
   confidence?: unknown;
 }
 
-export type ClassifyMode = "spending" | "transfer_purpose";
-
-export function createRemoteClassify(userId: string, mode: ClassifyMode = "spending"): ClassifyFn {
+export function createRemoteClassify(userId: string): ClassifyFn {
   return async (inputs) => {
     const res = await fetch(PROXY_PATH, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, items: inputs, mode }),
+      body: JSON.stringify({ user_id: userId, items: inputs }),
     });
     if (!res.ok) throw new Error(`categorize proxy ${res.status}`);
     const data = (await res.json()) as { results?: RawResult[] };

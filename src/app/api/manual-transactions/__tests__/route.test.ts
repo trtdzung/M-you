@@ -57,7 +57,6 @@ function txn(over: Partial<Transaction> = {}): Transaction {
     source: "self_reported",
     isRecurring: false,
     userEdited: true,
-    transferPurpose: "family",
     ...over,
   };
 }
@@ -114,13 +113,6 @@ describe("/api/manual-transactions", () => {
     expect(res.status).toBe(200);
     const rows = (await (await list()).json()) as Transaction[];
     expect(rows[0]).toMatchObject({ categoryId: "dining", type: "expense", userEdited: true });
-  });
-
-  it("clears transferPurpose when patched with null", async () => {
-    await post({ cif: CIF, txn: txn() }); // has transferPurpose: family
-    await patch({ cif: CIF, id: "manual-1", patch: { categoryId: "dining", type: "expense", transferPurpose: null } });
-    const rows = (await (await list()).json()) as Transaction[];
-    expect(rows[0].transferPurpose).toBeUndefined();
   });
 
   it("404s when patching an unknown id", async () => {
