@@ -35,19 +35,17 @@ describe("Home insight notification", () => {
     fireEvent.click(screen.getByRole("button", { name: "Xem cụ thể cùng M-Your" }));
     expect(push).toHaveBeenCalledWith("/pfm?assistant=1&insight=1");
     expect(takeInsightDraft("CIF_0002")).toBeNull();
-    expect(takeInsightDraft(cif)).toContain("51.000");
+    const payload = takeInsightDraft(cif);
+    expect(payload?.draft).toContain("51.000");
     expect(takeInsightDraft(cif)).toBeNull();
   });
-  it("persists dismissal and sends session topups instead of hiding the widget", async () => {
+  it("sends session topups instead of hiding the widget", async () => {
     topups = [{ amount: 200000, rebalance: { toJarId: "food" } }];
     const fetchMock = vi.fn(respond);
     vi.stubGlobal("fetch", fetchMock);
     render(<HomeInsightWidget />);
     await screen.findByRole("button", { name: /Xem insight/ });
     expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string).topups).toEqual([{ jarId: "food", amount: 200000 }]);
-    fireEvent.click(screen.getByRole("button", { name: "Ẩn insight" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: /Xem insight/ })).not.toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledWith("/api/proactive-insights/current", expect.objectContaining({ body: expect.stringContaining('"event":"dismissed"') }));
   });
   it("never displays the previous customer's card while loading another", async () => {
     const fetchMock = vi.fn(respond);

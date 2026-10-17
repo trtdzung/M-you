@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "priority_order": ["P0", "P1", "P2", "P3", "P4", "P5"],
+  "rules": [
+    {
+      "insight_type": "known_payment_due_reminder", "description": "Reminder for a known liability minimum payment; does not claim that liquidity is insufficient or that the full statement is due.",
+      "required_features": ["known_obligation_vnd_due_at"],
+      "trigger": "Raw Liability (not predicted recurring) has finite positive minimumPayment and valid YYYY-MM-DD dueDate within 30 Vietnam calendar days from injected asOf; no overdue reminder",
+      "priority_class": "P0", "severity_logic": "urgent when days_until_due<=7, else attention; mirrors existing upcomingObligation urgency",
+      "cooldown": "proposed 24h per liability/dueDate/state; no current persisted cooldown",
+      "suppression": "suppresses P4/P5 while active; unknown amount/date or failed source load produces no candidate",
+      "semantic_signature_fields": ["insight_type", "liability_id", "dueDate", "due_bucket", "liability_label", "source", "severity", "action", "rule_version"],
+      "fingerprint_fields": ["liability_id", "minimumPayment", "dueDate", "days_until_due", "source", "lastUpdatedAt", "rule_version"],
+      "llm_fields": ["liability_label", "minimum_payment", "due_date", "days_until_due", "source", "severity", "allowed_action"],
+      "widget_action": "review_payments", "readiness": "PARTIAL", "blockers": ["Liabilities are fixture/browser data and are not persisted in SQLite for the DB-backed Home MVP."],
+      "evidence_ref": ["src/insights/proactive/core.ts", "src/domain/models/index.ts:201", "src/domain/engine/obligations.ts:39", "src/insights/detectors/upcoming-obligation.ts"]
+    },
+    {
+      "insight_type": "payment_liquidity_shortfall", "description": "Known liability payment due soon exceeds verified available liquidity.",
+      "required_features": ["known_obligation_vnd_due_at", "casa_available_vnd", "obligation_coverage"],
+      "trigger": "PROPOSED: positive known liability minimumPayment due within 7 VN days AND current-account available balance below due amount; recurring predictions do not qualify as contractual obligations",
+      "priority_class": "P0", "severity_logic": "urgent when due within 2 days, otherwise attention; thresholds require product approval",
+      "cooldown": "proposed 24h per obligation unless due bucket/severity changes", "suppression": "suppresses P4/P5; no trigger when any mandatory input is unknown/stale",
+      "semantic_signature_fields": ["insight_type", "liability_id", "due_bucket", "severity", "action", "rule_version"],
+      "fingerprint_fields": ["liability_id", "minimumPayment", "dueDate", "casa_available_vnd", "lastUpdatedAt", "lastSyncedAt", "rule_version"],
+      "llm_fields": ["liability_label", "due_date", "due_amount", "available_balance", "shortfall", "severity", "allowed_action"],
+      "widget_action": "review_payments", "readiness": "PARTIAL",
+      "blockers": ["No approved due-date/threshold policy or source freshness SLA", "Liabilities are mock seed plus client localStorage; no authenticated server snapshot parity", "Need define whether savings liquidity is usable and avoid double-counting multiple obligations"],
+      "evidence_ref": ["src/domain/models/index.ts:201", "src/domain/engine/obligations.ts:39", "src/providers/mock/mock-provider.ts:138", "src/lib/accounts-store.ts:48"]
+    },
+    {
+      "insight_type": "jar_plan_pressure", "description": "Jar near its own monthly limit, over it but covered, or has an uncovered negative balance.",
+      "required_features": ["jar_limit_vnd", "jar_spent_vnd", "jar_remaining_vnd", "jar_utilization", "days_left_in_jar_cycle"],
+      "trigger": "current VN month and set limit; needs_cover when remaining<0; over_limit_covered when spent>limit and remaining>=0; near_limit when limit>0 and spent/limit>=0.8",
+      "priority_class": "P1", "severity_logic": "needs_cover=urgent; other states=attention",
+      "cooldown": "proposed 24h after dismiss; active record remains cached and can reappear on material state change",
+      "suppression": "suppresses P4/P5; one candidate per jar; resolver picks top N",
+      "semantic_signature_fields": ["insight_type", "jar_id", "period", "semantic_state", "jar_label", "source", "severity", "action", "rule_version"],
+      "fingerprint_fields": ["jar_id", "period", "jar_label", "budget_limit", "spent", "remaining", "rebalance_net", "days_left", "source", "freshness", "rule_version"],
+      "llm_fields": ["jar_label", "budget_limit", "spent", "remaining", "severity", "semantic_state", "allowed_action"],
+      "widget_action": "review_jars", "readiness": "READY", "blockers": [],
+      "evidence_ref": ["src/insights/proactive/core.ts", "src/domain/engine/jar-budget.ts:187", "src/insights/detectors/jar-pressure.ts", "src/components/hu-envelope/HuOverviewRow.tsx:108"]
+    },
+    {
+      "insight_type": "jar_depletion_forecast", "description": "Projected jar exhaustion before monthly cycle end using recent net spending.",
+      "required_features": ["jar_remaining_vnd", "days_left_in_jar_cycle", "jar_recent_daily_burn_vnd", "jar_days_to_empty", "jar_safe_daily_spend_vnd", "jar_projected_shortfall_vnd"],
+      "trigger": "PROPOSED: remaining>0, >=3 active spend days, daily burn>0 and days_to_empty<days_left; fixed-category policy and ingestion completeness must be defined",
+      "priority_class": "P1", "severity_logic": "proposed urgent <=3 days to empty, otherwise attention",
+      "cooldown": "proposed 24h per jar/state", "suppression": "suppresses P4/P5; dedupe with jar_plan_pressure by jar and select strongest state",
+      "semantic_signature_fields": ["insight_type", "jar_id", "period", "exhaustion_bucket", "severity", "rule_version"],
+      "fingerprint_fields": ["jar_id", "period", "remaining", "daily_burn", "days_left", "active_days", "transaction_watermark", "rule_version"],
+      "llm_fields": ["jar_label", "remaining", "days_to_empty", "days_left", "projected_shortfall", "severity", "allowed_action"],
+      "widget_action": "review_jars", "readiness": "PARTIAL",
+      "blockers": ["Current engine has no recent daily burn feature or ingestion watermark", "Archived 7/30-day recipe is not live code; product must approve windows and fixed-category treatment", "Server snapshot must include same client corrections and session rebalance data or explicitly exclude it"],
+      "evidence_ref": ["src/domain/models/index.ts:78", "src/domain/engine/jar-budget.ts:144", "docs/INSIGHT_FEATURE_ARCHIVE.md:22", "src/state/useFinancials.ts:107"]
+    },
+    {
+      "insight_type": "spending_spike", "description": "Large category increase versus previous month.",
+      "required_features": ["category_spend_delta_vnd"],
+      "trigger": "existing detector: previous>0, current>1.3*previous and delta>=500000 VND; select largest delta",
+      "priority_class": "P2", "severity_logic": "attention", "cooldown": "proposed once per category/month; reset on semantic state change",
+      "suppression": "may display with P0/P1 only when top-N policy allows; never displaces higher priority",
+      "semantic_signature_fields": ["insight_type", "category_id", "category_label", "source", "period", "severity", "rule_version"],
+      "fingerprint_fields": ["category_id", "period", "current_spend", "previous_spend", "category_label", "transaction_freshness", "rule_version"],
+      "llm_fields": ["category_label", "current_spend", "previous_spend", "delta", "severity", "allowed_action"],
+      "widget_action": "review_spending", "readiness": "READY", "blockers": [],
+      "evidence_ref": ["src/insights/detectors/spending-spike.ts:8", "src/domain/engine/finance-compose.ts:262", "src/domain/engine/cashflow.ts:67"]
+    },
+    {
+      "insight_type": "recurring_leakage", "description": "Recurring spending that may merit review; do not assert waste or cancellation eligibility.",
+      "required_features": ["recurring_series_estimate"],
+      "trigger": "PROPOSED: recurring series from >=3 distinct months plus an approved cost/variance policy",
+      "priority_class": "P2", "severity_logic": "attention only after policy review", "cooldown": "proposed one per series/month",
+      "suppression": "lower than P0/P1", "semantic_signature_fields": ["series_id", "period", "state", "rule_version"],
+      "fingerprint_fields": ["merchant_normalized", "average_amount", "distinct_months", "last_posted_at", "rule_version"],
+      "llm_fields": ["merchant_label", "average_amount", "source_estimate", "allowed_action"], "widget_action": "review_spending",
+      "readiness": "PARTIAL", "blockers": ["Recurring inference is not a bill contract and cannot establish leakage or avoidability", "Trigger threshold and eligible action absent"],
+      "evidence_ref": ["src/domain/engine/recurring.ts:10", "src/insights/detectors/new-recurring.ts:6"]
+    },
+    {
+      "insight_type": "goal_deviation", "description": "Goal is off an agreed savings schedule.",
+      "required_features": ["goal_gap_vnd", "goal_contribution_schedule"], "trigger": "PROPOSED: compare actual contribution against an explicit goal schedule; not target gap alone",
+      "priority_class": "P3", "severity_logic": "attention when approved schedule breached", "cooldown": "proposed weekly per goal/state",
+      "suppression": "lower than P0/P1/P2", "semantic_signature_fields": ["goal_id", "period", "deviation_bucket", "rule_version"],
+      "fingerprint_fields": ["goal_id", "targetAmount", "currentAmount", "targetDate", "schedule_revision", "rule_version"],
+      "llm_fields": ["goal_name", "approved_gap", "target_date", "allowed_action"], "widget_action": "review_goals",
+      "readiness": "PARTIAL", "blockers": ["No canonical contribution schedule or reliable savings history", "Goal records can live only in client localStorage"],
+      "evidence_ref": ["src/domain/models/index.ts:262", "src/domain/engine/finance-compose.ts:284", "src/state/goals.tsx"]
+    },
+    {
+      "insight_type": "safe_surplus_opportunity", "description": "Surplus after all mandatory obligations and approved buffer.",
+      "required_features": ["casa_available_vnd", "known_obligation_vnd_due_at", "obligation_coverage", "mandatory_reserve_requirement_vnd", "product_eligibility"],
+      "trigger": "BLOCKED until complete obligations and buffer policy yield positive verified surplus; product suggestion only from eligibility engine",
+      "priority_class": "P4", "severity_logic": "info", "cooldown": "proposed 30 days per state",
+      "suppression": "hard suppressed whenever P0/P1 active", "semantic_signature_fields": ["eligibility_decision_id", "surplus_bucket", "period", "rule_version"],
+      "fingerprint_fields": ["casa_available_vnd", "obligations_revision", "buffer_policy_version", "eligibility_revision", "rule_version"],
+      "llm_fields": ["verified_surplus", "eligible_action_only"], "widget_action": "none", "readiness": "BLOCKED",
+      "blockers": ["Mandatory reserve requirement missing", "Complete obligation coverage missing", "Product eligibility/policy engine missing; high CASA or unallocated balance is insufficient"],
+      "evidence_ref": ["src/domain/engine/unallocated-pool.ts", "src/domain/engine/surplus.ts", "docs/INSIGHT_FEATURE_ARCHIVE.md:73"]
+    },
+    {
+      "insight_type": "on_track_reinforcement", "description": "Positive spending reinforcement only after risk evaluation is complete.",
+      "required_features": ["jar_limit_vnd", "jar_spent_vnd", "days_left_in_jar_cycle", "risk_scan_completeness"],
+      "trigger": "PROPOSED: all eligible set-limit jars under approved safe pace with fresh complete snapshot and no P0/P1 active",
+      "priority_class": "P5", "severity_logic": "info", "cooldown": "proposed weekly per month",
+      "suppression": "hard suppressed whenever P0/P1 active", "semantic_signature_fields": ["period", "on_track_state", "rule_version"],
+      "fingerprint_fields": ["period", "eligible_jar_states", "data_freshness", "rule_version"],
+      "llm_fields": ["supported_positive_fact", "allowed_action"], "widget_action": "none", "readiness": "PARTIAL",
+      "blockers": ["Safe pace policy and complete risk coverage not implemented", "Missing/stale jars cannot be interpreted as safe"],
+      "evidence_ref": ["src/domain/engine/jar-budget.ts:187", "src/insights/proactive/core.ts"]
+    }
+  ]
+}
