@@ -18,6 +18,7 @@ export function GoalsListScreen() {
   const { data, loading, error, refresh } = useGoalsList();
   const { seedDemo } = useGoalMutations();
   const [creating, setCreating] = useState(false);
+  const [activeTab, setActiveTab] = useState<"manual" | "chat">("manual");
   const onCreate = () => setCreating(true);
   const onSeedDemo = async () => {
     const res = await seedDemo();
@@ -49,8 +50,40 @@ export function GoalsListScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <GoalCoachPanel onCreated={refresh} />
-      {body}
+      <div role="tablist" aria-label="Cách tạo mục tiêu" className="grid grid-cols-2 gap-1 rounded-2xl bg-border/40 p-1">
+        {([
+          ["manual", "Tạo thủ công"],
+          ["chat", "Chat với M-You"],
+        ] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            id={`goals-tab-${tab}`}
+            aria-selected={activeTab === tab}
+            aria-controls={`goals-panel-${tab}`}
+            tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => setActiveTab(tab)}
+            onKeyDown={(event) => {
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                event.preventDefault();
+                const next = event.key === "Home" ? "manual" : event.key === "End" ? "chat" : tab === "manual" ? "chat" : "manual";
+                setActiveTab(next);
+                document.getElementById(`goals-tab-${next}`)?.focus();
+              }
+            }}
+            className={`min-h-11 rounded-xl px-2 py-3 text-sm font-semibold transition-colors ${activeTab === tab ? "bg-surface text-text shadow-sm" : "text-muted"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id="goals-panel-manual" aria-labelledby="goals-tab-manual" hidden={activeTab !== "manual"}>
+        {body}
+      </div>
+      <div role="tabpanel" id="goals-panel-chat" aria-labelledby="goals-tab-chat" hidden={activeTab !== "chat"}>
+        <GoalCoachPanel onCreated={refresh} />
+      </div>
       {creating && <CreateGoalFlow onClose={() => setCreating(false)} onCreated={refresh} />}
     </div>
   );
