@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { LOGIN_PASSWORD, validateLogin } from "./auth";
 
 const CUSTOMERS = [
-  { cif: "CIF_0001", label: "Minh — Lương ổn định" },
-  { cif: "CIF_0002", label: "Lan — Thu nhập biến động" },
+  { cif: "CIF_0001", label: "Ly Lã — Lương ổn định" },
+  { cif: "CIF_0002", label: "Toàn Trần — Thu nhập biến động" },
 ];
 
 describe("validateLogin", () => {

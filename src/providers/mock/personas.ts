@@ -79,7 +79,7 @@ const SEED_BUDGETS: Budget[] = budgetsFromJars(DEFAULT_JAR_CONFIG.jars);
 const STABLE: PersonaMeta = {
   id: "stable",
   cif: "CIF_0001",
-  label: "Minh — Lương ổn định",
+  label: "Ly Lã — Lương ổn định",
   description: "Nhân viên văn phòng, lương cố định, ít nợ, chi tiêu đều đặn.",
   tier: "M-FIRST GOLD",
   params: { seed: 1001, salaryBase: 25_000_000, salaryVariance: 0.02, discretionaryScale: 1, extraIncomeChance: 0.1, housingBase: 6_000_000 },
@@ -99,7 +99,7 @@ const STABLE: PersonaMeta = {
 const IRREGULAR: PersonaMeta = {
   id: "irregular",
   cif: "CIF_0002",
-  label: "Lan — Thu nhập biến động",
+  label: "Toàn Trần — Thu nhập biến động",
   description: "Freelancer, thu nhập lên xuống, chi tiêu tùy hứng, hay vượt ngân sách.",
   tier: "M-FIRST",
   params: { seed: 2002, salaryBase: 22_000_000, salaryVariance: 0.55, discretionaryScale: 1.6, extraIncomeChance: 0.5, housingBase: 7_500_000 },
@@ -119,7 +119,7 @@ const IRREGULAR: PersonaMeta = {
 const WEALTHY: PersonaMeta = {
   id: "wealthy",
   cif: "CIF_0003",
-  label: "Hùng — Tài sản cao",
+  label: "Đào Nguyên — Tài sản cao",
   description: "Thu nhập cao, nhiều tài sản & nhiều khoản nợ, có tài sản chưa định giá.",
   tier: "M-FIRST PRIVATE",
   params: { seed: 3003, salaryBase: 80_000_000, salaryVariance: 0.08, discretionaryScale: 2.2, extraIncomeChance: 0.4, housingBase: 22_000_000 },
@@ -150,7 +150,7 @@ const WEALTHY: PersonaMeta = {
 const FRESH: PersonaMeta = {
   id: "fresh",
   cif: "CIF_0004",
-  label: "Tân — Mới mở tài khoản",
+  label: "Tân Vũ — Mới mở tài khoản",
   description: "Chỉ có lương về hằng tháng, chưa chi tiêu, chưa đặt hạn mức hũ — dùng để thử luồng thiết lập từ đầu.",
   tier: "M-FIRST",
   params: { seed: 4004, salaryBase: 20_000_000, salaryVariance: 0.02, discretionaryScale: 1, extraIncomeChance: 0.1, housingBase: 0, incomeOnly: true },

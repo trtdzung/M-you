@@ -6,9 +6,8 @@ import { usePersona } from "@/providers/context";
 import { LoginScreen } from "./LoginScreen";
 
 /**
- * Login-screen display names for the sample customers — distinct from each
- * persona's `label` (a financial-profile description used elsewhere, e.g. the
- * Settings persona switcher), so that switcher keeps its own copy untouched.
+ * Login-screen display names for the sample customers — the short form of each
+ * persona's `label` ("<name> — <financial profile>"); keep the two in sync.
  */
 export const LOGIN_DISPLAY_NAME: Record<string, string> = {
   CIF_0001: "Ly Lã",
