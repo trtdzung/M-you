@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus } from "lucide-react";
+import { Plus, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ErrorState, SkeletonCard } from "@/components/states";
+import { summarizeGoals } from "../../engine/summary";
+import { formatVndCompact } from "@/lib/format";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
 import { GOALS_COPY } from "../copy";
 import { GoalsHeader } from "../GoalsHeader";
@@ -19,6 +21,8 @@ export function GoalsListScreen() {
   const [activeTab, setActiveTab] = useState<"manual" | "chat">("manual");
   const [formKey, setFormKey] = useState(0);
   const [creating, setCreating] = useState(false);
+  const summary = summarizeGoals(data ?? []);
+  const compactMoney = (amount: number) => formatVndCompact(amount).replace(/\s*₫$/, "");
   const hasGoals = !!data?.length;
   const [frame, setFrame] = useState<HTMLElement | null>(null);
   useEffect(() => { setFrame(document.getElementById("device-canvas") ?? document.body); }, []);
@@ -60,10 +64,13 @@ export function GoalsListScreen() {
   if (hasGoals && !creating) return (
     <section className="flex flex-col gap-4 pb-24">
       <GoalsHeader />
-      <div>
-        <p className="text-[15px] leading-6 text-muted">Từng bước đến những điều bạn muốn.</p>
-        <p className="mt-4 text-[13px] font-medium text-muted">{data?.filter(goal => goal.status === "active").length} mục tiêu đang tích lũy</p>
+      <div className="rounded-3xl border border-primary/10 bg-surface-tint p-5">
+        <div className="flex items-center gap-2 text-[14px] font-medium text-muted"><Target size={18} className="text-primary" aria-hidden="true" />Tổng đã tích lũy</div>
+        <p className="mt-3 flex flex-wrap items-baseline gap-2 tabular-nums"><span className="text-[32px] font-semibold leading-10 tracking-tight text-text">{compactMoney(summary.saved)}</span><span className="text-[14px] text-muted">VND</span></p>
+        <p className="mt-1 text-[14px] text-muted">Cho {summary.count} mục tiêu · Tổng đích {compactMoney(summary.target)} VND</p>
+        <p className="mt-4 border-t border-primary/10 pt-3 text-[12px] leading-5 text-muted">Số tiền bạn tự ghi nhận · Không gồm mục tiêu đã lưu trữ</p>
       </div>
+      <div className="flex items-center justify-between gap-3 pt-1"><h2 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h2><span className="text-[13px] text-muted">{summary.active} đang tích lũy</span></div>
       {body}
       {frame && createPortal(
         <button type="button" aria-label="Tạo mục tiêu mới" onClick={openCreate} className="absolute bottom-[calc(24px+var(--safe-area-bottom))] right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2">

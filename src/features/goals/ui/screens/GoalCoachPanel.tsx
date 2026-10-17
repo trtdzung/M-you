@@ -64,7 +64,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
     <section className="flex flex-col gap-4 pb-44">
       <div className="flex items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles size={18} aria-hidden="true" /></span>
-        <h2 className="flex-1 text-[16px] leading-6 font-semibold text-text">M-You</h2>
+        <div className="flex-1"><h2 className="text-[16px] leading-6 font-semibold text-text">M-You</h2><p className="text-[12px] leading-5 text-muted">Cùng bạn lập kế hoạch tích lũy</p></div>
         {coach.phase !== "idle" && <div className="relative" onBlur={event => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setMenuOpen(false);
         }} onKeyDown={event => {
@@ -76,7 +76,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           </div>}
         </div>}
       </div>
-      {coach.phase === "idle" && <div className="rounded-2xl rounded-tl-sm bg-surface-tint p-4">
+      {coach.phase === "idle" && <div className="rounded-2xl rounded-tl-sm border border-primary/10 bg-surface-tint p-5">
         <p className="text-[16px] leading-6 font-medium text-text">Bạn đang muốn dành tiền cho điều gì?</p>
         <p className="mt-2 text-[14px] leading-6 text-muted">Kể mình nghe, mình sẽ giúp bạn xác định số tiền và thời gian.</p>
       </div>}

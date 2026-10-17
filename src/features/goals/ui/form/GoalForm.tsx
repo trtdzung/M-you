@@ -18,7 +18,7 @@ export function GoalForm({ form, slot, compact = false }: { form: GoalFormState;
     <MoneyField label={f.monthlyContribution} hint={f.monthlyHint} value={values.monthlyContribution} onChange={(v) => set("monthlyContribution", v)} error={errors.monthlyContribution} />
   </div>);
   return (
-    <div className={`flex flex-col gap-4 ${compact ? "[&_input]:min-w-0 [&_input]:w-full" : ""}`}>
+    <div className={`flex flex-col gap-5 ${compact ? "[&_input]:min-w-0 [&_input]:w-full" : ""}`}>
       <GoalNameField value={values.name} onChange={(v) => set("name", v)} error={errors.name} />
       <MoneyField
         label={f.targetAmount}
@@ -31,8 +31,9 @@ export function GoalForm({ form, slot, compact = false }: { form: GoalFormState;
         onChange={(v) => set("targetDate", v)}
         error={errors.targetDate}
       />
-      {compact ? <section className="border-t border-border pt-4">
-        <h3 className="mb-4 text-[14px] font-semibold text-text">Thông tin bổ sung</h3>
+      {compact ? <section className="mt-1 rounded-2xl border border-border/60 bg-surface p-4">
+        <h3 className="text-[16px] font-semibold text-text">Kế hoạch tích lũy</h3>
+        <p className="mb-5 mt-1 text-[13px] leading-5 text-muted">Thông tin bổ sung · Bạn có thể để trống số tiền và bổ sung sau.</p>
         {extras}
       </section> : extras}
       {slot}
