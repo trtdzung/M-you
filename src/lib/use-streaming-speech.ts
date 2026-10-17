@@ -10,6 +10,7 @@ export function useStreamingSpeech(
 ) {
   const [state, setState] = useState<SpeechState>("idle");
   const [error, setError] = useState("");
+  const [partial, setPartial] = useState("");
   const session = useRef<StreamingSpeech | null>(null);
   const callback = useRef(onTranscript);
   const optionsRef = useRef(options);
@@ -21,18 +22,33 @@ export function useStreamingSpeech(
     session.current = null;
     setState("idle");
     setError("");
+    setPartial("");
   }, []);
-  useEffect(() => () => session.current?.cancel(), []);
+  useEffect(() => () => {
+    session.current?.cancel();
+    session.current = null;
+  }, []);
 
   function start() {
     session.current?.cancel();
     setError("");
-    session.current = new StreamingSpeech({
-      onState: setState,
-      onTranscript: (text, final, metadata) => callback.current(text, final, metadata),
-      onError: (message) => { callback.current("", true); setError(message); },
+    setPartial("");
+    const next = new StreamingSpeech({
+      onState: (value) => { if (session.current === next) setState(value); },
+      onTranscript: (text, final, metadata) => {
+        if (session.current !== next) return;
+        setPartial(final ? "" : text);
+        callback.current(text, final, metadata);
+      },
+      onError: (message) => {
+        if (session.current !== next) return;
+        setPartial("");
+        callback.current("", true);
+        setError(message);
+      },
     }, optionsRef.current);
-    void session.current.start();
+    session.current = next;
+    void next.start();
   }
-  return { state, error, start, stop: () => session.current?.stop(), cancel };
+  return { state, error, partial, start, stop: () => session.current?.stop(), cancel };
 }

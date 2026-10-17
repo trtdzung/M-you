@@ -58,7 +58,7 @@ async function openWidget() {
   await waitFor(() => expect(screen.getByRole("button", { name: "Nhập bằng giọng nói" })).toBeEnabled());
 }
 describe("M-Your voice composer", () => {
-  it("keeps partial hypotheses hidden, preserves typed text and sends the refined final text", async () => {
+  it("shows partial captions separately, preserves typed text and sends the refined final text", async () => {
     await openWidget();
     const input = screen.getByPlaceholderText("Nhắn tin cho M-Your…");
     fireEvent.change(input, { target: { value: "Cho tôi biết" } });
@@ -68,10 +68,12 @@ describe("M-Your voice composer", () => {
     act(() => voice.callbacks!.onTranscript("chi tiêu", false));
     act(() => voice.callbacks!.onTranscript("chi tiêu tháng này", false));
     expect(input).toHaveValue("Cho tôi biết");
+    expect(screen.getByLabelText("Nội dung nghe được tạm thời")).toHaveTextContent("chi tiêu tháng này");
     expect(screen.getByRole("button", { name: "Gửi" })).toBeDisabled();
     expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
     act(() => { voice.callbacks!.onTranscript("chi tiêu tháng này?", true); voice.callbacks!.onState("idle"); });
     expect(input).toHaveValue("Cho tôi biết chi tiêu tháng này?");
+    expect(screen.queryByLabelText("Nội dung nghe được tạm thời")).not.toBeInTheDocument();
     expect(input).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
     await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledWith("Cho tôi biết chi tiêu tháng này?", "CIF_0001"));
@@ -93,6 +95,7 @@ describe("M-Your voice composer", () => {
     act(() => { voice.callbacks!.onError("Mất kết nối"); voice.callbacks!.onState("idle"); });
     expect(input).toHaveValue("Bản nháp");
     expect(screen.getByRole("alert")).toHaveTextContent("Mất kết nối");
+    expect(screen.queryByLabelText("Nội dung nghe được tạm thời")).not.toBeInTheDocument();
   });
   it("keeps an incomplete command editable and shows the specific follow-up", async () => {
     await openWidget();
