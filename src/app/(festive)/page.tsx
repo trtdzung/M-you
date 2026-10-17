@@ -7,10 +7,19 @@ import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
+import { HomeInsightWidget } from "@/components/home/HomeInsightWidget";
 import { useFinancials } from "@/state/useFinancials";
+import { useManualTxns } from "@/state/manual-txns";
+import { useJarConfig } from "@/state/jars";
+import { useCategories } from "@/state/categories";
+import { usePersona } from "@/providers/context";
 
 export default function HomePage() {
-  const { loading, error, raw } = useFinancials();
+  const { persona } = usePersona();
+  const { loaded: categoriesLoaded, error: categoriesError, categories } = useCategories();
+  const { loaded: manualTxnsLoaded } = useManualTxns();
+  const { loaded: jarsLoaded, error: jarsError } = useJarConfig();
+  const { loading, error, raw, financials } = useFinancials();
 
   const primary = useMemo(
     () => raw?.accounts.find((a) => a.type === "current") ?? null,
@@ -47,6 +56,16 @@ export default function HomePage() {
             <div className="shadow-card rounded-[24px] bg-surface p-5">
               <Empty title="Chưa có tài khoản" description="Chưa có tài khoản nào để hiển thị." />
             </div>
+          )}
+
+          {/* Render the proactive insight widget if the primary data dependencies are ready. */}
+          {financials && manualTxnsLoaded && jarsLoaded && !jarsError && categoriesLoaded && !categoriesError && (
+            <HomeInsightWidget
+              financials={financials}
+              transactions={raw?.transactions ?? []}
+              categories={categories}
+              cif={persona.cif}
+            />
           )}
 
           <HomeQuickGrid />

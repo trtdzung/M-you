@@ -90,6 +90,8 @@ interface ManualTxnsContextValue {
    * rebalances.
    */
   removeByTrigger: (triggerTxnId: string) => string[];
+  loaded: boolean;
+  loadError: boolean;
 }
 
 const ManualTxnsContext = createContext<ManualTxnsContextValue | null>(null);
@@ -216,6 +218,8 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   const { persona } = usePersona();
   const cif = persona.cif;
   const [manualTxns, setManualTxns] = useState<Transaction[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   // Mirror of the current array so `add`/`update` can compute their return value
   // synchronously (a setState updater's run timing is not guaranteed).
   const txnsRef = useRef<Transaction[]>([]);
@@ -231,6 +235,8 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     let active = true;
     apply([]);
+    setLoaded(false);
+    setLoadError(false);
     const legacyKey = `${STORAGE_PREFIX}.${cif}`;
     (async () => {
       try {
@@ -251,11 +257,18 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
           const persisted = new Set(rows.map((t) => t.id));
           if (legacy.every((t) => persisted.has(t.id))) clearLegacy(legacyKey);
         }
-        if (active) apply(mergeLocalExtras(rows, txnsRef.current));
+        if (active) {
+          apply(mergeLocalExtras(rows, txnsRef.current));
+          setLoaded(true);
+        }
       } catch (err) {
         // API unreachable → fall back to legacy localStorage so the app still works.
         console.error("Failed to load manual txns", err);
-        if (active) apply(mergeLocalExtras(readLegacy(legacyKey), txnsRef.current));
+        if (active) {
+          apply(mergeLocalExtras(readLegacy(legacyKey), txnsRef.current));
+          setLoaded(true);
+          setLoadError(true);
+        }
       }
     })();
     return () => {
@@ -326,8 +339,8 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   );
 
   const value = useMemo(
-    () => ({ manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger }),
-    [manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger],
+    () => ({ manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger, loaded, loadError }),
+    [manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger, loaded, loadError],
   );
   return <ManualTxnsContext.Provider value={value}>{children}</ManualTxnsContext.Provider>;
 }
