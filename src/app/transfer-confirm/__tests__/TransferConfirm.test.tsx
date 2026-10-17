@@ -363,9 +363,10 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
     expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: AMOUNT });
     // Coverage is delegated to the shared unit (one rebalance per donor), not booked here.
     expect(h.commit).toHaveBeenCalledTimes(1);
-    // The post-fund toast surfaces the donor + Hoàn tác / Đổi nguồn.
+    // The post-fund banner surfaces the donor. It is read-only — no Hoàn tác /
+    // Đổi nguồn action (that mechanic was removed; see AutoFundResultBanner).
     expect(await screen.findByText(/Đã bù/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Hoàn tác/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Hoàn tác/ })).not.toBeInTheDocument();
   });
 
   it("requiresManualGoal: prompts BEFORE booking, and confirm proceeds (no silent goal raid)", async () => {

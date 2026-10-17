@@ -16,8 +16,10 @@
  *  - `reconcile`     H3/H5: unwind + re-evaluate a changed trigger txn.
  *  - `reconcileLabels` S7/U4: batch-fund background auto-labels, each fund seeing
  *                    the legs written before it (no double-funding in a batch).
- *  - `undo`          C4: remove a fund AND re-validate (reports what it re-applied — U12).
- *  - `swapOptions` / `changeSource`  H1 atomic donor swap; goal needs confirm (S3).
+ *
+ * There is deliberately NO undo / change-source here: the post-fund banner is
+ * read-only, so a rebalance is corrected by re-categorising the trigger txn
+ * (`reconcile` unwinds its legs and re-funds), never by editing legs directly.
  *
  * Invariants: engine is sole truth (#1), rebalances are virtual/no OTP (#3),
  * excluded from thu/chi (#6), and carry `origin` provenance (#5).
@@ -30,7 +32,6 @@ import { DEMO_NOW } from "@/lib/demo-clock";
 import { jarIdForCategory, rebalanceInputsFor, snapshotForDate, type AutoFundDeps, type JarSnapshot } from "@/lib/auto-fund-core";
 import type { RawData } from "@/domain/engine/finance-compose";
 import { planCover, triggerContribution, type SnapshotOpts } from "./auto-fund-plan";
-import { planSwap, swapOptionsFor, type SwapRequest, type SwapResult } from "./auto-fund-swap";
 import { useFinancials } from "./useFinancials";
 import { useJarConfig } from "./jars";
 import { buildManualTxn, useManualTxns } from "./manual-txns";
@@ -58,11 +59,6 @@ export interface CommitInput {
   origin: "auto" | "manual";
   includeGoal?: boolean;
 }
-
-export type UndoResult =
-  | { status: "undone" }
-  | { status: "reapplied"; donors: DonorProposal[]; createdIds: string[] }
-  | { status: "residual"; donors: DonorProposal[]; createdIds: string[]; shortfall: number };
 
 type Origin = "auto" | "manual";
 
@@ -228,53 +224,9 @@ export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData
     [deps, jarConfig, removeByTrigger, fundWith],
   );
 
-  /**
-   * C4: undo the fund for a trigger, then re-validate the TARGET. A re-exposed
-   * overspend is re-covered from the non-goal chain (fully → `reapplied`, partly or
-   * not at all → `residual` with what's left) and the result says WHICH donors were
-   * used, so the UI can tell the user instead of silently dismissing (U12).
-   */
-  const undo = useCallback(
-    (p: { triggerTxnId: string; targetJarId: string | null; postedAt: string }): UndoResult => {
-      const removed = removeByTrigger(p.triggerTxnId);
-      if (!p.targetJarId) return { status: "undone" };
-      const { result: r } = fundWith(deps, {
-        targetJarId: p.targetJarId,
-        triggerTxnId: p.triggerTxnId,
-        postedAt: p.postedAt,
-        origin: "auto",
-        partialOnNeedsGoal: true, // never re-raid a goal jar on undo
-        excludeIds: new Set(removed),
-      });
-      if (r.status === "covered") return { status: "undone" };
-      if (r.status === "funded") return { status: "reapplied", donors: r.donors, createdIds: r.createdIds };
-      return { status: "residual", donors: r.donors, createdIds: r.createdIds, shortfall: r.shortfall };
-    },
-    [deps, removeByTrigger, fundWith],
-  );
-
-  /** H1/G31: the Đổi nguồn list, from the SAME trigger-month snapshot `changeSource` uses. */
-  const swapOptions = useCallback((p: SwapRequest) => swapOptionsFor(deps, p), [deps]);
-
-  /**
-   * H1 atomic "Đổi nguồn": create the NEW leg first, then drop the OLD ones. Refuses
-   * a `goal` donor unless `confirmGoal` (S3/G26) and any donor the engine wouldn't
-   * accept (G27) or that can't fully cover — the old legs stay intact on refusal.
-   */
-  const changeSource = useCallback(
-    (p: SwapRequest & { donorJarId: string; confirmGoal?: boolean }): SwapResult => {
-      const plan = planSwap(deps, p);
-      if (plan.status !== "ok" || !plan.donor) return { status: plan.status === "ok" ? "nothing" : plan.status, ids: p.oldIds, shortfall: plan.shortfall };
-      const { ids } = writeLegs([plan.donor], p.targetJarId, p.triggerTxnId, p.postedAt, "manual");
-      p.oldIds.forEach(remove); // old dropped only AFTER the new leg exists (atomic)
-      return { status: "swapped", ids, donor: plan.donor, shortfall: plan.shortfall };
-    },
-    [deps, writeLegs, remove],
-  );
-
   return useMemo(
-    () => ({ assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, undo, swapOptions, changeSource, removeByTrigger, jarConfig }),
-    [assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, undo, swapOptions, changeSource, removeByTrigger, jarConfig],
+    () => ({ assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, removeByTrigger, jarConfig }),
+    [assess, snapshotAt, commit, commitPersisted, fundJar, reconcile, reconcileLabels, removeByTrigger, jarConfig],
   );
 }
 

@@ -145,14 +145,7 @@ export function TransferSuccess({
           )}
 
           {fundResult && fundResult.createdIds.length > 0 && (
-            <AutoFundResultBanner
-              triggerTxnId={createdTxnId ?? ""}
-              targetJarId={fundResult.targetJarId}
-              targetLabel={fundResult.targetLabel}
-              postedAt={fundResult.postedAt}
-              donors={fundResult.donors}
-              createdIds={fundResult.createdIds}
-            />
+            <AutoFundResultBanner targetLabel={fundResult.targetLabel} donors={fundResult.donors} />
           )}
 
           {createdTxnId && <TransferCategorizeSection txnId={createdTxnId} sourceJarId={createdSourceJarId} amount={done.amount} />}

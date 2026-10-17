@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { useEffect, useRef, useState } from "react";
 import type { Account, JarConfig } from "@/domain/models";
 import type { FundResult } from "@/state/use-auto-fund";
@@ -8,10 +8,12 @@ import { AutoFundResultBanner } from "../AutoFundResultBanner";
 
 /**
  * The post-fund banner against the REAL `useAutoFund` + REAL ManualTxnsProvider
- * (fetch-mocked; jars/useFinancials mocked to a static config + the live store):
- *  - U23: after "Đổi nguồn" the headline names the NEW donor.
- *  - S3/G26: a goal jar needs an explicit confirm step before it is charged.
- *  - G22/U12: "Hoàn tác" tells the user what happened instead of vanishing.
+ * (fetch-mocked; jars/useFinancials mocked to a static config + the live store),
+ * so the headline is proven to name the donor the ENGINE actually charged.
+ *
+ * The banner is READ-ONLY: the old [Hoàn tác] / [Đổi nguồn] pair was removed
+ * together with the whole undo/swap mechanic, so the second test guards that no
+ * action ever creeps back onto it.
  */
 
 const h = vi.hoisted(() => ({ jarConfig: { version: 3, jars: [] } as JarConfig, accounts: [] as Account[] }));
@@ -45,16 +47,7 @@ function Scenario() {
     setFund(harness.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" }));
   }, [harness, trigger, fund]);
   if (!fund) return null;
-  return (
-    <AutoFundResultBanner
-      triggerTxnId={trigger!}
-      targetJarId={fund.targetJarId}
-      targetLabel={fund.targetLabel}
-      postedAt={fund.postedAt}
-      donors={fund.donors}
-      createdIds={fund.createdIds}
-    />
-  );
+  return <AutoFundResultBanner targetLabel={fund.targetLabel} donors={fund.donors} />;
 }
 
 beforeEach(() => {
@@ -73,46 +66,20 @@ beforeEach(() => {
   h.accounts = [account("cur", 3_000_000)]; // buf + fun + health → pool 0
 });
 
-async function renderFunded() {
-  render(<Scenario />, { wrapper });
-  expect(await screen.findByText(/từ Hũ Dự phòng → Ăn uống/)).toBeInTheDocument();
-}
-
 describe("AutoFundResultBanner", () => {
-  it("U23: after Đổi nguồn the headline names the new donor, not the old one", async () => {
-    await renderFunded();
-    fireEvent.click(screen.getByRole("button", { name: /Đổi nguồn/ }));
-    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /Hũ Hưởng thụ/ }));
-    expect(await screen.findByText(/từ Hũ Hưởng thụ → Ăn uống/)).toBeInTheDocument();
-    expect(screen.queryByText(/từ Hũ Dự phòng/)).not.toBeInTheDocument();
+  it("names the donor the engine actually charged, with the amount it moved", async () => {
+    render(<Scenario />, { wrapper });
+    expect(await screen.findByText(/từ Hũ Dự phòng → Ăn uống/)).toBeInTheDocument();
+    expect(screen.getByText("500.000 ₫")).toBeInTheDocument();
     expect(store.rebalances).toHaveLength(1);
-    expect(store.rebalances[0].rebalance).toMatchObject({ fromJarId: "fun" });
+    expect(store.rebalances[0].rebalance).toMatchObject({ fromJarId: "buf", toJarId: "food" });
   });
 
-  it("S3/G26: a goal jar opens a confirm step; nothing is charged until 'Xác nhận rút'", async () => {
-    await renderFunded();
-    fireEvent.click(screen.getByRole("button", { name: /Đổi nguồn/ }));
-    const sheet = await screen.findByRole("dialog");
-    fireEvent.click(within(sheet).getByRole("button", { name: /Hũ Sức khỏe/ }));
-    expect(within(sheet).getByRole("alertdialog", { name: "Xác nhận rút hũ Mục tiêu" })).toBeInTheDocument();
-    expect(store.rebalances[0].rebalance).toMatchObject({ fromJarId: "buf" }); // untouched so far
-
-    // Cancel returns to the list without charging.
-    fireEvent.click(within(sheet).getByRole("button", { name: "Huỷ" }));
-    expect(store.rebalances[0].rebalance).toMatchObject({ fromJarId: "buf" });
-
-    fireEvent.click(within(sheet).getByRole("button", { name: /Hũ Sức khỏe/ }));
-    fireEvent.click(within(sheet).getByRole("button", { name: "Xác nhận rút" }));
-    expect(await screen.findByText(/từ Hũ Sức khỏe → Ăn uống/)).toBeInTheDocument();
-    expect(store.rebalances).toHaveLength(1);
-    expect(store.rebalances[0].rebalance).toMatchObject({ fromJarId: "health", origin: "manual" });
-  });
-
-  it("G22/U12: Hoàn tác that re-applies a cover SAYS so and stays visible", async () => {
-    await renderFunded();
-    fireEvent.click(screen.getByRole("button", { name: /Hoàn tác/ }));
-    expect(await screen.findByText(/Đã hoàn tác — tự bù lại từ Hũ Dự phòng 500\.000/)).toBeInTheDocument();
+  it("is read-only — it offers no Hoàn tác / Đổi nguồn (or any other) action", async () => {
+    render(<Scenario />, { wrapper });
+    const banner = await screen.findByRole("status");
     expect(screen.queryByRole("button", { name: /Hoàn tác/ })).not.toBeInTheDocument();
-    await waitFor(() => expect(store.rebalances).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: /Đổi nguồn/ })).not.toBeInTheDocument();
+    expect(banner.querySelectorAll("button")).toHaveLength(0);
   });
 });
