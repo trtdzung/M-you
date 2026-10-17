@@ -89,7 +89,10 @@ export const jarOverspendCovered: MultiDetector = (f) => {
         type: "jar_needs_manual_cover",
         severity: "attention",
         title: `Hũ "${line.label}" cần bù thủ công`,
-        explanation: `Hũ "${line.label}" đã tiêu vượt ${money(shortfall)} chưa được bù. Hãy chọn hũ nguồn để bù.`,
+        // `shortfall` is `−remaining` (BALANCE axis — what no rebalance covered),
+        // not `spent − limit` (PLAN axis). Word it as the balance so it can never
+        // be read as the overspend figure the jar card's "Đã vượt X" badge shows.
+        explanation: `Hũ "${line.label}" đã tiêu quá số dư ${money(shortfall)} chưa được bù. Hãy chọn hũ nguồn để bù.`,
         facts: [
           fact("Cần bù", shortfall, { period: f.monthKey }),
           fact("Đã tiêu", line.spent),

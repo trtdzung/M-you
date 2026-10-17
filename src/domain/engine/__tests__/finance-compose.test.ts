@@ -36,6 +36,13 @@ async function loadRaw(personaId: PersonaId): Promise<RawData> {
   return { transactions, accounts, assets, liabilities, budgets, snapshots, goals, products };
 }
 
+/**
+ * `computeFinancials` was called with NO taxonomy here, so its fixed split ran
+ * against an empty set — the comparison calls must use the same one or they are
+ * not comparing the same composition.
+ */
+const NO_FIXED: ReadonlySet<string> = new Set();
+
 const MONTH = "2026-09";
 
 describe("computeFinancials", () => {
@@ -48,8 +55,8 @@ describe("computeFinancials", () => {
     const recurring = detectRecurring(raw.transactions);
 
     expect(f.monthKey).toBe(MONTH);
-    expect(f.cashflow).toEqual(aggregateCashflow(raw.transactions, period));
-    expect(f.prevCashflow).toEqual(aggregateCashflow(raw.transactions, prevPeriod));
+    expect(f.cashflow).toEqual(aggregateCashflow(raw.transactions, period, NO_FIXED));
+    expect(f.prevCashflow).toEqual(aggregateCashflow(raw.transactions, prevPeriod, NO_FIXED));
     expect(f.networth).toEqual(calculateNetWorth(raw.assets, raw.liabilities));
     expect(f.budgetLines).toEqual(evaluateBudget(raw.budgets, raw.transactions, period, DEMO_NOW));
     expect(f.categorySpend).toEqual(spendingByCategory(raw.transactions, period));
@@ -373,9 +380,10 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
     expect(f.jarEnvelope.pending.amount).toBe("unknown");
   });
 
-  it("S2: a pool cover leg (pool → jar) clears the jar's overspend and keeps the C1 identity", () => {
-    // CASA 8tr (already debited). food limit 3tr, spent 3.5tr → 500k over; the pool
-    // covered it with a `fromJarId: "pool"` leg → food remaining 0, not "cần bù".
+  it("S2: a pool cover leg (pool → jar) refills the jar's balance and keeps the C1 identity", () => {
+    // CASA 8tr (already debited). food limit 3tr, spent 3.5tr → 500k over plan; the
+    // pool refilled the BALANCE with a `fromJarId: "pool"` leg → food remaining 0, no
+    // longer "cần bù" — but the overspend against its own 3tr plan still stands.
     const cover = txn({
       type: "transfer",
       categoryId: REBALANCE_CATEGORY,
@@ -388,9 +396,10 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
     });
     const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
     const food = f.jarBudget.lines[0];
-    expect(food.remaining).toBe(0);
-    expect(food.status).not.toBe("over");
-    expect(f.jarEnvelope.jars[0].overLimit).toBe(false);
+    expect(food.remaining).toBe(0); // balance axis: healed
+    expect(food.limit).toBe(3_000_000); // plan axis: untouched by the cover
+    expect(food.status).toBe("over"); // 3.5tr spent on a 3tr plan
+    expect(f.jarEnvelope.jars[0].overLimit).toBe(true);
     const spendableTotal = f.jarBudget.lines.reduce((s, l) => s + (jarSpendable(l.remaining) ?? 0), 0);
     expect((f.unallocatedPool.amount as number) + spendableTotal).toBe(8_000_000); // C1 identity
     expect(f.unallocatedPool.amount).toBe(8_000_000); // pool not debited twice by the leg

@@ -1,8 +1,9 @@
 "use client";
 
 import { Search } from "lucide-react";
-import type { TransactionStatus } from "@/domain/models";
-import { CATEGORIES } from "@/domain/models";
+import type { StoredCategory, TransactionStatus } from "@/domain/models";
+import { CategoryTaxonomyNotice, taxonomyState } from "@/components/common/CategoryTaxonomyNotice";
+import { useCategories } from "@/state/categories";
 
 export interface TxnFilterState {
   search: string;
@@ -20,6 +21,17 @@ const STATUS_OPTIONS: { value: TxnFilterState["status"]; label: string }[] = [
   { value: "reversed", label: "Đã hủy" },
 ];
 
+/**
+ * Which categories the filter offers: the persona's ACTIVE ones, plus the one
+ * currently selected even if it has since been archived. Dropping a selected
+ * archived id would leave the control reading "Mọi danh mục" while the list below
+ * is still filtered (or, worse, silently widen the list) — the filter must always
+ * name what it is actually showing (invariant #5).
+ */
+function filterOptions(categories: StoredCategory[], selectedId: string): StoredCategory[] {
+  return categories.filter((c) => !c.archived || c.id === selectedId);
+}
+
 export function TxnFilters({
   value,
   onChange,
@@ -27,6 +39,10 @@ export function TxnFilters({
   value: TxnFilterState;
   onChange: (next: TxnFilterState) => void;
 }) {
+  const { categories, loaded, error, retry } = useCategories();
+  const options = filterOptions(categories, value.categoryId);
+  const state = taxonomyState({ loaded, error }, options.length);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 focus-within:ring-2 focus-within:ring-primary/50">
@@ -55,14 +71,23 @@ export function TxnFilters({
           value={value.categoryId}
           onChange={(e) => onChange({ ...value, categoryId: e.target.value })}
           aria-label="Lọc theo danh mục"
-          className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          disabled={state === "loading" || state === "error"}
+          className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-60"
         >
           <option value="all">Mọi danh mục</option>
-          {CATEGORIES.map((c) => (
+          {options.map((c) => (
             <option key={c.id} value={c.id}>{c.label}</option>
           ))}
         </select>
       </div>
+      {/* Never let a failed taxonomy load read as "this user has no categories" (U10). */}
+      <CategoryTaxonomyNotice
+        state={state}
+        error={error}
+        retry={retry}
+        emptyLabel="Chưa có danh mục nào để lọc."
+        className="text-xs"
+      />
     </div>
   );
 }

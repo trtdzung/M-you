@@ -3,7 +3,15 @@ import { categorize } from "../categorize-service";
 import type { ClassifyFn, ClassifyResult } from "../types";
 import type { CategoryMemory } from "@/state/category-memory";
 import { txn } from "@/domain/engine/__tests__/helpers";
-import { UNCLASSIFIED } from "@/domain/models";
+import { CATEGORIES, UNCLASSIFIED } from "@/domain/models";
+
+/**
+ * The whitelist these tests validate against. The bundled presets stand in for
+ * "the persona's stored taxonomy" here: the SERVICE has no default any more, so
+ * the list must be passed explicitly on every call — which is the contract under
+ * test (invariant #2).
+ */
+const TAXONOMY = CATEGORIES;
 
 const un = (over = {}) => txn({ categoryId: UNCLASSIFIED, type: "expense", ...over });
 const fixed = (results: ClassifyResult[]): ClassifyFn => async () => results;
@@ -14,6 +22,7 @@ describe("categorize — validation", () => {
     const out = await categorize({
       txns: [t],
       memory: {},
+      categories: TAXONOMY,
       classify: fixed([{ txnId: "a", categoryId: "not_a_category", confidence: 0.99 }]),
       classifyOrigin: "ai",
     });
@@ -24,6 +33,7 @@ describe("categorize — validation", () => {
     const out = await categorize({
       txns: [un({ id: "a", merchantNormalizedName: "zzz" })],
       memory: {},
+      categories: TAXONOMY,
       classify: fixed([{ txnId: "a", categoryId: UNCLASSIFIED, confidence: 0.99 }]),
       classifyOrigin: "ai",
     });
@@ -34,6 +44,7 @@ describe("categorize — validation", () => {
     const out = await categorize({
       txns: [un({ id: "a", type: "expense", merchantNormalizedName: "zzz" })],
       memory: {},
+      categories: TAXONOMY,
       classify: fixed([{ txnId: "a", categoryId: "transfer", confidence: 0.99 }]),
       classifyOrigin: "ai",
     });
@@ -44,6 +55,7 @@ describe("categorize — validation", () => {
     const out = await categorize({
       txns: [un({ id: "a", merchantNormalizedName: "zzz" })],
       memory: {},
+      categories: TAXONOMY,
       classify: fixed([{ txnId: "ghost", categoryId: "dining", confidence: 0.99 }]),
       classifyOrigin: "ai",
     });
@@ -57,6 +69,7 @@ describe("categorize — confidence gate", () => {
     const out = await categorize({
       txns,
       memory: {},
+      categories: TAXONOMY,
       classify: fixed([
         { txnId: "hi", categoryId: "dining", confidence: 0.8 },
         { txnId: "lo", categoryId: "dining", confidence: 0.79 },
@@ -79,6 +92,7 @@ describe("categorize — memory-first", () => {
     const out = await categorize({
       txns: [un({ id: "a", merchantNormalizedName: "cho ba" })],
       memory,
+      categories: TAXONOMY,
       classify,
       classifyOrigin: "ai",
     });
@@ -95,6 +109,7 @@ describe("categorize — memory-first", () => {
     const out = await categorize({
       txns: [un({ id: "a", merchantNormalizedName: "cho ba" })],
       memory,
+      categories: TAXONOMY,
       classify,
       classifyOrigin: "ai",
     });
@@ -113,7 +128,7 @@ describe("categorize — chunking + isolation", () => {
       if (call === 1) throw new Error("chunk boom");
       return inputs.map((i) => ({ txnId: i.txnId, categoryId: "dining", confidence: 0.9 }));
     };
-    const out = await categorize({ txns, memory: {}, classify, classifyOrigin: "ai", chunkSize: 2 });
+    const out = await categorize({ txns, memory: {}, categories: TAXONOMY, classify, classifyOrigin: "ai", chunkSize: 2 });
     // 5 txns → chunks of 2,2,1. First chunk throws (2 lost), rest yield 3.
     expect(out.chunkErrors).toBe(1);
     expect(out.assignments).toHaveLength(3);
@@ -127,7 +142,7 @@ describe("categorize — eligibility", () => {
       un({ id: "transfer", type: "transfer" }), // sentinel but ineligible type
     ];
     const classify = vi.fn(fixed([]));
-    const out = await categorize({ txns, memory: {}, classify, classifyOrigin: "ai" });
+    const out = await categorize({ txns, memory: {}, categories: TAXONOMY, classify, classifyOrigin: "ai" });
     expect(classify).not.toHaveBeenCalled(); // nothing eligible
     expect(out.assignments).toHaveLength(0);
   });

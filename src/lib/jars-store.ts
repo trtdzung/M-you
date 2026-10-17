@@ -14,6 +14,7 @@ import "server-only";
 
 import type { Jar, JarConfig, JarRole } from "@/domain/models";
 import { dedupeCategories, healOrphanCategories } from "@/domain/jar-rules";
+import { assignableCategoryIds } from "./categories-store";
 import { getDb } from "./db";
 
 /** The four donor-waterfall roles (plan 260918-1120, Phase 04 persistence). */
@@ -155,13 +156,16 @@ export function sanitizeJars(input: unknown): Jar[] | null {
  * `healOrphanCategories` sees every expense category as orphaned and synthesizes
  * a single catch-all "Khác" jar holding all of them (the same healing that runs
  * for any other persona) — this config is never a crash, but callers should not
- * assume "no rows" means "no jars back".
+ * assume "no rows" means "no jars back". The heal runs against this persona's
+ * STORED assignable taxonomy, not the bundled constant: that is what makes a
+ * category the user just created land in "Khác" by itself, and what leaves an
+ * ARCHIVED one (absent from that set) exactly where it is — the heal only ever
+ * adds, so no historical jar total moves.
  */
 export function readJarConfig(cif: string): JarConfig {
-  const rows = getDb()
-    .prepare("SELECT * FROM jars WHERE cif = ? ORDER BY sort_order ASC")
-    .all(cif) as JarRow[];
-  return healOrphanCategories(dedupeCategories({ version: 3, jars: rows.map(toJar) }));
+  const rows = getDb().prepare("SELECT * FROM jars WHERE cif = ? ORDER BY sort_order ASC").all(cif) as JarRow[];
+  const config = dedupeCategories({ version: 3, jars: rows.map(toJar) });
+  return healOrphanCategories(config, assignableCategoryIds(cif));
 }
 
 /**

@@ -8,16 +8,37 @@
  * The "savings" jar has no categories (spend is always 0), so its limit is
  * genuinely meaningless — `budgetLimit` stays `undefined` (unknown, never 0).
  *
- * IDs are validated against the current taxonomy so a provisional category set
- * never seeds an unknown id into a jar.
+ * **Templates are PRESET-ONLY, on purpose.** They are authored here, in code,
+ * against the bundled taxonomy — they cannot know about a category the user
+ * created. Consequence a caller must accept before applying one: a template
+ * replaces the whole jar set with these preset-only jars, so every CUSTOM
+ * category is re-orphaned and the read-heal (`healOrphanCategories`) lands it in
+ * "Khác". Nothing is lost and no total moves (heal only ever ADDS), but the
+ * user's own grouping of their own categories is gone. Do NOT "fix" this by
+ * reading the stored taxonomy here: this module is pure, cif-less and is the
+ * seed itself.
  */
 
 import type { Budget, Jar, JarConfig, JarRole } from "./index";
-import { CATEGORY_BY_ID } from "./categories";
+import { CATEGORIES } from "./categories";
 
-/** Keep only ids that currently exist as an expense category. */
+/**
+ * The BUNDLED preset expense ids. Named "built-in" on purpose: since the taxonomy
+ * became per-persona and writable (`data/schema.sql` → `categories`), this is no
+ * longer "the user's expense categories" — it is only the seed every persona
+ * starts from, and the fixed set these templates are authored against. Anything
+ * that VALIDATES or HEALS a real persona's config must pass that persona's STORED
+ * set (`assignableCategoryIds` / `knownExpenseCategoryIds`) instead.
+ */
+export const BUILT_IN_EXPENSE_IDS: readonly string[] = CATEGORIES.filter(
+  (c) => c.kind === "expense",
+).map((c) => c.id);
+
+const BUILT_IN_EXPENSE_ID_SET: ReadonlySet<string> = new Set(BUILT_IN_EXPENSE_IDS);
+
+/** Keep only ids that are a BUILT-IN expense category (templates are preset-only). */
 function expenseOnly(ids: string[]): string[] {
-  return ids.filter((id) => CATEGORY_BY_ID[id]?.kind === "expense");
+  return ids.filter((id) => BUILT_IN_EXPENSE_ID_SET.has(id));
 }
 
 const jar = (

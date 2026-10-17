@@ -85,17 +85,38 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_transactions_cif_posted ON transactions (cif, posted_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_cif_source ON transactions (cif, source, posted_at);
 
--- The spending/transfer category taxonomy ("categories are data", invariant #7).
--- Seeded lazily from `src/domain/models/categories.ts` (INSERT OR IGNORE, so a
--- category added in code appears and an edited row is never clobbered). Sentinels
--- (`unclassified`, `income`, `dieu-chinh-hu`) are NOT categories and never stored.
+-- The spending/transfer category taxonomy ("categories are data", invariant #7),
+-- PER PERSONA (`cif`) — like `jars`, `transactions` and `transaction_corrections`.
+-- Per-cif is load-bearing, not cosmetic: jars are per-cif and every expense
+-- category belongs to exactly one jar, so a GLOBAL taxonomy would mean one
+-- persona's new category becomes an orphan for EVERY persona and each one's next
+-- `readJarConfig` silently heals it into their "Khác" jar.
+-- Seeded lazily per cif from `src/domain/models/categories.ts` (INSERT OR IGNORE,
+-- so a category added in code appears and an edited row is never clobbered).
+-- Sentinels (`unclassified`, `income`, `dieu-chinh-hu`) are NOT categories and
+-- never stored.
+--  - `custom` 0 = bundled preset (rename/delete-locked through the API, 403),
+--    1 = user-created. A SEPARATE axis from `fixed` (which means "fixed/recurring
+--    cost" and feeds the cashflow fixed-vs-discretionary split) — never overload it.
+--  - `archived_at` NULL = active. An archived category leaves the assignable set
+--    (pickers, orphan-heal) but KEEPS its jar membership and stays "known", so no
+--    historical jar total ever moves and old corrections still round-trip.
+-- NOT BACKWARD COMPATIBLE with a pre-Phase-02 `data/pfm.sqlite3`: the old table
+-- has no `cif` column and `CREATE TABLE IF NOT EXISTS` will not add one, so a
+-- stale file fails loudly on the index below. Run `npm run db:seed`.
 CREATE TABLE IF NOT EXISTS categories (
-  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  id TEXT NOT NULL,                 -- preset id, or `c_<slug>` for a custom one
   label TEXT NOT NULL,              -- Vietnamese display label
   kind TEXT NOT NULL CHECK (kind IN ('expense', 'transfer')),
   fixed INTEGER NOT NULL,           -- 1 = fixed/recurring spend, 0 = discretionary
-  sort_order INTEGER NOT NULL
+  custom INTEGER NOT NULL DEFAULT 0,-- 1 = user-created (rename/delete allowed)
+  archived_at TEXT,                 -- ISO 8601; NULL = active
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (cif, id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_categories_cif ON categories (cif, sort_order);
 
 -- Per-transaction category overlay per persona (`cif`): user corrections AND
 -- AI/memory/heuristic assignments, plus the `hidden` flag. An overlay, never a

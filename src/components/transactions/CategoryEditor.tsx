@@ -1,19 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { useCorrections, useConfirmCategory } from "@/state/corrections";
 import { Sheet } from "@/components/primitives";
+import { CategoryCreateSheet } from "@/components/settings/CategoryCreateSheet";
 import { CategoryOptionGrid } from "./CategoryPickerSheet";
 
 /**
  * Bottom-sheet to re-categorize a transaction. Writes an in-session user
  * correction AND teaches the per-persona memory (via `confirmCategory`), so the
  * same merchant is recognised next time (invariant #4 — overlay, never mutation).
+ *
+ * "＋ Thêm danh mục" mở trình tạo KHÔNG kèm `jarId`: từ một giao dịch, người dùng
+ * chưa chọn hũ nào cả, nên server heal danh mục mới vào "Khác" và sheet nói rõ
+ * điều đó. Danh mục vừa tạo được gán luôn cho giao dịch này.
  */
 export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
   const { clearCategory } = useCorrections();
   const confirmCategory = useConfirmCategory();
+  const [adding, setAdding] = useState(false);
 
   function choose(categoryId: string) {
     confirmCategory(txn, categoryId);
@@ -22,7 +29,19 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
 
   return (
     <Sheet title="Sửa danh mục" description={txn.merchantName} onClose={onClose}>
-      <CategoryOptionGrid selectedId={txn.categoryId} kind="all" onSelect={choose} />
+      <CategoryOptionGrid
+        selectedId={txn.categoryId}
+        kind="all"
+        onSelect={choose}
+        onAddCategory={() => setAdding(true)}
+      />
+
+      {adding && (
+        <CategoryCreateSheet
+          onCreated={choose}
+          onClose={() => setAdding(false)}
+        />
+      )}
 
       {txn.userEdited && (
         <button

@@ -8,17 +8,25 @@
  *   2. remaining → `classify` in chunks ≤ CATEGORIZE_CHUNK_SIZE (#14); one bad
  *      chunk is isolated, the rest still return.
  *   3. TWO-TIER validation of every classifier result:
- *        (a) syntactic — categoryId ∈ taxonomy and not the UNCLASSIFIED sentinel;
+ *        (a) syntactic — categoryId ∈ the PASSED taxonomy and not the UNCLASSIFIED
+ *            sentinel;
  *        (b) semantic  — the category's `kind` must match the txn `type` (#4).
  *      A result failing either tier is DROPPED (the txn stays unclassified — we
  *      never invent a category).
  *   4. gate — confidence ≥ threshold ⇒ applied, else pending (#6, don't count).
  *
+ * The whitelist is `params.categories` — the persona's STORED taxonomy, the SAME
+ * list `buildCategorizeSystemPrompt` offered the model (invariant #2). It is
+ * never the bundled constant and there is no fallback: an id outside the passed
+ * list is dropped and the transaction stays unclassified. Passing `[]` therefore
+ * rejects everything, which is the honest outcome for a persona with no
+ * assignable categories — never a silent reversion to a preset.
+ *
  * The service returns overlay `Assignment[]`, never a money figure (invariant #1).
  */
 
-import type { Transaction } from "@/domain/models";
-import { CATEGORY_BY_ID, UNCLASSIFIED } from "@/domain/models";
+import type { CategoryDef, Transaction } from "@/domain/models";
+import { UNCLASSIFIED } from "@/domain/models";
 import { isUnclassified } from "@/domain/categorize/unclassified";
 import type { Assignment } from "@/state/corrections-core";
 import { lookupMemory, type CategoryMemory } from "@/state/category-memory";
@@ -28,6 +36,11 @@ import type { ClassifyFn, ClassifyInput, ClassifyOrigin } from "./types";
 export interface CategorizeParams {
   txns: Transaction[];
   memory: CategoryMemory;
+  /**
+   * The persona's ASSIGNABLE categories — the whitelist every suggestion (model
+   * AND memory) is validated against. Required: there is no bundled default.
+   */
+  categories: readonly CategoryDef[];
   classify: ClassifyFn;
   /** Provenance for classifier-produced assignments ("ai" or "heuristic"). */
   classifyOrigin: ClassifyOrigin;
@@ -49,15 +62,23 @@ export interface CategorizeOutcome {
 }
 
 /** The category's kind must match the transaction's type (Red Team #4). */
-function kindMatchesType(categoryId: string, txnType: Transaction["type"]): boolean {
-  const kind = CATEGORY_BY_ID[categoryId]?.kind;
+function kindMatchesType(
+  byId: ReadonlyMap<string, CategoryDef>,
+  categoryId: string,
+  txnType: Transaction["type"],
+): boolean {
+  const kind = byId.get(categoryId)?.kind;
   if (txnType === "expense") return kind === "expense";
   return false; // transfer / card_payment / fee / refund are never AI-labelled
 }
 
-function isValidSuggestion(categoryId: string, txnType: Transaction["type"]): boolean {
-  if (categoryId === UNCLASSIFIED || !CATEGORY_BY_ID[categoryId]) return false; // (a) syntactic
-  return kindMatchesType(categoryId, txnType); // (b) semantic
+function isValidSuggestion(
+  byId: ReadonlyMap<string, CategoryDef>,
+  categoryId: string,
+  txnType: Transaction["type"],
+): boolean {
+  if (categoryId === UNCLASSIFIED || !byId.has(categoryId)) return false; // (a) syntactic
+  return kindMatchesType(byId, categoryId, txnType); // (b) semantic
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -67,9 +88,15 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 export async function categorize(params: CategorizeParams): Promise<CategorizeOutcome> {
-  const { txns, memory, classify, classifyOrigin } = params;
+  const { txns, memory, categories, classify, classifyOrigin } = params;
   const threshold = params.threshold ?? CATEGORIZE_CONFIDENCE_THRESHOLD;
   const chunkSize = Math.max(1, params.chunkSize ?? CATEGORIZE_CHUNK_SIZE);
+  // The one whitelist for this run: built from the passed taxonomy and nothing
+  // else, so the answer can only ever be a category the user actually has.
+  const categoryById: ReadonlyMap<string, CategoryDef> = new Map(categories.map((c) => [c.id, c]));
+  const assignableIds: ReadonlySet<string> = new Set(
+    categories.filter((c) => c.kind === "expense").map((c) => c.id),
+  );
 
   // Defense-in-depth: only ever act on AI-eligible unclassified txns.
   const eligible = txns.filter(isUnclassified);
@@ -83,9 +110,12 @@ export async function categorize(params: CategorizeParams): Promise<CategorizeOu
   const remaining: Transaction[] = [];
   for (const t of eligible) {
     const merchant = t.merchantNormalizedName || t.merchantName;
-    const { categoryId, deadKey } = lookupMemory(memory, merchant);
+    // Memory is validated against the SAME stored taxonomy (not the bundled
+    // presets): a merchant the user mapped to a category they created must still
+    // be a hit, and a mapping to a category they archived must go stale.
+    const { categoryId, deadKey } = lookupMemory(memory, merchant, assignableIds);
     if (deadKey) deadMemoryKeys.push(deadKey);
-    if (categoryId && kindMatchesType(categoryId, t.type)) {
+    if (categoryId && kindMatchesType(categoryById, categoryId, t.type)) {
       assignments.push({ txnId: t.id, categoryId, origin: "memory", status: "applied" });
       memoryApplied++;
     } else {
@@ -116,7 +146,7 @@ export async function categorize(params: CategorizeParams): Promise<CategorizeOu
       const t = byId.get(r.txnId);
       if (!t) continue; // classifier hallucinated an id — ignore
       // 3. two-tier validation.
-      if (!isValidSuggestion(r.categoryId, t.type)) continue;
+      if (!isValidSuggestion(categoryById, r.categoryId, t.type)) continue;
       // 4. confidence gate.
       const status = r.confidence >= threshold ? "applied" : "pending";
       if (status === "applied") applied++;

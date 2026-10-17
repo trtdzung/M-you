@@ -5,10 +5,12 @@ import { Check, EyeOff, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import type { Transaction, TransactionType } from "@/domain/models";
 import { categoryLabel } from "@/domain/models";
 import { Money, Sheet, SourceBadge } from "@/components/primitives";
+import { useCategories } from "@/state/categories";
 import { useCorrections, useConfirmCategory } from "@/state/corrections";
 import { useCategoryMemory } from "@/state/category-memory";
 import { categoryColor } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
+import { CategoryCreateSheet } from "@/components/settings/CategoryCreateSheet";
 import { CategoryOptionGrid } from "./CategoryPickerSheet";
 import { CategoryProvenanceBadge } from "./CategoryProvenanceBadge";
 
@@ -34,9 +36,13 @@ function formatDate(iso: string): string {
  */
 export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
   const { corrections, clearCategory, setHidden, unsaved } = useCorrections();
+  // Nhãn lấy từ taxonomy đã lưu của người dùng (kể cả danh mục đã ẩn — giao dịch cũ
+  // vẫn phải gọi đúng tên, invariant #5), không lấy từ hằng số đóng gói.
+  const { labels } = useCategories();
   const confirmCategory = useConfirmCategory();
   const { forget } = useCategoryMemory();
   const [picking, setPicking] = useState(false);
+  const [adding, setAdding] = useState(false);
   const correction = corrections[txn.id];
   const hidden = correction?.hidden === true;
   const isPendingSuggestion = correction?.status === "pending" && correction.categoryId !== undefined;
@@ -77,7 +83,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
           <div className="flex flex-col gap-2 rounded-row border border-dashed border-primary/50 bg-primary-soft/40 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <CategoryProvenanceBadge correction={correction} />
-              <span className="text-sm font-medium text-text">{categoryLabel(correction.categoryId)}</span>
+              <span className="text-sm font-medium text-text">{categoryLabel(correction.categoryId, labels)}</span>
             </div>
             <div className="flex gap-2">
               <button
@@ -112,7 +118,12 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
             )}
           </div>
           {picking ? (
-            <CategoryOptionGrid selectedId={txn.categoryId} kind="all" onSelect={choose} />
+            <CategoryOptionGrid
+              selectedId={txn.categoryId}
+              kind="all"
+              onSelect={choose}
+              onAddCategory={() => setAdding(true)}
+            />
           ) : (
             <>
               <button
@@ -121,7 +132,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
                 className="flex min-h-11 w-full items-center gap-2 rounded-row border border-border bg-surface px-3 py-2 text-sm text-text hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryColor(txn.categoryId) }} />
-                <span className="flex-1 truncate text-left">{categoryLabel(txn.categoryId)}</span>
+                <span className="flex-1 truncate text-left">{categoryLabel(txn.categoryId, labels)}</span>
                 <Pencil size={13} className="shrink-0 text-primary" aria-hidden />
                 <span className="text-xs text-primary">Đổi</span>
               </button>
@@ -156,6 +167,11 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
           />
         </label>
       </div>
+
+      {/* Tạo từ một giao dịch: KHÔNG kèm `jarId` — người dùng chưa chọn hũ nào,
+          nên server heal danh mục mới vào "Khác" và sheet nói rõ nó rơi vào đâu.
+          Danh mục vừa tạo được gán luôn cho giao dịch này. */}
+      {adding && <CategoryCreateSheet onCreated={choose} onClose={() => setAdding(false)} />}
     </Sheet>
   );
 }

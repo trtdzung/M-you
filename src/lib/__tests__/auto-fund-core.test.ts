@@ -185,9 +185,9 @@ describe("snapshotForDate — overrides/excludeIds splice a not-yet-rerendered m
 
 describe("overspendOf", () => {
   const lines = [
-    { huId: "over", label: "Over", categoryIds: [], spent: 5_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, effectiveLimit: 4_000_000, remaining: -1_000_000, pct: 1.25, status: "over" as const, thresholdHit: true, source: "mock" as const, freshness: null },
-    { huId: "ok", label: "Ok", categoryIds: [], spent: 1_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, effectiveLimit: 4_000_000, remaining: 3_000_000, pct: 0.25, status: "ok" as const, thresholdHit: false, source: "mock" as const, freshness: null },
-    { huId: "unset", label: "Unset", categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null, limit: null, limitState: "unset" as const, rebalanceNet: 0, effectiveLimit: null, remaining: null, pct: null, status: null, thresholdHit: false, source: "mock" as const, freshness: null },
+    { huId: "over", label: "Over", categoryIds: [], spent: 5_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, remaining: -1_000_000, pct: 1.25, status: "over" as const, thresholdHit: true, source: "mock" as const, freshness: null },
+    { huId: "ok", label: "Ok", categoryIds: [], spent: 1_000_000, prevSpent: 0, momDelta: 0, momPct: null, limit: 4_000_000, limitState: "set" as const, rebalanceNet: 0, remaining: 3_000_000, pct: 0.25, status: "ok" as const, thresholdHit: false, source: "mock" as const, freshness: null },
+    { huId: "unset", label: "Unset", categoryIds: [], spent: 0, prevSpent: 0, momDelta: 0, momPct: null, limit: null, limitState: "unset" as const, rebalanceNet: 0, remaining: null, pct: null, status: null, thresholdHit: false, source: "mock" as const, freshness: null },
   ];
 
   it("returns the positive magnitude of a negative remaining", () => {

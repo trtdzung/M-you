@@ -6,7 +6,7 @@ import { spendingByCategory } from "@/domain/engine/category";
 import type { Period } from "@/domain/engine/types";
 import { generateDataset } from "@/providers/mock/fixtures/generate";
 import { PERSONAS } from "@/providers/mock/personas";
-import { UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
+import { FIXED_CATEGORY_IDS, UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
 
 describe("isUnclassified (type gate — Red Team #4)", () => {
   it("is true for an unclassified expense", () => {
@@ -53,7 +53,7 @@ describe("engine tolerates UNCLASSIFIED without defaulting to 0 (invariant #6)",
       txn({ id: "a", categoryId: "dining", type: "expense", amount: 100 }),
       txn({ id: "b", categoryId: UNCLASSIFIED, type: "expense", amount: 40 }),
     ];
-    const cf = aggregateCashflow(txns, period);
+    const cf = aggregateCashflow(txns, period, FIXED_CATEGORY_IDS);
     expect(cf.expense).toBe(140); // unclassified money is NOT dropped from the total
     const rows = spendingByCategory(txns, period);
     const unclRow = rows.find((r) => r.categoryId === UNCLASSIFIED);

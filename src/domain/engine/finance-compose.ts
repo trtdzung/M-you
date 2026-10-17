@@ -16,6 +16,7 @@ import type {
   Liability,
   MockProduct,
   MonthlySnapshot,
+  StoredCategory,
   Transaction,
 } from "@/domain/models";
 import {
@@ -149,6 +150,14 @@ export interface Financials {
    * `listGoals()` stays seed-only, red-team #2/#3).
    */
   goals: Goal[];
+  /**
+   * id → label over the PERSONA'S stored taxonomy, the map this composition ran
+   * with. Exposed so every downstream presenter (insight detectors, charts) names
+   * a category exactly as the numbers above were labelled — one map, no second
+   * lookup that could disagree. Empty when the caller supplied no taxonomy; then
+   * `categoryLabel`'s built-in fallback still names the ten presets.
+   */
+  categoryLabels: ReadonlyMap<string, string>;
 }
 
 export interface ComposeOptions {
@@ -181,6 +190,25 @@ export interface ComposeOptions {
    * (red-team #2) with no double-count (red-team #3).
    */
   userGoals?: Goal[];
+  /**
+   * The persona's STORED category taxonomy (`useCategories().categories`, archived
+   * included so a historical label still resolves). Categories are data, not a
+   * bundled constant (invariant #7), and this is the single seam through which
+   * they reach the engine — `src/domain` stays pure, with no hook, fetch or
+   * `server-only` import.
+   *
+   * It drives exactly two things, both derived here so there is one definition:
+   *  - `labels` — presentation. Absent ⇒ `categoryLabel` falls back to the built-in
+   *    preset map, then to the raw id. Never affects an amount.
+   *  - `fixedCategoryIds` — the fixed/discretionary split of `expense`. Absent ⇒
+   *    nothing is flagged fixed (`fixed: 0`, `discretionary: expense`). That is a
+   *    truthful reading of an empty taxonomy, but it is NOT what a real persona
+   *    looks like: every client path must pass this (`useFinancials` does), and a
+   *    test that asserts the split must pass it too.
+   * `income`, `expense`, `net` and every jar/budget number are identical with or
+   * without it.
+   */
+  categories?: StoredCategory[];
 }
 
 /**
@@ -201,7 +229,13 @@ export function computeFinancials(
   const period = monthPeriodFromKey(month);
   const prevPeriod = monthPeriodFromKey(prevMonthKey(month));
   const recurring = detectRecurring(txns);
-  const cashflow = aggregateCashflow(txns, period);
+  // The two views of the stored taxonomy the engine needs, derived once (DRY).
+  const taxonomy = options.categories ?? [];
+  const labels: ReadonlyMap<string, string> = new Map(taxonomy.map((c) => [c.id, c.label]));
+  const fixedCategoryIds: ReadonlySet<string> = new Set(
+    taxonomy.filter((c) => c.fixed).map((c) => c.id),
+  );
+  const cashflow = aggregateCashflow(txns, period, fixedCategoryIds);
   const obligations = upcomingObligations(recurring, liabilities, { now, horizonDays: 30 });
   const trend = networthTrend(raw.snapshots);
 
@@ -253,10 +287,10 @@ export function computeFinancials(
   return {
     monthKey: month,
     cashflow,
-    prevCashflow: aggregateCashflow(txns, prevPeriod),
+    prevCashflow: aggregateCashflow(txns, prevPeriod, fixedCategoryIds),
     networth,
-    budgetLines: evaluateBudget(raw.budgets, txns, period, now),
-    categorySpend: spendingByCategory(txns, period),
+    budgetLines: evaluateBudget(raw.budgets, txns, period, now, labels),
+    categorySpend: spendingByCategory(txns, period, undefined, labels),
     recurring,
     obligations,
     endOfMonth,
@@ -272,5 +306,6 @@ export function computeFinancials(
     unlabeled: { count: unlabeled.count, amount: unlabeled.amount, source: unlabeled.source },
     health: financialHealth(cashflow, raw.accounts, networth),
     goals: [...raw.goals, ...(options.userGoals ?? [])],
+    categoryLabels: labels,
   };
 }

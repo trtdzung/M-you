@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FIXED_CATEGORY_IDS } from "@/domain/models";
 import { aggregateCashflow } from "../cashflow";
 import { monthPeriod } from "../types";
 import { txn } from "./helpers";
@@ -13,6 +14,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "housing", amount: 6_000_000 }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.expense).toBe(6_200_000);
   });
@@ -25,6 +27,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "dining", amount: 2_000_000 }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.income).toBe(28_000_000);
     expect(result.expense).toBe(2_000_000);
@@ -38,6 +41,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "dining", amount: 200_000 }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.byCategory).toEqual([{ categoryId: "dining", amount: 200_000 }]);
   });
@@ -51,6 +55,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "dining", amount: 300_000 }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.expense).toBe(300_000);
   });
@@ -62,6 +67,7 @@ describe("aggregateCashflow", () => {
         txn({ id: "ref", type: "refund", direction: "credit", categoryId: "shopping", amount: 400_000, relatedTransactionId: "buy" }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.expense).toBe(600_000);
     expect(result.byCategory).toEqual([{ categoryId: "shopping", amount: 600_000 }]);
@@ -74,6 +80,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "dining", amount: 200_000 }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.expense).toBe(200_000);
   });
@@ -85,6 +92,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "shopping", amount: 800_000, status: "pending" }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.expense).toBe(200_000);
     expect(result.pendingExpense).toBe(800_000);
@@ -98,6 +106,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "dining", amount: 1_100_000 }), // discretionary
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.fixed).toBe(6_900_000);
     expect(result.discretionary).toBe(1_100_000);
@@ -110,6 +119,7 @@ describe("aggregateCashflow", () => {
         txn({ type: "expense", categoryId: "dining", amount: 300_000, postedAt: "2026-06-15T10:00:00.000Z" }),
       ],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.expense).toBe(300_000);
   });
@@ -118,6 +128,7 @@ describe("aggregateCashflow", () => {
     const result = aggregateCashflow(
       [txn({ type: "expense", amount: 100_000, source: "msb", postedAt: "2026-06-20T10:00:00.000Z" })],
       JUNE,
+      FIXED_CATEGORY_IDS,
     );
     expect(result.meta.period.label).toBe("06/2026");
     expect(result.meta.sourceCoverage.sources).toContain("msb");

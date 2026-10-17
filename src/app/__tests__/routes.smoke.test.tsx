@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
+import { CategoryTaxonomyProvider } from "@/state/categories";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { GoalProvider } from "@/state/goals";
@@ -48,11 +49,13 @@ function renderScreen(ui: ReactElement) {
       <CorrectionsProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
+          <CategoryTaxonomyProvider>
             <AssetLiabilityProvider>
               <GoalProvider>
                 <PeriodProvider>{ui}</PeriodProvider>
               </GoalProvider>
             </AssetLiabilityProvider>
+          </CategoryTaxonomyProvider>
         </JarConfigProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>

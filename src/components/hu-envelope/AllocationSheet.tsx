@@ -12,10 +12,20 @@ import { AllocationJarRow } from "./AllocationJarRow";
 
 /**
  * "Chia ngay" bottom sheet: set each jar's **hạn mức** (`budgetLimit`) — the one
- * number that is at once its allocation, its ceiling and its balance. This is a
- * "số tổng mới" editor, NOT a top-up: every input is PREFILLED with the jar's
- * current limit, so editing one jar never wipes another's (red-team C1). It moves
- * NO real money — a pure display partition of the CASA balance (invariant #3).
+ * number that is at once its allocation, its ceiling and its balance. It moves NO
+ * real money — a pure display partition of the CASA balance (invariant #3).
+ *
+ * DIVIDE-FROM-SCRATCH: every input opens at 0 and "Còn lại để chia" opens at the
+ * FULL CASA balance, so the sheet always states the same thing it does: you are
+ * splitting the whole balance again. It is deliberately NOT prefilled with the
+ * current limits — a prefilled sheet left a leftover remainder sitting in "Còn
+ * lại để chia" (e.g. 880K) that read as an error rather than as unallocated
+ * money. A jar left at 0 therefore ends up "chưa đặt hạn mức", and its previous
+ * limit is shown beside the input as reference only.
+ *
+ * Because an untouched sheet would otherwise wipe every limit, `canSubmit`
+ * requires at least one jar to carry a positive amount — opening the sheet and
+ * hitting "Lưu hạn mức" straight away can never clear the whole config.
  *
  * Guardrail: Σ (hạn mức mới của mọi hũ) ≤ CASA pool. The server re-checks and
  * rejects 422 if exceeded (client check is UX). Writes atomically via
@@ -33,10 +43,10 @@ export function AllocationSheet({
 }) {
   const { updateJars } = useJarConfig();
   const { pending } = envelope;
-  // Prefill each jar with its current budgetLimit (0 = chưa đặt). Editing a row
-  // sets that jar's NEW total limit; other rows keep their prefilled value.
+  // Every jar opens at 0: this sheet divides the whole balance again rather than
+  // topping up the existing split. A row left at 0 is saved as "chưa đặt hạn mức".
   const [draft, setDraft] = useState<Record<string, number>>(() =>
-    Object.fromEntries(jars.map((j) => [j.id, j.budgetLimit ?? 0])),
+    Object.fromEntries(jars.map((j) => [j.id, 0])),
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
@@ -44,22 +54,20 @@ export function AllocationSheet({
   const poolKnown = pending.pool !== "unknown";
   const pool = poolKnown ? (pending.pool as number) : 0;
   const allocated = useMemo(() => Object.values(draft).reduce((s, n) => s + (n || 0), 0), [draft]);
-  // Live headroom as the user edits. At open (draft = current limits) this equals
-  // `pending.amount` by construction — the "Chờ phân bổ" card the CTA came from
-  // shows the same number, so "Chia ngay 13tr" can't land on "còn 200k".
+  // Live headroom as the user edits. At open (every row 0) this is the FULL CASA
+  // balance — the sheet divides everything again, so there is never a leftover
+  // remainder carried in from the previous split.
   const leftToSplit = pool - allocated;
-  const changed = useMemo(
-    () => jars.some((j) => (draft[j.id] ?? 0) !== (j.budgetLimit ?? 0)),
-    [draft, jars],
-  );
-  const canSubmit = poolKnown && leftToSplit >= 0 && changed && !submitting;
+  // A sheet nobody typed into must not be savable: it would clear every limit.
+  const canSubmit = poolKnown && leftToSplit >= 0 && allocated > 0 && !submitting;
 
   async function submit() {
     setError(false);
     setSubmitting(true);
     try {
-      // Only send jars whose limit actually changed. 0 → clear back to "chưa đặt"
-      // (invariant #6: an empty limit is unknown, never a stored 0).
+      // Only send jars whose limit actually changed — a jar left at 0 that had no
+      // limit is skipped, a jar left at 0 that HAD one is cleared back to "chưa
+      // đặt" (invariant #6: an empty limit is unknown, never a stored 0).
       const patches: Record<string, { budgetLimit: number | undefined }> = {};
       for (const jar of jars) {
         const next = draft[jar.id] ?? 0;
@@ -75,7 +83,7 @@ export function AllocationSheet({
   }
 
   return (
-    <Sheet title="Đặt hạn mức cho hũ" description="Đặt hạn mức mỗi hũ — hạn mức là số dư hiển thị. Không chuyển tiền, không cần OTP." onClose={onClose}>
+    <Sheet title="Đặt hạn mức cho hũ" description="Chia lại toàn bộ số dư — hạn mức là số dư hiển thị. Hũ để trống sẽ thành chưa đặt hạn mức. Không chuyển tiền, không cần OTP." onClose={onClose}>
       {!poolKnown ? (
         <InsufficientData description="Chưa có số dư tài khoản để phân bổ." />
       ) : (

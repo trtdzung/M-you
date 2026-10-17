@@ -14,6 +14,7 @@ import path from "node:path";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DB_PATH = path.join(ROOT, "data", "pfm.sqlite3");
 const SCHEMA_PATH = path.join(ROOT, "data", "schema.sql");
+const SEED_JARS_PATH = path.join(ROOT, "data", "seed-jars.json");
 
 const NOW = new Date().toISOString();
 
@@ -31,20 +32,17 @@ const SEED_BENEFICIARIES = [
   { id: "b_w_hoa", cif: "CIF_0003", name: "Lê Thị Hoa", accountNumber: "0071000998877", bankName: "Vietcombank" },
 ];
 
-// The "Cá nhân" 6-jar template (src/domain/models/jar-defaults.ts) — duplicated
-// here rather than imported, same reasoning as SEED_BENEFICIARIES above (this
-// is a plain .mjs script, no TS loader configured).
+// The "Cá nhân" 6-jar template, read from data/seed-jars.json — the ONE copy this
+// plain .mjs script and `JAR_TEMPLATES.caNhan` (src/domain/models/jar-defaults.ts)
+// both answer to. It used to be a second hand-maintained literal here, which is
+// exactly how a seeded jar drifts from the template a persona is later re-applied
+// (different limits, different categories, silently different numbers).
+// `scripts/__tests__/seed-jars-parity.test.ts` fails the build if the two diverge.
 // `role` mirrors the template's donor-waterfall role (U11) — the column must be
 // seeded, or every seeded jar reads back role-less (engine default `spending`)
-// and the "Tiết kiệm" buffer / "Thiết yếu" essential ordering is lost.
-const SEED_JARS = [
-  { id: "essentials", label: "Thiết yếu", categoryIds: ["housing", "utilities", "insurance", "subscriptions"], role: "essential", budgetLimit: 8_000_000 },
-  { id: "food", label: "Ăn uống", categoryIds: ["dining", "groceries"], role: "spending", budgetLimit: 4_000_000 },
-  { id: "transport", label: "Di chuyển", categoryIds: ["transport"], role: "spending", budgetLimit: 1_500_000 },
-  { id: "lifestyle", label: "Hưởng thụ", categoryIds: ["entertainment", "shopping"], role: "spending", budgetLimit: 2_500_000 },
-  { id: "health", label: "Sức khỏe", categoryIds: ["health"], role: "spending", budgetLimit: 1_000_000 },
-  { id: "savings", label: "Tiết kiệm", categoryIds: [], role: "buffer", budgetLimit: undefined },
-];
+// and the "Tiết kiệm" buffer / "Thiết yếu" essential ordering is lost. A jar with
+// no limit simply OMITS `budgetLimit` (JSON has no `undefined`) and seeds NULL.
+const SEED_JARS = JSON.parse(readFileSync(SEED_JARS_PATH, "utf8"));
 
 // salaryBase per CIF, duplicated from src/providers/mock/personas.ts (same reason
 // as SEED_BENEFICIARIES: plain .mjs, no TS loader). scale = salaryBase / 25tr —
@@ -119,6 +117,17 @@ if (txnCols.length > 0 && !txnCols.some((c) => c.name === "source")) {
   db.exec(
     "ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'mock' CHECK (source IN ('mock', 'msb', 'self_reported'))",
   );
+}
+// `categories` became PER-CIF (plan 260920-1019 Phase 02). A pre-Phase-02 table
+// has no `cif` column, and `CREATE TABLE IF NOT EXISTS` will not add one — the
+// schema's `idx_categories_cif` would fail. This script IS the documented remedy
+// for that loud failure, so it drops the legacy shape: the table holds no user
+// data in a dev DB (it is re-seeded lazily per persona from
+// `src/domain/models/categories.ts` on the first read).
+const catCols = db.prepare("PRAGMA table_info(categories)").all();
+if (catCols.length > 0 && !catCols.some((c) => c.name === "cif")) {
+  db.exec("DROP TABLE categories");
+  console.log("Dropped the legacy global `categories` table (now per-cif, re-seeded on first read)");
 }
 db.exec(readFileSync(SCHEMA_PATH, "utf8"));
 if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'manual_transactions'").get()) {

@@ -4,7 +4,7 @@
  */
 
 import type { Budget, Transaction } from "@/domain/models";
-import { CATEGORY_BY_ID } from "@/domain/models";
+import { categoryLabel } from "@/domain/models";
 import { netExpenseByCategory } from "./cashflow";
 import { daysLeftIn, statusOf, type PressureStatus } from "./pressure";
 import type { Period } from "./types";
@@ -23,11 +23,16 @@ export interface BudgetLine {
   status: BudgetStatus;
 }
 
+/**
+ * `labels` is the persona's stored id→label map. Presentation only — the `used`
+ * and `limit` numbers are keyed by id and never touched by it.
+ */
 export function evaluateBudget(
   budgets: Budget[],
   txns: Transaction[],
   period: Period,
   now: Date = new Date(),
+  labels?: ReadonlyMap<string, string>,
 ): BudgetLine[] {
   const byCat = netExpenseByCategory(txns, period);
   const daysLeft = daysLeftIn(period, now);
@@ -36,7 +41,7 @@ export function evaluateBudget(
     const used = Math.max(0, byCat.get(b.categoryId) ?? 0);
     return {
       categoryId: b.categoryId,
-      label: CATEGORY_BY_ID[b.categoryId]?.label ?? b.categoryId,
+      label: categoryLabel(b.categoryId, labels),
       limit: b.limit,
       used,
       pct: b.limit > 0 ? used / b.limit : 0,

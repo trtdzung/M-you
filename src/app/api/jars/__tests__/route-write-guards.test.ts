@@ -211,6 +211,35 @@ describe("POST /api/jars/:id/categories", () => {
   });
 });
 
+describe("jar writes validate against THIS persona's stored taxonomy", () => {
+  /** Insert a custom category straight into the store (no route needed here). */
+  function storeCategory(cif: string, id: string, archivedAt: string | null): void {
+    readJarConfig(cif); // lazily seeds this cif's presets first
+    holder.db!
+      .prepare(
+        `INSERT INTO categories (cif, id, label, kind, fixed, custom, archived_at, sort_order)
+         VALUES (?, ?, ?, 'expense', 0, 1, ?, 99)`,
+      )
+      .run(cif, id, id, archivedAt);
+  }
+
+  it("rejects a category belonging to ANOTHER cif (422)", async () => {
+    storeCategory("CIF_OTHER", "c_hoc-phi", null);
+    seed([{ id: "a", label: "A", categoryIds: [] }]);
+    const res = await patchOne("a", { categoryIds: ["c_hoc-phi"] });
+    expect(res.status).toBe(422);
+    expect((await res.json()).invalid).toEqual(["c_hoc-phi"]);
+  });
+
+  it("accepts an ARCHIVED id — archived leaves `assignable` but stays `known`", async () => {
+    storeCategory(CIF, "c_hoc-phi", "2026-09-01T00:00:00.000Z");
+    seed([{ id: "a", label: "A", categoryIds: [] }]);
+    const res = await patchOne("a", { categoryIds: ["c_hoc-phi"] });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as JarConfig).jars.find((j) => j.id === "a")?.categoryIds).toEqual(["c_hoc-phi"]);
+  });
+});
+
 describe("DELETE /api/jars/:id — removes the jar's rebalance legs (S8)", () => {
   function insertTxn(id: string, rebalance?: Record<string, string>, cif = CIF, source = "self_reported"): void {
     const payload = { id, postedAt: "2026-09-16T10:00:00.000Z", amount: 500_000, categoryId: "dieu-chinh-hu", rebalance };

@@ -21,7 +21,7 @@
  */
 
 import type { JarConfig, Transaction } from "@/domain/models";
-import { CATEGORIES, UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
+import { UNCLASSIFIED, UNCLASSIFIED_LABEL } from "@/domain/models";
 import { spendingByCategory, type CategorySpend } from "./category";
 import type { Period } from "./types";
 
@@ -83,20 +83,27 @@ export function duplicateCategoryIds(config: JarConfig): string[] {
   return Array.from(dupes);
 }
 
-/** Every expense category id in the taxonomy (chip-coverage source of truth). */
-export const EXPENSE_CATEGORY_IDS: readonly string[] = CATEGORIES.filter(
-  (c) => c.kind === "expense",
-).map((c) => c.id);
-
 /**
  * Expense category ids that no jar in `config` claims — the "orphans" the exactly-
  * one invariant heals into the "Khác" jar on load (`state/jars`). Pure and
- * order-stable (taxonomy order) so the heal + any validator agree. Empty when the
- * config already covers every expense category (every template does).
+ * order-stable (the injected set's own order, i.e. taxonomy / display order) so
+ * the heal + any validator agree. Empty when the config already covers every
+ * expense category (every template does).
+ *
+ * `expenseIds` is REQUIRED: it is the taxonomy to measure against — the persona's
+ * stored assignable set (`assignableCategoryIds(cif)` server-side,
+ * `useCategories().assignable` client-side). It carries no default on purpose.
+ * A bundled-preset default silently measured every persona against the seed, so a
+ * category the user created was never seen as an orphan and never landed in a hũ
+ * at all; making it required is what forces each caller to say which taxonomy it
+ * means.
  */
-export function orphanExpenseCategoryIds(config: JarConfig): string[] {
+export function orphanExpenseCategoryIds(
+  config: JarConfig,
+  expenseIds: Iterable<string>,
+): string[] {
   const mapped = categoryToJarMap(config);
-  return EXPENSE_CATEGORY_IDS.filter((id) => !mapped.has(id));
+  return [...expenseIds].filter((id) => !mapped.has(id));
 }
 
 /**
@@ -105,11 +112,14 @@ export function orphanExpenseCategoryIds(config: JarConfig): string[] {
  * Spend-independent by construction — a jar with zero spend this period keeps its
  * chip (selecting it yields an empty state, red-team #11). "Tất cả" is a UI
  * concern the view prepends; it is not part of this list.
+ *
+ * `expenseIds` is REQUIRED for the same reason as `orphanExpenseCategoryIds`:
+ * whether "Khác" gets a chip is a statement about the PERSONA'S taxonomy.
  */
-export function jarChipList(config: JarConfig): JarChip[] {
+export function jarChipList(config: JarConfig, expenseIds: Iterable<string>): JarChip[] {
   const chips: JarChip[] = config.jars.map((jar) => ({ jarId: jar.id, label: jar.label }));
   const mapped = categoryToJarMap(config);
-  const hasOrphan = EXPENSE_CATEGORY_IDS.some((id) => !mapped.has(id));
+  const hasOrphan = [...expenseIds].some((id) => !mapped.has(id));
   if (hasOrphan) chips.push({ jarId: KHAC_JAR_ID, label: KHAC_JAR_LABEL });
   return chips;
 }
@@ -125,13 +135,18 @@ const labelByJarId = (config: JarConfig): Map<string, string> =>
  * and zero-amount groups are dropped from the chart data (chips come from
  * `jarChipList`, not from here). `share` is each group's fraction of the period
  * total; an empty period yields `[]` (never a NaN share).
+ *
+ * `labels` is the persona's stored id→label map, forwarded to
+ * `spendingByCategory` so a custom category's slice is named by the user's own
+ * label instead of its raw id. It never changes an AMOUNT — grouping is by id.
  */
 export function groupSpendingByJar(
   config: JarConfig,
   txns: Transaction[],
   period: Period,
+  labels?: ReadonlyMap<string, string>,
 ): JarSpendGroup[] {
-  const spends = spendingByCategory(txns, period);
+  const spends = spendingByCategory(txns, period, undefined, labels);
   const total = spends.reduce((s, c) => s + c.amount, 0);
   const catToJar = categoryToJarMap(config);
   const jarLabels = labelByJarId(config);

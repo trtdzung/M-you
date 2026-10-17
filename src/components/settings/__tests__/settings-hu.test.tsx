@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { PersonaProvider } from "@/providers/context";
 import { JarConfigProvider } from "@/state/jars";
+import { CategoryTaxonomyProvider } from "@/state/categories";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 
 const replace = vi.fn();
@@ -18,7 +19,9 @@ function wrapper({ children }: { children: ReactNode }) {
   return (
     <PersonaProvider>
       <ManualTxnsProvider>
-        <JarConfigProvider>{children}</JarConfigProvider>
+        <JarConfigProvider>
+          <CategoryTaxonomyProvider>{children}</CategoryTaxonomyProvider>
+        </JarConfigProvider>
       </ManualTxnsProvider>
     </PersonaProvider>
   );

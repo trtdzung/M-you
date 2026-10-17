@@ -5,6 +5,7 @@ import { PersonaProvider, usePersona } from "@/providers/context";
 import { CorrectionsProvider } from "@/state/corrections";
 import { ManualTxnsProvider } from "@/state/manual-txns";
 import { JarConfigProvider } from "@/state/jars";
+import { CategoryTaxonomyProvider } from "@/state/categories";
 import { PeriodProvider } from "@/state/period";
 import type { AssetFields } from "@/domain/models/asset-liability-input";
 import { GoalProvider } from "@/state/goals";
@@ -23,11 +24,13 @@ function wrapper({ children }: { children: ReactNode }) {
       <CorrectionsProvider>
       <ManualTxnsProvider>
         <JarConfigProvider>
+          <CategoryTaxonomyProvider>  
             <AssetLiabilityProvider>
-              <GoalProvider>
-                <PeriodProvider>{children}</PeriodProvider>
-              </GoalProvider>
-            </AssetLiabilityProvider>
+                <GoalProvider>
+                  <PeriodProvider>{children}</PeriodProvider>
+                </GoalProvider>
+              </AssetLiabilityProvider>
+          </CategoryTaxonomyProvider>
         </JarConfigProvider>
         </ManualTxnsProvider>
     </CorrectionsProvider>

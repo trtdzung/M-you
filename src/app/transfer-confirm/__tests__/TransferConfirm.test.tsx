@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { type RenderOptions, render as rtlRender, screen, fireEvent, within } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 
 /**
  * The mock MSB confirm screen (OUTSIDE the AI facade). `confirm()` debits the
@@ -154,6 +156,16 @@ vi.mock("@/lib/transfer-draft-store", () => ({
 }));
 
 import { TransferConfirm } from "../TransferConfirm";
+
+
+/**
+ * Every render goes through `StubCategoryTaxonomy`: the components below read
+ * the persona's taxonomy via `useCategories()` but own none of it, so they get
+ * an already-loaded preset taxonomy instead of the real fetching provider (the
+ * provider itself is covered by its own tests).
+ */
+const render = (ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) =>
+  rtlRender(ui, { ...options, wrapper: StubCategoryTaxonomy });
 
 const AMOUNT = 500_000;
 
@@ -351,9 +363,10 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
     expect(h.store[0]).toMatchObject({ categoryId: "dining", type: "expense", amount: AMOUNT });
     // Coverage is delegated to the shared unit (one rebalance per donor), not booked here.
     expect(h.commit).toHaveBeenCalledTimes(1);
-    // The post-fund toast surfaces the donor + Hoàn tác / Đổi nguồn.
+    // The post-fund banner surfaces the donor. It is read-only — no Hoàn tác /
+    // Đổi nguồn action (that mechanic was removed; see AutoFundResultBanner).
     expect(await screen.findByText(/Đã bù/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Hoàn tác/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Hoàn tác/ })).not.toBeInTheDocument();
   });
 
   it("requiresManualGoal: prompts BEFORE booking, and confirm proceeds (no silent goal raid)", async () => {

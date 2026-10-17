@@ -8,15 +8,16 @@
  *  - #4 never mutates provider data — resolution returns new txn objects.
  *  - #6 a `pending` assignment does NOT change the effective category (the txn
  *    stays UNCLASSIFIED for the engine, so it is not counted until confirmed);
- *    an assignment pointing at an id no longer in the taxonomy falls back to the
- *    original category and is NEVER dropped.
+ *    an APPLIED assignment is never dropped, not even when its category id is
+ *    unknown here — the taxonomy is per-persona and stored, so an id this module
+ *    cannot recognise is far more likely to be a category the user just created
+ *    than a bad one.
  *  - #5 provenance (`origin`/`confidence`) is preserved on every record.
  *  - Race (Red Team #6): a `user`-origin record is never overwritten by an
  *    AI/memory/heuristic assignment.
  */
 
 import type { Transaction } from "@/domain/models";
-import { CATEGORY_BY_ID } from "@/domain/models";
 
 /** Where a category override came from. Absent ⇒ legacy user correction. */
 export type CorrectionOrigin = "user" | "ai" | "memory" | "heuristic";
@@ -137,13 +138,16 @@ export function isHidden(corrections: Corrections, txnId: string): boolean {
  * Resolve one transaction's effective category from its correction (pure).
  *  - a `pending` assignment leaves the category untouched (engine still treats
  *    the txn as unclassified — invariant #6);
- *  - an override pointing at an id no longer in the taxonomy falls back to the
- *    original category (never dropped, never thrown — invariant #6);
- *  - otherwise the override wins, flagging `userEdited` only for user origin.
+ *  - every APPLIED override wins, whatever its id. It is deliberately NOT checked
+ *    against a taxonomy here: the server accepted and stored this label, so
+ *    reverting it client-side would put the spend back on the bank's category —
+ *    in the wrong hũ, in the wrong budget, with no error on screen. An id the
+ *    live taxonomy cannot resolve renders as its raw id (`categoryLabel`'s
+ *    fallback): ugly and honest, never a wrong number.
+ *  - `userEdited` is flagged only for user origin.
  */
 export function resolveEffective(txn: Transaction, c: Correction | undefined): Transaction {
   if (!c || c.status === "pending" || c.categoryId === undefined) return txn;
-  if (!CATEGORY_BY_ID[c.categoryId]) return txn; // orphaned id ⇒ keep original
   if (c.categoryId === txn.categoryId) return txn;
   const userEdited = c.origin === undefined || c.origin === "user" || txn.userEdited;
   return { ...txn, categoryId: c.categoryId, userEdited };

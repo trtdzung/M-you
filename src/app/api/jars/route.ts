@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import type { Jar } from "@/domain/models";
+import { assignableCategoryIds } from "@/lib/categories-store";
 import { readJarConfig, sanitizeJar, sanitizeJarPatch, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
 import { capViolation, categoryViolation, reservedIdViolation } from "./jar-write-guards";
 
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
   if (!cif || typeof cif !== "string") return missingCif();
   const jar = sanitizeJar(body?.jar);
   if (!jar) return NextResponse.json({ error: "jar is invalid" }, { status: 422 });
-  const rejected = reservedIdViolation([jar.id], true) ?? categoryViolation(jar.categoryIds);
+  const rejected = reservedIdViolation([jar.id], true) ?? categoryViolation(cif, jar.categoryIds);
   if (rejected) return rejected;
 
   const current = readJarConfig(cif);
@@ -74,10 +75,16 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "duplicate jar id" }, { status: 422 });
   }
   const rejected =
-    reservedIdViolation(jars.map((j) => j.id), false) ?? categoryViolation(jars.flatMap((j) => j.categoryIds));
+    reservedIdViolation(jars.map((j) => j.id), false) ?? categoryViolation(cif, jars.flatMap((j) => j.categoryIds));
   if (rejected) return rejected;
 
-  const next = healOrphanCategories(dedupeCategories({ version: 3, jars }));
+  // Heal against THIS persona's assignable taxonomy: a preset-only template must
+  // not leave the user's own categories orphaned, and an archived one already in
+  // a jar must stay there (the heal only ever adds).
+  const next = healOrphanCategories(
+    dedupeCategories({ version: 3, jars }),
+    assignableCategoryIds(cif),
+  );
   const overCap = capViolation(cif, next.jars, readJarConfig(cif).jars);
   if (overCap) return overCap;
   return NextResponse.json(writeJarConfig(cif, next));

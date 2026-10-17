@@ -1,17 +1,17 @@
 /**
  * Vietnamese user-facing copy for a failed `/api/jars*` call (U10/U20). The
- * provider throws a transport-level `JarApiError`; this maps it to one sentence
+ * provider throws a transport-level `ApiError`; this maps it to one sentence
  * the settings/budget screens can show verbatim. Over-cap keeps the server's
  * exact `overBy` so the message matches the deterministic cap check.
  */
 
-import { JarApiError } from "@/providers/jar-api-error";
+import { ApiError } from "@/providers/api-error";
 import { formatVnd } from "@/lib/format";
 
 export const JAR_LOAD_ERROR = "Không tải được danh sách hũ. Vui lòng thử lại.";
 
 export function jarMutationErrorMessage(err: unknown): string {
-  if (err instanceof JarApiError) {
+  if (err instanceof ApiError) {
     if (err.isOverCap) {
       return err.overBy != null
         ? `Vượt số dư ${formatVnd(err.overBy)}. Giảm hạn mức lại.`

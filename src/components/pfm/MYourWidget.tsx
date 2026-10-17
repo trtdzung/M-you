@@ -10,6 +10,7 @@ import { usePersona } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { jarSpeechContext } from "@/lib/speech-context";
 import type { SpeechFinalMetadata } from "@/lib/speech-types";
+import { useCategories } from "@/state/categories";
 import {
   getChatHistory,
   sendChatMessage,
@@ -63,6 +64,11 @@ function composeVoiceDraft(prefix: string, transcript: string) {
 export function MYourWidget() {
   const { persona } = usePersona();
   const { config: jarConfig } = useJarConfig();
+  // Whitelist for `isTransferFormUi` — THIS persona's assignable ids, never the
+  // bundled presets (which would drop every category the user created). Narrows
+  // only; an id outside it simply does not render a card (invariant #2).
+  const { assignable } = useCategories();
+  const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const cif = persona.cif;
   const speechContext = useMemo(
     () => jarSpeechContext(jarConfig.jars.map((jar) => ({ id: jar.id, label: jar.label }))),
@@ -293,7 +299,7 @@ export function MYourWidget() {
                       {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
                     </div>
                     {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
-                    {m.role === "agent" && isTransferFormUi(m.ui) && <AgentTransferFormCard form={m.ui} />}
+                    {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
                   </div>
                 ))}
                 {sending && (

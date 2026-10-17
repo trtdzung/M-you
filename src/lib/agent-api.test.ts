@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { isChartUi, type ChartUi } from "./agent-api";
+import { isChartUi, isTransferFormUi, type ChartUi, type TransferFormUi } from "./agent-api";
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body } as Response;
@@ -135,5 +135,44 @@ describe("isChartUi", () => {
   it("is false when series is empty or missing", () => {
     expect(isChartUi({ ...validPie, series: [] })).toBe(false);
     expect(isChartUi({ type: "chart", chart_type: "pie", title: "t", labels: [] })).toBe(false);
+  });
+});
+
+/**
+ * The agent's `category` is whitelist-validated, never trusted (invariant #2).
+ * Against the BUNDLED presets that whitelist silently excludes every category the
+ * user created, so the card never renders for them; the persona's stored
+ * assignable set is the correct whitelist. Widening it is not an option — an id
+ * outside the set must still be rejected.
+ */
+describe("isTransferFormUi (whitelist validation)", () => {
+  const form: TransferFormUi = {
+    type: "transfer_form",
+    beneficiary_id: "ben-1",
+    amount: 500_000,
+    note: "Học phí tháng 9",
+    category: "dining",
+  };
+
+  it("is true for a well-formed payload on a preset category", () => {
+    expect(isTransferFormUi(form)).toBe(true);
+  });
+
+  it("accepts a CUSTOM category when the stored expense set is passed", () => {
+    const custom = { ...form, category: "c_hoc-phi" };
+    expect(isTransferFormUi(custom)).toBe(false); // bundled presets: the bug
+    expect(isTransferFormUi(custom, new Set(["dining", "c_hoc-phi"]))).toBe(true);
+  });
+
+  it("rejects an id outside the passed set — the set is never widened", () => {
+    expect(isTransferFormUi({ ...form, category: "c_ghost" }, new Set(["dining"]))).toBe(false);
+    expect(isTransferFormUi({ ...form, category: "transfer" }, new Set(["dining"]))).toBe(false);
+  });
+
+  it("is false for a malformed payload, never throws", () => {
+    expect(isTransferFormUi(null)).toBe(false);
+    expect(isTransferFormUi({ type: "chart" })).toBe(false);
+    expect(isTransferFormUi({ ...form, amount: 0 })).toBe(false);
+    expect(isTransferFormUi({ ...form, beneficiary_id: "  " })).toBe(false);
   });
 });

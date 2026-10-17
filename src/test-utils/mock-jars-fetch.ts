@@ -19,7 +19,12 @@ import type { Account, Jar, JarConfig, Transaction } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 import { PERSONA_LIST } from "@/providers/mock/personas";
 import { buildPersonaAccounts, generateDataset } from "@/providers/mock/fixtures/generate";
-import { handleCorrectionsRequest, resetMockCorrections } from "./mock-corrections-fetch";
+import {
+  handleCategoriesRequest,
+  mockAssignableCategoryIds,
+  resetMockCategories,
+} from "./mock-categories-fetch";
+import { handleCorrectionsRequest, mockCorrectionUsage, resetMockCorrections } from "./mock-corrections-fetch";
 
 /**
  * In-memory accounts per persona, mirroring the server's `accounts-store.ts`
@@ -69,9 +74,19 @@ function jsonResponse(data: unknown, status = 200): Response {
  * dropped category) still comes back healed. Routing every store update
  * AND every GET through this same commit point reproduces that guarantee
  * here, instead of each branch below needing to remember to normalize.
+ *
+ * The heal runs against the PERSONA'S taxonomy (`mock-categories-fetch`), the
+ * same set the real `readJarConfig` passes: that is what makes a category the
+ * test just created land in "Khác" by itself, and what keeps an archived one from
+ * being yanked out of the hũ it is already in.
  */
-function commit(next: JarConfig): JarConfig {
-  store = healOrphanCategories(dedupeCategories(next));
+function commit(next: JarConfig, cif: string | null): JarConfig {
+  // No cif ⇒ no persona ⇒ no taxonomy to heal against. An EMPTY set is the honest
+  // answer (nothing is orphaned because nothing is known), and it matches the
+  // real route, which refuses a cif-less write outright rather than healing
+  // against the bundled seed.
+  const assignable = cif ? mockAssignableCategoryIds(cif) : new Set<string>();
+  store = healOrphanCategories(dedupeCategories(next), assignable);
   return store;
 }
 
@@ -99,16 +114,16 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
   const idMatch = parsed.pathname.match(/^\/api\/jars\/([^/]+)(\/categories)?$/);
 
   if (!idMatch) {
-    if (method === "GET") return jsonResponse(commit(store));
+    if (method === "GET") return jsonResponse(commit(store, cif));
     if (method === "POST") {
       const jar = body?.jar as Jar;
       const created: Jar = { ...jar, id: uniqueJarId(store.jars, jar.id) };
       const nextJars = [...stripCategories(store.jars, created.categoryIds), created];
-      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }), 201);
+      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }, cif), 201);
     }
     if (method === "PUT") {
       const nextJars = (body?.jars as Jar[]) ?? [];
-      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }));
+      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }, cif));
     }
     if (method === "PATCH") {
       // Batch "Chia ngay": apply each patch (undefined-clears via null), reject
@@ -128,7 +143,7 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
         merged.set(jarId, next as unknown as Jar);
       }
       const nextJars = store.jars.map((j) => merged.get(j.id) ?? j);
-      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }));
+      return overCap(nextJars, cif) ?? jsonResponse(commit({ version: 3, jars: nextJars }, cif));
     }
     return jsonResponse({ error: "unhandled" }, 500);
   }
@@ -142,10 +157,13 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
     const categoryId = body?.categoryId as string;
     const stripped = stripCategories(store.jars, [categoryId]);
     return jsonResponse(
-      commit({
-        version: 3,
-        jars: stripped.map((j) => (j.id === id ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j)),
-      }),
+      commit(
+        {
+          version: 3,
+          jars: stripped.map((j) => (j.id === id ? { ...j, categoryIds: [...j.categoryIds, categoryId] } : j)),
+        },
+        cif,
+      ),
     );
   }
 
@@ -161,10 +179,10 @@ async function handleJarsRequest(url: string, init?: RequestInit): Promise<Respo
       return next as unknown as Jar;
     });
     if (patch.categoryIds) jars = stripCategories(jars, patch.categoryIds as string[], id);
-    return overCap(jars, cif) ?? jsonResponse(commit({ version: 3, jars }));
+    return overCap(jars, cif) ?? jsonResponse(commit({ version: 3, jars }, cif));
   }
   if (method === "DELETE") {
-    return jsonResponse(commit({ version: 3, jars: store.jars.filter((j) => j.id !== id) }));
+    return jsonResponse(commit({ version: 3, jars: store.jars.filter((j) => j.id !== id) }, cif));
   }
   return jsonResponse({ error: "unhandled" }, 500);
 }
@@ -236,15 +254,24 @@ export function installMockJarsApi(): void {
     if (url.startsWith("/api/jars")) return handleJarsRequest(url, init);
     if (url.startsWith("/api/accounts")) return handleAccountsRequest(url, init);
     if (url.startsWith("/api/transactions")) return Promise.resolve(handleTransactionsRequest(url, init));
+    // The taxonomy stub reaches the hũ store through this port — a category write
+    // is also a jar write server-side, and both must come back as one aggregate.
+    const taxonomy = handleCategoriesRequest(url, init, {
+      readJars: () => store,
+      commitJars: (jars, cif) => commit({ version: 3, jars }, cif),
+      usageCount: mockCorrectionUsage,
+    });
+    if (taxonomy) return Promise.resolve(taxonomy);
     const labels = handleCorrectionsRequest(url, init);
     if (labels) return Promise.resolve(labels);
     return originalFetch!(input as RequestInfo, init);
   }) as typeof fetch;
 }
 
-/** Reset the in-memory jar set, accounts and labels — call in `beforeEach`. */
+/** Reset the in-memory jar set, taxonomy, accounts and labels — call in `beforeEach`. */
 export function resetMockJarsApi(): void {
   store = freshConfig();
   accountsStore = {};
+  resetMockCategories();
   resetMockCorrections();
 }

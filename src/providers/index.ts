@@ -20,5 +20,5 @@ export function getProviders(personaId: PersonaId = DEFAULT_PERSONA): Providers 
   return provider;
 }
 
-export type { Providers } from "./interfaces";
+export type { CategoryWriteResult, Providers } from "./interfaces";
 export type { PersonaId, PersonaMeta } from "./mock/personas";

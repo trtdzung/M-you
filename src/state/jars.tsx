@@ -12,7 +12,8 @@
  * so requests reach the server in click order and responses are applied in that
  * same order — the final UI and DB both equal the LAST click, never whichever
  * response happened to arrive last. A persona generation guard (K03) drops any
- * result that belongs to a previous persona.
+ * result that belongs to a previous persona. Both live in
+ * `./serial-request-queue` so the category provider runs on the SAME machinery.
  *
  * Failures are surfaced, never swallowed (U10/U20): `error` for the initial
  * load, `mutationError` (Vietnamese, server reason kept — e.g. over-cap) for a
@@ -26,6 +27,7 @@ import { DEFAULT_JAR_CONFIG, JAR_TEMPLATES, type JarTemplate } from "@/domain/mo
 import { useProviders } from "@/providers/context";
 import type { Providers } from "@/providers";
 import { JAR_LOAD_ERROR, jarMutationErrorMessage } from "./jars-error-message";
+import { useSerialRequestQueue } from "./serial-request-queue";
 
 type JarPatch = Partial<Omit<Jar, "id">>;
 
@@ -60,6 +62,25 @@ export interface JarConfigContextValue {
   /** REPLACE the whole jar set with a template's (confirm-on-replace in UI). */
   applyTemplate: (templateId: JarTemplate["id"]) => Promise<boolean>;
   resetToSeed: () => Promise<boolean>;
+  /**
+   * Opaque marker of the config currently held: capture it BEFORE issuing a write
+   * on another resource and hand it back to `applyServerConfig` below. Two configs
+   * carry no version we could compare, so this counter is the only "newer" test.
+   */
+  configToken: () => number;
+  /**
+   * Apply a `JarConfig` returned by a write on ANOTHER resource — a category
+   * create/delete re-homes categories, so `/api/categories*` answers with the
+   * whole aggregate. It runs through the SAME serial queue and the SAME persona
+   * guard as a jar write, so a second copy of the jar config can never be painted
+   * on out of band (that is how a category ends up in two hũ client-side and
+   * `evaluateJarBudget` double-counts its spend — Σ-conservation, invariant #6).
+   *
+   * `since` is the `configToken()` taken when the other write was ISSUED. If any
+   * jar response has been applied since then, that one is newer and this copy is
+   * DROPPED rather than clobbering it. Resolves once the decision is made.
+   */
+  applyServerConfig: (config: JarConfig, since?: number) => Promise<void>;
 }
 
 const EMPTY_CONFIG: JarConfig = { version: 3, jars: [] };
@@ -73,64 +94,62 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  /** Bumped on persona switch / retry / unmount: results of an older generation are dropped. */
-  const genRef = useRef(0);
-  /** Tail of the serial request queue (never rejects). */
-  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const { enqueue, generation, newGeneration } = useSerialRequestQueue();
+  /**
+   * Bumped every time a server config is applied — the counter behind
+   * `configToken`, so a config handed over by a category write can never overwrite
+   * a jar response that landed after it was fetched.
+   */
+  const revRef = useRef(0);
 
-  /** Append `op` to the serial queue; resolves/rejects with `op`'s own result. */
-  const enqueue = useCallback(<T,>(op: () => Promise<T>): Promise<T> => {
-    const task = queueRef.current.then(op);
-    queueRef.current = task.catch(() => undefined);
-    return task;
+  /** The ONE place a server config reaches state (so `revRef` can never drift). */
+  const applyConfig = useCallback((next: JarConfig) => {
+    revRef.current += 1;
+    setConfig(next);
   }, []);
 
   // Load on mount, persona switch and retry. Reset to empty FIRST, synchronously
   // — otherwise the previous persona's jars stay on screen until the new fetch
-  // resolves (H5). A new generation starts a fresh queue: the new persona's load
-  // never waits behind the old persona's writes.
+  // resolves (H5).
   useEffect(() => {
-    const gen = ++genRef.current;
-    queueRef.current = Promise.resolve();
-    setConfig(EMPTY_CONFIG);
+    const gen = newGeneration();
+    applyConfig(EMPTY_CONFIG);
     setLoaded(false);
     setError(null);
     setMutationError(null);
     enqueue(() => providers.getJarConfig()).then(
       (next) => {
-        if (gen !== genRef.current) return;
-        setConfig(next);
+        if (gen !== generation()) return;
+        applyConfig(next);
         setLoaded(true);
       },
       (err: unknown) => {
         console.error("Failed to load jar config", err);
-        if (gen === genRef.current) setError(JAR_LOAD_ERROR);
+        if (gen === generation()) setError(JAR_LOAD_ERROR);
       },
     );
-    return () => {
-      genRef.current += 1;
-    };
-  }, [providers, reloadKey, enqueue]);
+    return () => void newGeneration();
+  }, [providers, reloadKey, enqueue, generation, newGeneration, applyConfig]);
 
   /** Run one config write in order; apply its response only for the live persona. */
   const mutate = useCallback(
     (op: (p: Providers) => Promise<JarConfig>, surface = true): Promise<boolean> => {
-      const gen = genRef.current;
+      const gen = generation();
       return enqueue(() => op(providers)).then(
         (next) => {
-          if (gen !== genRef.current) return false; // K03: previous persona's response
-          setConfig(next);
+          if (gen !== generation()) return false; // K03: previous persona's response
+          applyConfig(next);
           if (surface) setMutationError(null);
           return true;
         },
         (err: unknown) => {
           console.error("Jar mutation failed", err);
-          if (gen === genRef.current && surface) setMutationError(jarMutationErrorMessage(err));
+          if (gen === generation() && surface) setMutationError(jarMutationErrorMessage(err));
           return false;
         },
       );
     },
-    [enqueue, providers],
+    [enqueue, generation, providers, applyConfig],
   );
 
   const value = useMemo<JarConfigContextValue>(
@@ -145,9 +164,9 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
       updateJar: (id, patch) => mutate((p) => p.updateJar(id, patch)),
       updateJars: (patches) => {
         // Same queue + persona guard, but the rejection is handed to the caller.
-        const gen = genRef.current;
+        const gen = generation();
         return enqueue(() => providers.updateJars(patches)).then((next) => {
-          if (gen === genRef.current) setConfig(next);
+          if (gen === generation()) applyConfig(next);
         });
       },
       removeJar: (id) => mutate((p) => p.removeJar(id)),
@@ -155,8 +174,19 @@ export function JarConfigProvider({ children }: { children: React.ReactNode }) {
         jarId === null ? Promise.resolve(false) : mutate((p) => p.assignCategory(categoryId, jarId)),
       applyTemplate: (templateId) => mutate((p) => p.replaceJars(JAR_TEMPLATES[templateId].jars)),
       resetToSeed: () => mutate((p) => p.replaceJars(DEFAULT_JAR_CONFIG.jars)),
+      configToken: () => revRef.current,
+      applyServerConfig: (next, since) => {
+        const gen = generation();
+        const rev = since ?? revRef.current;
+        return enqueue(() => Promise.resolve(next)).then((cfg) => {
+          // Stale in two ways: a different persona (K03), or a jar response that
+          // landed after this config was fetched — that one is newer truth.
+          if (gen !== generation() || rev !== revRef.current) return;
+          applyConfig(cfg);
+        });
+      },
     }),
-    [config, loaded, error, mutationError, mutate, enqueue, providers],
+    [config, loaded, error, mutationError, mutate, enqueue, generation, providers, applyConfig],
   );
 
   return <JarConfigContext.Provider value={value}>{children}</JarConfigContext.Provider>;

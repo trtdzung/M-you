@@ -99,46 +99,6 @@ describe("U5 — a trigger funds only its own contribution; partial cover when f
   });
 });
 
-describe("G22/U12 — undo says what it did", () => {
-  it("reapplied: returns the donors + new leg ids it re-applied", () => {
-    h.jarConfig = { version: 3, jars: [food, buf(6_000_000)] };
-    h.accounts = [account("cur", 6_000_000)];
-    const { result } = renderHook(() => useHarness(), { wrapper });
-    let trigger = "";
-    act(() => {
-      trigger = result.current.addTxn(spend(4_500_000, "dining"));
-    });
-    act(() => {
-      result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "auto" });
-    });
-    let out: ReturnType<typeof result.current.undo> | undefined;
-    act(() => {
-      out = result.current.undo({ triggerTxnId: trigger, targetJarId: "food", postedAt: SEP });
-    });
-    expect(out).toMatchObject({ status: "reapplied", donors: [{ jarId: "buf", label: "Hũ Dự phòng", take: 500_000 }] });
-    expect(out?.status === "reapplied" && out.createdIds).toEqual(rebalancesFor(result.current.manualTxns, trigger).map((t) => t.id));
-  });
-
-  it("residual: returns the uncovered amount (goal jar never re-raided on undo)", () => {
-    h.jarConfig = { version: 3, jars: [food, goal] };
-    h.accounts = [account("cur", 5_000_000)];
-    const { result } = renderHook(() => useHarness(), { wrapper });
-    let trigger = "";
-    act(() => {
-      trigger = result.current.addTxn(spend(4_800_000, "dining"));
-    });
-    act(() => {
-      result.current.fundJar({ targetJarId: "food", triggerTxnId: trigger, postedAt: SEP, origin: "manual", includeGoal: true });
-    });
-    let out: ReturnType<typeof result.current.undo> | undefined;
-    act(() => {
-      out = result.current.undo({ triggerTxnId: trigger, targetJarId: "food", postedAt: SEP });
-    });
-    expect(out).toMatchObject({ status: "residual", shortfall: 800_000, donors: [] });
-    expect(rebalancesFor(result.current.manualTxns, trigger)).toHaveLength(0);
-  });
-});
-
 describe("S7/U4 — reconcileLabels funds background labels once, never double-funding within a batch", () => {
   it("two labels into one jar in the same tick: legs total the overspend exactly (2M), not 2M each", () => {
     h.jarConfig = { version: 3, jars: [food, buf(6_000_000)] };

@@ -14,6 +14,9 @@ vi.mock("@/providers/context", () => ({
 vi.mock("@/state/jars", () => ({
   useJarConfig: () => ({ config: { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: [] }] } }),
 }));
+vi.mock("@/state/categories", () => ({
+  useCategories: () => ({ assignable: [{ id: "food", label: "Ăn uống" }] }),
+}));
 
 const speech = vi.hoisted(() => ({
   callback: null as null | ((text: string, final: boolean, metadata?: SpeechFinalMetadata) => void),

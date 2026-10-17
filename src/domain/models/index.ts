@@ -21,7 +21,7 @@ export {
   isRebalanceCategory,
   categoryLabel,
 } from "./categories";
-export type { CategoryDef, CategoryKind } from "./categories";
+export type { CategoryDef, CategoryKind, StoredCategory } from "./categories";
 
 export {
   TRANSFER_PURPOSES,

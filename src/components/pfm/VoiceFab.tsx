@@ -11,6 +11,7 @@ import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { jarSpeechContext } from "@/lib/speech-context";
 import type { SpeechFinalMetadata } from "@/lib/speech-types";
 import { useJarConfig } from "@/state/jars";
+import { useCategories } from "@/state/categories";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
@@ -89,6 +90,12 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     () => jarSpeechContext(jarConfig.jars.map((jar) => ({ id: jar.id, label: jar.label }))),
     [jarConfig.jars],
   );
+  // The whitelist `isTransferFormUi` validates the agent's `category` against.
+  // It must be THIS persona's assignable ids: passing nothing falls back to the
+  // bundled presets, which would reject every category the user created. The set
+  // only ever narrows what renders — it can never widen it (invariant #2).
+  const { assignable } = useCategories();
+  const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const [sectionOpen, setSectionOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -247,7 +254,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             ) : sending ? (
               <span className="text-xs text-muted">Đang phân tích…</span>
             ) : reply ? (
-              isTransferFormUi(reply.ui) ? (
+              isTransferFormUi(reply.ui, expenseIds) ? (
                 <div className="flex w-full flex-col items-start">
                   <AgentTransferFormCard form={reply.ui} fullWidth />
                 </div>

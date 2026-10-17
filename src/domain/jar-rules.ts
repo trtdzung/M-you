@@ -20,12 +20,7 @@
 
 import type { Jar, JarConfig } from "@/domain/models";
 import { REBALANCE_CATEGORY, UNCLASSIFIED } from "@/domain/models";
-import {
-  EXPENSE_CATEGORY_IDS,
-  KHAC_JAR_ID,
-  KHAC_JAR_LABEL,
-  orphanExpenseCategoryIds,
-} from "@/domain/engine/category-jars";
+import { KHAC_JAR_ID, KHAC_JAR_LABEL, orphanExpenseCategoryIds } from "@/domain/engine/category-jars";
 import { POOL_DONOR_ID } from "@/domain/engine/jar-funding";
 
 /**
@@ -41,11 +36,21 @@ export function isReservedJarId(id: string, creating: boolean): boolean {
   return ALWAYS_RESERVED_JAR_IDS.has(id) || (creating && id === KHAC_JAR_ID);
 }
 
-const EXPENSE_IDS: ReadonlySet<string> = new Set(EXPENSE_CATEGORY_IDS);
-
-/** Ids in `catIds` that are not an expense category of the taxonomy (A11/A49). */
-export function invalidExpenseCategoryIds(catIds: readonly string[]): string[] {
-  return catIds.filter((c) => !EXPENSE_IDS.has(c));
+/**
+ * Ids in `catIds` that are not an expense category of the taxonomy (A11/A49).
+ *
+ * `knownIds` is the taxonomy to validate against and is REQUIRED. The jar write
+ * doors pass the persona's STORED set (`knownExpenseCategoryIds(cif)`) so a
+ * category the user created a second ago is immediately assignable, and so
+ * persona A's id can never validate for persona B. There is deliberately no
+ * bundled-preset default: it would have rejected every custom category at the
+ * write door with a 422 that reads like the id was invented.
+ */
+export function invalidExpenseCategoryIds(
+  catIds: readonly string[],
+  knownIds: ReadonlySet<string>,
+): string[] {
+  return catIds.filter((c) => !knownIds.has(c));
 }
 
 /** Remove `catIds` from every jar except `exceptId` (keeps categories unique). */
@@ -71,9 +76,18 @@ export function uniqueJarId(jars: Jar[], base: string): string {
  * `budgetLimit` — an unassigned catch-all has no meaningful monthly limit
  * (unknown, never 0). A no-op for a config that already covers every expense
  * category (every template does), so a fresh seed is untouched.
+ *
+ * `expenseIds` is the taxonomy to heal against and is REQUIRED — `readJarConfig`
+ * passes the persona's stored ASSIGNABLE set (active expense ids), which is what
+ * makes a newly created category land in "Khác" by itself, and what keeps an
+ * ARCHIVED category from being yanked out of its jar: this function only ever
+ * ADDS, never strips, so an id missing from `expenseIds` but already in a jar
+ * stays put (and its historical jar totals never move). Never make it strip, and
+ * never give it a bundled-preset default — healing persona A's config against the
+ * seed would drop A's own categories out of every hũ.
  */
-export function healOrphanCategories(config: JarConfig): JarConfig {
-  const orphans = orphanExpenseCategoryIds(config);
+export function healOrphanCategories(config: JarConfig, expenseIds: Iterable<string>): JarConfig {
+  const orphans = orphanExpenseCategoryIds(config, expenseIds);
   if (orphans.length === 0) return config;
   const existing = config.jars.find((j) => j.id === KHAC_JAR_ID);
   if (existing) {

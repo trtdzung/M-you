@@ -176,4 +176,60 @@ describe("jarPressure detector (BIDV wallet model — jarBudget-based)", () => {
       jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines: [] }) })),
     ).toBeNull();
   });
+
+  describe("hai trục: hũ vượt kế hoạch nhưng đã được bù đủ số dư thì nhường lượt kể", () => {
+    const covered = makeJarBudgetLine({
+      huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000,
+      limitState: "set", status: "over", pct: 1.2, rebalanceNet: 800_000,
+      remaining: 0, thresholdHit: true,
+    });
+    const short = makeJarBudgetLine({
+      huId: "transport", label: "Đi lại", spent: 2_100_000, limit: 2_000_000,
+      limitState: "set", status: "over", pct: 1.05, remaining: -100_000, thresholdHit: true,
+    });
+    const run = (lines: ReturnType<typeof makeJarBudgetLine>[]) =>
+      jarPressure(makeFinancials({ monthKey: THIS_MONTH, jarBudget: makeJarBudgetResult({ lines }) }));
+
+    it("hũ vượt kế hoạch nhưng đã được bù đủ tiền → nhường cho jarOverspendCovered, không bắn", () => {
+      expect(run([covered])).toBeNull();
+    });
+
+    it("hũ còn thiếu tiền vẫn bắn urgent, dù pct thấp hơn hũ đã bù", () => {
+      const insight = run([covered, short]);
+      expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:transport`);
+      expect(insight?.severity).toBe("urgent");
+      assertGrounded(insight!);
+    });
+
+    it("fact số dư không bao giờ âm: hũ còn thiếu tiền báo 'Cần bù' dương, không phải 'Còn lại' âm", () => {
+      const insight = run([short]);
+      // `factValues` normalises with Math.abs, so assert on the raw facts instead.
+      const facts = insight!.sourceFacts;
+      expect(facts.every((f) => typeof f.value !== "number" || f.value >= 0)).toBe(true);
+      const labels = facts.map((f) => f.label);
+      expect(labels).toContain("Cần bù");
+      expect(labels).not.toContain("Còn lại");
+      expect(facts.find((f) => f.label === "Cần bù")?.value).toBe(100_000);
+    });
+
+    it("hũ còn tiền vẫn báo 'Còn lại' như cũ", () => {
+      const nearLine = makeJarBudgetLine({
+        huId: "fun", label: "Hưởng thụ", spent: 900_000, limit: 1_000_000,
+        limitState: "set", status: "near", pct: 0.9, remaining: 100_000, thresholdHit: true,
+      });
+      const insight = run([nearLine]);
+      expect(insight!.sourceFacts.find((f) => f.label === "Còn lại")?.value).toBe(100_000);
+      expect(insight!.sourceFacts.map((f) => f.label)).not.toContain("Cần bù");
+    });
+
+    it("hũ đã bù không che mất một hũ 'sắp chạm' khác", () => {
+      const nearLine = makeJarBudgetLine({
+        huId: "fun", label: "Hưởng thụ", spent: 900_000, limit: 1_000_000,
+        limitState: "set", status: "near", pct: 0.9, remaining: 100_000, thresholdHit: true,
+      });
+      const insight = run([covered, nearLine]);
+      expect(insight?.id).toBe(`jarPressure:${THIS_MONTH}:fun`);
+      expect(insight?.severity).toBe("attention");
+    });
+  });
 });

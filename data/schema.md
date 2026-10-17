@@ -92,21 +92,54 @@ Category labels are never written back to this table — they live in the
 
 ## `categories`
 
-The Vietnamese spending taxonomy as data (invariant #7). Seeded lazily by
-`categories-store.ts` from `CATEGORIES` (`src/domain/models/categories.ts`) with
-`INSERT OR IGNORE`: a category added in code appears on the next read, an
-existing row is never clobbered. Served by `GET /api/categories` and used
-server-side to validate every stored label. Sentinels (`unclassified`, `income`,
-`dieu-chinh-hu`) are not categories and are never stored. The client still
-renders from the bundled `CATEGORIES` constant (same source as the seed).
+The Vietnamese spending taxonomy as data (invariant #7) — **per persona (`cif`)
+and writable**. Seeded lazily *per cif* by `categories-store.ts` from
+`CATEGORIES` (`src/domain/models/categories.ts`) with `INSERT OR IGNORE`: a
+category added in code appears on the next read for every persona, an existing
+(possibly renamed) row is never clobbered. Sentinels (`unclassified`, `income`,
+`dieu-chinh-hu`) are not categories and are never stored.
+
+**Why per-cif.** `jars` is per-cif and every expense category belongs to exactly
+one jar. With a global taxonomy, one persona creating a category would make it an
+orphan for *every* persona, and each one's next `readJarConfig` would silently
+heal it into their "Khác" jar — one user's edit rewriting everyone's jar config.
+
+> ⚠️ **Not backward compatible.** The pre-Phase-02 table has no `cif` column and
+> `CREATE TABLE IF NOT EXISTS` will not add one, so a stale `data/pfm.sqlite3`
+> fails loudly on `idx_categories_cif`. That is deliberate — a silently empty
+> taxonomy would 422 every jar write. Run `npm run db:seed` and commit the file.
 
 | column | type | notes |
 |---|---|---|
-| `id` | TEXT PK | e.g. `dining`, `transport` |
-| `label` | TEXT | Vietnamese display name |
-| `kind` | TEXT | `expense` \| `transfer` |
-| `fixed` | INTEGER | 1 = fixed cost |
-| `sort_order` | INTEGER | display order |
+| `cif` | TEXT PK¹ | owner |
+| `id` | TEXT PK¹ | preset id (`dining`…) or `c_<slug>` for a user-created one |
+| `label` | TEXT | Vietnamese display name (NFC-trimmed, ≤ 40 chars) |
+| `kind` | TEXT | `expense` \| `transfer` (a created category is always `expense`) |
+| `fixed` | INTEGER | 1 = fixed cost — the cashflow split axis, **not** built-in-vs-custom |
+| `custom` | INTEGER | 0 = bundled preset (rename/delete locked, 403), 1 = user-created |
+| `archived_at` | TEXT | ISO 8601; NULL = active |
+| `sort_order` | INTEGER | display order (a created category sorts last) |
+
+Read by `GET /api/categories?cif=` (active only; `&includeArchived=1` adds
+archived rows flagged `archived: true`) and written by
+`POST /api/categories {cif, label, fixed?, jarId?}` /
+`PATCH|DELETE /api/categories/:id?cif=`. Every write is ONE transaction covering
+the category row **and** the jar-config write, and answers with the whole
+resulting aggregate `{categories, jarConfig}`. Ids are generated server-side from
+the label (slug whitelist `c_` + `[a-z0-9-]`) — a client-supplied `id` is ignored.
+
+Three id sets are derived from this table (`categories-store.ts`):
+`assignableCategoryIds` (active expense — pickers and the orphan-heal),
+`knownExpenseCategoryIds` (active ∪ archived expense — the jar write guard) and
+`knownCategoryIds` (everything — the `transaction_corrections` write guard).
+Archiving is the escape hatch for a category still in use: it leaves the pickers
+but keeps its jar membership and stays *known*, so no historical jar total moves.
+Deleting is allowed only at usage 0 (else `409 {error, usedBy}`), and strips the
+id from every jar of that cif in the same transaction.
+
+Note: until Phase 03 of plan `260920-1019`, the client/engine/AI still render
+from the bundled `CATEGORIES` constant — a category created through the API is
+server-side truth but not yet visible in the UI.
 
 ## `transaction_corrections`
 
@@ -116,7 +149,8 @@ of the bank row in `transactions` (invariant #4). Read and written only by
 `src/state/corrections.tsx` via `GET /api/corrections?cif=` and
 `PATCH /api/corrections {cif, changes: {txnId: record | null}}` (one atomic
 batch; `null` deletes). The store `normalize`s each record (provenance defaults,
-#5), rejects the whole batch if a `categoryId` is not in `categories` (422), and
+#5), rejects the whole batch if a `categoryId` is not in THIS persona's
+`categories` rows — `knownCategoryIds(cif)`, active ∪ archived (422) — and
 never lets a non-user record overwrite a user one (user wins). Labels left in
 browser `localStorage` (`msb-pfm.corrections[.<cif>]`) by earlier builds are
 migrated up once on load. `npm run db:seed` clears this table with `transactions`.
@@ -157,7 +191,9 @@ category, like `type:"transfer"`) plus a `rebalance` meta
 `{ fromJarId, toJarId, triggerTxnId, origin: "auto"|"manual" }`. Because `payload`
 is the full JSON Transaction, the meta persists with no column change; the engine
 folds `Σ nhận − Σ cho` into each jar's `remaining`. The `rebalance` whitelist entry
-above is what keeps a PATCH from silently dropping the meta.
+above is what keeps a PATCH from silently dropping the meta. A rebalance never
+touches `jars.budget_limit` — it moves the derived balance only, never the plan;
+see "Two independent axes" in `data/jars/schema.md`.
 
 ## `jars`
 

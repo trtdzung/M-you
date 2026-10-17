@@ -3,6 +3,7 @@
  * `inPeriod` (D16/J05/S11/U21, J06). Deterministic — no wall clock.
  */
 import { describe, expect, it } from "vitest";
+import { FIXED_CATEGORY_IDS } from "@/domain/models";
 import { aggregateCashflow, inPeriod } from "../cashflow";
 import { addMonthsToKey, dateToMonthKey, isoInPeriod, monthPeriod, monthPeriodFromKey, parseMonthKey } from "../types";
 import { txn } from "./helpers";
@@ -93,7 +94,7 @@ describe("inPeriod compares real instants (D16/J05)", () => {
 
   it("cash flow counts a midnight-VN txn in the right month", () => {
     const t = txn({ postedAt: "2026-09-30T17:30:00.000Z", amount: 50_000 }); // 01/10 00:30 VN
-    expect(aggregateCashflow([t], SEP).expense).toBe(0);
-    expect(aggregateCashflow([t], monthPeriodFromKey("2026-10")).expense).toBe(50_000);
+    expect(aggregateCashflow([t], SEP, FIXED_CATEGORY_IDS).expense).toBe(0);
+    expect(aggregateCashflow([t], monthPeriodFromKey("2026-10"), FIXED_CATEGORY_IDS).expense).toBe(50_000);
   });
 });

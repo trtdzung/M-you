@@ -71,10 +71,22 @@ export function isChartUi(ui: UiPayload | null | undefined): ui is ChartUi {
  * falls back to showing `answer` alone. This only validates SHAPE —
  * `beneficiary_id` matching a real saved beneficiary is checked separately
  * by `AgentTransferFormCard` (it needs the live beneficiaries list to do so).
+ *
+ * `expenseIds` is the whitelist the agent's `category` is checked against
+ * (invariant #2 — the model's answer is validated, never trusted). Callers pass
+ * the persona's STORED assignable ids (`useCategories()`); without them the
+ * bundled presets stand in, which silently rejects every category the user
+ * created. It is only ever narrowed, never widened: an id outside the set means
+ * the card does not render, and no money is ever moved by this function.
  */
-export function isTransferFormUi(ui: UiPayload | null | undefined): ui is TransferFormUi {
+export function isTransferFormUi(
+  ui: UiPayload | null | undefined,
+  expenseIds?: ReadonlySet<string>,
+): ui is TransferFormUi {
   if (!ui || ui.type !== "transfer_form") return false;
   const f = ui as Partial<TransferFormUi>;
+  const knownExpense = (id: string) =>
+    expenseIds ? expenseIds.has(id) : CATEGORY_BY_ID[id]?.kind === "expense";
   return (
     typeof f.beneficiary_id === "string" &&
     f.beneficiary_id.trim() !== "" &&
@@ -83,7 +95,7 @@ export function isTransferFormUi(ui: UiPayload | null | undefined): ui is Transf
     f.amount > 0 &&
     typeof f.note === "string" &&
     typeof f.category === "string" &&
-    CATEGORY_BY_ID[f.category]?.kind === "expense"
+    knownExpense(f.category)
   );
 }
 

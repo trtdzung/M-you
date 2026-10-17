@@ -1,19 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { CATEGORIZE_SYSTEM_PROMPT, buildUserPrompt, parseCategorizeResults } from "../prompt";
+import { CATEGORIES, type CategoryDef } from "@/domain/models";
+import { buildCategorizeSystemPrompt, buildUserPrompt, parseCategorizeResults } from "../prompt";
 import type { ClassifyInput } from "../types";
 
-describe("CATEGORIZE_SYSTEM_PROMPT", () => {
-  it("lists expense category ids and instructs JSON-only output", () => {
-    expect(CATEGORIZE_SYSTEM_PROMPT).toContain("dining");
-    expect(CATEGORIZE_SYSTEM_PROMPT).toMatch(/JSON ONLY/);
+/** The bundled presets stand in for one persona's stored expense taxonomy. */
+const PRESET_EXPENSE: CategoryDef[] = CATEGORIES.filter((c) => c.kind === "expense");
+
+describe("buildCategorizeSystemPrompt", () => {
+  it("lists the passed category ids and instructs JSON-only output", () => {
+    const prompt = buildCategorizeSystemPrompt(PRESET_EXPENSE);
+    expect(prompt).toContain("dining");
+    expect(prompt).toMatch(/JSON ONLY/);
   });
 
   it("does not list the transfer category id as a valid target", () => {
     // "transfer" is a `kind`, not a catalog id — the id list itself must not
     // contain a line starting with the bare id "transfer".
-    const lines = CATEGORIZE_SYSTEM_PROMPT.split("\n");
-    const idLines = lines.filter((l) => /\|.*\|/.test(l)); // "id | label | kind" rows
-    expect(idLines.some((l) => l.startsWith("transfer |"))).toBe(false);
+    const lines = buildCategorizeSystemPrompt(PRESET_EXPENSE).split("\n");
+    const idLines = lines.filter((l: string) => /\|.*\|/.test(l)); // "id | label | kind" rows
+    expect(idLines.some((l: string) => l.startsWith("transfer |"))).toBe(false);
   });
 });
 

@@ -11,7 +11,7 @@
  */
 
 import type { Transaction } from "@/domain/models";
-import { FIXED_CATEGORY_IDS, isRebalanceCategory } from "@/domain/models";
+import { isRebalanceCategory } from "@/domain/models";
 import { coverageOf, isoInPeriod, type AggregateMeta, type Period } from "./types";
 
 export interface CategoryAmount {
@@ -64,7 +64,20 @@ export function netExpenseByCategory(txns: Transaction[], period: Period): Map<s
   return byCat;
 }
 
-export function aggregateCashflow(txns: Transaction[], period: Period): CashflowResult {
+/**
+ * `fixedCategoryIds` is the persona's stored set of categories flagged `fixed`
+ * (recurring, non-negotiable). REQUIRED, with no bundled default: "fixed" is a
+ * per-category user setting now, so a custom category the user marked fixed must
+ * count as fixed, and the bundled seed cannot know about it. It splits `expense`
+ * only — `income`, `expense` and `net` are identical whatever is passed, so a
+ * wrong set can never move a headline total, only the fixed/discretionary cut
+ * (which feeds `projection`'s run-rate).
+ */
+export function aggregateCashflow(
+  txns: Transaction[],
+  period: Period,
+  fixedCategoryIds: ReadonlySet<string>,
+): CashflowResult {
   let income = 0;
   let pendingExpense = 0;
   let latest: string | null = null;
@@ -90,7 +103,7 @@ export function aggregateCashflow(txns: Transaction[], period: Period): Cashflow
   const byCategory: CategoryAmount[] = [];
   for (const [categoryId, amount] of byCatMap) {
     expense += amount;
-    if (FIXED_CATEGORY_IDS.has(categoryId)) fixed += amount;
+    if (fixedCategoryIds.has(categoryId)) fixed += amount;
     byCategory.push({ categoryId, amount });
   }
   byCategory.sort((a, b) => b.amount - a.amount);

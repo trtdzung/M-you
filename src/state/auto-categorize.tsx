@@ -26,9 +26,10 @@ import { getConsent, hasScope, CONSENT_CHANGED_EVENT } from "@/lib/consent";
 import { usePersona } from "@/providers/context";
 import { isUnclassified } from "@/domain/categorize/unclassified";
 import { categorize } from "@/ai/categorize/categorize-service";
-import { localClassify } from "@/ai/categorize/local-classifier";
+import { createLocalClassify } from "@/ai/categorize/local-classifier";
 import { createRemoteClassify } from "@/ai/categorize/remote-classifier";
 import { isAutoCategorizeEnabled } from "@/ai/categorize/config";
+import { useCategories } from "./categories";
 import { useFinancials } from "./useFinancials";
 import { useCorrections } from "./corrections";
 import { isUserOrigin, type Assignment, type Corrections } from "./corrections-core";
@@ -83,6 +84,12 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
   const { allTransactions, transactions, raw, loading, error: dataError } = useFinancials();
   const { corrections, loaded, upsertAssignments } = useCorrections();
   const { memory, forget } = useCategoryMemory();
+  // The persona's ASSIGNABLE categories — simultaneously the catalogue offered to
+  // the classifier and the whitelist its answer is validated against (invariant
+  // #2). One list, so the model can never be offered an option the validator
+  // would reject, nor the reverse.
+  const { assignable, loaded: taxonomyLoaded } = useCategories();
+  const assignableIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   // Reuses THIS provider's txn view (no second data fetch). Read through refs after
   // the async classify so the reconcile runs on the LATEST txns/corrections, not
   // the snapshot captured when the run started.
@@ -128,6 +135,11 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
     if (inFlight.current) return undefined;
     if (!isAutoCategorizeEnabled()) return undefined;
     if (todo.length === 0) return undefined;
+    // Never classify against a taxonomy we have not loaded: every suggestion
+    // would be validated against an EMPTY whitelist and silently dropped, which
+    // reads on screen as "the AI found nothing" (invariant #6). Wait instead —
+    // the effect below re-fires once `assignable` arrives.
+    if (!taxonomyLoaded) return undefined;
     inFlight.current = true;
     setRunning(true);
     setRunError(false);
@@ -138,6 +150,7 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
       const outcome = await categorize({
         txns: todo,
         memory,
+        categories: assignable,
         classify: aiConsent ? createRemoteClassify(persona.cif) : async () => [],
         classifyOrigin: "ai",
       });
@@ -154,7 +167,8 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
           const fb = await categorize({
             txns: leftover,
             memory,
-            classify: localClassify,
+            categories: assignable,
+            classify: createLocalClassify(assignableIds),
             classifyOrigin: "heuristic",
           });
           assignments = assignments.concat(fb.assignments);
@@ -197,7 +211,7 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
       inFlight.current = false;
       setRunning(false);
     }
-  }, [todo, aiConsent, memory, upsertAssignments, forget, persona.cif]);
+  }, [todo, aiConsent, memory, upsertAssignments, forget, persona.cif, assignable, assignableIds, taxonomyLoaded]);
 
   // Auto-backfill: debounced, keyed on the stable todo string + consent.
   const runRef = useRef(run);
@@ -205,10 +219,10 @@ export function AutoCategorizeProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     // Wait for the stored overlay: backfilling before it loads would re-label
     // (and re-send) txns the server already has labels for.
-    if (loading || !loaded || todoKey === "") return;
+    if (loading || !loaded || !taxonomyLoaded || todoKey === "") return;
     const timer = setTimeout(() => void runRef.current(), 500);
     return () => clearTimeout(timer);
-  }, [todoKey, aiConsent, loading, loaded]);
+  }, [todoKey, aiConsent, loading, loaded, taxonomyLoaded]);
 
   const status: AutoCategorizeStatus = running
     ? "loading"

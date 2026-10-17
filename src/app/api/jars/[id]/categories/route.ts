@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!categoryId || typeof categoryId !== "string") {
     return NextResponse.json({ error: "categoryId is required" }, { status: 422 });
   }
-  const badCategory = categoryViolation([categoryId]);
+  const badCategory = categoryViolation(cif, [categoryId]);
   if (badCategory) return badCategory;
 
   const current = readJarConfig(cif);

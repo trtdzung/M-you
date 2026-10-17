@@ -3,6 +3,7 @@ import { currentMonthKey } from "@/lib/demo-clock";
 import { runDetectors } from "../run";
 import { spendingSpike } from "../detectors/spending-spike";
 import { numbersIn, factValues } from "../narrate";
+import { REBALANCE_CATEGORY, type Transaction } from "@/domain/models";
 import type { Insight } from "../types";
 import { makeCashflow, makeFinancials, makeJarBudgetLine, makeJarBudgetResult } from "./helpers";
 
@@ -58,5 +59,35 @@ describe("runDetectors", () => {
     );
     expect(insights.length).toBeGreaterThanOrEqual(2);
     expect(insights[0].severity).toBe("urgent");
+  });
+
+  it("H3: một hũ vượt hạn mức ĐÃ ĐƯỢC BÙ chỉ sinh ĐÚNG MỘT insight, không double-warn", () => {
+    // Hai trục: `status` vẫn "over" (4.8tr trên hạn mức 4tr) trong khi số dư đã được
+    // bù về 0. `jarOverspendCovered` là nguồn duy nhất kể chuyện này; `jarPressure`
+    // phải im để người dùng không thấy hai card nói cùng một việc.
+    const leg = {
+      id: "rb1", accountId: "acc", postedAt: `${currentMonthKey()}-12T10:00:00.000Z`,
+      amount: 800_000, direction: "debit", type: "transfer", categoryId: REBALANCE_CATEGORY,
+      merchantName: "Điều chỉnh hũ", status: "posted", source: "self_reported", currency: "VND",
+      rebalance: { fromJarId: "transport", toJarId: "food", triggerTxnId: "t1", origin: "auto" },
+    } as unknown as Transaction;
+
+    const insights = runDetectors(
+      makeFinancials({
+        monthKey: currentMonthKey(),
+        jarBudget: makeJarBudgetResult({
+          lines: [
+            makeJarBudgetLine({ huId: "food", label: "Ăn uống", spent: 4_800_000, limit: 4_000_000, limitState: "set", status: "over", pct: 1.2, rebalanceNet: 800_000, remaining: 0, thresholdHit: true }),
+            makeJarBudgetLine({ huId: "transport", label: "Đi lại", spent: 0, limit: 2_000_000, limitState: "set", status: "ok", pct: 0, rebalanceNet: -800_000, remaining: 1_200_000 }),
+          ],
+        }),
+        jarRebalances: [leg],
+      }),
+    );
+
+    const aboutFood = insights.filter((i) => i.explanation.includes("Ăn uống"));
+    expect(aboutFood).toHaveLength(1);
+    expect(aboutFood[0].type).toBe("jar_overspend_covered");
+    expect(insights.some((i) => i.type === "jar_pressure")).toBe(false);
   });
 });

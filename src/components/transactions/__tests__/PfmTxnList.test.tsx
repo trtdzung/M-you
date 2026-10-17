@@ -4,6 +4,7 @@ import { PersonaProvider } from "@/providers/context";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
 import { mockStoredCorrections } from "@/test-utils/mock-corrections-fetch";
+import { CategoryTaxonomyProvider } from "@/state/categories";
 import { CategoryMemoryProvider } from "@/state/category-memory";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ManualTxnsProvider } from "@/state/manual-txns";
@@ -11,6 +12,9 @@ import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { useFinancials } from "@/state/useFinancials";
+import { isoInPeriod, monthPeriodFromKey } from "@/domain/engine";
+import { currentMonthKey } from "@/lib/demo-clock";
+import type { Transaction } from "@/domain/models";
 import { PfmTxnList } from "../PfmTxnList";
 
 /**
@@ -55,9 +59,10 @@ function renderList() {
   return render(
     <PersonaProvider>
       <CorrectionsProvider>
-        <CategoryMemoryProvider>
-          <ManualTxnsProvider>
-            <JarConfigProvider>
+        <ManualTxnsProvider>
+          <JarConfigProvider>
+            <CategoryTaxonomyProvider>
+              <CategoryMemoryProvider>
                 <AssetLiabilityProvider>
                   <GoalProvider>
                     <PeriodProvider>
@@ -68,9 +73,10 @@ function renderList() {
                     </PeriodProvider>
                   </GoalProvider>
                 </AssetLiabilityProvider>
-            </JarConfigProvider>
-          </ManualTxnsProvider>
-        </CategoryMemoryProvider>
+              </CategoryMemoryProvider>
+            </CategoryTaxonomyProvider>
+          </JarConfigProvider>
+        </ManualTxnsProvider>
       </CorrectionsProvider>
     </PersonaProvider>,
   );
@@ -187,5 +193,43 @@ describe("PfmTxnList", () => {
     // "Đã sửa danh mục" mark), proving the change flows back into the list.
     fireEvent.click(screen.getAllByLabelText("Đóng")[1]);
     await waitFor(() => expect(screen.getAllByLabelText("Đã sửa danh mục").length).toBeGreaterThan(0));
+  });
+
+  /**
+   * "Chưa phân loại" is measured against the persona's STORED taxonomy, not the
+   * bundled presets. Against the constant, a transaction the user had labelled
+   * with a category they created rendered highlighted as UNLABELLED — a
+   * provenance lie (invariant #5) about a row that is, in fact, labelled.
+   */
+  it("does not flag a transaction labelled with a CUSTOM category as chưa phân loại", async () => {
+    await fetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cif: "CIF_0001", label: "Học phí" }),
+    });
+    // A REAL transaction from the seeded persona, inside the month the list shows.
+    const period = monthPeriodFromKey(currentMonthKey());
+    const txns = (await (await fetch("/api/transactions?cif=CIF_0001")).json()) as Transaction[];
+    const target = txns.find((t) => t.type === "expense" && isoInPeriod(t.postedAt, period));
+    expect(target).toBeDefined();
+    await fetch("/api/corrections", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cif: "CIF_0001",
+        changes: { [target!.id]: { categoryId: "c_hoc-phi", origin: "user", status: "applied" } },
+      }),
+    });
+
+    const { container } = renderList();
+    await waitForLoaded(container);
+
+    // The correction survived resolution (it is not silently reverted) AND the
+    // row names the category the user gave it. Before the labels map was threaded
+    // through, `categoryLabel` could only fall back to the raw id "c_hoc-phi" —
+    // a labelled transaction that read like a broken one (invariant #5).
+    const label = await screen.findByText("Học phí");
+    const row = label.closest("button")?.parentElement;
+    expect(row?.className ?? "").not.toContain("bg-warning-soft");
   });
 });

@@ -1,14 +1,30 @@
 /**
  * In-memory SQLite DDL shared by the `/api/jars` route suites — the minimal
- * `jars` / `accounts` / `transactions` tables the handlers touch (jar
- * writes, the CASA cap's `casaPoolForCif`, and DELETE's rebalance-leg cleanup).
+ * `jars` / `categories` / `accounts` / `transactions` tables the handlers touch
+ * (jar writes, the CASA cap's `casaPoolForCif`, and DELETE's rebalance-leg
+ * cleanup).
  */
+
+/**
+ * The per-cif taxonomy. It travels WITH `JARS_DDL` because a jar read/write can
+ * no longer happen without it: `readJarConfig` heals against
+ * `assignableCategoryIds(cif)` and `categoryViolation` validates against
+ * `knownExpenseCategoryIds(cif)`, both of which lazily seed this table.
+ */
+export const CATEGORIES_DDL = `CREATE TABLE categories (
+  cif TEXT NOT NULL, id TEXT NOT NULL, label TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('expense', 'transfer')),
+  fixed INTEGER NOT NULL, custom INTEGER NOT NULL DEFAULT 0, archived_at TEXT,
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (cif, id)
+);`;
 
 export const JARS_DDL = `CREATE TABLE jars (
   id TEXT NOT NULL, cif TEXT NOT NULL, label TEXT NOT NULL, category_ids TEXT NOT NULL,
   budget_limit REAL, color TEXT, icon TEXT, sort_order INTEGER NOT NULL, role TEXT,
   PRIMARY KEY (cif, id)
-);`;
+);
+${CATEGORIES_DDL}`;
 
 // CASA is DB-backed: `casaPoolForCif` reads the `accounts` table (lazily
 // seeding CIF_0001's 18tr `current` account on first read).
