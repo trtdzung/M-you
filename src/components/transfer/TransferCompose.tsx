@@ -132,8 +132,10 @@ export function TransferCompose() {
   const jars = useMemo(
     () =>
       jarConfig.jars.map((jar) => {
-        const balance = snapshot?.lines.find((line) => line.huId === jar.id)?.balance ?? null;
-        return { ...jar, balance, spendable: jarSpendable(balance) };
+        const line = snapshot?.lines.find((l) => l.huId === jar.id);
+        const balance = line?.balance ?? null;
+        // `spent`/`limit` are this month's (the snapshot's month), shown small under the balance.
+        return { ...jar, balance, spendable: jarSpendable(balance), spent: line?.spent ?? null, limit: line?.limit ?? null };
       }),
     [jarConfig, snapshot],
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { Card, Money, Sheet, SourceBadge } from "@/components/primitives";
+import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBankByName } from "@/lib/transfer-banks";
@@ -53,7 +54,13 @@ export function TransferAmountStep({
   recipient: SelectedRecipient;
   accounts: Account[];
   /** A jar with a running balance is selectable as a source (its derived `spendable = max(0, balance)`); one with none (`balance == null`) stays view-only. */
-  jars?: (Jar & { balance: number | null; spendable: number | null })[];
+  jars?: (Jar & {
+    balance: number | null;
+    spendable: number | null;
+    /** Đã chi tháng này / hạn mức tháng (`null` = unknown / chưa đặt) — a small hint under the balance. */
+    spent?: number | null;
+    limit?: number | null;
+  })[];
   /** The virtual "Chưa phân bổ" pool (null/omitted while jars are still loading — RT#14). */
   pool?: UnallocatedPoolResult | null;
   source: TransferSource | null;
@@ -286,6 +293,7 @@ export function TransferAmountStep({
                         ) : (
                           <p className="mt-0.5 text-xs text-muted">Chưa có số dư</p>
                         )}
+                        <JarMonthUsage spent={jar.spent ?? null} limit={jar.limit ?? null} />
                       </div>
                     </>
                   );
@@ -320,4 +328,20 @@ export function TransferAmountStep({
 /** "1000000" → "1.000.000" (vi-VN grouping). String-based, so no precision loss on long input. */
 function groupThousands(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/**
+ * "Đã chi 2.187.000 đ / 4.800.000 đ" — this month's spend against the jar's monthly
+ * limit, small and quiet under the balance. Turns red once spend passes the limit. A
+ * jar with no limit shows only what was spent ("Chưa đặt hạn mức"); one with neither
+ * spend nor limit shows nothing (never a fabricated 0 line).
+ */
+function JarMonthUsage({ spent, limit }: { spent: number | null; limit: number | null }) {
+  if (spent === null || (limit === null && spent <= 0)) return null;
+  const over = limit !== null && spent > limit;
+  return (
+    <p className={cn("mt-0.5 text-[11px] tabular-nums", over ? "text-negative" : "text-muted")}>
+      Đã chi {formatVnd(spent)} {limit === null ? "· Chưa đặt hạn mức" : `/ ${formatVnd(limit)}`} tháng này
+    </p>
+  );
 }
