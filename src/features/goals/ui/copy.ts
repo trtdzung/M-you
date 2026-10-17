@@ -16,6 +16,7 @@ export const GOALS_COPY = {
   saving: "Đang lưu…",
   cancel: "Hủy",
   archivedGroup: "Đã lưu trữ",
+  listMonthly: (amount: string) => `Góp ${amount}/tháng`,
   notFoundTitle: "Không tìm thấy mục tiêu",
   notFoundDescription: "Mục tiêu này không tồn tại hoặc đã bị xóa.",
   backToList: "Về danh sách mục tiêu",
