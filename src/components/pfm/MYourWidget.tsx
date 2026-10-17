@@ -28,11 +28,13 @@ import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
 import { ClarifyAnswerBubble } from "./ClarifyAnswerBubble";
+import { takeInsightDraft } from "@/insights/proactive/chat-handoff";
 
 interface ChatBubble {
   id: string;
   role: "user" | "agent";
-  text: string;
+  text: string; // visible display text
+  sendText?: string; // full text sent to agent (may include hidden context)
   ui?: UiPayload;
   error?: boolean;
 }
@@ -102,6 +104,22 @@ export function MYourWidget() {
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
   const [input, setInput] = useState("");
+  const [inputVisible, setInputVisible] = useState(""); // text shown in textarea/bubble
+  const draftPersona = useRef(cif);
+  const insightParam = params?.get("insight") === "1";
+  useEffect(() => {
+    if (draftPersona.current !== cif) {
+      setInput("");
+      setInputVisible("");
+      draftPersona.current = cif;
+    }
+    if (!isOpen || !insightParam) return;
+    const payload = takeInsightDraft(cif);
+    if (payload) {
+      setInput(payload.draft);          // full draft (with hidden seed) → sent to agent
+      setInputVisible(payload.visibleText); // only the question → shown in UI
+    }
+  }, [isOpen, insightParam, cif]);
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -227,9 +245,27 @@ export function MYourWidget() {
   async function send() {
     const text = input.trim();
     if (!text) return;
+    // Show only the visible question in the bubble; send full text (with hidden context) to agent
+    const visibleForBubble = inputVisible.trim() || text;
     setInput("");
+    setInputVisible("");
     setVoiceGuidance("");
-    await postMessage(text);
+    // Temporarily patch postMessage to use visibleForBubble for the bubble
+    if (!composerDisabled && !voiceBusy) {
+      const userId = `m${++idRef.current}`;
+      const replyId = `m${++idRef.current}`;
+      setMessages((prev) => [...prev, { id: userId, role: "user", text: visibleForBubble, sendText: text }]);
+      setReopenedIndex(null);
+      setSending(true);
+      try {
+        const res = await sendChatMessage(text, cif);
+        setMessages((prev) => [...prev, { id: replyId, role: "agent", text: res.answer, ui: res.ui }]);
+      } catch {
+        setMessages((prev) => [...prev, { id: replyId, role: "agent", text: SEND_ERROR, error: true }]);
+      } finally {
+        setSending(false);
+      }
+    }
   }
 
   async function handleDelete() {
@@ -392,9 +428,10 @@ export function MYourWidget() {
           <div className="shadow-nav shrink-0 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+var(--safe-area-bottom))]">
             <div className="flex items-end gap-2">
               <textarea
-                value={input}
+                value={inputVisible}
                 onChange={(e) => {
                   setInput(e.target.value);
+                  setInputVisible(e.target.value);
                   setVoiceGuidance("");
                 }}
                 onKeyDown={handleKey}
@@ -423,7 +460,7 @@ export function MYourWidget() {
               <button
                 type="button"
                 onClick={send}
-                disabled={composerDisabled || voiceBusy || !input.trim()}
+                disabled={composerDisabled || voiceBusy || !inputVisible.trim()}
                 aria-label="Gửi"
                 className="brand-gradient flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
               >
