@@ -142,6 +142,29 @@ describe("BudgetTab", () => {
     expect(screen.queryByText("Cần bù thủ công")).not.toBeInTheDocument();
   });
 
+  it("số dư hũ KHÔNG BAO GIỜ âm: một hũ tiêu quá số dư hiện 0 ₫, phần chưa bù nằm ở 'Cần bù thủ công'", () => {
+    // limit 2tr, đã tiêu 2.5tr, mới nhận bù 200k → remaining −300k.
+    // Hai con số PHẢI tách bạch: vượt kế hoạch 500k (spent − limit) vs chưa bù 300k (−remaining).
+    const short = line({
+      label: "Đi lại", spent: 2_500_000, limit: 2_000_000, rebalanceNet: 200_000,
+      remaining: -300_000, pct: 1.25, status: "over", thresholdHit: true,
+    });
+    mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [short])) };
+    const { container } = render(<BudgetTab />);
+
+    // Không một số tiền âm nào được render ở bất kỳ đâu trên thẻ hũ.
+    expect(container.textContent).not.toMatch(/-\s?\d/);
+    expect(screen.queryByText(/-300\.000/)).not.toBeInTheDocument();
+    // Số dư bị chặn sàn ở 0 (giống JarEnvelopeCard ở Tổng quan).
+    expect(screen.getByText("Số dư").textContent).toContain("0");
+    // Phần chưa bù vẫn còn nguyên, đúng số, đúng nhãn trục SỐ DƯ.
+    expect(screen.getByText("Cần bù thủ công")).toBeInTheDocument();
+    expect(screen.getByText(/đã tiêu quá số dư 300\.000/)).toBeInTheDocument();
+    expect(screen.queryByText(/vượt hạn mức 300\.000/)).not.toBeInTheDocument();
+    // Trục kế hoạch vẫn kể đúng câu chuyện của nó, bằng con số KHÁC.
+    expect(screen.getByText(/Đã vượt 500\.000/)).toBeInTheDocument();
+  });
+
   it("U15: the 'Cần bù thủ công' notice carries an action that opens the allocation sheet", () => {
     const over = line({ spent: 4_500_000, remaining: -500_000, pct: 1.125, status: "over", thresholdHit: true });
     mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [over])) };

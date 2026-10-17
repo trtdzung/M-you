@@ -14,6 +14,11 @@ import { buildInsight, fact, money } from "../narrate";
  * double-warn (H3). H2 guard: only the current month, so a closed period never
  * raises a stale warning.
  */
+/** "Còn lại" when the jar still holds money, "Cần bù" (positive) when it does not. */
+function balanceFact(remaining: number) {
+  return remaining < 0 ? fact("Cần bù", -remaining) : fact("Còn lại", remaining);
+}
+
 export const jarPressure: Detector = (f) => {
   if (f.monthKey !== currentMonthKey()) return null;
 
@@ -43,7 +48,11 @@ export const jarPressure: Detector = (f) => {
     facts: [
       fact("Đã tiêu", line.spent),
       fact("Hạn mức", limit),
-      fact("Còn lại", line.remaining ?? 0),
+      // A hũ cannot hold negative money, so "Còn lại" never carries a negative
+      // figure. An `over` jar here is always `stillShort` (remaining < 0), so its
+      // balance reads as a positive "Cần bù" instead — same rule the jar card,
+      // `JarEnvelopeCard` and the Ngân sách header already follow.
+      balanceFact(line.remaining ?? 0),
     ],
     confidence: 0.95,
     actionType: "review_jars",
