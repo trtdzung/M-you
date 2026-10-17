@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
+import { MessageSquarePlus, MoreHorizontal, Sparkles } from "lucide-react";
+import { Sheet } from "@/components/primitives";
 import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
 import { draftToForm } from "../../coach/to-form";
@@ -11,16 +12,23 @@ import { CoachOutOfScope } from "../coach/CoachOutOfScope";
 import { CoachQuestion } from "../coach/CoachQuestion";
 import { CoachTranscript } from "../coach/CoachTranscript";
 import { GOALS_COPY } from "../copy";
-import { secondaryButton } from "../styles";
+import { primaryButton, secondaryButton } from "../styles";
 import { CreateGoalFlow } from "./CreateGoalFlow";
 
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
 export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => void; active?: boolean }) {
   const coach = useGoalCoach();
   const [manual, setManual] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmNew, setConfirmNew] = useState(false);
+  const [composerKey, setComposerKey] = useState(0);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const busy = coach.phase === "asking" || coach.phase === "answering";
   const restart = () => {
     setManual(false);
+    setMenuOpen(false);
+    setConfirmNew(false);
+    setComposerKey(key => key + 1);
     coach.reset();
   };
 
@@ -44,9 +52,6 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           />
         )}
         {coach.draft && <p className="text-sm text-text">{GOALS_COPY.coach.draftReady}</p>}
-        <button type="button" onClick={restart} className={secondaryButton}>
-          {GOALS_COPY.coach.restart}
-        </button>
       </div>
     );
   }
@@ -57,13 +62,27 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   };
   return (
     <section className="flex flex-col gap-4 pb-44">
-      <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles size={18} aria-hidden="true" /></span><h2 className="text-[16px] leading-6 font-semibold text-text">M-You</h2></div>
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles size={18} aria-hidden="true" /></span>
+        <h2 className="flex-1 text-[16px] leading-6 font-semibold text-text">M-You</h2>
+        {coach.phase !== "idle" && <div className="relative" onBlur={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setMenuOpen(false);
+        }} onKeyDown={event => {
+          if (event.key === "Escape") { setMenuOpen(false); menuButton.current?.focus(); }
+        }}>
+          <button ref={menuButton} type="button" aria-label="Tùy chọn trò chuyện" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(open => !open)} className="flex h-11 w-11 items-center justify-center rounded-full text-muted hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"><MoreHorizontal size={22} aria-hidden="true" /></button>
+          {menuOpen && <div role="menu" aria-label="Tùy chọn trò chuyện" className="absolute right-0 top-full z-30 mt-1 w-60 rounded-xl border border-border bg-surface p-1.5 shadow-card">
+            <button autoFocus role="menuitem" type="button" className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-[14px] font-medium text-text hover:bg-surface-muted focus:bg-surface-muted focus:outline-none" onClick={() => { setMenuOpen(false); menuButton.current?.focus(); setConfirmNew(true); }}><MessageSquarePlus size={18} aria-hidden="true" />Cuộc trò chuyện mới</button>
+          </div>}
+        </div>}
+      </div>
       {coach.phase === "idle" && <div className="rounded-2xl rounded-tl-sm bg-surface-tint p-4">
         <p className="text-[16px] leading-6 font-medium text-text">Bạn đang muốn dành tiền cho điều gì?</p>
         <p className="mt-2 text-[14px] leading-6 text-muted">Kể mình nghe, mình sẽ giúp bạn xác định số tiền và thời gian.</p>
       </div>}
       {body}
       <CoachInput
+        key={composerKey}
         active={active}
         showSuggestions={coach.phase === "idle"}
         disabled={coach.phase !== "idle" && !(coach.phase === "need_info" && coach.question?.allow_free_text)}
@@ -73,6 +92,12 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           else if (coach.question) coach.answer(coach.question.slot, text, "text");
         }}
       />
+      {active && confirmNew && <Sheet title="Bắt đầu cuộc trò chuyện mới?" description="Nội dung trao đổi và mục tiêu chưa lưu sẽ bị bỏ. Mục tiêu đã lưu vẫn được giữ." onClose={() => setConfirmNew(false)}>
+        <div className="flex flex-col gap-3">
+          <button type="button" onClick={restart} className={`${primaryButton} w-full`}>Bắt đầu mới</button>
+          <button type="button" onClick={() => setConfirmNew(false)} className={secondaryButton}>Tiếp tục trò chuyện</button>
+        </div>
+      </Sheet>}
       {coach.draft && (
         <CreateGoalFlow
           prefill={draftToForm(coach.draft, transferNow())}
