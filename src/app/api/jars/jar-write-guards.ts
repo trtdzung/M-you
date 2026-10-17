@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { invalidExpenseCategoryIds, isReservedJarId } from "@/domain/jar-rules";
-import { fitsCasaCap } from "@/domain/engine";
+import { fitsCasaCap, jarSpendableTotal } from "@/domain/engine";
 import type { Jar } from "@/domain/models";
-import { casaPoolForCif } from "@/lib/casa-pool";
+import { readAccounts } from "@/lib/accounts-store";
+import { readTransactions } from "@/lib/transactions-store";
+import { readManualTxns } from "@/lib/manual-txns-store";
+import { DEMO_NOW } from "@/lib/demo-clock";
 import { knownExpenseCategoryIds } from "@/lib/categories-store";
 
 /**
@@ -17,13 +20,20 @@ function unprocessable(body: Record<string, unknown>): NextResponse {
 }
 
 /**
- * CASA cap (S4/S5): reject only when the write RAISES Σ budgetLimit past the
- * persona's live CASA pool. `baseline` is the stored config before the write, so
- * lowering / clearing / re-saving always passes, even over cap or with CASA < 0.
- * Unknown CASA blocks increases only (`overBy: null`).
+ * CASA cap (S4/S5), BALANCE LENS: reject only when the write RAISES Σ spendable
+ * past the persona's live CASA pool. `baseline` is the stored config before the
+ * write, so lowering / clearing / re-saving / covering an overspent jar always
+ * passes, even over cap or with CASA < 0. Unknown CASA blocks increases only
+ * (`overBy: null`). Reads the persona's live txns (bank + self-reported) so
+ * `Σ spendable` matches exactly what the overview and the allocation sheet show
+ * (shared `jarSpendableTotal`, so client preview and server never diverge).
  */
 export function capViolation(cif: string, nextJars: Jar[], baseline: Jar[]): NextResponse | null {
-  const cap = fitsCasaCap(nextJars, casaPoolForCif(cif) ?? "unknown", {}, baseline);
+  const accounts = readAccounts(cif);
+  const txns = [...readTransactions(cif), ...readManualTxns(cif)];
+  const next = jarSpendableTotal(nextJars, accounts, txns, DEMO_NOW);
+  const base = jarSpendableTotal(baseline, accounts, txns, DEMO_NOW);
+  const cap = fitsCasaCap(next.total, base.total, next.pool);
   return cap.ok ? null : unprocessable({ error: "over CASA cap", overBy: cap.overBy ?? null });
 }
 

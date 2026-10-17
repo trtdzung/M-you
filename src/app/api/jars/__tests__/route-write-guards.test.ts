@@ -92,9 +92,11 @@ describe("POST /api/jars", () => {
 describe("PUT /api/jars", () => {
   it("rejects a replace that raises Σ over CASA (A17)", async () => {
     seed([{ id: "a", label: "A", categoryIds: [], budgetLimit: 5_000_000 }]);
+    // Empty categoryIds → no spend attaches, so Σ spendable == Σ limit == 20tr,
+    // isolating the cap check from the persona's seeded transaction history.
     const res = await put([
-      { id: "x", label: "X", categoryIds: ["housing"], budgetLimit: 10_000_000 },
-      { id: "y", label: "Y", categoryIds: ["dining"], budgetLimit: 10_000_000 },
+      { id: "x", label: "X", categoryIds: [], budgetLimit: 10_000_000 },
+      { id: "y", label: "Y", categoryIds: [], budgetLimit: 10_000_000 },
     ]);
     expect(res.status).toBe(422);
     expect((await res.json()).overBy).toBe(2_000_000);

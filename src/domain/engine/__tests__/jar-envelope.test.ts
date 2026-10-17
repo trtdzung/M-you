@@ -88,15 +88,14 @@ describe("evaluateJarEnvelope — CASA pool (chờ phân bổ)", () => {
   });
 });
 
-describe("evaluateJarEnvelope — pending is the allocation headroom (limit lens, D27)", () => {
-  it("spend does NOT enlarge the headroom — CASA 10tr, limit 5tr, spent 1tr → still 5tr", () => {
-    // The spendable lens (picker pool) would say 6tr here; the sheet would only
-    // accept 5tr, so the card must say 5tr too.
+describe("evaluateJarEnvelope — pending is the unallocated pool (balance lens, D26)", () => {
+  it("balance lens: CASA 10tr, limit 5tr, spent 1tr → spendable 4tr → pending 6tr (== unallocated pool)", () => {
     const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 5_000_000 }]);
     const res = evaluateJarEnvelope(cfg, [account("cur", 10_000_000)], new Map([["food", 1_000_000]]), PERIOD);
-    expect(res.pending.amount).toBe(5_000_000);
-    expect(res.pending.allocated).toBe(5_000_000);
-    expect(res.pending.amount).not.toBe(
+    expect(res.pending.amount).toBe(6_000_000);
+    expect(res.pending.allocated).toBe(4_000_000); // Σ spendable, not the 5tr limit
+    // Now IDENTICAL to the transfer picker's "Chưa phân bổ" (one definition, D26).
+    expect(res.pending.amount).toBe(
       computeUnallocatedPool({ casaBalance: 10_000_000, spendableTotal: 4_000_000 }).amount,
     );
   });
@@ -105,16 +104,16 @@ describe("evaluateJarEnvelope — pending is the allocation headroom (limit lens
     const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 3_000_000 }]);
     const res = evaluateJarEnvelope(cfg, [account("cur", 8_000_000)], new Map([["food", 500_000]]), PERIOD);
     expect(res.pending.amount).toBe((res.pending.pool as number) - res.pending.allocated);
-    expect(res.pending.amount).toBe(5_000_000);
+    expect(res.pending.amount).toBe(5_500_000); // 8tr − 2,5tr spendable
   });
 
-  it("an overspent jar still claims its full hạn mức; unset jars claim nothing", () => {
+  it("an overspent jar claims 0 (its balance is gone); unset jars claim nothing", () => {
     const cfg = config([
       { id: "food", label: "Ăn uống", budgetLimit: 1_000_000 },
       { id: "bills", label: "Hóa đơn" },
     ]);
     const res = evaluateJarEnvelope(cfg, CURRENT, new Map([["food", 1_500_000]]), PERIOD);
-    expect(res.pending.amount).toBe(4_000_000); // 5tr − 1tr hạn mức (bills unset → 0)
+    expect(res.pending.amount).toBe(5_000_000); // 5tr − 0 (food spendable 0, bills unset → 0)
     expect(res.pending.overAllocated).toBe(false);
   });
 
@@ -134,7 +133,7 @@ describe("evaluateJarEnvelope — pending is the allocation headroom (limit lens
 });
 
 describe("evaluateJarEnvelope — per-jar còn lại trong hũ (một con số)", () => {
-  it("budgetLimit set → remaining = budgetLimit − spent, counts toward pending.allocated, source self_reported", () => {
+  it("budgetLimit set → remaining = budgetLimit − spent; its SPENDABLE (not the limit) counts toward pending.allocated", () => {
     const cfg = config([{ id: "food", label: "Ăn uống", budgetLimit: 2_000_000 }]);
     const spent = new Map([["food", 800_000]]);
     const res = evaluateJarEnvelope(cfg, CURRENT, spent, PERIOD);
@@ -144,7 +143,8 @@ describe("evaluateJarEnvelope — per-jar còn lại trong hũ (một con số)"
     expect(food.remaining).toBe(1_200_000);
     expect(food.inUse).toBe(true);
     expect(food.source).toBe("self_reported");
-    expect(res.pending.allocated).toBe(2_000_000);
+    // Balance lens: allocated = Σ spendable = max(0, remaining), NOT the 2tr limit.
+    expect(res.pending.allocated).toBe(1_200_000);
   });
 
   it("no budgetLimit → budgetLimit/remaining null, inUse false, source mock (never a fabricated 0)", () => {
@@ -191,10 +191,10 @@ describe("evaluateJarEnvelope — per-jar còn lại trong hũ (một con số)"
     expect(res.pending.amount).toBe(1_000_000);
   });
 
-  it("regression: the card can no longer promise headroom the sheet rejects", () => {
-    // Bug as reported: card said "Chờ phân bổ 13,09 tr" while the sheet it opens
-    // said "Còn lại để chia 199,9K" — the ~12,89tr gap was Σ đã chi kỳ này, which
-    // the old spendable lens handed back as if it were allocatable.
+  it("balance lens: pending = CASA − Σ spendable, stable through spending", () => {
+    // With spending this period, CASA is the LIVE (post-spend) balance and each
+    // jar's spendable has shrunk by what it spent — so pending stays the true
+    // "chưa gán vào hũ nào", NOT the old limit lens (which would show 199,9K here).
     const cfg = config([
       { id: "food", label: "Ăn uống", budgetLimit: 4_000_000 },
       { id: "bills", label: "Hóa đơn", budgetLimit: 8_000_000 },
@@ -202,11 +202,13 @@ describe("evaluateJarEnvelope — per-jar còn lại trong hũ (một con số)"
     ]);
     const spent = new Map([["food", 3_500_000], ["bills", 6_000_000], ["khac", 3_390_000]]);
     const res = evaluateJarEnvelope(cfg, [account("cur", 17_199_900)], spent, PERIOD);
-    expect(res.pending.allocated).toBe(17_000_000);
-    expect(res.pending.amount).toBe(199_900); // what the sheet will accept
-    // The spendable lens would have shown 12,89tr more — the whole of Σ đã chi.
+    // remaining: food 0,5tr · bills 2tr · khac 1,61tr → Σ spendable 4,11tr.
     const spendableTotal = res.jars.reduce((s, l) => s + Math.max(0, l.remaining ?? 0), 0);
-    expect(17_199_900 - spendableTotal).toBe(199_900 + 12_890_000);
+    expect(spendableTotal).toBe(4_110_000);
+    expect(res.pending.allocated).toBe(4_110_000);
+    expect(res.pending.pool).toBe(17_199_900);
+    // 17,199,900 − 4,110,000 = 13,089,900 — the money no jar's balance claims yet.
+    expect(res.pending.amount).toBe(13_089_900);
   });
 
   it("is deterministic (same inputs → same output)", () => {

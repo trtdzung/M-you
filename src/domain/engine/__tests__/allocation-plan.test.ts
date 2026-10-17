@@ -1,82 +1,62 @@
 import { describe, it, expect } from "vitest";
-import type { Jar } from "@/domain/models";
 import { fitsCasaCap } from "../allocation-plan";
 
-function jar(id: string, budgetLimit?: number): Jar {
-  return { id, label: id, categoryIds: [], budgetLimit };
-}
-
-describe("fitsCasaCap", () => {
-  const JARS = [jar("food", 5_000_000), jar("bills", 7_000_000), jar("savings")];
-
-  it("Σ budgetLimit exactly equal to CASA → ok", () => {
-    expect(fitsCasaCap(JARS, 12_000_000, {})).toEqual({ ok: true });
+/**
+ * `fitsCasaCap(nextSpendable, baseSpendable, casaPool)` — the pure S5 accept/reject
+ * rule over BALANCE-lens totals (`Σ spendable`). The caller derives the two totals
+ * from `evaluateJarEnvelope`, so these tests exercise only the rule, not spend.
+ */
+describe("fitsCasaCap — balance lens (Σ spendable ≤ CASA)", () => {
+  it("Σ spendable exactly equal to CASA (an increase) → ok", () => {
+    expect(fitsCasaCap(12_000_000, 0, 12_000_000)).toEqual({ ok: true });
   });
 
-  it("Σ over CASA by 1 VND → fail with overBy", () => {
-    expect(fitsCasaCap(JARS, 11_999_999, {})).toEqual({ ok: false, overBy: 1 });
+  it("increase over CASA by 1 VND → fail with overBy", () => {
+    expect(fitsCasaCap(12_000_001, 0, 12_000_000)).toEqual({ ok: false, overBy: 1 });
   });
 
-  it("applies drafts as the final state (not per-jar) before summing", () => {
-    // food 5tr → 6tr, bills 7tr → 4tr ⇒ Σ = 10tr ≤ 12tr
-    expect(fitsCasaCap(JARS, 12_000_000, { food: 6_000_000, bills: 4_000_000 })).toEqual({ ok: true });
-    // food 5tr → 9tr ⇒ Σ = 16tr > 12tr by 4tr
-    expect(fitsCasaCap(JARS, 12_000_000, { food: 9_000_000 })).toEqual({ ok: false, overBy: 4_000_000 });
+  it("increase within CASA → ok", () => {
+    expect(fitsCasaCap(10_000_000, 6_000_000, 12_000_000)).toEqual({ ok: true });
   });
 
-  it("a jar with undefined budgetLimit (savings) is not counted", () => {
-    expect(fitsCasaCap([jar("food", 8_000_000), jar("savings")], 8_000_000, {})).toEqual({ ok: true });
+  it("pool unknown → any increase blocked (ok:false, no overBy)", () => {
+    expect(fitsCasaCap(1, 0, "unknown")).toEqual({ ok: false });
   });
 
-  it("a draft can newly fund a previously-unset jar", () => {
-    expect(fitsCasaCap([jar("food", 8_000_000), jar("savings")], 8_000_000, { savings: 1 })).toEqual({
-      ok: false,
-      overBy: 1,
-    });
+  it("no change (next == base) → ok even when pool unknown", () => {
+    expect(fitsCasaCap(5_000_000, 5_000_000, "unknown")).toEqual({ ok: true });
   });
 
-  it("pool unknown → blocked (ok:false, no overBy)", () => {
-    expect(fitsCasaCap(JARS, "unknown", {})).toEqual({ ok: false });
-  });
-
-  it("empty jars / empty drafts → ok trivially", () => {
-    expect(fitsCasaCap([], 0, {})).toEqual({ ok: true });
-  });
-
-  it("ignores non-finite draft values", () => {
-    expect(fitsCasaCap([jar("food", 5_000_000)], 5_000_000, { food: Number.NaN })).toEqual({ ok: true });
+  it("empty everything → ok trivially", () => {
+    expect(fitsCasaCap(0, 0, 0)).toEqual({ ok: true });
   });
 });
 
-describe("fitsCasaCap — only an INCREASE of Σ can be rejected (S5)", () => {
-  const OVER = [jar("a", 40_000_000), jar("b", 30_000_000)]; // Σ 70tr
-
-  it("lowering a limit on an already-over-cap config passes even if still over (A34)", () => {
-    expect(fitsCasaCap(OVER, 57_600_000, { a: 35_000_000 })).toEqual({ ok: true });
+describe("fitsCasaCap — only an INCREASE of Σ spendable can be rejected (S5)", () => {
+  it("lowering Σ spendable on an already-over-cap config passes even if still over (A34)", () => {
+    // base 70tr, next 65tr, CASA 57,6tr — lowered, still over, but allowed.
+    expect(fitsCasaCap(65_000_000, 70_000_000, 57_600_000)).toEqual({ ok: true });
   });
 
-  it("re-saving the same value passes when CASA dropped below Σ (C08)", () => {
-    expect(fitsCasaCap(OVER, 52_600_000, { a: 40_000_000 })).toEqual({ ok: true });
+  it("re-saving the same total passes when CASA dropped below Σ (C08)", () => {
+    expect(fitsCasaCap(70_000_000, 70_000_000, 52_600_000)).toEqual({ ok: true });
   });
 
-  it("limit 0 on a 0-jar passes when CASA is negative (C03)", () => {
-    expect(fitsCasaCap([jar("khac", 0)], -1_000_000, { khac: 0 })).toEqual({ ok: true });
+  it("Σ spendable 0 passes when CASA is negative (C03)", () => {
+    expect(fitsCasaCap(0, 0, -1_000_000)).toEqual({ ok: true });
   });
 
-  it("raising while over cap is still rejected with the full overBy", () => {
-    expect(fitsCasaCap(OVER, 57_600_000, { a: 40_000_001 })).toEqual({ ok: false, overBy: 12_400_001 });
+  it("raising while over cap is rejected with the full overBy", () => {
+    // base 70tr, next 70,000,001, CASA 57,6tr → over by 12,400,001.
+    expect(fitsCasaCap(70_000_001, 70_000_000, 57_600_000)).toEqual({ ok: false, overBy: 12_400_001 });
   });
 
-  it("explicit baseline: no-op write passes, an increase past CASA fails", () => {
-    expect(fitsCasaCap(OVER, 10_000_000, {}, OVER)).toEqual({ ok: true });
-    const raised = [jar("a", 40_000_000), jar("b", 31_000_000)];
-    expect(fitsCasaCap(raised, 57_600_000, {}, OVER)).toEqual({ ok: false, overBy: 13_400_000 });
-    expect(fitsCasaCap(raised, 71_000_000, {}, OVER)).toEqual({ ok: true });
+  it("an increase that lands exactly on CASA is accepted", () => {
+    expect(fitsCasaCap(57_600_000, 40_000_000, 57_600_000)).toEqual({ ok: true });
   });
 
   it("unknown CASA blocks increases only", () => {
-    expect(fitsCasaCap(OVER, "unknown", { a: 1 })).toEqual({ ok: true });
-    expect(fitsCasaCap(OVER, "unknown", { a: 40_000_001 })).toEqual({ ok: false });
-    expect(fitsCasaCap([jar("x")], "unknown", {}, [jar("x")])).toEqual({ ok: true });
+    expect(fitsCasaCap(40_000_001, 40_000_000, "unknown")).toEqual({ ok: false });
+    expect(fitsCasaCap(39_000_000, 40_000_000, "unknown")).toEqual({ ok: true });
   });
 });

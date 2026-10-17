@@ -357,18 +357,18 @@ describe("computeFinancials — one unallocated number (D26/S12/D27)", () => {
     jars: [{ id: "food", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 3_000_000 }],
   };
 
-  it("the two lenses diverge by Σ đã chi: picker pool = CASA − Σ spendable, overview pending = CASA − Σ hạn mức", () => {
+  it("both lenses AGREE (balance lens): picker pool and overview pending are one number = CASA − Σ spendable", () => {
     const raw = makeRaw({
       transactions: [txn({ categoryId: "dining", amount: 500_000 })],
       accounts: [currentAccount("cur", 8_000_000)],
     });
     const f = computeFinancials(raw, REBALANCE_MONTH, { jarConfig });
-    // Spendable lens: spending frees the 500k back into the transferable pool.
+    // food limit 3tr, spent 500k → remaining/spendable 2,5tr. CASA 8tr → 5,5tr free.
     expect(f.unallocatedPool.amount).toBe(5_500_000);
-    // Limit lens: the 3tr hạn mức still stands, so the allocation headroom is 5tr —
-    // exactly what the sheet shows as "Còn lại để chia" and what `fitsCasaCap` accepts.
-    expect(f.jarEnvelope.pending.amount).toBe(5_000_000);
-    expect(f.jarEnvelope.pending.allocated).toBe(3_000_000);
+    // jarEnvelope.pending is now the SAME balance lens (D26) — no longer the limit lens.
+    expect(f.jarEnvelope.pending.amount).toBe(5_500_000);
+    expect(f.jarEnvelope.pending.amount).toBe(f.unallocatedPool.amount);
+    expect(f.jarEnvelope.pending.allocated).toBe(2_500_000); // Σ spendable
     expect(f.jarEnvelope.pending.overAllocated).toBe(false);
   });
 

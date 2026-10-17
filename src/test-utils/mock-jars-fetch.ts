@@ -13,10 +13,11 @@
  */
 
 import { dedupeCategories, healOrphanCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
-import { fitsCasaCap } from "@/domain/engine";
+import { fitsCasaCap, jarSpendableTotal } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
 import type { Account, Jar, JarConfig, Transaction } from "@/domain/models";
 import { DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
+import { DEMO_NOW } from "@/lib/demo-clock";
 import { PERSONA_LIST } from "@/providers/mock/personas";
 import { buildPersonaAccounts, generateDataset } from "@/providers/mock/fixtures/generate";
 import {
@@ -42,14 +43,26 @@ function accountsFor(cif: string): Account[] {
 }
 
 /**
- * CASA pool for `cif`, mirroring the server's `casa-pool.ts` (server-only, can't
- * be imported here): live Σ `availableBalance` of the `current` accounts.
+ * The persona's generated bank history (deterministic, memoized) — mirrors the
+ * `server-only` `transactions-store.ts`. Empty for a non-persona cif.
  */
-function casaFor(cif: string | null): Amount {
-  if (!cif) return "unknown";
-  const current = accountsFor(cif).filter((a) => a.type === "current");
-  if (current.length === 0) return "unknown";
-  return current.reduce((s, a) => s + a.availableBalance, 0);
+function txnsFor(cif: string | null): Transaction[] {
+  if (!cif) return [];
+  const persona = PERSONA_LIST.find((p) => p.cif === cif);
+  if (!persona) return [];
+  txnCache[cif] ??= generateDataset(persona).transactions;
+  return txnCache[cif];
+}
+
+/**
+ * Σ spendable (`Σ max(0, remaining)`) a jar config would hold, and the CASA pool —
+ * via the shared engine `jarSpendableTotal`, the exact function the real server
+ * guard uses, so the mocked cap can never disagree with the card or the client
+ * preview. Bank history only (`txnsFor`), matching the server's read path.
+ */
+function spendableTotalFor(jars: Jar[], cif: string | null): { total: number; pool: Amount } {
+  const accounts = cif ? accountsFor(cif) : [];
+  return jarSpendableTotal(jars, accounts, txnsFor(cif), DEMO_NOW);
 }
 
 let store: JarConfig = freshConfig();
@@ -91,12 +104,14 @@ function commit(next: JarConfig, cif: string | null): JarConfig {
 }
 
 /**
- * The server's cap rule (every write door): 422 only when the write RAISES
- * Σ budgetLimit (vs the stored config) AND the new Σ exceeds CASA — lowering,
+ * The server's cap rule (every write door), BALANCE LENS: 422 only when the write
+ * RAISES Σ spendable (vs the stored config) AND the new Σ exceeds CASA — lowering,
  * clearing or re-saving always passes, even on an already-over-cap config.
  */
 function overCap(nextJars: Jar[], cif: string | null): Response | null {
-  const cap = fitsCasaCap(nextJars, casaFor(cif), {}, store.jars);
+  const next = spendableTotalFor(nextJars, cif);
+  const base = spendableTotalFor(store.jars, cif);
+  const cap = fitsCasaCap(next.total, base.total, next.pool);
   return cap.ok ? null : jsonResponse({ error: "over CASA cap", overBy: cap.overBy ?? null }, 422);
 }
 
