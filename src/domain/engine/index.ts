@@ -16,6 +16,7 @@ export * from "./jar-spendable-total";
 export * from "./jar-rebalance";
 export * from "./jar-envelope";
 export * from "./casa-balance";
+export * from "./account-summary";
 export * from "./unallocated-pool";
 export * from "./unlabeled-spend";
 export * from "./jar-funding";

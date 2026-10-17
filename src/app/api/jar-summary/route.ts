@@ -17,10 +17,14 @@ import { applyCorrections, isHidden } from "@/state/corrections-core";
  * transactions. Read-only: nothing here moves money (#3). The Agent only reads
  * this to PROPOSE a jar change; `pfm` performs it after the customer confirms.
  *
- *   GET ?cif=&month=YYYY-MM → { month, casaBalance, unallocated, allocationHeadroom, jars[] }
+ *   GET ?cif=&month=YYYY-MM → { month, unallocated, allocationHeadroom, jars[] }
  *
  * `month` defaults to the demo clock's current month. Money-in-account figures
  * are `null` when the persona has no `current` account (unknown, never a fake 0 — #6).
+ *
+ * The plain CASA balance (no jar computation) lives at `GET /api/account-summary`
+ * instead — it was dropped from here on purpose so this response stays jar-only;
+ * a caller wanting both calls both.
  */
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -72,7 +76,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       month,
-      casaBalance: orNull(fin.jarEnvelope.pending.pool),
       unallocated: orNull(fin.unallocatedPool.amount),
       allocationHeadroom: orNull(fin.jarEnvelope.pending.amount),
       jars,

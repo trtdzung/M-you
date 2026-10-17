@@ -49,6 +49,13 @@ Thông tin của **từng hũ** trong 1 tháng, do chính engine của `pfm` tí
 đọc được **giống hệt số khách thấy trên màn Tổng quan / Ngân sách**, Agent không cần
 tự cộng giao dịch.
 
+> ⚠️ **Thay đổi phá vỡ tương thích (2026-09-23):** response này **không còn field
+> `casaBalance`** — đã tách sang endpoint riêng `GET /api/account-summary?cif=` (mục 2).
+> Code Agent đang đọc `summary.get("casaBalance")` từ `jar-summary`
+> (`tools/customer_data_tools.py`, hàm `render_jar_summary`) sẽ nhận `None`/thiếu field
+> thay vì số thật — không lỗi, nhưng model sẽ nghĩ CASA "chưa biết". Agent team cần gọi
+> thêm `GET /api/account-summary?cif=` để lấy lại số này.
+
 **Query param:** `cif` (bắt buộc); `month` (tuỳ chọn, dạng `YYYY-MM`, mặc định là
 tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng → `422`.
 
@@ -57,7 +64,6 @@ tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng
 ```json
 {
   "month": "2026-09",
-  "casaBalance": 18000000,
   "unallocated": 13044000,
   "allocationHeadroom": 1000000,
   "jars": [
@@ -103,9 +109,12 @@ tháng hiện tại của demo). Thiếu `cif` hoặc `month` sai định dạng
 
 | Field | Ý nghĩa |
 |---|---|
-| `casaBalance` | tiền thật trong tài khoản thanh toán (`null` nếu không có tài khoản thanh toán) |
-| `unallocated` | **"Chưa phân bổ"** = `casaBalance − Σ spendable`. Là nguồn `"pool"` khi chia tiền giữa hũ (B4). Có thể âm |
-| `allocationHeadroom` | **"Chờ phân bổ"** = `casaBalance − Σ budgetLimit`. Là phần hạn mức **còn được đặt thêm**; đây đúng là trần server kiểm khi tạo/sửa hũ (B2, B3). **Âm = tổng hạn mức đã vượt CASA** → không tăng thêm hạn mức được (ví dụ trên: +1.000.000, còn chỗ đặt thêm tối đa 1.000.000) |
+| `unallocated` | **"Chưa phân bổ"** = CASA − Σ `spendable`. Là nguồn `"pool"` khi chia tiền giữa hũ (B4). Có thể âm |
+| `allocationHeadroom` | **"Chờ phân bổ"** = CASA − Σ `budgetLimit`. Là phần hạn mức **còn được đặt thêm**; đây đúng là trần server kiểm khi tạo/sửa hũ (B2, B3). **Âm = tổng hạn mức đã vượt CASA** → không tăng thêm hạn mức được (ví dụ trên: +1.000.000, còn chỗ đặt thêm tối đa 1.000.000) |
+
+Cả hai đều tính từ CASA (tiền thật trong tài khoản thanh toán) nội bộ — muốn đọc riêng số
+CASA, gọi `GET /api/account-summary?cif=` (mục 2). `unallocated`/`allocationHeadroom` vẫn
+`null` khi khách không có tài khoản thanh toán, dù `casaBalance` không còn nằm trong response này.
 
 **Về "số dư hiện tại" của hũ:** đây là số **tính ra**, không có trường nào để ghi
 trực tiếp. Muốn tăng số dư hũ có 2 cách, tương ứng 2 form khác nhau:
@@ -127,17 +136,32 @@ Các số tiền `null` nghĩa là **chưa biết** — đừng coi là 0. `500`
 
 ## 2. Endpoint khác (tham khảo — không bắt buộc cho form hũ)
 
+Agent hiện thực sự gọi `jar-summary` (Phần 1), `categories` và `beneficiaries` dưới đây
+(`tools/customer_data_tools.py`) — **cần gọi thêm `account-summary`** để lấy lại
+`casaBalance` (xem cảnh báo đầu Phần 1). Bảng này bớt các endpoint đọc dữ liệu thô mà
+Agent không tự gọi (`/api/jars`, `/api/accounts`, `/api/transactions`,
+`/api/manual-transactions`, `/api/corrections`) — `jar-summary` đã gộp sẵn các con số cần
+cho form hũ, và `/api/transactions-full` dưới đây đã gộp sẵn 3 endpoint giao dịch thô đó
+cho trường hợp cần liệt kê từng giao dịch.
+
 | Endpoint | Dùng để |
 |---|---|
-| `GET /api/jars?cif=` | cấu hình hũ thô (`id`, `label`, `categoryIds`, `budgetLimit`) — `jar-summary` đã bao gồm |
 | `GET /api/beneficiaries?cif=` | danh sách người nhận đã lưu — cần cho `transfer_form` (B1) |
-| `GET /api/accounts?cif=` | tài khoản; CASA = Σ `availableBalance` của `type: "current"` |
-| `GET /api/transactions?cif=&from=&to=` | giao dịch ngân hàng (chỉ đọc) |
-| `GET /api/manual-transactions?cif=` | giao dịch tự khai báo + các dòng bù giữa hũ (`categoryId: "dieu-chinh-hu"`) |
-| `GET /api/corrections?cif=` | nhãn danh mục do khách sửa đè lên giao dịch |
 | `GET /api/categories?cif=` | danh mục chi tiêu **của khách** (khách có thể tự thêm/đổi tên/lưu trữ) — cần `cif` |
+| `GET /api/account-summary?cif=` | `{ casaBalance: number \| null }` — số dư tài khoản thanh toán, **không kèm hũ**. **Thay cho `casaBalance` đã bỏ khỏi `jar-summary`** — Agent cần gọi endpoint này để có lại số CASA |
+| `GET /api/transactions-full?cif=&from=&to=` | **toàn bộ giao dịch** (ngân hàng + tự khai báo) với `categoryId` **đã gộp corrections** — xem chi tiết ngay dưới; **chưa được Agent gọi**, thêm sẵn cho nhu cầu liệt kê giao dịch sau này |
 
-Tất cả đều cần `cif` và trả `422` khi thiếu.
+Cả 4 đều cần `cif` và trả `422` khi thiếu.
+
+`GET /api/transactions-full?cif=&from=&to=` trả `(Transaction & { hidden: boolean })[]`,
+mới nhất trước — gộp sẵn `/api/transactions` + `/api/manual-transactions` rồi áp
+`/api/corrections` đè lên `categoryId`, đúng logic `jar-summary` dùng để tính `spent`. Dùng
+endpoint này khi cần liệt kê **từng giao dịch** kèm category đúng như khách đang thấy trên
+app (ví dụ trả lời "tháng này tôi chi gì ở Ăn uống"); `jar-summary` chỉ có số tổng theo hũ,
+không có danh sách. `from`/`to` là khoảng ISO đóng hai đầu, cùng quy ước `/api/transactions`.
+Giao dịch bị khách ẩn khỏi báo cáo **vẫn có trong danh sách**, chỉ đánh dấu `hidden: true`
+(khác `jar-summary`, nơi các dòng này bị loại khỏi số tổng) — bỏ qua các dòng `hidden: true`
+nếu muốn khớp đúng số `jar-summary` đã tính.
 
 `GET /api/beneficiaries?cif=` trả `Beneficiary[]`:
 
