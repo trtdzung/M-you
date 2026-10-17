@@ -118,7 +118,14 @@ describe("VoiceFab refined transcript hand-off", () => {
     expect(speech.stop).not.toHaveBeenCalled();
   });
 
-  it("asks for missing transfer details instead of auto-sending", async () => {
+  // The STT's own `transfer_between_jars` pre-check used to block the send here —
+  // dropped (see VoiceFab.tsx): it false-positives on ordinary utterances that
+  // merely mention a jar's name, and the real agent already handles genuine
+  // ambiguity (or a negated request) correctly on its own. Every recognized
+  // utterance now reaches the agent unconditionally, whatever `interpretation`
+  // (if any) came back alongside it — these two tests just confirm that holds
+  // even for the two `interpretation` shapes that used to gate it.
+  it("still forwards to the agent even when the STT flags the utterance as incomplete", async () => {
     render(<VoiceFab />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
@@ -131,11 +138,13 @@ describe("VoiceFab refined transcript hand-off", () => {
         ambiguous_slots: [], clarification: "Bạn muốn chuyển tiền từ hũ nào?",
       },
     }));
-    expect(await screen.findByText("Bạn muốn chuyển tiền từ hũ nào?")).toBeInTheDocument();
-    expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
+    await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledWith(
+      "Chuyển 500.000 VND sang hũ Ăn uống",
+      "CIF_0001",
+    ));
   });
 
-  it("does not auto-send a complete command when it is negated", async () => {
+  it("still forwards a negated command — the real agent recognizes the negation itself", async () => {
     render(<VoiceFab />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
     await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
@@ -148,7 +157,9 @@ describe("VoiceFab refined transcript hand-off", () => {
         ambiguous_slots: [], clarification: "Mình hiểu là bạn không muốn thực hiện giao dịch này, nên mình chưa gửi đi.",
       },
     }));
-    expect(await screen.findByText("Mình hiểu là bạn không muốn thực hiện giao dịch này, nên mình chưa gửi đi.")).toBeInTheDocument();
-    expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
+    await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledWith(
+      "Đừng chuyển 500.000 VND từ hũ Ăn uống sang hũ Khác",
+      "CIF_0001",
+    ));
   });
 });

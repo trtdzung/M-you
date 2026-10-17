@@ -97,7 +97,12 @@ describe("M-You voice composer", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Mất kết nối");
     expect(screen.queryByLabelText("Nội dung nghe được tạm thời")).not.toBeInTheDocument();
   });
-  it("keeps an incomplete command editable and shows the specific follow-up", async () => {
+  // This screen never auto-sends on voice (the customer always presses Gửi
+  // themselves), so the STT's own `interpretation` has nothing to gate here — it
+  // used to still surface a local "cần thêm..." hint, dropped because that signal
+  // false-positives on ordinary utterances (see VoiceFab.tsx). The recognized
+  // text just lands in the composer, editable, same as any other voice input.
+  it("keeps a recognized command editable, with no local guidance from the STT's own intent hint", async () => {
     await openWidget();
     fireEvent.click(screen.getByRole("button", { name: "Nhập bằng giọng nói" }));
     act(() => {
@@ -113,6 +118,7 @@ describe("M-You voice composer", () => {
       voice.callbacks!.onState("idle");
     });
     expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toHaveValue("Chuyển 500.000 VND sang hũ Ăn uống");
-    expect(screen.getByRole("status")).toHaveTextContent("Bạn muốn chuyển tiền từ hũ nào?");
+    expect(screen.queryByText("Bạn muốn chuyển tiền từ hũ nào?")).not.toBeInTheDocument();
+    expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
   });
 });

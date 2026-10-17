@@ -9,7 +9,6 @@ import { usePersona } from "@/providers/context";
 import { sendChatMessage, isChartUi, isClarifyOptionsUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { jarSpeechContext } from "@/lib/speech-context";
-import type { SpeechFinalMetadata } from "@/lib/speech-types";
 import { useJarConfig } from "@/state/jars";
 import { useCategories } from "@/state/categories";
 import { AgentMarkdown } from "./AgentMarkdown";
@@ -121,18 +120,17 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     }
   }, [cif, sending, transcript]);
 
-  const voice = useStreamingSpeech((text, final, metadata?: SpeechFinalMetadata) => {
+  const voice = useStreamingSpeech((text, final) => {
     if (!final) return;
     const refinedText = text.trim();
     setTranscript(refinedText);
-    const interpretation = metadata?.interpretation;
-    if (interpretation?.intent === "transfer_between_jars" && !interpretation.actionable) {
-      setReply({
-        answer: interpretation.clarification || "Mình chưa nghe đủ thông tin chuyển tiền. Bạn vui lòng nói lại rõ hơn nhé.",
-        ui: null,
-      });
-      return;
-    }
+    // Always forward to the real agent — the STT service's own `transfer_between_jars`
+    // pre-check false-positives on ordinary utterances that merely mention a jar's
+    // name (e.g. "Chuyển cho Lan 500.000đ tiền ăn uống" is a person transfer, not a
+    // jar rebalance, but "ăn uống" matches a jar entity). The agent already handles
+    // genuine ambiguity correctly on its own (it can ask via `clarify_options`), so
+    // gating the send on this signal only produced wrong local answers, never a
+    // real saving.
     if (refinedText) void handleSend(refinedText);
   }, { ...speechContext, endpointing: "manual" });
   const voiceRef = useRef(voice);

@@ -9,7 +9,6 @@ import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { jarSpeechContext } from "@/lib/speech-context";
-import type { SpeechFinalMetadata } from "@/lib/speech-types";
 import { useCategories } from "@/state/categories";
 import {
   getChatHistory,
@@ -123,7 +122,6 @@ export function MYourWidget() {
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [voiceGuidance, setVoiceGuidance] = useState("");
   const idRef = useRef(0);
   const titleId = useId();
   const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,19 +129,18 @@ export function MYourWidget() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const voicePrefix = useRef("");
 
-  const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean, metadata?: SpeechFinalMetadata) => {
+  // The STT service's own `transfer_between_jars` interpretation used to gate a local
+  // "cần thêm hũ nguồn/đích" hint here — dropped: it false-positives on ordinary
+  // utterances that merely mention a jar's name (e.g. a person transfer noted "tiền
+  // ăn uống"), and this screen never auto-sends on voice anyway (the customer always
+  // presses Gửi themselves) — the real agent already asks for what it actually needs.
+  const acceptFinalVoiceTranscript = useCallback((text: string, final: boolean) => {
     // Partial captions stay separate from the draft. Only the server's final
     // after refinement/fallback may update the composer.
     if (!final) return;
     const nextText = composeVoiceDraft(voicePrefix.current, text.trim());
     setInput(nextText);
     setInputVisible(nextText);
-    const interpretation = metadata?.interpretation;
-    setVoiceGuidance(
-      interpretation?.intent === "transfer_between_jars" && !interpretation.actionable
-        ? interpretation.clarification || "Mình chưa nghe đủ thông tin chuyển tiền. Bạn có thể bổ sung trước khi gửi."
-        : "",
-    );
   }, []);
 
   const voice = useStreamingSpeech(acceptFinalVoiceTranscript, { ...speechContext, endpointing: "silence" });
@@ -251,7 +248,6 @@ export function MYourWidget() {
     const visibleForBubble = inputVisible.trim() || text;
     setInput("");
     setInputVisible("");
-    setVoiceGuidance("");
     // Temporarily patch postMessage to use visibleForBubble for the bubble
     if (!composerDisabled && !voiceBusy) {
       const userId = `m${++idRef.current}`;
@@ -434,7 +430,6 @@ export function MYourWidget() {
                 onChange={(e) => {
                   setInput(e.target.value);
                   setInputVisible(e.target.value);
-                  setVoiceGuidance("");
                 }}
                 onKeyDown={handleKey}
                 rows={1}
@@ -448,7 +443,6 @@ export function MYourWidget() {
                   if (voiceBusy) voice.stop();
                   else {
                     voicePrefix.current = input.trim();
-                    setVoiceGuidance("");
                     voice.start();
                   }
                 }}
@@ -469,7 +463,7 @@ export function MYourWidget() {
                 <Send size={16} />
               </button>
             </div>
-            {(voiceBusy || voice.error || voiceGuidance) && (
+            {(voiceBusy || voice.error) && (
               <div
                 role={voice.error ? "alert" : "status"}
                 aria-live="polite"
@@ -477,7 +471,7 @@ export function MYourWidget() {
               >
                 {!voice.error && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-primary" />}
                 <span>
-                  {voice.error || voiceGuidance || (voice.state === "connecting"
+                  {voice.error || (voice.state === "connecting"
                     ? "Đang mở micro… Hãy cho phép micro nếu được hỏi."
                     : voice.state === "recording"
                       ? "Mình đang nghe… Bấm dừng khi bạn nói xong."
