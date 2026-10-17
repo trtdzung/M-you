@@ -12,6 +12,7 @@ import { DeleteGoalConfirm } from "../detail/DeleteGoalConfirm";
 import { GoalActionBar } from "../detail/GoalActionBar";
 import { GoalDetailHeader } from "../detail/GoalDetailHeader";
 import { GoalDetailStats } from "../detail/GoalDetailStats";
+import { GoalTimeline } from "../detail/GoalTimeline";
 import { LedgerHistory } from "../detail/LedgerHistory";
 import { primaryButton, secondaryButton } from "../styles";
 import { EditGoalFlow } from "./EditGoalFlow";
@@ -63,11 +64,12 @@ export function GoalDetailScreen({ id }: { id: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5 pb-6 pt-4">
+      <Card className="flex flex-col gap-4 rounded-2xl">
         <GoalDetailHeader goal={goal} />
-        <GoalDetailStats goal={goal} />
       </Card>
+      <GoalTimeline goal={goal} ledger={ledger} />
+      <Card className="rounded-2xl"><h2 className="mb-2 text-[18px] font-semibold text-text">Kế hoạch của bạn</h2><GoalDetailStats goal={goal} /></Card>
       <GoalActionBar
         status={goal.status}
         onContribute={() => setLedgerKind("deposit")}
@@ -77,7 +79,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
         onArchive={() => setStatus("archived")}
         onDelete={() => setConfirmingDelete(true)}
       />
-      <Card>
+      <Card className="rounded-2xl">
         <LedgerHistory entries={ledger} />
       </Card>
       {ledgerKind && (

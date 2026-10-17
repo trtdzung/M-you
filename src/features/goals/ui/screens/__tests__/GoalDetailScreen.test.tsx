@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GoalLedgerEntry, SavingsGoalView } from "../../../model/types";
 import { GoalDetailScreen } from "../GoalDetailScreen";
 
+vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+
 const nav = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
@@ -104,6 +106,7 @@ describe("GoalDetailScreen", () => {
 
   it("pauses, resumes and archives through update", async () => {
     const { rerender } = render(<GoalDetailScreen id="goal_1" />);
+    fireEvent.click(screen.getByText("Quản lý mục tiêu"));
     fireEvent.click(screen.getByRole("button", { name: "Tạm dừng" }));
     await waitFor(() => expect(mutations.update).toHaveBeenCalledWith("goal_1", { status: "paused" }));
     expect(detail.refresh).toHaveBeenCalled();
@@ -119,6 +122,7 @@ describe("GoalDetailScreen", () => {
 
   it("deletes after confirmation and leaves the detail route", async () => {
     render(<GoalDetailScreen id="goal_1" />);
+    fireEvent.click(screen.getByText("Quản lý mục tiêu"));
     fireEvent.click(screen.getByRole("button", { name: "Xóa" }));
     fireEvent.click(await screen.findByRole("button", { name: "Xóa mục tiêu" }));
     await waitFor(() => expect(mutations.remove).toHaveBeenCalledWith("goal_1"));
