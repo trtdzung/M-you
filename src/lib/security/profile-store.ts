@@ -55,6 +55,7 @@ export function sanitizeSecurityState(v: unknown): SecurityState | { error: stri
     if (v[key] !== null && !isTime(v[key])) return { error: `${key} is invalid` };
   }
   if (typeof v.accountLocked !== "boolean") return { error: "accountLocked is invalid" };
+  if (v.cardsLocked !== undefined && typeof v.cardsLocked !== "boolean") return { error: "cardsLocked is invalid" };
   // Added with the hold (E12): older saved states fall back to the defaults.
   const holdEnabled = v.holdEnabled === undefined ? SECURITY_DEFAULTS.holdEnabled : v.holdEnabled;
   const holdThreshold = v.holdThreshold === undefined ? SECURITY_DEFAULTS.holdThreshold : v.holdThreshold;
@@ -77,6 +78,7 @@ export function sanitizeSecurityState(v: unknown): SecurityState | { error: stri
     transferLockUntil: v.transferLockUntil as number | null,
     holdEnabled,
     holdThreshold,
+    cardsLocked: (v.cardsLocked as boolean | undefined) ?? v.accountLocked,
     accountLocked: v.accountLocked,
     accountLockedAt: v.accountLockedAt as number | null,
     pendingOff,

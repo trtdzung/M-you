@@ -30,6 +30,7 @@ export const SECURITY_DEFAULTS: SecurityState = {
   transferLockUntil: null,
   holdEnabled: false,
   holdThreshold: 20_000_000,
+  cardsLocked: false,
   accountLocked: false,
   accountLockedAt: null,
   pendingOff: {},

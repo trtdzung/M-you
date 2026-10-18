@@ -15,6 +15,7 @@ import {
   expireOpen, findOpenByDedupe, getIntervention, insertIntervention, markAnswered, markShown, openInterventions, shownHistory,
   type NewIntervention, type StoredContext,
 } from "./intervention-store";
+import { startEmergency, lockEmergency } from "./emergency";
 import { actionFor } from "./actions";
 import type { EvaluateTrigger, Intervention, InterventionTarget, RespondAction } from "./intervention-types";
 import { SCENARIO_COPY, type ScenarioId } from "./scenario-copy";
@@ -179,7 +180,13 @@ export function shown(cif: string, id: string): boolean {
 /** Log the customer's choice; returns the action for the app, or null when the intervention is closed. */
 export function respond(cif: string, id: string, choice: string): RespondAction | null {
   const intervention = getIntervention(cif, id);
-  if (!intervention || !markAnswered(cif, id, choice, engineNow(cif).getTime())) return null;
+  if (!intervention) return null;
+  const action = actionFor(choice);
+  const entering = intervention.scenario === "SC1" && action.kind === "emergency" && choice !== "Khóa ngay";
+  const now = engineNow(cif).getTime();
+  if (!(entering ? shown(cif, id) : markAnswered(cif, id, choice, now))) return null;
   recordEvent(cif, "intervention_answered", { interventionId: id, scenario: intervention.scenario, choice });
-  return actionFor(choice);
+  if (intervention.scenario === "SC1" && choice === SCENARIO_COPY.SC1.chips[0]) lockEmergency(cif);
+  else if (action.kind === "emergency" && intervention.scenario !== "SC1") startEmergency(cif);
+  return action;
 }

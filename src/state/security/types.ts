@@ -22,6 +22,8 @@ export type SecurityState = {
   holdEnabled: boolean;
   /** VND; set by the customer ("ngưỡng KH đặt"). */
   holdThreshold: number;
+  /** Simulated cards are locked together with the account. */
+  cardsLocked?: boolean;
   accountLocked: boolean;
   accountLockedAt: number | null;
   /** When (ms) a requested "turn off" takes effect; lowering security waits 24h. */

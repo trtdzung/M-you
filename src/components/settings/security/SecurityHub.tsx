@@ -13,6 +13,8 @@ import { SecurityLoading } from "./SecurityLoading";
 import { securityScore } from "./security-score";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 import { pokeInterventions } from "@/components/security/useInterventions";
+import { useRouter } from "next/navigation";
+import { requestEmergency } from "@/components/security/emergency";
 import { useEffect } from "react";
 import { usePersona } from "@/providers/context";
 import type { SecurityScore } from "./security-score";
@@ -24,6 +26,8 @@ const dateLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { day: "2-dig
 /** Settings › Bảo mật: score, Scam Shield entry points and the existing auth rows. */
 export function SecurityHub() {
   useScreenEvent("hub_open");
+  const router = useRouter();
+  const { persona } = usePersona();
   const demo = useSettingsDemo();
   const security = useSecurityStore(useShallow(state => ({ hasHydrated: state.hasHydrated, aiProtect: state.aiProtect, antiPhishingCode: state.antiPhishingCode, emergencyContacts: state.emergencyContacts, trustedContacts: state.trustedContacts, transferLockUntil: state.transferLockUntil, pendingOff: state.pendingOff })));
   if (!security.hasHydrated) return <SecurityLoading />;
@@ -67,7 +71,7 @@ export function SecurityHub() {
       <Row label="Tự khóa chuyển tiền" href={href("transfer-lock")} detail="Tạm khóa chuyển tiền ra ngoài khi bạn muốn" trailing={lockUntil !== null ? <Badge tone="danger">Đang khóa đến {dateLabel(lockUntil)}</Badge> : <Badge tone="neutral">Đang tắt</Badge>} />
     </Panel>
     <Panel title="Thiết lập khác"><Row label="Quản lý thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Chữ ký số" icon={PenLine} href={href("signature")} /></Panel>
-    <Link href={href("sos")} className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-negative bg-white py-3 font-semibold text-negative"><TriangleAlert size={20} aria-hidden />Tôi nghĩ mình bị lừa</Link>
+    <button type="button" onClick={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push(href("sos")); }); }} className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-negative bg-white py-3 font-semibold text-negative"><TriangleAlert size={20} aria-hidden />Tôi nghĩ mình bị lừa</button>
     <Panel><Row label="Kiến thức bảo mật hữu ích" icon={CircleHelp} href={href("knowledge")} detail="Trang bị kiến thức để bảo vệ tài sản" /></Panel>
     {/* Testers: shown in every build, biz test runs a production image. */}
     <Panel><Row label="Công cụ test (demo)" icon={FlaskConical} href={href("test-tools")} detail="Đặt nhanh trạng thái, giờ giả lập, kịch bản chuyển tiền" /></Panel>

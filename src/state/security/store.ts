@@ -56,7 +56,7 @@ const OFF_CHANGES: Record<OffKey, Partial<SecurityState>> = {
   aiProtect: { aiProtect: false },
   antiPhishing: { antiPhishingCode: null },
   transferLock: { transferLockUntil: null },
-  accountLock: { accountLocked: false, accountLockedAt: null },
+  accountLock: { cardsLocked: false, accountLocked: false, accountLockedAt: null },
   hold: { holdEnabled: false },
 };
 
@@ -106,7 +106,7 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     // A new lock also drops any unlock request still waiting.
     lockTransfers: (days, now = clockNow()) => set(state => ({ transferLockUntil: now + days * DAY_MS, pendingOff: withoutPending(state.pendingOff, "transferLock") })),
     lockAccount: (now = clockNow()) => {
-      set(state => ({ accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") }));
+      set(state => ({ cardsLocked: true, accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") }));
       postSecurityEvent("account_locked", {});
     },
     setFamilyAlerts: on => set({ familyAlerts: on }),

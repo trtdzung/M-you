@@ -54,6 +54,7 @@ export function TransferAlertSheet({ open, intervention, classifyOnly = false, o
         <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => onChoose(STOP)}>{STOP}</button>
         {chips.map(chip => <button key={chip} type="button" className={outline} onClick={() => onChoose(chip)}>{chip}</button>)}
         <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={() => onChoose(SCAMMED)}>{SCAMMED}</button>
+        {intervention.scenario === "DH6" && <button type="button" className={outline} onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>}
         {!classifyOnly && (
           <button type="button" className={`${outline} disabled:opacity-50`} disabled={seconds > 0} onClick={() => onChoose(PROCEED)}>
             {seconds > 0 ? `${PROCEED} (${seconds} giây)` : PROCEED}

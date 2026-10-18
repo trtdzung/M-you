@@ -1,5 +1,6 @@
 "use client";
 
+import { requestEmergency } from "@/components/security/emergency";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
@@ -151,7 +152,10 @@ export function TransferConfirm() {
     const action = actionFor(choice);
     useSecurityStore.getState().logAlert({ level: "yellow", situation: "Có người yêu cầu chuyển thêm", choice });
     setClassifyFor(null);
-    if (action.kind === "emergency") return router.push("/settings/sos");
+    if (action.kind === "emergency") {
+      void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); });
+      return;
+    }
     if (action.kind === "callback") return setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
     setShieldNotice("Giao dịch chưa được thực hiện.");
   }

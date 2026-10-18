@@ -95,8 +95,8 @@ function Popup({ item, onChoose, onShown }: { item: Intervention; onChoose: (cho
         intervention={item}
         onChoose={onChoose}
         extra={item.level === "red" && (
-          <button type="button" className="mt-3 w-full rounded-full border-2 border-negative py-3 text-sm font-semibold text-negative" onClick={() => onChoose("Tôi nghĩ mình bị lừa")}>
-            Tôi nghĩ mình bị lừa
+          <button type="button" className="mt-3 w-full rounded-full border-2 border-negative py-3 text-sm font-semibold text-negative" onClick={() => onChoose(item.scenario === "DH6" ? "Không phải tôi → khóa ngay" : "Tôi nghĩ mình bị lừa")}>
+            {item.scenario === "DH6" ? "Không phải tôi → khóa ngay" : "Tôi nghĩ mình bị lừa"}
           </button>
         )}
       />
@@ -132,9 +132,11 @@ export function InterventionHost() {
   const choose = (item: Intervention) => (choice: string) => void respond(item.id, choice).then(act);
 
   const visible = items.filter(item => !SELF_DRAWN.has(item.target));
+  const routedFullscreen = useRef<string | null>(null);
   const fullscreen = visible.find(item => item.surface === "fullscreen");
   useEffect(() => {
-    if (!fullscreen) return;
+    if (!fullscreen || routedFullscreen.current === fullscreen.id) return;
+    routedFullscreen.current = fullscreen.id;
     shown(fullscreen.id);
     if (pathname !== "/settings/sos") router.push("/settings/sos");
   }, [fullscreen, pathname, router, shown]);
