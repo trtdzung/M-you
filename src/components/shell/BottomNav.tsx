@@ -13,7 +13,7 @@ type Tab = { href: string; label: string; icon: LucideIcon; match: string[] };
  */
 const TABS: Tab[] = [
   { href: "/", label: "Trang chủ", icon: Home, match: [] },
-  { href: "/accounts", label: "Tài khoản", icon: Wallet, match: ["/accounts", "/transactions"] },
+  { href: "/accounts", label: "Tài sản", icon: Wallet, match: ["/accounts", "/transactions"] },
   { href: "/settings", label: "Cài đặt", icon: Settings, match: ["/settings"] },
 ];
 
@@ -31,7 +31,7 @@ export function BottomNav() {
       aria-label="Điều hướng chính"
       className="shell-bottom-nav pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-shell-main-inset"
     >
-      <ul className="shadow-nav pointer-events-auto flex w-full items-stretch justify-between gap-1 rounded-full border border-white/40 bg-white/70 px-2 py-2 backdrop-blur-xl">
+      <ul className="shadow-nav pointer-events-auto flex w-full items-stretch justify-between gap-1 rounded-full border border-white/40 bg-white px-2 py-2 backdrop-blur-xl">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
           const Icon = tab.icon;

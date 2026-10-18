@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Eye, EyeOff } from "lucide-react";
-import { formatVnd } from "@/lib/format";
 
 /**
  * Thẻ tài khoản chính kiểu MSB (khớp ref `1.1`): hàng hạng (avatar + tên hạng +
@@ -26,7 +25,7 @@ export function AccountSummaryCard({
 
   return (
     <section
-      className="shadow-card rounded-[24px] border border-white/40 bg-white/70 p-2 backdrop-blur-xl"
+      className="home-account rounded-[24px] border border-white bg-[#ffecef] p-4"
       aria-label="Tài khoản chính"
       data-freshness={freshness ?? undefined}
     >
@@ -41,25 +40,25 @@ export function AccountSummaryCard({
           aria-hidden="true"
           className="h-11 w-11 shrink-0 rounded-full object-cover"
         />
-        <span className="flex-1 truncate text-lg font-bold tracking-wide text-primary">
+        <span className="flex-1 truncate text-lg font-medium tracking-wide text-primary">
           {tier}
         </span>
         <ChevronRight size={22} className="shrink-0 text-text" />
       </Link>
 
-      <div className="my-2 h-px bg-border" />
+      <div className="my-3 h-px bg-border" />
 
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted">{maskedNumber}</p>
-          <p className="text-xl font-bold tracking-wide text-text">
+          <p className="text-2xl font-bold tracking-wide text-text">
             {hidden ? (
               <span aria-label="Số dư đang ẩn">
                 <span aria-hidden="true">*******</span>{" "}
                 <span className="text-muted">VND</span>
               </span>
             ) : (
-              <span>{formatVnd(balance)}</span>
+              <span>{balance.toLocaleString("en-US")} VND</span>
             )}
           </p>
         </div>

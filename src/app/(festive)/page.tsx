@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { AnniversaryHero } from "@/components/home/AnniversaryHero";
 import { HomeHeader } from "@/components/shell/HomeHeader";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
@@ -20,10 +21,8 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* Header ngồi thẳng trên nền toàn màn "2/9" (không còn khối hero riêng).
-          Spacer để lộ chữ số "2/9" của ảnh nền trước khi tới các thẻ. */}
       <HomeHeader notifications={9} />
-      <div aria-hidden className="h-72" />
+      <AnniversaryHero />
 
       {loading && (
         <div className="flex flex-col gap-4">
@@ -37,7 +36,6 @@ export default function HomePage() {
 
       {!loading && !error && (
         <div className="flex flex-col gap-4">
-          <HomeInsightWidget />
 
           {primary ? (
             <AccountSummaryCard
@@ -78,6 +76,7 @@ export default function HomePage() {
               />,
             ]}
           />
+          <HomeInsightWidget />
         </div>
       )}
     </div>

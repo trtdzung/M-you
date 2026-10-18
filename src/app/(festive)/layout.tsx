@@ -38,16 +38,17 @@ export default function FestiveLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const home = pathname === "/";
   const settings = pathname?.startsWith("/settings");
   const settingsDetail = settings && pathname !== "/settings";
   return (
     <PhoneShell
-      className={settings ? "shell-calm settings-shell" : undefined}
+      className={settings ? "shell-calm settings-shell" : home ? "login-shell home-shell" : undefined}
       mainClassName={settingsDetail ? "settings-main-detail" : undefined}
-      background={settings ? <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[#fce0d5] to-[#fbd0d4]" /> : <FestiveBg />}
+      background={settings ? <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[#fce0d5] to-[#fbd0d4]" /> : home ? <div aria-hidden className="login-background absolute inset-0 -z-10" /> : <FestiveBg />}
       nav={settingsDetail ? undefined : <BottomNav />}
       fab={
-        !settings && <Suspense fallback={null}>
+        !settings && !home && <Suspense fallback={null}>
           <VoiceFab floating />
         </Suspense>
       }

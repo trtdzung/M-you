@@ -457,3 +457,21 @@ body {
   outline: 2px solid #10284b;
   outline-offset: 3px;
 }
+
+/* Home simulation follows the same anniversary surface as login. */
+.home-quick-grid { background: #ffecef; border-color: white; padding: 18px 8px 12px; }
+.home-quick-grid > div:first-child { row-gap: 24px; }
+.home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 76px; gap: 12px; }
+.home-quick-grid svg { width: 29px; height: 29px; }
+.home-quick-grid span { font-size: 13px; line-height: 1.35; }
+.home-quick-grid > div:last-child > * { flex: 1; }
+.home-shell .shell-bottom-nav { padding-inline: 30px; }
+.home-shell .login-anniversary { height: clamp(195px, 23dvh, 230px); }
+.home-shell .login-years { font-size: 175px; }
+.home-quick-grid > div:first-child { row-gap: 14px; }
+.home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 64px; }
+.home-shell .login-anniversary { height: 190px; }
+.home-shell .home-account { padding: 12px 16px; }
+.home-quick-grid { padding-top: 12px; }
+.home-quick-grid > div:first-child { row-gap: 8px; }
+.home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 54px; gap: 8px; }
