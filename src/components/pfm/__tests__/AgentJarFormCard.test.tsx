@@ -66,7 +66,7 @@ describe("AgentJarFormCard — create with an opening balance", () => {
   it("prefills Số dư ban đầu from initial_balance and creates with addJar(jar, balance)", async () => {
     render(<AgentJarFormCard form={createForm()} />);
     expect(balanceInput().value).toBe("1000000");
-    expect(screen.getByText(/Chờ phân bổ: 5\.000\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/Chờ phân bổ: 5,000,000/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Tạo hũ" }));
     await waitFor(() => expect(addJar).toHaveBeenCalledTimes(1));
     const [jar, balance] = addJar.mock.calls[0];
@@ -94,7 +94,7 @@ describe("AgentJarFormCard — create with an opening balance", () => {
   it("a balance above Chờ phân bổ is rejected before any write", async () => {
     render(<AgentJarFormCard form={createForm({ initial_balance: 6_000_000 })} />);
     fireEvent.click(screen.getByRole("button", { name: "Tạo hũ" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Số dư ban đầu vượt số tiền chờ phân bổ (còn 5.000.000");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Số dư ban đầu vượt số tiền chờ phân bổ (còn 5,000,000");
     expect(addJar).not.toHaveBeenCalled();
   });
 

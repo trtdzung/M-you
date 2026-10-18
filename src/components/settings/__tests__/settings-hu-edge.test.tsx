@@ -184,7 +184,7 @@ describe("HuEditorSheet — failed writes are visible (U20)", () => {
     const { dialog, limit } = await openEditor();
     fireEvent.change(limit, { target: { value: "3000000" } });
     fireEvent.blur(limit);
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/Vượt số dư 1\.000/);
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/Vượt số dư 1,000/);
     await waitFor(() => expect(limit.value).toBe("4000000"));
   });
 });

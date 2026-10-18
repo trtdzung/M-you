@@ -28,8 +28,8 @@ describe("TransferBankEntry", () => {
     renderEntry();
     fireEvent.click(screen.getByRole("button", { name: "Ngân hàng nhận" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Tên ngân hàng" }), { target: { value: "ngoai thuong" } });
-    expect(screen.queryByRole("button", { name: "MSB", exact: true })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Vietcombank", exact: true }));
+    expect(screen.queryByRole("button", { name: "MSB" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Vietcombank" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ngân hàng nhận" })).toHaveTextContent("Vietcombank");
   });

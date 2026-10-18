@@ -77,7 +77,7 @@ describe("jarOverspendCovered — COVERED shape (a jar that received a covering 
     expect(insight!.severity).toBe("attention");
     expect(insight!.actionType).toBe("review_jars");
     expect(insight!.title).toBe('Hũ "Ăn uống" đã được bù số dư');
-    expect(insight!.explanation).toContain("800.000");
+    expect(insight!.explanation).toContain("800,000");
     // Two axes kept apart: the covered money (balance) and the plan breach (limit).
     expect(insight!.sourceFacts.find((f) => f.label === "Đã bù")?.value).toBe(800_000);
     expect(insight!.sourceFacts.find((f) => f.label === "Vượt hạn mức")?.value).toBe(800_000);

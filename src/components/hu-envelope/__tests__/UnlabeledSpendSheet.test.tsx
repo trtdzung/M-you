@@ -14,7 +14,7 @@ vi.mock("@/state/corrections", () => ({
 
 // Self-reported transfers are labelled through the manual-txn store (a type flip
 // a corrections overlay cannot express); expenses still go through corrections.
-const updateManualTxn = vi.fn(() => true);
+const updateManualTxn = vi.fn((_id?: string, _patch?: Record<string, unknown>) => true);
 vi.mock("@/state/manual-txns", () => ({
   useManualTxns: () => ({ update: updateManualTxn }),
 }));

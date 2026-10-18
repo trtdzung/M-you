@@ -11,7 +11,7 @@ describe("create goal page", () => {
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
-    expect(nav.push).toHaveBeenCalledWith("/pfm?tab=goals");
+    expect(nav.replace).toHaveBeenCalledWith("/pfm?tab=goals");
     fireEvent.click(screen.getByRole("button", { name: "Lưu mục tiêu kiểm thử" }));
     expect(nav.replace).toHaveBeenCalledWith("/goals/saved-id");
   });
