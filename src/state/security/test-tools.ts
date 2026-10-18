@@ -64,8 +64,7 @@ const DAY_MS = 24 * HOUR_MS;
 const VN_OFFSET_MS = 7 * HOUR_MS;
 
 /** The time the transfer alert is judged at: `now`, or the same VN day at `alertHour`:00. */
-export function alertClock(now: Date = transferNow()): Date {
-  const { alertHour } = useTestToolsStore.getState();
+export function alertClock(now: Date = transferNow(), alertHour: number | null = useTestToolsStore.getState().alertHour): Date {
   if (alertHour === null) return now;
   const vnDayStart = Math.floor((now.getTime() + VN_OFFSET_MS) / DAY_MS) * DAY_MS;
   return new Date(vnDayStart + alertHour * HOUR_MS - VN_OFFSET_MS);

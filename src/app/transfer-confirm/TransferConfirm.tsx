@@ -16,9 +16,9 @@ import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { isTransferBlocked } from "@/state/security/selectors";
-import { alertClock } from "@/state/security/test-tools";
+import { alertClock, useTestToolsStore } from "@/state/security/test-tools";
 import { useShallow } from "zustand/react/shallow";
-import { accountLastFour, isTrustedRecipient, transferAlertLevel } from "@/lib/transfer-alert";
+import { accountLastFour, isTrustedRecipient, transferAlertLevel, transferHistory } from "@/lib/transfer-alert";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
@@ -58,7 +58,7 @@ export function TransferConfirm() {
   // transaction the user would then be unable to see or re-label.
   const { byId: categoryById, assignable } = useCategories();
   const { adopt: adoptManualTxn, addPersisted } = useManualTxns();
-  const { financials } = useFinancials();
+  const { financials, transactions: historyTxns, raw } = useFinancials();
   const autoFund = useAutoFund();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
@@ -95,18 +95,31 @@ export function TransferConfirm() {
   // Scam Shield (demo rules): Yellow = banner, Red = sheet before committing.
   // Nothing is judged until the store has loaded this persona's settings.
   const shield = useSecurityStore(useShallow((state) => ({ hydrated: state.hasHydrated, aiProtect: state.aiProtect, trusted: state.trustedContacts })));
+  // T1/T1b/T3 need the customer's own history and the source balance; unknown stays unknown.
+  const history = useMemo(() => transferHistory(historyTxns, transferNow()), [historyTxns]);
+  const sourceBalance = useMemo(() => {
+    const accounts = raw?.accounts ?? [];
+    const source = accounts.find((a) => a.id === draft?.sourceAccountId) ?? accounts.find((a) => a.type === "current");
+    return source?.balance ?? null;
+  }, [raw, draft]);
+  // Re-judge when a tester changes the simulated hour while this screen is open.
+  const alertHour = useTestToolsStore((state) => state.alertHour);
   const alert = useMemo(() => shield.hydrated
     ? transferAlertLevel({
         amount,
         isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
         recipientName: name,
         recipientAccount: draft?.accountNumber ?? acct,
+        recipientBank: draft?.recipientBankName,
         memo: memo.trim() || null,
-        postedAt: alertClock(),
+        postedAt: alertClock(transferNow(), alertHour),
         aiProtect: shield.aiProtect,
         trusted: shield.trusted,
+        pastRecipients: history.pastRecipients,
+        largestOutflow90d: history.largestOutflow90d,
+        balance: sourceBalance,
       })
-    : { level: "green" as const, reasons: [] }, [shield, amount, draft, name, acct, memo]);
+    : { level: "green" as const, reasons: [] }, [shield, amount, draft, name, acct, memo, history, sourceBalance, alertHour]);
   const [redOpen, setRedOpen] = useState(false);
   const [shieldNotice, setShieldNotice] = useState<string | null>(null);
 
@@ -287,7 +300,7 @@ export function TransferConfirm() {
         createdSourceJarId={createdSourceJarId}
         recipientSaved={recipientSaved}
         onSaveRecipient={saveRecipient}
-        trusted={lastFour === null ? null : isTrustedRecipient(shield.trusted, done.recipientName, doneAccount)}
+        trusted={lastFour === null ? null : isTrustedRecipient(shield.trusted, done.recipientName, doneAccount, done.recipientBankName ?? undefined)}
         onTrust={() => {
           if (lastFour) useSecurityStore.getState().addTrustedContact({ name: done.recipientName, bank: done.recipientBankName ?? "Chưa rõ ngân hàng", account: `••• ${lastFour}` });
         }}
