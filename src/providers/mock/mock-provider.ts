@@ -199,6 +199,20 @@ export function createMockProvider(dataset: Dataset, personaId: PersonaId, cif: 
       if (!res.ok) throw new Error(`createBeneficiary failed: ${res.status}`);
       return res.json();
     },
+    async getAgentPreferences() {
+      const res = await fetch(`/api/agent-preferences?cif=${encodeURIComponent(cif)}`);
+      if (!res.ok) throw await apiError("getAgentPreferences", res);
+      return res.json();
+    },
+    async saveAgentPreferences(prefs) {
+      const res = await fetch("/api/agent-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif, ...prefs }),
+      });
+      if (!res.ok) throw await apiError("saveAgentPreferences", res);
+      return res.json();
+    },
     async getJarConfig() {
       // A failed load THROWS (U10): an empty `jars: []` would read as "no jars
       // yet" and the UI would offer "Thêm hũ" instead of an error + retry.

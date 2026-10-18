@@ -196,3 +196,16 @@ CREATE TABLE IF NOT EXISTS proactive_financial_profiles (
   sync_token TEXT NOT NULL,
   verified_at TEXT NOT NULL
 );
+
+-- One row per persona (`cif`): standing instructions/preferences the customer gives
+-- M-You (plan 261013), never financial facts — see `data/schema.md`.
+CREATE TABLE IF NOT EXISTS agent_preferences (
+  cif TEXT PRIMARY KEY,
+  response_length TEXT CHECK (response_length IS NULL OR response_length IN ('concise', 'balanced', 'detailed')),
+  tone TEXT CHECK (tone IS NULL OR tone IN ('friendly', 'formal', 'playful')),
+  risk_appetite TEXT CHECK (risk_appetite IS NULL OR risk_appetite IN ('cautious', 'balanced', 'aggressive')),
+  address_as TEXT NOT NULL DEFAULT '',
+  about TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);

@@ -14,6 +14,14 @@ vi.mock("@/providers/context", () => ({
 vi.mock("@/state/jars", () => ({
   useJarConfig: () => ({ config: { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: [] }] } }),
 }));
+// Preferences play no part in these hand-off tests — "ready" with everything
+// unset means `withPreferenceSeed` never appends a preamble (no seed to build).
+vi.mock("@/state/agent-preferences", () => ({
+  useAgentPreferences: () => ({
+    preferences: { responseLength: null, tone: null, riskAppetite: null, addressAs: "", about: "", notes: "" },
+    status: "ready",
+  }),
+}));
 vi.mock("@/state/categories", () => ({
   useCategories: () => ({ assignable: [{ id: "food", label: "Ăn uống" }] }),
 }));

@@ -183,8 +183,9 @@ cho trường hợp cần liệt kê từng giao dịch.
 | `GET /api/categories?cif=` | danh mục chi tiêu **của khách** (khách có thể tự thêm/đổi tên/lưu trữ) — cần `cif` |
 | `GET /api/account-summary?cif=` | `{ casaBalance: number \| null }` — số dư tài khoản thanh toán, **không kèm hũ**. **Thay cho `casaBalance` đã bỏ khỏi `jar-summary`** — Agent cần gọi endpoint này để có lại số CASA |
 | `GET /api/transactions-full?cif=&from=&to=` | **toàn bộ giao dịch** (ngân hàng + tự khai báo) với `categoryId` **đã gộp corrections** — xem chi tiết ngay dưới; **chưa được Agent gọi**, thêm sẵn cho nhu cầu liệt kê giao dịch sau này |
+| `GET /api/agent-preferences?cif=` | hướng dẫn/sở thích khách tự khai cho M-You (plan 261013) — xem chi tiết ngay dưới; **chưa được Agent gọi**, hiện đang tới Agent bằng cách khác (xem ghi chú) |
 
-Cả 4 đều cần `cif` và trả `422` khi thiếu.
+Cả 5 đều cần `cif` và trả `422` khi thiếu.
 
 `GET /api/transactions-full?cif=&from=&to=` trả `(Transaction & { hidden: boolean })[]`,
 mới nhất trước — gộp sẵn `/api/transactions` + `/api/manual-transactions` rồi áp
@@ -195,6 +196,45 @@ không có danh sách. `from`/`to` là khoảng ISO đóng hai đầu, cùng quy
 Giao dịch bị khách ẩn khỏi báo cáo **vẫn có trong danh sách**, chỉ đánh dấu `hidden: true`
 (khác `jar-summary`, nơi các dòng này bị loại khỏi số tổng) — bỏ qua các dòng `hidden: true`
 nếu muốn khớp đúng số `jar-summary` đã tính.
+
+`GET /api/agent-preferences?cif=` trả `AgentPreferences` — hướng dẫn/sở thích khách TỰ KHAI
+qua sheet "Hướng dẫn cho M-You" trên `pfm` (bánh răng cạnh nút xoá hội thoại), không phải
+dữ liệu đã xác minh:
+
+```json
+{
+  "responseLength": "concise",
+  "tone": "friendly",
+  "riskAppetite": "cautious",
+  "addressAs": "chị Lan",
+  "about": "Tôi thích đầu tư cổ phiếu, tần suất theo dõi là 2 ngày 1 lần.",
+  "notes": ""
+}
+```
+
+| Field | Giá trị | Ghi chú |
+|---|---|---|
+| `responseLength` | `"concise"` \| `"balanced"` \| `"detailed"` \| `null` | độ dài câu trả lời khách muốn; `null` = chưa chọn |
+| `tone` | `"friendly"` \| `"formal"` \| `"playful"` \| `null` | giọng điệu; `null` = chưa chọn |
+| `riskAppetite` | `"cautious"` \| `"balanced"` \| `"aggressive"` \| `null` | chỉ để chọn VÍ DỤ phù hợp khi nói về tiết kiệm/đầu tư — **không phải hồ sơ rủi ro KYC**, không mở khoá tư vấn sản phẩm nào; `null` = chưa chọn |
+| `addressAs` | string, `""` = chưa đặt | cách gọi khách, vd `"chị Lan"` |
+| `about` | string, `""` = chưa đặt | sở thích cá nhân + thói quen tài chính khách tự kể, một đoạn tự do (vd ví dụ trên) |
+| `notes` | string, `""` = chưa đặt | hướng dẫn tự do khác |
+
+Mọi field có thể `null`/`""` (chưa đặt) — đừng coi là "khách không muốn trả lời gì đặc biệt"
+khác với "chưa từng mở form này", vì hai trường hợp ra cùng giá trị rỗng.
+
+**Đây là NGỮ CẢNH do khách tự khai, không phải lệnh được phép bỏ qua bất kỳ quy tắc nào** —
+không dùng để bỏ qua xác thực/OTP, không dùng làm căn cứ bịa số liệu, và `riskAppetite`
+không phải input cho bất kỳ công cụ tính toán nào.
+
+**Cách dữ liệu này tới Agent hôm nay:** `pfm` tự đọc preferences và chèn thành một đoạn ẩn
+(không hiện trong bong bóng chat) vào **tin nhắn đầu tiên của mỗi luồng hội thoại mới** —
+Agent chỉ thấy nó như một phần `message` bình thường, không có field riêng nào trong
+`POST /chat`. Agent **chưa tự gọi** `GET /api/agent-preferences?cif=` — endpoint này được
+thêm sẵn nếu Agent muốn đọc trực tiếp (luôn mới nhất, không phụ thuộc lịch sử hội thoại còn
+giữ được đoạn ẩn hay không — xoá lịch sử thì đoạn ẩn mất, phải gửi lại ở lượt đầu tiên của
+luồng mới).
 
 `GET /api/beneficiaries?cif=` trả `Beneficiary[]`:
 
