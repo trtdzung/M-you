@@ -14,6 +14,16 @@ function pickBank(name: string | RegExp) {
 }
 
 describe("TransferBankEntry", () => {
+  it("filters banks by their full Vietnamese name and keeps the selection flow", () => {
+    renderEntry();
+    fireEvent.click(screen.getByRole("button", { name: "Ngân hàng nhận" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Tên ngân hàng" }), { target: { value: "ngoai thuong" } });
+    expect(screen.queryByRole("button", { name: "MSB", exact: true })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Vietcombank", exact: true }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ngân hàng nhận" })).toHaveTextContent("Vietcombank");
+  });
+
   it("only lists banks with a real logo — no branch step for any of them", () => {
     renderEntry();
     fireEvent.click(screen.getByRole("button", { name: "Ngân hàng nhận" }));

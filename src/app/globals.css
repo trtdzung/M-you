@@ -537,3 +537,6 @@ body {
 .transfer-sheet h2 { font-size: 20px; font-weight: 700; color: #10284b; }
 .transfer-sheet > div:first-child > button { color: #10284b; }
 .transfer-sheet input:focus-visible { outline: 2px solid #ff9b60; outline-offset: 1px; }
+
+.transfer-bank-sheet { max-height: 82%; background: #fff; }
+.transfer-bank-sheet > div:first-child { position: sticky; top: -16px; z-index: 1; background: #fff; }

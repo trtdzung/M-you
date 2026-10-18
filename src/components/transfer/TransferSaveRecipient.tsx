@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Card, Sheet } from "@/components/primitives";
+import { Card } from "@/components/primitives";
 import { maskAccount } from "@/lib/mask-account";
-import { ACCOUNT_NUMBER_PATTERN, TRANSFER_BANKS, findBank } from "@/lib/transfer-banks";
+import { ACCOUNT_NUMBER_PATTERN, findBank } from "@/lib/transfer-banks";
+import { TransferBankSheet } from "./TransferBankSheet";
 import { BankLogo } from "./BankLogo";
 import type { SelectedRecipient } from "./RecipientPicker";
 
@@ -149,22 +150,7 @@ export function TransferSaveRecipient({
       </button>
 
       {bankSheetOpen && (
-        <Sheet className="transfer-sheet" title="Chọn ngân hàng nhận" onClose={() => setBankSheetOpen(false)}>
-          <ul className="flex flex-col divide-y divide-border">
-            {TRANSFER_BANKS.map((b) => (
-              <li key={b.id}>
-                <button
-                  type="button"
-                  onClick={() => selectBank(b.id)}
-                  className="flex min-h-14 w-full items-center gap-3 px-1 py-3 text-left text-[15px] font-medium text-text"
-                >
-                  <BankLogo bank={b} size="md" />
-                  {b.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Sheet>
+        <TransferBankSheet onClose={() => setBankSheetOpen(false)} onSelect={selectBank} />
       )}
     </div>
   );
