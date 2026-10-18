@@ -6,6 +6,7 @@ import { pushWithTransition } from "@/lib/view-transition";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { Sheet } from "@/components/primitives/Sheet";
 import { formatVnd } from "@/lib/format";
+import { INVESTMENT_DISCLAIMER } from "@/lib/security/scenario-copy";
 import { usePersona } from "@/providers/context";
 import { useAssetLiabilities } from "@/state/assets";
 import { useGoals } from "@/state/goals";
@@ -95,18 +96,21 @@ export function HomeInsightWidget() {
     </>;
   }
   const amount = formatVnd(insight.candidate.metric.value);
+  const investment = insight.candidate.topic === "investment";
   return <>
-    <section aria-label="Gợi ý tài chính" className="home-insight-card flex items-center">
+    <section aria-label="Gợi ý tài chính" className={`home-insight-card flex ${investment ? "flex-col" : "items-center"}`}>
       <button type="button" onClick={() => setExpanded(true)} className="flex min-h-16 min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left focus-visible:outline-primary" aria-label={`Xem insight: ${insight.title}`}>
         <Sparkles size={24} className="shrink-0 text-primary" aria-hidden />
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-text">{insight.title}</span>
           <span className="block truncate text-xs text-muted">M-Your · {insight.candidate.confidence === "estimated" ? "Ước tính, xem chi tiết" : "Chạm để xem chi tiết"}</span></span>
         <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
       </button>
+      {investment && <p className="px-4 pb-3 text-xs text-muted">{INVESTMENT_DISCLAIMER}</p>}
     </section>
     {error && <p role="alert" className="text-xs text-white">{error}</p>}
     <Sheet open={expanded} title={insight.title} onClose={close} className="home-insight-sheet">
       <p className="text-sm text-muted">{insight.body}</p>
+      {investment && <p className="mt-3 text-xs text-muted">{INVESTMENT_DISCLAIMER}</p>}
       <div className="my-5 rounded-2xl border border-orange-100 bg-[#fff1ea] p-4"><p className="text-xs text-muted">{insight.candidate.metric.label}</p><p className="mt-2 text-2xl font-bold text-text">{amount}</p>
         {insight.candidate.confidence === "estimated" && <p className="mt-1 text-xs text-muted">Đây là ước tính dựa trên dữ liệu hiện có.</p>}</div>
       <div className="flex flex-col gap-2">

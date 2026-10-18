@@ -41,6 +41,10 @@ export type ScenarioCopy = {
 /** UC13 opening line (Thông tư 53/2026). Scan, case review, and agent popups show it. */
 export const AI_SESSION_LINE = "Bạn đang trò chuyện với trợ lý AI của MSB.";
 
+/** UC13 disclaimer. Only under investment or advisory copy, never on a warning. */
+export const INVESTMENT_DISCLAIMER =
+  "Thông tin chỉ mang tính tham khảo, không phải khuyến nghị đầu tư. Thị trường luôn có rủi ro.";
+
 /** UC 12 diagnostic questions ("Câu hỏi phân loại" until the agent asks its own). */
 export const CLASSIFY_QUESTIONS = [
   "Có ai đang gọi điện hướng dẫn anh/chị không?",
