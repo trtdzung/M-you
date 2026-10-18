@@ -30,7 +30,7 @@ export function PlanSliders({
   const baseMonths = monthsLeft(now, draft.targetDate);
   const months = overrides.targetDate ? monthsLeft(now, overrides.targetDate) : baseMonths;
   const amount = overrides.targetAmount ?? draft.targetAmount;
-  const step = draft.targetAmount >= 1_000_000_000 ? 5_000_000 : 1_000_000;
+  const step = draft.targetAmount >= 1_000_000_000 ? 5_000_000 : draft.targetAmount >= 10_000_000 ? 1_000_000 : draft.targetAmount >= 1_000_000 ? 100_000 : 10_000;
   const minAmount = Math.max(step, Math.floor((draft.targetAmount * 0.3) / step) * step);
   const maxAmount = Math.ceil((draft.targetAmount * 1.7) / step) * step;
 
@@ -48,10 +48,11 @@ export function PlanSliders({
       <h4 className="text-[13px] font-semibold text-text">{c.title}</h4>
       <label className="flex flex-col gap-1 text-[13px] text-muted">
         <span className="flex justify-between"><span>{c.months}</span><span className="font-semibold text-text">{c.monthsValue(months)}</span></span>
-        <input type="range" className={range} min={1} max={Math.max(MAX_MONTHS, baseMonths)} step={1} value={months} onChange={(e) => set({ months: Number(e.target.value) })} />
+        <input type="range" disabled={draft.flexibility === "fixed"} className={`${range} disabled:opacity-40`} min={1} max={Math.max(MAX_MONTHS, baseMonths)} step={1} value={months} onChange={(e) => set({ months: Number(e.target.value) })} />
       </label>
+      {draft.flexibility === "fixed" && <p className="text-xs leading-5 text-muted">Mục tiêu có hạn cố định, chỉ điều chỉnh số tiền.</p>}
       <label className="flex flex-col gap-1 text-[13px] text-muted">
-        <span className="flex justify-between"><span>{c.amount}</span><span className="font-semibold text-text">{formatGoalMoney(amount)}</span></span>
+        <span className="flex justify-between"><span>{c.amount}</span><span className="font-semibold text-text">{formatGoalMoney(amount)} VND</span></span>
         <input type="range" className={range} min={minAmount} max={maxAmount} step={step} value={Math.min(maxAmount, Math.max(minAmount, amount))} onChange={(e) => set({ amount: Number(e.target.value) })} />
       </label>
       <p role="status" className="text-[14px] leading-6 text-text">

@@ -1,18 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Sheet } from "@/components/primitives";
 import type { SavingsGoalView } from "../../model/types";
 import type { Caution, Plan } from "../../advisor/analysis-types";
 import { cashflowSentence, verdictSentence } from "../../advisor/templates";
-import { recommendedPlan } from "../../advisor/recommend";
+import { usePersonaCif } from "@/providers/context";
+import { transferNow } from "@/lib/demo-clock";
+import { applyAdjustment, toCurrentDraft } from "../../advisor/apply-adjustment";
+import { adjustAck } from "../../advisor/templates";
+import { coachGoal } from "../../client/goals-api";
+import type { AnalyzeDraft } from "../../advisor/analysis-types";
 import { useGoalAdvisor } from "../../client/hooks/use-goal-advisor";
 import { useAdvisorNarration } from "../../client/hooks/use-advisor-narration";
 import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
 import { formatGoalMoney } from "../shared/format-goal-money";
 import { primaryButton, secondaryButton } from "../styles";
 import { VerdictCard } from "./VerdictCard";
-import { PlanCard } from "./PlanCard";
+import { PlanCompare } from "./PlanCompare";
+import { FollowUp } from "./FollowUp";
 
 const money = (amount: number) => `${formatGoalMoney(amount)} VND`;
 function cautionText(caution: Caution) {
@@ -30,15 +36,53 @@ export function SavedGoalAssessment({ goal, onUpdated }: { goal: SavingsGoalView
   const [error, setError] = useState("");
   const { update, pending } = useGoalMutations();
   const eligible = goal.status !== "archived" && goal.currentAmount < goal.targetAmount;
-  const advisor = useGoalAdvisor(eligible ? {
+  const cif = usePersonaCif();
+  const savedDraft: AnalyzeDraft = {
     name: goal.name, targetAmount: goal.targetAmount, targetDate: goal.targetDate,
     flexibility: goal.flexibility, openingAmount: goal.currentAmount,
-  } : null, `${goal.id}:${goal.updatedAt}:${goal.currentAmount}:${retry}`);
+  };
+  const [draft, setDraft] = useState(savedDraft);
+  const [adjustStatus, setAdjustStatus] = useState<"idle" | "busy" | "unclear" | "failed">("idle");
+  const [ack, setAck] = useState("");
+  const sequence = useRef(0);
+  useEffect(() => () => { sequence.current++; }, []);
+  const advisor = useGoalAdvisor(eligible ? draft : null, `${goal.id}:${goal.updatedAt}:${goal.currentAmount}:${retry}`);
+  const previewChanged = draft.targetAmount !== goal.targetAmount || draft.targetDate !== goal.targetDate || Object.keys(advisor.overrides).length > 0;
+  const currentDraft: AnalyzeDraft = { ...draft, ...advisor.overrides };
+  async function adjust(text: string) {
+    if (!cif || adjustStatus === "busy") return;
+    const request = ++sequence.current;
+    setAdjustStatus("busy");
+    setAck("");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 20_000); });
+    const response = await Promise.race([coachGoal(cif, { request: text, answers: [], currentDraft: toCurrentDraft(currentDraft, transferNow()) }), timeout]);
+    clearTimeout(timer);
+    if (request !== sequence.current) return;
+    if (response?.ok && response.data.status === "adjust" && response.data.adjustment) {
+      const adjustment = response.data.adjustment;
+      if (adjustment.kind === "use_savings_amount") {
+        setAck("Để dùng thêm tiền đã có, hãy ghi nhận khoản góp trước. Phần điều chỉnh này chỉ thay đổi kế hoạch, chưa tăng số đã tích lũy.");
+        setAdjustStatus("idle");
+        return;
+      }
+      const next = applyAdjustment(currentDraft, adjustment, transferNow());
+      if (goal.flexibility === "fixed" && next.targetDate !== goal.targetDate) {
+        setAck("Mục tiêu có hạn cố định. Bạn có thể chỉnh số tiền; để đổi thời hạn, hãy đổi loại mục tiêu trong Quản lý mục tiêu.");
+        setAdjustStatus("idle");
+        return;
+      }
+      setDraft(next);
+      advisor.setOverrides({});
+      setAck(`${adjustAck(adjustment)} Kế hoạch đang được tính lại; mục tiêu chưa được lưu thay đổi.`);
+      setAdjustStatus("idle");
+    } else setAdjustStatus(response?.ok && response.data.message_code === "adjust_unclear" ? "unclear" : "failed");
+  }
   // Explanation only: no conversation or goal-collection request.
   const narration = useAdvisorNarration(null, goal.name, advisor.analysis);
   const analysis = advisor.analysis;
   if (!eligible) return null;
-  const selected = analysis && advisor.selectedPlanId ? analysis.plans[advisor.selectedPlanId] : null;
+  const selected = advisor.view.analysis && advisor.selectedPlanId ? advisor.view.analysis.plans[advisor.selectedPlanId] : null;
   const cautions = analysis && advisor.selectedPlanId ? analysis.insights[advisor.selectedPlanId].cautions : [];
   const reviewMonthly = review ? Math.ceil(Math.max(0, review.targetAmount - goal.currentAmount) / Math.max(1, review.months)) : 0;
   async function apply() {
@@ -50,6 +94,7 @@ export function SavedGoalAssessment({ goal, onUpdated }: { goal: SavingsGoalView
   return (
     <Card className="flex flex-col gap-4" as="section">
       <h2 className="text-base font-semibold text-text">Đánh giá của M-You</h2>
+      {previewChanged && <div className="rounded-xl bg-surface-tint p-3 text-sm leading-6"><p>Bạn đang thử một kế hoạch khác. Mục tiêu đã lưu chưa thay đổi.</p><button type="button" className={`${secondaryButton} mt-2`} onClick={() => { sequence.current++; setDraft(savedDraft); advisor.setOverrides({}); setAck(""); setAdjustStatus("idle"); }}>Về kế hoạch đã lưu</button></div>}
       {advisor.phase === "loading" && <p role="status" className="text-sm text-muted">Đang đánh giá mục tiêu và dòng tiền của bạn…</p>}
       {advisor.phase === "failed" && <div className="flex flex-col gap-3"><p role="alert" className="text-sm text-muted">Mục tiêu đã được lưu. Chưa tải được đánh giá.</p><button type="button" className={secondaryButton} onClick={() => setRetry(value => value + 1)}>Thử lại đánh giá</button></div>}
       {analysis && <>
@@ -62,22 +107,31 @@ export function SavedGoalAssessment({ goal, onUpdated }: { goal: SavingsGoalView
         </div>
         {cautions.length > 0 && <div><h3 className="mb-2 text-sm font-semibold text-text">Điểm cần lưu ý</h3><ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted">{cautions.map((c, index) => <li key={index}>{cautionText(c)}</li>)}</ul></div>}
         <p className="text-xs leading-5 text-muted">Đánh giá riêng mục tiêu này, chưa trừ khoản góp cho các mục tiêu khác. Các nguồn tiền bổ sung trong phương án là gợi ý, chưa được ghi nhận vào tích lũy.</p>
-        {analysis.verdict !== "unknown" && <>
-          <h3 className="text-sm font-semibold text-text">Các hướng đạt mục tiêu</h3>
-          <div role="radiogroup" aria-label="Phương án cho mục tiêu">
-            {Object.values(analysis.plans).filter(plan => plan.available && (plan.id === "keep_deadline" || plan.needed)).map(plan => <div key={plan.id} className="mb-3 last:mb-0"><PlanCard plan={plan} selected={plan.id === advisor.selectedPlanId} recommended={plan.id === recommendedPlan(analysis)} onSelect={() => advisor.selectPlan(plan.id)} narration={narration.plans[plan.id]} /></div>)}
-          </div>
-          {selected && <button type="button" className={secondaryButton} onClick={() => { setError(""); setReview(selected); }}>Xem điều chỉnh mục tiêu</button>}
-        </>}
+        <PlanCompare
+          draft={draft}
+          view={advisor.view}
+          overrides={advisor.overrides}
+          onOverrides={advisor.setOverrides}
+          selectedPlanId={advisor.selectedPlanId}
+          onSelect={advisor.selectPlan}
+          narration={narration}
+        />
+        <FollowUp draft={currentDraft} status={adjustStatus} onSubmit={(text) => void adjust(text)} />
+        {ack && <p role="status" className="rounded-xl bg-surface-muted p-3 text-sm leading-6 text-text">{ack}</p>}
+        <p className="text-xs leading-5 text-muted">Thử điều chỉnh chỉ thay đổi bản xem trước. Số đã tích lũy và mục tiêu đã lưu được giữ nguyên cho đến khi bạn xác nhận.</p>
+        <button type="button" className={secondaryButton} disabled={!selected || advisor.view.phase !== "ready" || adjustStatus === "busy"} onClick={() => { if (selected) { setError(""); setReview(selected); } }}>Xem điều chỉnh mục tiêu</button>
+
       </>}
       {review && <Sheet title="Xem điều chỉnh mục tiêu" onClose={() => { if (!pending) setReview(null); }}>
         <div className="flex flex-col gap-4 text-sm leading-6">
+          <p className="font-semibold">{goal.name}</p>
           <p>Số tiền: {money(goal.targetAmount)} → <strong>{money(review.targetAmount)}</strong></p>
           <p>Thời hạn: {goal.targetDate.split("-").reverse().join("/")} → <strong>{review.targetDate.split("-").reverse().join("/")}</strong></p>
           <p>Mức góp mỗi tháng: <strong>{money(reviewMonthly)}</strong></p>
           <p className="text-muted">Mức góp tính từ số đã tích lũy hiện tại, chưa tính lãi hoặc các nguồn tiền bổ sung gợi ý. Bạn cần tự thực hiện và ghi nhận các khoản góp.</p>
           {error && <p role="alert" className="text-negative">{error}</p>}
           <button type="button" className={primaryButton} disabled={pending} onClick={apply}>{pending ? "Đang lưu…" : "Xác nhận điều chỉnh"}</button>
+          <button type="button" className={secondaryButton} disabled={pending} onClick={() => setReview(null)}>Tiếp tục chỉnh</button>
         </div>
       </Sheet>}
     </Card>

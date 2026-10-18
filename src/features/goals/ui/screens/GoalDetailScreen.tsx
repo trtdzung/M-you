@@ -85,7 +85,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
         onDelete={() => setConfirmingDelete(true)}
       />
       <Card className="rounded-2xl"><GoalDetailStats goal={goal} /></Card>
-      <SavedGoalAssessment goal={goal} onUpdated={() => { refresh(); setFeedback("Đã điều chỉnh mục tiêu. Đánh giá sẽ được cập nhật theo kế hoạch mới."); }} />
+      <SavedGoalAssessment key={`${goal.id}:${goal.updatedAt}:${goal.currentAmount}`} goal={goal} onUpdated={() => { refresh(); setFeedback("Đã điều chỉnh mục tiêu. Đánh giá sẽ được cập nhật theo kế hoạch mới."); }} />
       <GoalTimeline goal={goal} ledger={ledger} />
       <Card className="rounded-2xl">
         <LedgerHistory entries={ledger} />
