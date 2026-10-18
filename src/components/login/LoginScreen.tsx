@@ -1,175 +1,117 @@
 "use client";
 
 import { useState } from "react";
-import {
-  BookOpen,
-  ChevronDown,
-  CreditCard,
-  Eye,
-  EyeOff,
-  Landmark,
-  Phone,
-  Ticket,
-} from "lucide-react";
+import { ArrowUpRight, Bell, ChevronDown, Eye, EyeOff, Headphones, QrCode, ScanFace, ScanLine, UserRound } from "lucide-react";
 import { PhoneShell } from "@/components/shell/PhoneShell";
+import { Sheet } from "@/components/primitives";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
 import { validateLogin, type LoginCustomer } from "@/lib/auth";
 
-/** Same photo background as Trang chủ (`FestiveBg`) — one shared brand surface across the app. */
-function LoginBg() {
+function AnniversaryHero() {
   return (
-    <>
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/bg-2-9.png')] bg-cover bg-top" />
-      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent to-black/20" />
-    </>
+    <div className="login-anniversary" aria-label="MSB · Vươn tầm từ di sản · 35 năm">
+      <svg viewBox="0 0 400 270" className="absolute inset-0 h-full w-full" aria-hidden="true">
+        {[ [45, 90, 32], [180, 30, 20], [300, 65, 17], [350, 180, 16] ].map(([x, y, radius], index) => (
+          <g key={index} stroke="#ffd278" opacity="0.5">
+            {Array.from({ length: 16 }, (_, ray) => <line key={ray} x1={x} y1={y - 5} x2={x} y2={y - radius} transform={`rotate(${ray * 22.5} ${x} ${y})`} />)}
+          </g>
+        ))}
+        <g fill="#ffb24d" opacity="0.22">
+          {Array.from({ length: 18 }, (_, i) => <rect key={i} x={i * 24 - 4} y={205 - (i * 37 % 65)} width={19} height={100} />)}
+        </g>
+      </svg>
+      <span className="login-heritage">VƯƠN TẦM<br /><small>TỪ</small> DI SẢN</span>
+      <span className="login-years">35</span>
+      <span className="login-year-label">NĂM</span>
+    </div>
   );
 }
 
-/** Decorative-only — this prototype has no branch locator, help center, or hotline flow. */
-const QUICK_LINKS = [
-  { label: "ATM/Chi nhánh", icon: Landmark },
-  { label: "Hướng dẫn", icon: BookOpen },
-  { label: "Gọi tổng đài", icon: Phone },
-] as const;
-
-/**
- * Prototype login screen: pick one of the sample customers (CIF_0001..0003)
- * and enter the shared demo password. Not real authentication — `LoginGate`
- * is the actual boundary; this component only validates the form and reports
- * the chosen customer up via `onLogin`.
- */
-export function LoginScreen<T extends LoginCustomer>({
-  customers,
-  onLogin,
-}: {
+/** MSB pre-login landing. Password verification remains in the existing demo gate. */
+export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "", onLogin }: {
   customers: T[];
+  initialCif?: string;
   onLogin: (customer: T) => void;
 }) {
-  const [cif, setCif] = useState("");
+  const [cif, setCif] = useState(initialCif);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [sheet, setSheet] = useState<"login" | "personal-qr" | "qr" | "support" | "language" | "notifications" | null>(null);
+  const [transfer, setTransfer] = useState(false);
+  const customer = customers.find(c => c.cif === cif);
 
-  function handleLogin() {
-    const result = validateLogin(cif, password, customers);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+  function closeSheet() {
+    setSheet(null);
+    setPassword("");
+    setShowPassword(false);
     setError("");
+  }
+  function handleLogin(event: React.FormEvent) {
+    event.preventDefault();
+    const result = validateLogin(cif, password, customers);
+    if (!result.ok) { setError(result.error); return; }
+    setError("");
+    setPassword("");
     onLogin(result.customer);
   }
 
   return (
-    <PhoneShell background={<LoginBg />} mainClassName="shell-main--login">
-      <div className="flex min-h-full flex-col">
-        <div className="flex items-center justify-between">
+    <PhoneShell className="login-shell" background={<div aria-hidden className="login-background absolute inset-0 -z-10" />} mainClassName="shell-main--login">
+      <div className="pb-8">
+        <header className="login-topbar">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/msb-logo-white.png" alt="MSB" className="h-7 w-auto" />
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/25 px-2.5 py-1 text-xs font-semibold text-white">
-            VN <ChevronDown size={12} />
-          </span>
-        </div>
-
-        <div className="h-[190px] shrink-0" aria-hidden />
-
-        <div className="flex flex-1 flex-col gap-4 pb-6">
-          <div className="shadow-card rounded-[26px] bg-surface p-5">
-            <h1 className="mb-4 text-lg font-bold text-text">Xin chào Quý khách</h1>
-
-            <div className="relative mb-3">
-              <select
-                aria-label="Khách hàng"
-                value={cif}
-                onChange={(e) => {
-                  setCif(e.target.value);
-                  setError("");
-                }}
-                className="h-12 w-full appearance-none rounded-2xl border-none bg-surface-muted px-4 pr-10 text-sm text-text outline-none"
-              >
-                <option value="" disabled>
-                  Chọn khách hàng
-                </option>
-                {customers.map((c) => (
-                  <option key={c.cif} value={c.cif}>
-                    {c.label} · {c.cif}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted" />
-            </div>
-
-            <div className="relative mb-3">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                placeholder="Nhập mật khẩu"
-                className="h-12 w-full rounded-2xl border-none bg-surface-muted px-4 pr-12 text-sm text-text outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-
-            {error && <p className="mb-3 text-xs text-negative">{error}</p>}
-
-            <button
-              type="button"
-              onClick={handleLogin}
-              className="brand-gradient flex h-12 w-full items-center justify-center rounded-full text-base font-bold text-white"
-            >
-              Đăng nhập
-            </button>
-
-            {/* Decorative — no help-center flow in this prototype. */}
-            <p className="mt-3.5 text-center text-sm font-semibold text-primary">Hỗ trợ đăng nhập</p>
-
-            <div className="my-4 border-t border-border" />
-
-            {/* Decorative — no guest mode or self-registration flow in this prototype. */}
-            <div className="flex items-center justify-around">
-              <span className="flex items-center gap-2 text-sm font-semibold text-text">
-                <Ticket size={17} /> Trải nghiệm trước
-              </span>
-              <span className="h-5 w-px bg-border" aria-hidden />
-              <span className="flex items-center gap-2 text-sm font-semibold text-text">
-                <CreditCard size={17} /> Đăng ký
-              </span>
-            </div>
+          <img src="/brand/msb-logo-white.png" alt="MSB" className="h-9 w-auto" />
+          <div className="flex items-center gap-3">
+            <button type="button" aria-label="Thông báo" className="login-icon-button" onClick={() => setSheet("notifications")}><Bell size={25} /></button>
+            <button type="button" aria-label="Ngôn ngữ" className="flex h-11 items-center gap-2 rounded-[10px] bg-[#fff3eb] px-3 text-sm font-semibold text-text" onClick={() => setSheet("language")}>VN <ChevronDown size={17} /></button>
           </div>
-
-          <div className="shadow-card flex items-stretch justify-around rounded-[22px] bg-surface px-2 py-4">
-            {QUICK_LINKS.map(({ label, icon: Icon }) => (
-              <div key={label} className="flex flex-1 flex-col items-center gap-1.5">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary">
-                  <Icon size={18} />
-                </span>
-                <span className="text-center text-[11px] font-medium text-text">{label}</span>
+        </header>
+        <AnniversaryHero />
+        <section className="login-welcome" aria-label="Đăng nhập khách hàng">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="mb-2 text-sm text-muted">Chào mừng trở lại,</p>
+              <div className="relative rounded-lg focus-within:ring-2 focus-within:ring-orange-400">
+                <span aria-hidden className="flex items-center gap-3 text-lg font-bold text-[#10284b]"><span className="truncate">{customer?.label ?? "Chọn khách hàng"}</span><UserRound size={24} className="shrink-0" /></span>
+                <select aria-label="Khách hàng" value={cif} onChange={e => { setCif(e.target.value); setError(""); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+                  <option value="" disabled>Chọn khách hàng</option>
+                  {customers.map(c => <option key={c.cif} value={c.cif}>{c.label} · {c.cif}</option>)}
+                </select>
               </div>
-            ))}
+            </div>
+            <button type="button" aria-label="QR cá nhân" onClick={() => setSheet("personal-qr")} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] border border-orange-300 bg-white/40 text-[#10284b]"><QrCode size={37} /></button>
           </div>
-
-          {/* Horizontally swipeable — same scroll-snap carousel as Home's promo row. */}
-          <PromoCarousel
-            items={[
-              <PromoCard key="savings" variant="image" image="/brand/banner-savings.jpg" imageAlt="Ưu đãi tiết kiệm" />,
-              <PromoCard key="business" variant="image" image="/brand/banner-business.jpg" imageAlt="Ưu đãi doanh nghiệp" />,
-              <PromoCard key="family" variant="image" image="/brand/banner-family.jpg" imageAlt="Ưu đãi gia đình" />,
-            ]}
-          />
-        </div>
+          <button type="button" onClick={() => { setTransfer(false); setSheet("login"); }} className="login-submit"><ScanFace size={24} aria-hidden />Đăng nhập</button>
+        </section>
+        <section aria-label="Truy cập nhanh" className="login-shortcuts">
+          <button type="button" onClick={() => { setTransfer(true); setSheet("login"); }}><ArrowUpRight size={31} /><span>Chuyển tiền</span></button>
+          <button type="button" onClick={() => setSheet("qr")}><ScanLine size={31} /><span>Quét QR</span></button>
+          <button type="button" onClick={() => setSheet("support")}><Headphones size={31} /><span>Hỗ trợ</span></button>
+        </section>
+        <PromoCarousel items={[
+          <PromoCard key="family" variant="image" image="/brand/banner-family.jpg" imageAlt="Ưu đãi thẻ MSB" />,
+          <PromoCard key="savings" variant="image" image="/brand/banner-savings.jpg" imageAlt="Ưu đãi tiết kiệm" />,
+          <PromoCard key="business" variant="image" image="/brand/banner-business.jpg" imageAlt="Ưu đãi doanh nghiệp" />,
+        ]} />
       </div>
+      {sheet === "login" && <Sheet title="Đăng nhập" description={transfer ? "Vui lòng đăng nhập trước khi sử dụng Chuyển tiền." : "Sử dụng mật khẩu demo để vào ứng dụng."} onClose={closeSheet}>
+        <form onSubmit={handleLogin} className="pb-3">
+          <p className="mb-4 text-sm font-semibold text-text">{customer?.label ?? "Vui lòng chọn khách hàng ở màn hình đăng nhập"}</p>
+          <label className="mb-2 block text-sm font-medium" htmlFor="login-password">Mật khẩu</label>
+          <div className="relative mb-3">
+            <input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={e => { setPassword(e.target.value); setError(""); }} placeholder="Nhập mật khẩu" autoComplete="off" aria-invalid={Boolean(error)} aria-describedby={error ? "login-error" : undefined} className="h-12 w-full rounded-[10px] border border-border bg-surface-muted px-3 pr-12 text-base outline-none focus:ring-2 focus:ring-orange-300" />
+            <button type="button" aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} onClick={() => setShowPassword(v => !v)} className="absolute right-1 top-0 flex h-12 w-11 items-center justify-center text-muted">{showPassword ? <EyeOff size={21} /> : <Eye size={21} />}</button>
+          </div>
+          {error && <p id="login-error" role="alert" className="mb-4 text-sm text-negative">{error}</p>}
+          <button type="submit" className="login-submit">Đăng nhập</button>
+          <button type="button" onClick={() => { setPassword(""); setError(""); setSheet("support"); }} className="mt-4 flex min-h-11 w-full items-center justify-center text-sm font-semibold text-primary">Hỗ trợ đăng nhập</button>
+        </form>
+      </Sheet>}
+      {sheet && sheet !== "login" && <Sheet title={{ "personal-qr": "QR cá nhân", qr: "Quét QR", support: "Hỗ trợ", language: "Ngôn ngữ", notifications: "Thông báo" }[sheet]} onClose={closeSheet}>
+        {sheet === "personal-qr" ? <div className="pb-4 text-center"><QrCode size={120} className="mx-auto mb-4 text-text" /><p className="font-semibold">{customer?.label}</p><p className="mt-2 text-sm text-muted">QR minh hoạ cho hồ sơ demo, không dùng để nhận tiền.</p></div> : sheet === "qr" ? <div className="pb-4 text-center"><div className="mx-auto mb-5 flex h-40 w-40 items-center justify-center rounded-[20px] border-2 border-dashed border-orange-300 bg-orange-50"><ScanLine size={80} className="text-primary" /></div><p className="text-sm leading-relaxed text-muted">Khung quét QR mô phỏng. Bản demo không mở camera hoặc thực hiện thanh toán.</p></div> : sheet === "support" ? <div className="space-y-4 pb-4 text-sm leading-relaxed"><p>Chọn tên khách hàng trên thẻ chào mừng để đổi hồ sơ demo, sau đó bấm Đăng nhập và nhập mật khẩu demo đang dùng.</p><p className="text-muted">Bản giả lập không kết nối tài khoản ngân hàng thật. Không nhập thông tin đăng nhập ngân hàng của bạn.</p><button type="button" className="login-submit" onClick={() => setSheet("login")}>Quay lại đăng nhập</button></div> : sheet === "language" ? <div className="pb-4"><button type="button" className="flex min-h-12 w-full items-center justify-between text-sm font-semibold" onClick={closeSheet}>🇻🇳 Tiếng Việt <span className="text-primary">Đang sử dụng</span></button><p className="mt-3 text-xs text-muted">Bản giả lập hiện hỗ trợ Tiếng Việt.</p></div> : <p className="pb-5 text-sm text-muted">Bạn chưa có thông báo mới. Đăng nhập để xem thông báo tài khoản.</p>}
+      </Sheet>}
     </PhoneShell>
   );
 }

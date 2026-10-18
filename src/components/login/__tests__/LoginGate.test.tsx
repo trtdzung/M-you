@@ -55,10 +55,11 @@ describe("LoginGate", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), {
       target: { value: "CIF_0002" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
       target: { value: LOGIN_PASSWORD },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
     expect(screen.getByText("Persona hiện tại: irregular")).toBeInTheDocument();
   });
@@ -69,10 +70,11 @@ describe("LoginGate", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), {
       target: { value: "CIF_0001" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
       target: { value: LOGIN_PASSWORD },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
     expect(push).toHaveBeenCalledWith("/");
   });
@@ -82,10 +84,11 @@ describe("LoginGate", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), {
       target: { value: "CIF_0002" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
       target: { value: LOGIN_PASSWORD },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
     first.unmount();
 
     renderGate();
@@ -94,15 +97,17 @@ describe("LoginGate", () => {
     expect(screen.queryByRole("combobox", { name: "Khách hàng" })).not.toBeInTheDocument();
   });
 
-  it("stays clickable and shows an error when the password is typed before a customer is chosen", () => {
+  it("shows an error when no customer is chosen", () => {
     renderGate();
+    fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), { target: { value: "" } });
 
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
       target: { value: LOGIN_PASSWORD },
     });
-    expect(screen.getByRole("button", { name: "Đăng nhập" })).toBeEnabled();
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
     expect(screen.getByText("Vui lòng chọn khách hàng")).toBeInTheDocument();
   });
@@ -113,10 +118,11 @@ describe("LoginGate", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Khách hàng" }), {
       target: { value: "CIF_0001" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
       target: { value: "wrong" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
     expect(screen.getByText("Sai mật khẩu, vui lòng thử lại")).toBeInTheDocument();
     expect(screen.queryByText(/Persona hiện tại/)).not.toBeInTheDocument();

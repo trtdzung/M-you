@@ -348,3 +348,112 @@ body {
 .settings-shell:has(.settings-simple) > [aria-hidden="true"] {
   background: #f7f8fa;
 }
+
+/* Pre-login MSB landing: anniversary artwork is decorative, all controls stay live. */
+.login-shell {
+  --shell-ink: #151515;
+}
+.login-background {
+  background: radial-gradient(ellipse at 60% 0%, #ff8b20 0%, #ff5620 28%, #ed1321 64%);
+}
+.login-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  gap: 16px;
+}
+.login-icon-button {
+  display: flex;
+  height: 42px;
+  width: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff3eb;
+  color: #10284b;
+}
+.login-anniversary {
+  position: relative;
+  display: flex;
+  height: clamp(240px, 31dvh, 330px);
+  align-items: center;
+  justify-content: center;
+  margin: 0 -16px;
+  overflow: hidden;
+  color: #fff6b5;
+}
+.login-years {
+  position: relative;
+  margin-left: 42px;
+  font-size: clamp(155px, 43vw, 205px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -20px;
+  font-family: Georgia, serif;
+  text-shadow: 0 0 16px #ffb848;
+}
+.login-heritage {
+  position: absolute;
+  left: 8%;
+  top: 45%;
+  z-index: 1;
+  font-size: clamp(14px, 4vw, 19px);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+.login-heritage small { font-size: 10px; }
+.login-year-label {
+  position: absolute;
+  right: 6%;
+  top: 48%;
+  font-size: 19px;
+  font-weight: 700;
+}
+.login-welcome {
+  border: 1px solid white;
+  border-radius: 24px;
+  background: #ffecef;
+  padding: 18px 16px 16px;
+}
+.login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffa54f, #ee6335);
+  color: white;
+  font-size: 17px;
+  font-weight: 600;
+}
+.login-shortcuts {
+  display: flex;
+  align-items: stretch;
+  margin: 16px 0;
+  border: 1px solid white;
+  border-radius: 24px;
+  background: #ffecef;
+  padding: 15px 6px;
+}
+.login-shortcuts button {
+  display: flex;
+  flex: 1;
+  min-height: 60px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  color: #10284b;
+  font-size: 13px;
+  font-weight: 500;
+}
+.login-shortcuts svg { stroke-width: 1.7; }
+.login-shell button:focus-visible {
+  outline: 2px solid #10284b;
+  outline-offset: 3px;
+}

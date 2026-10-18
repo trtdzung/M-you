@@ -29,15 +29,15 @@ function readAuthenticated(): boolean {
  * The app's front door: renders `LoginScreen` until one of the sample
  * customers logs in, then switches the active persona to match and reveals
  * `children`. The login is remembered in localStorage (the persona is already
- * persisted by `PersonaProvider`), so a reload stays signed in. There is no
- * logout affordance.
+ * persisted by `PersonaProvider`), so a reload stays signed in. Settings provides
+ * the logout affordance.
  */
 export function LoginGate({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   // Until storage has been read we render nothing, so a signed-in user never
   // sees a flash of the login screen. Read after mount to keep SSR output stable.
   const [ready, setReady] = useState(false);
-  const { personas, setPersona } = usePersona();
+  const { persona, personas, setPersona } = usePersona();
   const router = useRouter();
 
   useEffect(() => {
@@ -52,6 +52,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
     return (
       <LoginScreen
         customers={customers}
+        initialCif={persona.cif}
         onLogin={(customer) => {
           setPersona(customer.id);
           setAuthenticated(true);
