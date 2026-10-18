@@ -39,7 +39,9 @@ export function TransferBankEntry({
   const digits = accountNumber.replace(/[\s.]/g, "");
   const accountValid = ACCOUNT_NUMBER_PATTERN.test(digits);
   const nameValid = recipientName.trim().length > 0;
-  const canContinue = Boolean(pickedRecipient || bank) && accountValid && nameValid;
+  const canContinue = pickedRecipient
+    ? Boolean(pickedRecipient.accountNumber.trim() && pickedRecipient.name.trim())
+    : Boolean(bank) && accountValid && nameValid;
 
   function selectBank(id: string) {
     setPickedRecipient(null);
@@ -91,7 +93,7 @@ export function TransferBankEntry({
               <IdCard size={22} aria-hidden />
             </button>
           </div>
-          {accountNumber.length > 0 && !accountValid && (
+          {!pickedRecipient && accountNumber.length > 0 && !accountValid && (
             <p className="mt-1.5 text-xs text-negative">Số tài khoản/thẻ cần có 8–19 chữ số.</p>
           )}
         </div>
@@ -110,14 +112,17 @@ export function TransferBankEntry({
         </div>
       </Card>
 
+      <div className="mt-auto flex shrink-0 flex-col gap-2">
+      {!canContinue && <p className="text-center text-sm text-muted">{!bank ? "Chọn ngân hàng nhận để tiếp tục." : !accountValid ? "Nhập số tài khoản/thẻ gồm 8–19 chữ số." : "Nhập tên người nhận để tiếp tục."}</p>}
       <button
         type="button"
         disabled={!canContinue}
         onClick={submit}
-        className="login-submit mt-auto shrink-0 disabled:opacity-40"
+        className="login-submit shrink-0 disabled:opacity-40"
       >
         Tiếp tục
       </button>
+      </div>
 
       {recipientSheetOpen && (
         <Sheet className="transfer-sheet" title="Người thụ hưởng" onClose={() => setRecipientSheetOpen(false)}>

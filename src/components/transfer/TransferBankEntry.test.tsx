@@ -14,6 +14,16 @@ function pickBank(name: string | RegExp) {
 }
 
 describe("TransferBankEntry", () => {
+  it("allows an existing saved payee without applying manual-entry number constraints", () => {
+    const onContinue = vi.fn();
+    render(<TransferBankEntry onContinue={onContinue} transactions={[]} beneficiaries={[{ id: "saved", name: "Saved Payee", accountNumber: "VJTP024E150410260IL", bankName: "Vietcombank", source: "mock" }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Chọn người nhận đã lưu hoặc gần đây" }));
+    fireEvent.click(screen.getByRole("button", { name: /Saved Payee Vietcombank/ }));
+    expect(screen.getByRole("button", { name: "Tiếp tục" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+    expect(onContinue).toHaveBeenCalledWith(expect.objectContaining({ accountNumber: "VJTP024E150410260IL", source: "saved_beneficiary" }));
+  });
+
   it("filters banks by their full Vietnamese name and keeps the selection flow", () => {
     renderEntry();
     fireEvent.click(screen.getByRole("button", { name: "Ngân hàng nhận" }));
