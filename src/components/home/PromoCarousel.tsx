@@ -8,7 +8,7 @@ import { Dots } from "./Dots";
  * dot pagination đồng bộ vị trí cuộn. Nhận sẵn các slide (card ưu đãi tĩnh mock +
  * card insight thật) — không tự dựng nội dung. Cuộn nội bộ, không đụng window.
  */
-export function PromoCarousel({ items }: { items: ReactNode[] }) {
+export function PromoCarousel({ items, inset = false }: { items: ReactNode[]; inset?: boolean }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
 
@@ -29,7 +29,7 @@ export function PromoCarousel({ items }: { items: ReactNode[] }) {
       <div
         ref={scrollerRef}
         onScroll={onScroll}
-        className="no-scrollbar -mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto px-4"
+        className={`no-scrollbar flex snap-x snap-mandatory items-start gap-3 overflow-x-auto ${inset ? "" : "-mx-4 px-4"}`}
         role="group"
         aria-label="Ưu đãi & gợi ý"
       >

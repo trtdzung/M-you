@@ -56,6 +56,7 @@ export default function HomePage() {
           <HomeQuickGrid />
 
           <PromoCarousel
+            inset
             items={[
               <PromoCard
                 key="savings"
