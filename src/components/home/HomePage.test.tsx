@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import HomePage from "@/app/(festive)/page";
 const state = vi.hoisted(() => ({ provider: { listAccounts: vi.fn() } }));
-vi.mock("@/providers/context", () => ({ useProviders: () => state.provider }));
+vi.mock("@/providers/context", () => ({ useProviders: () => state.provider, usePersona: () => ({ persona: { cif: "CIF_0001", tier: "M-STANDARD" } }) }));
 vi.mock("./HomeInsightWidget", () => ({ HomeInsightWidget: () => <div>Gợi ý tài chính</div> }));
 vi.mock("@/components/primitives", () => ({ SourceBadge: () => null }));
 
@@ -15,6 +15,7 @@ describe("Home loading", () => {
     expect(screen.getByRole("link", { name: "PFM" })).toBeTruthy();
     expect(screen.getByAltText(/Cùng tài khoản MSB/)).toBeTruthy();
     expect(screen.queryByText("Chưa có tài khoản")).toBeNull();
+    expect(screen.getByLabelText("Số dư đang ẩn")).toBeTruthy();
     await act(async () => resolve([]));
     expect(screen.getByText("Chưa có tài khoản")).toBeTruthy();
   });

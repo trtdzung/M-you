@@ -18,7 +18,7 @@ export function AccountSummaryCard({
 }: {
   tier: string;
   maskedNumber: string;
-  balance: number;
+  balance: number | null;
   freshness: string | null;
 }) {
   const [hidden, setHidden] = useState(true);
@@ -58,7 +58,7 @@ export function AccountSummaryCard({
                 <span className="text-muted">VND</span>
               </span>
             ) : (
-              <span>{balance.toLocaleString("en-US")} VND</span>
+              <span>{balance === null ? "Chưa có dữ liệu số dư" : `${balance.toLocaleString("en-US")} VND`}</span>
             )}
           </p>
         </div>

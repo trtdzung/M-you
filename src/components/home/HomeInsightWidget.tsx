@@ -78,8 +78,20 @@ export function HomeInsightWidget() {
     router.push("/pfm?assistant=1&insight=1");
   }
   if (!insight) {
-    if (error) return <button className="rounded-xl bg-white/95 px-3 py-2 text-left text-xs text-muted" onClick={() => setRefresh((n) => n + 1)}>{error}</button>;
-    return loading && ready ? <div role="status" className="rounded-xl bg-white/95 px-3 py-2 text-xs text-muted">M-Your đang xem tình hình tài chính…</div> : null;
+    return <>
+      <section aria-label="Gợi ý tài chính" className="flex min-h-14 items-center rounded-[24px] border border-white/40 bg-white/70 px-2 shadow-card backdrop-blur-xl">
+        <button type="button" onClick={() => setExpanded(true)} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left focus-visible:outline-primary">
+          <Sparkles size={18} className="shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-text">Gợi ý tài chính</span><span className="block text-[11px] text-muted">M-Your · Chạm để xem chi tiết</span></span>
+          <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
+        </button>
+      </section>
+      {expanded && <Sheet title="Gợi ý tài chính" onClose={close}>
+        <p className="mb-4 text-sm text-muted">{error || (loading ? "Đang cập nhật gợi ý tài chính cho bạn." : "Hiện chưa có gợi ý mới cho bạn.")}</p>
+        {error && <button type="button" onClick={() => setRefresh(n => n + 1)} className="rounded-xl bg-primary px-4 py-3 text-sm text-white">Thử lại</button>}
+        <button type="button" onClick={() => router.push("/pfm")} className="mt-3 block rounded-xl border border-primary px-4 py-3 text-sm text-primary">Xem tổng quan tài chính</button>
+      </Sheet>}
+    </>;
   }
   const amount = formatVnd(insight.candidate.metric.value);
   return <>

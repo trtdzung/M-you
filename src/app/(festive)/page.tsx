@@ -8,12 +8,13 @@ import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
 import { HomeInsightWidget } from "@/components/home/HomeInsightWidget";
-import { Empty, ErrorState, SkeletonCard } from "@/components/states";
-import { useProviders } from "@/providers/context";
+import { Empty } from "@/components/states";
+import { usePersona, useProviders } from "@/providers/context";
 import type { Providers } from "@/providers";
 
 export default function HomePage() {
   const providers = useProviders();
+  const { persona } = usePersona();
   const [result, setResult] = useState<{ provider: Providers; accounts: Awaited<ReturnType<Providers["listAccounts"]>>; error: boolean } | null>(null);
   useEffect(() => {
     let active = true;
@@ -36,20 +37,19 @@ export default function HomePage() {
       <div className="flex flex-col gap-4">
           <HomeInsightWidget />
 
-          {!current ? <SkeletonCard className="h-32" /> : current.error ? <ErrorState /> : primary ? (
+          {!current || current.error || primary ? (
             <AccountSummaryCard
-              tier={primary.tier ?? "MSB"}
-              maskedNumber={primary.maskedNumber}
-              balance={primary.balance}
-              freshness={primary.lastSyncedAt}
+              key={persona.cif}
+              tier={primary?.tier ?? persona.tier}
+              maskedNumber={primary?.maskedNumber ?? "Tài khoản chính"}
+              balance={primary?.balance ?? null}
+              freshness={primary?.lastSyncedAt ?? null}
             />
           ) : (
             <div className="shadow-card rounded-[24px] bg-surface p-5">
               <Empty title="Chưa có tài khoản" description="Chưa có tài khoản nào để hiển thị." />
             </div>
           )}
-
-
 
           <HomeQuickGrid />
 

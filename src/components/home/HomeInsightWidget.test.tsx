@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { HomeInsight } from "@/insights/proactive/home-contract";
 import { takeInsightDraft } from "@/insights/proactive/chat-handoff";
 
@@ -57,6 +57,8 @@ describe("Home insight notification", () => {
   it("offers retry on API failure", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error(); }));
     render(<HomeInsightWidget />);
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+    fireEvent.click(screen.getByRole("button", { name: /Gợi ý tài chính/ }));
     expect(await screen.findByRole("button", { name: /Thử lại/ })).toBeInTheDocument();
   });
 });
