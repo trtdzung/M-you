@@ -241,3 +241,23 @@ CREATE TABLE IF NOT EXISTS security_engine_state (
   alert_hour INTEGER CHECK (alert_hour IS NULL OR (alert_hour BETWEEN 0 AND 23)),
   updated_at INTEGER NOT NULL
 );
+
+-- Scam Shield engine (E04). Accounts on the fraud warning list — a MOCK of NHNN's
+-- SIMO list / MSB's internal list (SIMO has no public API for the hackathon).
+-- `bank` '' = any bank. Signal T2, scenario DH4, account lookup (UC 10).
+CREATE TABLE IF NOT EXISTS warned_accounts (
+  account TEXT NOT NULL,
+  bank TEXT NOT NULL DEFAULT '',
+  level TEXT NOT NULL CHECK (level IN ('danger', 'suspicious')),
+  source TEXT NOT NULL DEFAULT 'mock' CHECK (source IN ('mock')),
+  note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (account, bank)
+);
+-- demo data: obviously fake numbers (9704 0000 …), seeded once; test tools can edit.
+INSERT OR IGNORE INTO warned_accounts (account, bank, level, note) VALUES
+  ('9704000000000001', 'VietinBank', 'danger', 'Giả danh công an / cơ quan thuế'),
+  ('9704000000000002', 'BIDV', 'danger', 'Việc làm online, làm nhiệm vụ hưởng hoa hồng'),
+  ('9704000000000003', 'Techcombank', 'danger', 'Đầu tư lợi nhuận cao'),
+  ('9704000000000004', '', 'danger', 'Báo chuyển nhầm, nhờ chuyển trả sang tài khoản khác'),
+  ('9704000000000005', 'Vietcombank', 'suspicious', 'Trúng thưởng, yêu cầu nộp phí nhận quà'),
+  ('9704000000000006', '', 'suspicious', 'Giả danh người thân cấp cứu');
