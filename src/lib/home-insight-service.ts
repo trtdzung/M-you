@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "./db";
 import { AGENT_BASE_URL, agentAuthHeaders } from "./agent-proxy-auth";
+import { ensureInvestmentFixture } from "./security/investment-fixture";
 import { recoveryState } from "./security/recovery";
 import { customerSnapshot, snapshotHash } from "./financial-snapshot-service";
 import { validAgentSelection, type HomeInsight, type HomeInsightResult } from "@/insights/proactive/home-contract";
@@ -16,6 +17,7 @@ function storage() {
   return db;
 }
 export async function generateHomeInsight(cif: string, input: unknown): Promise<HomeInsightResult> {
+  ensureInvestmentFixture(cif);
   const { snapshot, snapshotId: originalSnapshotId } = customerSnapshot(cif, input);
   const cooldown = recoveryState(cif).cooldown;
   if (cooldown) snapshot.candidates = snapshot.candidates.filter(candidate => candidate.topic !== "investment");
