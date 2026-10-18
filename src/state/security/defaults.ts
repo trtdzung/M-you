@@ -12,11 +12,12 @@ const TRUSTED_SAMPLE: TrustedContact[] = [
   { id: "trusted-3", name: "LE THI MAI", bank: "Techcombank", account: "••• 0835" },
 ];
 
-// demo data
+// demo data. Dated before the demo clock (15/09, see demo-clock.ts) so new
+// warnings, stamped with transferNow(), list above them.
 const ALERT_LOG_SAMPLE: AlertLogEntry[] = [
-  { id: "alert-demo-1", at: vnTime(10, 12, 22, 24), level: "red", situation: "Vừa tất toán sổ rồi chuyển cho người nhận mới", choice: "Dừng lại" },
-  { id: "alert-demo-2", at: vnTime(10, 8, 21, 10), level: "yellow", situation: "Tên giống người quen, khác số tài khoản", choice: "Để tôi gọi" },
-  { id: "alert-demo-3", at: vnTime(10, 2, 23, 40), level: "red", situation: "Chuyển khoản lớn lúc nửa đêm, nội dung có chữ \"thuế\"", choice: "Để MSB gọi lại" },
+  { id: "alert-demo-1", at: vnTime(9, 12, 22, 24), level: "red", situation: "Vừa tất toán sổ rồi chuyển cho người nhận mới", choice: "Dừng lại" },
+  { id: "alert-demo-2", at: vnTime(9, 8, 21, 10), level: "yellow", situation: "Tên giống người quen, khác số tài khoản", choice: "Để tôi gọi" },
+  { id: "alert-demo-3", at: vnTime(9, 2, 23, 40), level: "red", situation: "Chuyển khoản lớn lúc nửa đêm, nội dung có chữ \"thuế\"", choice: "Để MSB gọi lại" },
 ];
 
 export const SECURITY_DEFAULTS: SecurityState = {
