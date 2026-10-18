@@ -120,6 +120,7 @@ export function MYourWidget() {
   }, [isOpen, insightParam, cif]);
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   const idRef = useRef(0);
   const titleId = useId();
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +152,7 @@ export function MYourWidget() {
   const loadHistory = useCallback(() => {
     setHistoryStatus("loading");
     setHistoryUnavailable(false);
+    setDeleteError(false);
     getChatHistory(cif)
       .then((res) => {
         setMessages(fromHistory(res.messages));
@@ -260,13 +262,16 @@ export function MYourWidget() {
   async function handleDelete() {
     if (deleting || voiceBusy) return;
     setDeleting(true);
+    setDeleteError(false);
     try {
       await deleteChatHistory(cif);
       // The server confirmed the delete — the transcript is empty as of this response,
       // so the chat is usable again right away (no arbitrary cooldown, plan 260927).
       setMessages([]);
     } catch {
-      // Nothing was actually deleted server-side — leave the transcript as is.
+      // Nothing was actually deleted server-side — leave the transcript as is, but say
+      // so: a silent no-op here reads as "bấm xoá vẫn hiện lịch sử" with no explanation.
+      setDeleteError(true);
     } finally {
       setDeleting(false);
     }
@@ -329,6 +334,12 @@ export function MYourWidget() {
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {historyStatus === "loading" && <Loading label="Đang tải hội thoại…" />}
+
+            {deleteError && (
+              <div role="alert" className="mb-3 rounded-2xl bg-negative-soft px-3.5 py-3 text-sm text-negative">
+                Không xoá được hội thoại lúc này. Lịch sử vẫn còn nguyên — bạn thử lại sau nhé.
+              </div>
+            )}
 
             {historyUnavailable && (
               <div role="alert" className="mb-3 rounded-2xl bg-warning-soft px-3.5 py-3 text-sm text-text">

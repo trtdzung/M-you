@@ -275,6 +275,7 @@ describe("MYourWidget", () => {
 
     expect(screen.getByText("Xin chào")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Không xoá được hội thoại lúc này");
   });
 
   it("closes the overlay with the close button by clearing ?assistant", async () => {
