@@ -1,21 +1,23 @@
 // Scam Shield signal engine: T1–T8 of the "AI Agent Fraud" spec (section 1),
-// each with the evidence it fired on. Pure: no React, no store, no DB — the
-// server builds `SignalContext` (signal-context.ts), tests and the confirm
-// screen can call this directly. Missing data never fires a signal.
+// plus two UC12 context patterns (many orders in one minute, spend over a
+// spending jar). Those two are evidence for the agent only — the level table
+// never reads them. Pure: no React, no store, no DB. Missing data never fires.
 
 import { normalizeText } from "@/components/settings/security/scan-message";
 import type { Transaction } from "@/domain/models";
 import { findBankByName } from "@/lib/transfer-banks";
 
-export type SignalCode = "T1" | "T1b" | "T2" | "T3" | "T4" | "T5" | "T6" | "T7a" | "T7b" | "T8";
-/** Spec column "Độ mạnh": Trung bình / Mạnh / Phụ (only raises a level). */
-export type SignalStrength = "medium" | "strong" | "aux";
+export type SignalCode = "T1" | "T1b" | "T2" | "T3" | "T4" | "T5" | "T6" | "T7a" | "T7b" | "T8" | "P3" | "P4";
+/** Spec column "Độ mạnh": Trung bình / Mạnh / Phụ (only raises a level). `context` is not in that table. */
+export type SignalStrength = "medium" | "strong" | "aux" | "context";
 export type SignalFacts = Record<string, number | string | boolean>;
 export type Signal = { code: SignalCode; strength: SignalStrength; evidence: string; facts: SignalFacts };
 
 export const SIGNAL_STRENGTH: Record<SignalCode, SignalStrength> = {
   T1: "medium", T1b: "medium", T2: "strong", T3: "medium", T4: "strong",
   T5: "strong", T6: "medium", T7a: "medium", T7b: "medium", T8: "aux",
+  // UC12 patterns (3) and (4). Context for the agent; resolveTransfer ignores them.
+  P3: "context", P4: "context",
 };
 
 const MINUTE_MS = 60 * 1000;
@@ -49,6 +51,9 @@ export const ALERT_RULES = {
   /** T7b with an outgoing transfer: credits received within this window, share sent on. */
   largeCreditWindowMs: 24 * HOUR_MS,
   passOnShare: 0.8,
+  /** UC12 context: outgoing orders inside one minute, including the one being judged. */
+  burstWindowMs: MINUTE_MS,
+  burstMinOrders: 3,
 } as const;
 
 // T8 memo keywords from the spec, matched on normalized (no-accent) text.
@@ -102,6 +107,11 @@ export type SignalContext = {
   usualCredit?: number | null;
   /** T8: a screen-sharing app is on (simulated). */
   screenSharing?: boolean;
+  /**
+   * UC12 «chi vượt hũ chi tiêu»: a spending jar whose month spend is already
+   * over its own limit. Omitted or null = not over (an unset limit is not zero).
+   */
+  jarOverspend?: { label: string; spent: number; limit: number } | null;
 };
 
 const VN_OFFSET_HOURS = 7;
@@ -279,6 +289,26 @@ function largeCreditSignal(ctx: SignalContext, now: number): Signal | null {
   });
 }
 
+/**
+ * UC12 «nhiều giao dịch liên tục trong 1 phút». Counts earlier outgoing orders
+ * in the window plus the one being judged. Context only: strength `context`.
+ */
+function burstSignal(ctx: SignalContext, now: number): Signal | null {
+  const recent = (ctx.transfersOut ?? []).filter(t => t.at <= now && now - t.at <= ALERT_RULES.burstWindowMs);
+  const count = recent.length + 1;
+  if (count < ALERT_RULES.burstMinOrders) return null;
+  return signal("P3", `Nhiều giao dịch liên tục trong 1 phút: ${count} lệnh. Ngữ cảnh cho agent, không đổi mức.`, { count });
+}
+
+/** UC12 «chi vượt hũ chi tiêu». The level table does not read P4. */
+function jarOverSignal(ctx: SignalContext): Signal | null {
+  const over = ctx.jarOverspend;
+  if (!over || over.label.trim() === "" || !(over.spent > over.limit)) return null;
+  return signal("P4", `Chi vượt hũ chi tiêu (${over.label}): đã tiêu ${fmtVnd(over.spent)}, hạn mức ${fmtVnd(over.limit)}. Ngữ cảnh cho agent, không đổi mức.`, {
+    label: over.label, spent: over.spent, limit: over.limit,
+  });
+}
+
 function contextSignal(ctx: SignalContext): Signal | null {
   const night = isNight(ctx.postedAt);
   const words = riskWords(ctx.memo);
@@ -294,16 +324,19 @@ function contextSignal(ctx: SignalContext): Signal | null {
 
 /**
  * Every signal for one transfer about to be confirmed. M-You protection off →
- * none. A trusted contact keeps only T2 (a listed account is flagged anyway).
+ * none. A trusted contact keeps T2 (a listed account is flagged anyway) and
+ * any P3/P4 context. P3/P4 never change the level.
  */
 export function computeSignals(ctx: SignalContext): Signal[] {
   if (!ctx.aiProtect) return [];
   const now = (ctx.now ?? ctx.postedAt).getTime();
+  // P3/P4 stay on the list for the agent. resolveTransfer never reads them.
+  const contextOnly = [burstSignal(ctx, now), jarOverSignal(ctx)].filter((s): s is Signal => s !== null);
   const out: Signal[] = [];
   if (ctx.warned) {
     out.push(signal("T2", `Tài khoản nhận nằm trong danh sách cảnh báo lừa đảo (${ctx.warned.level === "danger" ? "Nguy hiểm" : "Nghi ngờ"}, dữ liệu giả lập)`, { level: ctx.warned.level, note: ctx.warned.note ?? "" }));
   }
-  if (isTrustedRecipient(ctx.trusted, ctx.recipientName, ctx.recipientAccount, ctx.recipientBank)) return out;
+  if (isTrustedRecipient(ctx.trusted, ctx.recipientName, ctx.recipientAccount, ctx.recipientBank)) return [...out, ...contextOnly];
   const recipient = recipientSignals(ctx);
   out.push(...recipient);
   const extra = [
@@ -316,6 +349,7 @@ export function computeSignals(ctx: SignalContext): Signal[] {
     contextSignal(ctx),
   ];
   for (const s of extra) if (s) out.push(s);
+  out.push(...contextOnly);
   return out;
 }
 

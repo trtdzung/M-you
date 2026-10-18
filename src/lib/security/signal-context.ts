@@ -7,7 +7,12 @@ import "server-only";
  */
 
 import type { Transaction } from "@/domain/models";
+import { netExpenseByCategory } from "@/domain/engine/cashflow";
+import { categoryToJarMap } from "@/domain/engine/category-jars";
+import { ownedCategories, validBudgetLimit } from "@/domain/engine/jar-budget";
+import { dateToMonthKey, monthPeriodFromKey } from "@/domain/engine/types";
 import { readAccounts } from "@/lib/accounts-store";
+import { readJarConfig } from "@/lib/jars-store";
 import { readManualTxns } from "@/lib/manual-txns-store";
 import { readTransactions } from "@/lib/transactions-store";
 import { engineAlertTime, engineNow } from "./clock";
@@ -75,6 +80,24 @@ function usualCredit(history: Transaction[], now: number): number | null {
       && at < now - ALERT_RULES.baitWindowMs && at >= now - ALERT_RULES.historyDays * DAY_MS;
   });
   return regular.length ? regular.reduce((sum, t) => sum + t.amount, 0) / regular.length : null;
+}
+
+/**
+ * UC12 «chi vượt hũ chi tiêu»: the spending jar furthest over its own monthly
+ * limit. A jar with no limit (Tiết kiệm) is skipped — missing is not zero.
+ */
+function jarOverspend(cif: string, history: Transaction[], now: Date): { label: string; spent: number; limit: number } | null {
+  const config = readJarConfig(cif);
+  const spentByCategory = netExpenseByCategory(history, monthPeriodFromKey(dateToMonthKey(now)));
+  const owner = categoryToJarMap(config);
+  let hit: { label: string; spent: number; limit: number } | null = null;
+  for (const jar of config.jars) {
+    const limit = validBudgetLimit(jar.budgetLimit);
+    if (limit === null) continue;
+    const spent = ownedCategories(jar.id, jar.categoryIds, owner).reduce((sum, id) => sum + (spentByCategory.get(id) ?? 0), 0);
+    if (spent > limit && (!hit || spent - limit > hit.spent - hit.limit)) hit = { label: jar.label, spent, limit };
+  }
+  return hit;
 }
 
 function screenSharing(cif: string): boolean {
@@ -155,6 +178,7 @@ export function buildTransferContext(cif: string, review: TransferReview): Signa
       .map(e => ({ at: e.at, amount: e.payload.amount, recipient: { last4: e.payload.recipientLast4, bank: e.payload.recipientBank, name: e.payload.recipientName } })),
     ...moneyFacts(cif, base),
     screenSharing: screenSharing(cif),
+    jarOverspend: jarOverspend(cif, base.history, base.now),
   };
 }
 

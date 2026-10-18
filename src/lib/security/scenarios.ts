@@ -72,7 +72,7 @@ const CHANGE_WORDS: Record<string, string> = { device_login: "đăng nhập thi�
 const RED_ORDER: ScenarioId[] = ["DH4", "DH5", "DH6", "DH7", "DH-T5", "DH8"];
 const YELLOW_ORDER: ScenarioId[] = ["DH1", "DH3", "DH3-2", "DH2"];
 
-/** Spec section 2, row by row, for a transfer about to be confirmed. */
+/** Spec section 2, row by row. P3 and P4 are agent context and are not read here. */
 export function resolveTransfer(signals: Signal[]): TransferResolution {
   const t1 = !!has(signals, "T1");
   const t3 = !!has(signals, "T3");
