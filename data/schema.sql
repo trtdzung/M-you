@@ -261,3 +261,28 @@ INSERT OR IGNORE INTO warned_accounts (account, bank, level, note) VALUES
   ('9704000000000004', '', 'danger', 'Báo chuyển nhầm, nhờ chuyển trả sang tài khoản khác'),
   ('9704000000000005', 'Vietcombank', 'suspicious', 'Trúng thưởng, yêu cầu nộp phí nhận quà'),
   ('9704000000000006', '', 'suspicious', 'Giả danh người thân cấp cứu');
+
+-- Scam Shield engine (E08). One row per warning the engine decided to show
+-- (tooltip, banner, popup, full screen): the rule copy (spec wording), the agent
+-- copy when the fraud agent enriched it, and what the customer chose. Also the
+-- history the frequency rules ("1 lần/tháng", "không lặp trong 30 ngày") read.
+CREATE TABLE IF NOT EXISTS interventions (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  scenario TEXT NOT NULL,
+  level TEXT NOT NULL CHECK (level IN ('green', 'yellow', 'red')),
+  surface TEXT NOT NULL,
+  target TEXT NOT NULL,
+  dedupe_key TEXT,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'shown', 'answered', 'expired')),
+  context TEXT NOT NULL,
+  copy_rule TEXT NOT NULL,
+  copy_agent TEXT,
+  agent_status TEXT NOT NULL DEFAULT 'none',
+  countdown_sec INTEGER,
+  created_at INTEGER NOT NULL,
+  shown_at INTEGER,
+  answered_at INTEGER,
+  choice TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_interventions_cif_status ON interventions (cif, status);
