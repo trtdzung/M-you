@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
+import { ensureCcBrief } from "./cc-brief";
 import { engineNow } from "./clock";
 import { recordEvent } from "./events";
 import { findOpenByDedupe, insertIntervention } from "./intervention-store";
@@ -37,6 +38,7 @@ export function lockEmergency(cif: string) {
     writeProfile(cif, state);
     recordEvent(cif, "account_locked", {}, now);
     recordEvent(cif, "case_opened", { caseId: randomUUID() }, now);
+    try { ensureCcBrief(cif); } catch { console.error("SC1 cc brief failed"); }
     return state;
   })();
 }

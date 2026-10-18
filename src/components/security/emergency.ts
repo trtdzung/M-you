@@ -16,3 +16,17 @@ export async function requestEmergency(cif: string, action: "enter" | "lock"): P
     return null;
   }
 }
+
+/** Latest simulated CC/RM summary, written only after the account is locked. */
+export async function loadEmergencyBrief(cif: string): Promise<string | null> {
+  try {
+    const response = await fetch("/api/security/emergency", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, action: "brief" }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    return typeof result.brief?.summary === "string" ? result.brief.summary : null;
+  } catch {
+    return null;
+  }
+}

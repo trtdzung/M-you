@@ -23,6 +23,8 @@ export type SecurityEventPayloads = {
   account_locked: Record<string, never>;
   case_opened: { caseId: string };
   family_push: { message: string; scenario?: string; contactIds?: string[] };
+  /** Simulated handoff of the emergency summary to priority CC/RM. No balances. */
+  cc_brief: { summary: string; caseId: string | null };
 };
 
 export type SecurityEventType = keyof SecurityEventPayloads;
@@ -30,7 +32,7 @@ export type SecurityEventType = keyof SecurityEventPayloads;
 export const SECURITY_EVENT_TYPES = [
   "incoming_credit", "transfer_out", "fd_settled", "locked_jar_withdrawn", "device_login", "password_changed", "devices_signed_out",
   "phone_changed", "screen_share_on", "screen_share_off", "app_open", "hub_open", "transfer_screen_open",
-  "recipient_entered", "intervention_shown", "intervention_answered", "account_locked", "case_opened", "family_push",
+  "recipient_entered", "intervention_shown", "intervention_answered", "account_locked", "case_opened", "family_push", "cc_brief",
 ] as const satisfies readonly SecurityEventType[];
 
 export type SecurityEvent<T extends SecurityEventType = SecurityEventType> = {

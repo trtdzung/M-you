@@ -8,7 +8,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts } from "@/state/security/selectors";
 import { usePersona } from "@/providers/context";
-import { requestEmergency } from "@/components/security/emergency";
+import { loadEmergencyBrief, requestEmergency } from "@/components/security/emergency";
 import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
 import { SourceLine } from "@/components/security/InterventionCopy";
 import { Notice } from "../../settings-ui";
@@ -32,7 +32,14 @@ export function SosScreen() {
   const { persona } = usePersona();
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [brief, setBrief] = useState<string | null>(null);
   useEffect(() => { void requestEmergency(persona.cif, "enter").then(ok => setError(!ok)); }, [persona.cif]);
+  useEffect(() => {
+    if (!security.accountLocked) { setBrief(null); return; }
+    let live = true;
+    void loadEmergencyBrief(persona.cif).then(summary => { if (live) setBrief(summary); });
+    return () => { live = false; };
+  }, [persona.cif, security.accountLocked, security.accountLockedAt]);
   async function confirmLock() {
     setBusy(true);
     const state = await requestEmergency(persona.cif, "lock");
@@ -68,6 +75,7 @@ export function SosScreen() {
     </Step>
     <Step n={3} title="Nói chuyện với tổng đài viên">
       <p className="text-muted">M-You soạn sẵn tóm tắt, bạn không cần kể lại từ đầu.</p>
+      {brief && <p className="mt-3 text-sm leading-relaxed" role="status">{brief}</p>}
       <a href="tel:1900545426" className={`${redButton} mt-3`}><Phone size={18} aria-hidden />{SCENARIO_COPY.SC1.chips[2]}</a>
     </Step>
     {contacts.length > 0
