@@ -80,7 +80,7 @@ describe("AutoFundResultBanner", () => {
   it("names the donor the engine actually charged, with the amount it moved", async () => {
     render(<Scenario />, { wrapper });
     expect(await screen.findByText(/từ Hũ Dự phòng → Ăn uống/)).toBeInTheDocument();
-    expect(screen.getByText("500.000 ₫")).toBeInTheDocument();
+    expect(screen.getByText("500,000 VND")).toBeInTheDocument();
     expect(store.rebalances).toHaveLength(1);
     expect(store.rebalances[0].rebalance).toMatchObject({ fromJarId: "buf", toJarId: "food" });
   });

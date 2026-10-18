@@ -28,7 +28,7 @@ export interface MockExecutedTransfer {
   source: DataSource; // always "mock" — never presented as a real MSB transfer
 }
 
-/** Comma-grouped, "VND" suffix — matches the real MSB receipt screen exactly (the rest of the app uses "₫"/period-grouping; this one screen deliberately doesn't). */
+/** Comma-grouped amount, consistent with the simulated app. */
 function formatVndComma(amount: number): string {
   return new Intl.NumberFormat("en-US").format(amount);
 }
@@ -72,36 +72,36 @@ export function TransferSuccess({
   const memoText = done.memo ?? `${toPlainUpper(done.senderName)} chuyen tien`;
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center justify-between px-4 pb-2 pt-[calc(var(--safe-area-top)+0.25rem)]">
+    <div className="transfer-receipt flex min-h-full flex-col">
+      <header className="flex shrink-0 items-center justify-between px-4 pb-6 pt-[calc(var(--safe-area-top)+0.25rem)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/msb-logo.png" alt="MSB" className="h-7 w-auto" />
+        <img src="/brand/msb-logo.png" alt="MSB" className="h-8 w-auto" />
         <button
           type="button"
           onClick={() => router.push("/")}
           aria-label="Về trang chủ"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-text transition-colors hover:bg-surface/80"
         >
           <Home size={20} strokeWidth={2} />
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-        <Card className="flex flex-col" padding="none">
-          <div className="flex items-start gap-3 px-5 pt-5 pb-4">
+      <div className="flex flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
+        <Card className="transfer-card flex flex-col overflow-hidden" padding="none">
+          <div className="flex items-start gap-3 px-5 pt-6 pb-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon_success.png" alt="" aria-hidden className="mt-0.5 h-10 w-10 shrink-0" />
+            <img src="/icon_success.png" alt="" aria-hidden className="mt-0.5 h-14 w-14 shrink-0" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-positive">Chuyển tiền thành công</p>
+              <p className="text-lg font-semibold text-positive">Chuyển tiền thành công</p>
               <p className="mt-1 tabular-nums text-text">
-                <span className="text-2xl font-bold">{formatVndComma(done.amount)}</span>{" "}
-                <span className="text-base text-muted">{done.currency}</span>
+                <span className="text-[28px] font-bold">{formatVndComma(done.amount)}</span>{" "}
+                <span className="text-[24px] font-semibold text-muted">{done.currency}</span>
               </p>
-              <p className="mt-0.5 text-xs text-muted">{formatDateTime(done.executedAt)}</p>
+              <p className="mt-1 text-sm text-muted">{formatDateTime(done.executedAt)}</p>
             </div>
           </div>
 
-          <div className="flex flex-col divide-y divide-border border-t border-border">
+          <div className="mx-5 flex flex-col border-t border-[#dfe5ee]">
             <Row label="Người nhận">
               <div className="flex items-center gap-2.5">
                 {recipientBank ? (
@@ -116,8 +116,8 @@ export function TransferSuccess({
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-[15px] font-bold text-text">{toPlainUpper(done.recipientName)}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted">
+                  <p className="truncate text-base font-bold text-text">{toPlainUpper(done.recipientName)}</p>
+                  <p className="mt-1 truncate text-sm text-muted">
                     {done.recipientBankName && <span>{done.recipientBankName} · </span>}
                     <span className="tabular-nums">{done.recipientAccountNumber ?? done.recipientAccountMasked}</span>
                   </p>
@@ -127,14 +127,14 @@ export function TransferSuccess({
             <Row label="Người chuyển">
               <div className="flex items-center gap-2.5">
                 {senderBank && <BankLogo bank={senderBank} />}
-                <p className="truncate text-[15px] font-bold text-text">{toPlainUpper(done.senderName)}</p>
+                <p className="truncate text-base font-bold text-text">{toPlainUpper(done.senderName)}</p>
               </div>
             </Row>
-            <Row label="Nội dung">
-              <p className="text-sm text-text">{memoText}</p>
+            <Row label="Nội dung chuyển tiền">
+              <p className="text-base font-medium text-text">{memoText}</p>
             </Row>
             <Row label="Phí (bao gồm VAT)">
-              <p className="text-sm text-text">Miễn phí</p>
+              <p className="text-base font-medium text-text">Miễn phí</p>
             </Row>
           </div>
 
@@ -153,14 +153,14 @@ export function TransferSuccess({
           <button
             type="button"
             onClick={() => setShowDetails((v) => !v)}
-            className="flex items-center justify-center gap-1 border-b border-border py-3 text-sm font-semibold text-primary"
+            className="flex items-center justify-center gap-1 border-b border-border py-4 text-base font-semibold text-primary"
           >
             {showDetails ? "Ẩn chi tiết" : "Chi tiết giao dịch"}
             {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
 
           {showDetails && (
-            <div className="flex flex-col divide-y divide-border border-b border-border">
+            <div className="mx-5 flex flex-col divide-y divide-border border-b border-border">
               <Row label="Hình thức">
                 <p className="text-sm text-text">Chuyển nhanh 24/7</p>
               </Row>
@@ -173,30 +173,32 @@ export function TransferSuccess({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2 px-5 py-4">
-            <button type="button" onClick={() => {}} className="flex flex-col items-center gap-1.5 text-primary">
-              <Share2 size={20} strokeWidth={1.8} />
-              <span className="text-xs font-medium text-text">Chia sẻ</span>
-            </button>
+          <div className="flex justify-center px-5 py-5">
             <button
               type="button"
               onClick={onSaveRecipient}
               disabled={recipientSaved}
               className="flex flex-col items-center gap-1.5 text-primary disabled:text-positive"
             >
-              <UserPlus size={20} strokeWidth={1.8} />
-              <span className="text-xs font-medium text-text">{recipientSaved ? "Đã lưu" : "Lưu người nhận"}</span>
+              <UserPlus size={28} strokeWidth={1.8} />
+              <span className="text-sm font-medium text-text">{recipientSaved ? "Đã lưu" : "Lưu người nhận"}</span>
             </button>
           </div>
         </Card>
 
-        <button
-          type="button"
-          onClick={() => router.push("/transfer")}
-          className="mt-4 flex h-13 w-full items-center justify-center rounded-full bg-primary text-base font-bold text-primary-fg"
-        >
-          Giao dịch khác
-        </button>
+        <div className="mt-auto grid grid-cols-2 gap-4 pt-4">
+          <button type="button" onClick={() => {}} className="flex min-h-12 items-center justify-center gap-2 rounded-[9px] border border-primary bg-white text-base font-semibold text-primary">
+            <Share2 size={18} />
+            Chia sẻ
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/transfer")}
+            className="login-submit"
+          >
+            Giao dịch khác
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -204,8 +206,8 @@ export function TransferSuccess({
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 px-4 py-3">
-      <span className="text-xs text-muted">{label}</span>
+    <div className="flex flex-col gap-2 py-3">
+      <span className="text-[15px] text-muted">{label}</span>
       {children}
     </div>
   );
