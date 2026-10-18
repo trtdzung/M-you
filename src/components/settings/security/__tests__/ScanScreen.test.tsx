@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { takeInsightDraft } from "@/insights/proactive/chat-handoff";
+import { takePendingChatMessage } from "@/insights/proactive/chat-handoff";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -18,12 +18,12 @@ describe("Kiểm tra tin nhắn lạ → chat", () => {
     type("0912345678");
     expect(screen.getByText(/Nhận diện: số điện thoại/i)).toBeInTheDocument();
   });
-  it("sends the typed prompt to the M-You chat instead of scanning locally", () => {
+  it("opens the M-You chat and queues exactly the typed question, without insight params", () => {
     render(<ScanScreen />);
     type("0912345678");
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra" }));
-    expect(push).toHaveBeenCalledWith("/pfm?assistant=1&insight=1");
-    expect(takeInsightDraft("CIF_0001")?.draft).toBe("Kiểm tra bảo mật cho số điện thoại sau: 0912345678");
+    expect(push).toHaveBeenCalledWith("/pfm?assistant=1");
+    expect(takePendingChatMessage("CIF_0001")).toBe("Kiểm tra bảo mật cho số điện thoại sau: 0912345678");
   });
   it("disables the button when empty", () => {
     render(<ScanScreen />);

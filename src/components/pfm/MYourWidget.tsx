@@ -29,7 +29,7 @@ import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
 import { ClarifyAnswerBubble } from "./ClarifyAnswerBubble";
 import { StatusBar } from "@/components/shell/StatusBar";
-import { takeInsightDraft } from "@/insights/proactive/chat-handoff";
+import { takeInsightDraft, takePendingChatMessage } from "@/insights/proactive/chat-handoff";
 import { resetPreferenceSeed, withPreferenceSeed } from "@/lib/agent-preference-seed";
 import { useAgentPreferences } from "@/state/agent-preferences";
 import { AgentPreferencesSheet } from "./AgentPreferencesSheet";
@@ -131,6 +131,9 @@ export function MYourWidget() {
       setInputVisible(payload.visibleText); // only the question → shown in UI
     }
   }, [isOpen, insightParam, cif]);
+  // A question queued by another screen (e.g. Cài đặt › Kiểm tra tin nhắn lạ): sent into THIS thread as an
+  // ordinary customer turn once the history has loaded, so the reload cannot wipe its bubble.
+  const [pendingSend, setPendingSend] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
@@ -171,6 +174,8 @@ export function MYourWidget() {
     getChatHistory(cif)
       .then((res) => {
         setMessages(fromHistory(res.messages));
+        const queued = takePendingChatMessage(cif);
+        if (queued) setPendingSend(queued);
         setHistoryStatus("ready");
       })
       .catch(() => {
@@ -179,6 +184,8 @@ export function MYourWidget() {
         // temporary agent outage does not prevent local STT verification.
         setMessages([]);
         setHistoryUnavailable(true);
+        const queued = takePendingChatMessage(cif);
+        if (queued) setPendingSend(queued);
         setHistoryStatus("ready");
       });
   }, [cif]);
@@ -253,6 +260,12 @@ export function MYourWidget() {
       setSending(false);
     }
   }
+
+  useEffect(() => {
+    if (pendingSend === null || composerDisabled || voiceBusy) return;
+    setPendingSend(null);
+    void postMessage(pendingSend);
+  });
 
   async function send() {
     const text = input.trim();

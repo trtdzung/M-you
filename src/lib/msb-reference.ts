@@ -46,10 +46,12 @@ function statusOf(p: Promotion, now: Date): PromotionStatus {
   return day < p.startDate ? "upcoming" : day > p.endDate ? "expired" : "active";
 }
 export function listPromotions(filter: { q?: string; status?: PromotionStatus }, now: Date) {
-  const q = filter.q ? fold(filter.q) : "";
+  const q = filter.q ? fold(filter.q).trim() : "";
+  // Whole-word match: plain `includes` let "hoan tien" hit "kho(an tien)" inside "khoản tiền gửi".
+  const keyword = q ? new RegExp(`(?<![a-z0-9])${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")}(?![a-z0-9])`) : null;
   return promotions
     .map((p) => ({ ...p, status: statusOf(p, now) }))
-    .filter((p) => (!filter.status || p.status === filter.status) && (!q || fold(`${p.name} ${p.summary}`).includes(q)));
+    .filter((p) => (!filter.status || p.status === filter.status) && (!keyword || keyword.test(fold(`${p.name} ${p.summary}`))));
 }
 
 export function listChannels(type?: ChannelType) {

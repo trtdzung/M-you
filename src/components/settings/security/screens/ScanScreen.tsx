@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { saveChatDraft } from "@/insights/proactive/chat-handoff";
+import { savePendingChatMessage } from "@/insights/proactive/chat-handoff";
 import { pushWithTransition } from "@/lib/view-transition";
 import { usePersona } from "@/providers/context";
 import { Action } from "../../settings-ui";
@@ -15,7 +15,7 @@ const SAMPLES = [
   "Cuc thue thong bao ong/ba co khoan no thue, de nghi cung cap ma OTP de xac minh.",
 ];
 
-/** Settings › Kiểm tra tin nhắn lạ: classifies the pasted text and hands the question to the M-You chat. */
+/** Settings › Kiểm tra tin nhắn lạ: classifies the pasted text and queues the question for the current M-You chat. */
 export function ScanScreen() {
   const { persona } = usePersona();
   const router = useRouter();
@@ -24,9 +24,9 @@ export function ScanScreen() {
   const kind = text.trim() ? classifyScanInput(text) : null;
 
   const check = () => {
-    if (!saveChatDraft(persona.cif, buildScanPrompt(text))) { setError("Chưa mở được khung chat. Vui lòng thử lại."); return; }
+    if (!savePendingChatMessage(persona.cif, buildScanPrompt(text))) { setError("Chưa mở được khung chat. Vui lòng thử lại."); return; }
     setError("");
-    pushWithTransition((href) => router.push(href), "/pfm?assistant=1&insight=1");
+    pushWithTransition((href) => router.push(href), "/pfm?assistant=1");
   };
 
   return <>

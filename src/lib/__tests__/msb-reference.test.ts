@@ -16,6 +16,11 @@ describe("promotions", () => {
     expect(listPromotions({ q: "hoan tien", status: "active" }, NOW).map((p) => p.id)).toEqual(["promo-card-dining-2026q3"]);
     expect(listPromotions({ q: "khong co chuong trinh nay" }, NOW)).toEqual([]);
   });
+  it("matches whole words only, so \"hoàn tiền\" does not hit \"khoản tiền gửi\"", () => {
+    const ids = listPromotions({ q: "hoàn tiền" }, NOW).map((p) => p.id);
+    expect(ids).toContain("promo-card-dining-2026q3");
+    expect(ids).not.toContain("promo-saving-open-2026q4");
+  });
 });
 
 describe("normalizeValue", () => {
