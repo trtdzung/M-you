@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-const groupFormatter = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+const groupFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 /** Digits only → whole VND, or `null` when empty (thousand dots are display-only). */
 export function parseAmountInput(text: string): number | null {
@@ -58,7 +58,7 @@ export function JarTransferAmountField({
           aria-describedby={error ? errorId : undefined}
           className="h-12 min-w-0 flex-1 bg-transparent text-lg font-semibold tabular-nums text-text outline-none"
         />
-        <span className="text-sm text-muted">₫</span>
+        <span className="text-sm text-muted">VND</span>
       </div>
       {error && (
         <p id={errorId} role="alert" className="text-xs text-negative">

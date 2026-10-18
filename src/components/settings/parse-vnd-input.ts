@@ -14,7 +14,7 @@ export type VndInputResult =
   | { kind: "ok"; value: number }
   | { kind: "error"; message: string };
 
-export const VND_INPUT_FORMAT_ERROR = "Chỉ nhập số tiền, vd 5.000.000";
+export const VND_INPUT_FORMAT_ERROR = "Chỉ nhập số tiền, vd 5,000,000";
 export const VND_INPUT_NEGATIVE_ERROR = "Không được âm";
 export const VND_INPUT_TOO_LARGE_ERROR = "Số tiền quá lớn";
 
@@ -26,7 +26,7 @@ export function parseVndInput(raw: string): VndInputResult {
   const text = raw
     .replace(/[  ]/g, " ")
     .trim()
-    .replace(/\s*[₫đ]$/i, "")
+    .replace(/\s*(?:VND|[₫đ])$/i, "")
     .trim();
   if (text === "") return { kind: "empty" };
   if (text.startsWith("-")) return { kind: "error", message: VND_INPUT_NEGATIVE_ERROR };

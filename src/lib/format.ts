@@ -7,7 +7,7 @@
 export const UNKNOWN = "unknown" as const;
 export type MaybeAmount = number | typeof UNKNOWN | null | undefined;
 
-const vndFormatter = new Intl.NumberFormat("vi-VN", {
+const vndFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
@@ -22,12 +22,12 @@ export function isUnknownAmount(amount: MaybeAmount): boolean {
 }
 
 /**
- * Format a number as VND, e.g. 1250000 -> "1.250.000 ₫".
+ * Format a number as VND, e.g. 1250000 -> "1,250,000 VND".
  * Unknown values return the em dash placeholder.
  */
 export function formatVnd(amount: MaybeAmount): string {
   if (isUnknownAmount(amount)) return "—";
-  return `${vndFormatter.format(amount as number)} ₫`;
+  return `${vndFormatter.format(amount as number)} VND`;
 }
 
 /** Compact VND for tight spaces, e.g. 1250000 -> "1,25 tr". */
@@ -45,7 +45,7 @@ export function formatVndCompact(amount: MaybeAmount): string {
   if (abs >= 1_000) {
     return `${sign}${trim(abs / 1_000)}K`;
   }
-  return `${sign}${vndFormatter.format(abs)} ₫`;
+  return `${sign}${vndFormatter.format(abs)} VND`;
 }
 
 function trim(n: number): string {
@@ -68,7 +68,7 @@ export function formatVndUnit(amount: MaybeAmount): string {
   if (abs >= 1_000_000_000) return `${sign}${trim(abs / 1_000_000_000)} Tỷ`;
   if (abs >= 1_000_000) return `${sign}${trim(abs / 1_000_000)} Tr`;
   if (abs >= 1_000) return `${sign}${trim(abs / 1_000)} N`;
-  return `${sign}${vndFormatter.format(abs)} ₫`;
+  return `${sign}${vndFormatter.format(abs)} VND`;
 }
 
 /**

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatVnd } from "@/lib/format";
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Eye, EyeOff } from "lucide-react";
@@ -58,7 +59,7 @@ export function AccountSummaryCard({
                 <span className="text-muted">VND</span>
               </span>
             ) : (
-              <span>{balance === null ? "Chưa có dữ liệu số dư" : `${balance.toLocaleString("en-US")} VND`}</span>
+              <span>{balance === null ? "Chưa có dữ liệu số dư" : formatVnd(balance)}</span>
             )}
           </p>
         </div>

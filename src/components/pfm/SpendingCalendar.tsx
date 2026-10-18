@@ -31,7 +31,7 @@ function compactSpend(amount: number): string {
   if (abs >= 1_000_000_000) return `-${COMPACT_NUMBER.format(abs / 1_000_000_000)}Tỷ`;
   if (abs >= 1_000_000) return `-${COMPACT_NUMBER.format(abs / 1_000_000)}Tr`;
   if (abs >= 1_000) return `-${COMPACT_NUMBER.format(abs / 1_000)}K`;
-  return `-${Math.round(abs)}₫`;
+  return `-${Math.round(abs)} VND`;
 }
 
 /** Daily totals use the same posted, refund, transfer, and rebalance rules as cashflow. */

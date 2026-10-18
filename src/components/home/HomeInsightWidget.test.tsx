@@ -34,7 +34,7 @@ describe("Home insight notification", () => {
     expect(push).toHaveBeenCalledWith("/pfm?assistant=1&insight=1");
     expect(takeInsightDraft("CIF_0002")).toBeNull();
     const payload = takeInsightDraft(cif);
-    expect(payload?.draft).toContain("51.000");
+    expect(payload?.draft).toContain("51,000 VND");
     expect(takeInsightDraft(cif)).toBeNull();
   });
   it("sends no session topups — jar deposits are persisted in jar_ledger and read server-side", async () => {
