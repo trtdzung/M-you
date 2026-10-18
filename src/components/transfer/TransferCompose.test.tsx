@@ -75,6 +75,14 @@ beforeEach(() => {
 });
 
 describe("TransferCompose", () => {
+  it("opens the existing recipient picker from the account-number contact button", async () => {
+    render(<TransferCompose />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chọn người nhận đã lưu hoặc gần đây" }));
+    expect(screen.getByRole("tab", { name: "Đã lưu" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Gần đây" })).toBeInTheDocument();
+  });
+
   it("hands a validated saved recipient to mock confirmation without an account number", async () => {
     render(<TransferCompose />);
     fireEvent.click(await screen.findByRole("button", { name: /Lan Anh/ }));

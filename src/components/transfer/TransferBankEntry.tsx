@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, IdCard } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { maskAccount } from "@/lib/mask-account";
 import { ACCOUNT_NUMBER_PATTERN, findBank } from "@/lib/transfer-banks";
@@ -16,8 +16,10 @@ import type { SelectedRecipient } from "./RecipientPicker";
  */
 export function TransferBankEntry({
   onContinue,
+  onChooseRecipient,
 }: {
   onContinue: (recipient: SelectedRecipient) => void;
+  onChooseRecipient: () => void;
 }) {
   const [bankId, setBankId] = useState<string | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
@@ -73,6 +75,9 @@ export function TransferBankEntry({
               aria-invalid={accountNumber.length > 0 && !accountValid}
               className="min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-muted"
             />
+            <button type="button" onClick={onChooseRecipient} aria-label="Chọn người nhận đã lưu hoặc gần đây" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text focus-visible:outline-2 focus-visible:outline-primary">
+              <IdCard size={22} aria-hidden />
+            </button>
           </div>
           {accountNumber.length > 0 && !accountValid && (
             <p className="mt-1.5 text-xs text-negative">Số tài khoản/thẻ cần có 8–19 chữ số.</p>
