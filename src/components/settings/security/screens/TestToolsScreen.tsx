@@ -4,6 +4,7 @@ import { useSecurityStore } from "@/state/security/store";
 import { Notice } from "../../settings-ui";
 import { SecurityLoading } from "../SecurityLoading";
 import { AlertHourPanel } from "../test-tools/AlertHourPanel";
+import { AlertLogPanel } from "../test-tools/AlertLogPanel";
 import { PresetPanel } from "../test-tools/PresetPanel";
 import { ResetPanel } from "../test-tools/ResetPanel";
 import { ScenarioPanel } from "../test-tools/ScenarioPanel";
@@ -23,5 +24,6 @@ export function TestToolsScreen() {
     <ScenarioPanel />
     <ResetPanel />
     <SkipWaitPanel />
+    <AlertLogPanel />
   </>;
 }
