@@ -18,6 +18,8 @@ import { CoachTranscript } from "../coach/CoachTranscript";
 import { GoalAdvisorCard } from "../advisor/GoalAdvisorCard";
 import { GOALS_COPY } from "../copy";
 import { primaryButton, secondaryButton } from "../styles";
+import { ConfirmPlan } from "../advisor/ConfirmPlan";
+import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
 import { CreateGoalFlow } from "./CreateGoalFlow";
 
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
@@ -30,6 +32,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const advisor = useGoalAdvisor(analyzeDraft, draftKey);
   const narration = useAdvisorNarration(analyzeDraft ? draftKey : null, analyzeDraft?.name ?? null, advisor.analysis);
   // The form opens with the plan the customer picked (its date/amount), not the raw draft.
+  const chosenPlanId = advisor.selectedPlanId;
   const chosen = advisor.view.analysis && advisor.selectedPlanId ? advisor.view.analysis.plans[advisor.selectedPlanId] : null;
   const reviewPrefill = coach.draft
     ? chosen && analyzeDraft
@@ -42,6 +45,9 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
       : draftToForm(coach.draft, transferNow())
     : null;
   const [reviewing, setReviewing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const { create, pending: creating } = useGoalMutations();
   const [manual, setManual] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
@@ -50,6 +56,8 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const busy = coach.phase === "asking" || coach.phase === "answering";
   const restart = () => {
     setReviewing(false);
+    setConfirming(false);
+    setConfirmError(null);
     setManual(false);
     setMenuOpen(false);
     setConfirmNew(false);
@@ -79,6 +87,24 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         {coach.draft && <p className="text-sm text-text">{GOALS_COPY.coach.draftReady}</p>}
       </div>
     );
+  }
+
+  // Writes only on an explicit confirm; the idempotency key makes a second press harmless.
+  async function confirmCreate() {
+    if (!chosen || !chosenPlanId || !analyzeDraft || !coach.requestId) return;
+    setConfirmError(null);
+    const res = await create({
+      name: analyzeDraft.name,
+      targetAmount: chosen.targetAmount,
+      targetDate: chosen.targetDate,
+      flexibility: analyzeDraft.flexibility,
+      monthlyContribution: chosen.monthly > 0 ? chosen.monthly : null,
+      openingAmount: analyzeDraft.openingAmount > 0 ? analyzeDraft.openingAmount : null,
+      requestKey: `coach:${coach.requestId}:${chosenPlanId}`,
+    });
+    if (!res) return;
+    if (res.ok) done();
+    else setConfirmError(res.error ?? Object.values(res.errors ?? {})[0] ?? "");
   }
 
   const done = () => {
@@ -132,7 +158,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           onOverrides={advisor.setOverrides}
           selectedPlanId={advisor.selectedPlanId}
           onSelectPlan={advisor.selectPlan}
-          onReview={() => setReviewing(true)}
+          onReview={() => (chosenPlanId && chosen ? setConfirming(true) : setReviewing(true))}
           narration={narration}
           followUp={{ status: coach.adjustStatus, onSubmit: (text) => void coach.adjust(text, toCurrentDraft(analyzeDraft, transferNow())) }}
         />
@@ -145,6 +171,26 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         <p className="mt-3 text-[13px] leading-5 text-muted">M-You đã điền thông tin từ cuộc trò chuyện. Bạn kiểm tra và chỉnh sửa trước khi lưu.</p>
         <button type="button" className={`${primaryButton} mt-4 w-full`} onClick={() => setReviewing(true)}>Kiểm tra và tạo mục tiêu</button>
       </section>}
+      {confirming && chosen && analyzeDraft && (
+        <ConfirmPlan
+          values={{
+            name: analyzeDraft.name,
+            targetAmount: chosen.targetAmount,
+            targetDate: chosen.targetDate,
+            flexibility: analyzeDraft.flexibility,
+            openingAmount: analyzeDraft.openingAmount,
+            monthly: chosen.monthly,
+            sourceHint: chosen.fundingFromJars[0]
+              ? GOALS_COPY.advisor.confirm.jar(chosen.fundingFromJars[0].label)
+              : chosen.fundingFromIdle > 0 ? GOALS_COPY.advisor.confirm.idle : null,
+          }}
+          pending={creating}
+          error={confirmError}
+          onConfirm={() => void confirmCreate()}
+          onEdit={() => { setConfirming(false); setReviewing(true); }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
       {coach.draft && reviewPrefill && reviewing && (
         <CreateGoalFlow
           prefill={reviewPrefill}
