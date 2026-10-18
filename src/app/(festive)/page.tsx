@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { AnniversaryHero } from "@/components/home/AnniversaryHero";
 import { HomeHeader } from "@/components/shell/HomeHeader";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
@@ -9,36 +9,34 @@ import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
 import { HomeInsightWidget } from "@/components/home/HomeInsightWidget";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
-import { useFinancials } from "@/state/useFinancials";
+import { useProviders } from "@/providers/context";
+import type { Providers } from "@/providers";
 
 export default function HomePage() {
-  const { loading, error, raw } = useFinancials();
-
-  const primary = useMemo(
-    () => raw?.accounts.find((a) => a.type === "current") ?? null,
-    [raw],
-  );
+  const providers = useProviders();
+  const [result, setResult] = useState<{ provider: Providers; accounts: Awaited<ReturnType<Providers["listAccounts"]>>; error: boolean } | null>(null);
+  useEffect(() => {
+    let active = true;
+    providers.listAccounts().then(accounts => {
+      if (active) setResult({ provider: providers, accounts, error: false });
+    }).catch(() => {
+      if (active) setResult({ provider: providers, accounts: [], error: true });
+    });
+    return () => { active = false; };
+  }, [providers]);
+  // Never show the previous customer's balance while the provider switches.
+  const current = result?.provider === providers ? result : null;
+  const primary = current?.accounts.find(a => a.type === "current") ?? null;
 
   return (
     <div>
       <HomeHeader notifications={9} />
       <AnniversaryHero />
 
-      {loading && (
-        <div className="flex flex-col gap-4">
-          <SkeletonCard className="h-32" />
-          <SkeletonCard className="h-56" />
-          <SkeletonCard className="h-28" />
-        </div>
-      )}
-
-      {error && <ErrorState />}
-
-      {!loading && !error && (
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
           <HomeInsightWidget />
 
-          {primary ? (
+          {!current ? <SkeletonCard className="h-32" /> : current.error ? <ErrorState /> : primary ? (
             <AccountSummaryCard
               tier={primary.tier ?? "MSB"}
               maskedNumber={primary.maskedNumber}
@@ -79,7 +77,6 @@ export default function HomePage() {
             ]}
           />
         </div>
-      )}
     </div>
   );
 }
