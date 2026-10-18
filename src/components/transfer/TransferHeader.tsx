@@ -24,7 +24,7 @@ export function TransferHeader({
   onRightClick?: () => void;
 }) {
   return (
-    <header className="flex items-center gap-2 px-4 pb-5 pt-[calc(var(--safe-area-top)+0.25rem)]">
+    <header className="transfer-header flex items-center gap-2 px-4 pb-5 pt-[calc(var(--safe-area-top)+0.25rem)]">
       <button
         type="button"
         onClick={onBack}

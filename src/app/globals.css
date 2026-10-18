@@ -501,3 +501,39 @@ body {
   font-size: 15px;
   font-weight: 600;
 }
+
+/* Transfer chrome follows the simulated settings screens; controls retain their handlers. */
+.transfer-shell { color: #10284b; }
+.transfer-header { min-height: 64px; margin-bottom: 12px; }
+.transfer-shell .transfer-card {
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: none;
+}
+.transfer-shell input:focus-visible,
+.transfer-shell div:has(> input):focus-within {
+  outline: 2px solid #ff9b60;
+  outline-offset: 1px;
+}
+.transfer-shell input::placeholder { color: #a5adbc; }
+.transfer-shell .login-submit:disabled {
+  background: #c3c8d1;
+  color: #fff;
+  opacity: 1;
+}
+.transfer-sheet {
+  border-radius: 24px 24px 0 0;
+  padding-left: 16px;
+  padding-right: 16px;
+  box-shadow: none;
+}
+.transfer-sheet > div:first-child {
+  align-items: center;
+  margin-left: -16px;
+  margin-right: -16px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid #dfe5ee;
+}
+.transfer-sheet h2 { font-size: 20px; font-weight: 700; color: #10284b; }
+.transfer-sheet > div:first-child > button { color: #10284b; }
+.transfer-sheet input:focus-visible { outline: 2px solid #ff9b60; outline-offset: 1px; }

@@ -66,9 +66,9 @@ export function TransferSaveRecipient({
         ‹ Quay lại
       </button>
 
-      <Card className="flex flex-col gap-4">
+      <Card className="transfer-card flex flex-col gap-4">
         <div>
-          <label className="mb-2 block text-[13px] font-medium text-text">Ngân hàng nhận</label>
+          <label className="mb-2 block text-[15px] font-medium text-text">Ngân hàng nhận</label>
           <button
             type="button"
             onClick={() => setBankSheetOpen(true)}
@@ -84,7 +84,7 @@ export function TransferSaveRecipient({
         </div>
 
         <div>
-          <label htmlFor="xfer-save-account" className="mb-2 block text-[13px] font-medium text-text">
+          <label htmlFor="xfer-save-account" className="mb-2 block text-[15px] font-medium text-text">
             Số tài khoản/Số thẻ
           </label>
           <input
@@ -103,7 +103,7 @@ export function TransferSaveRecipient({
 
         {accountValid && (
           <div>
-            <label htmlFor="xfer-save-name" className="mb-2 block text-[13px] font-medium text-text">
+            <label htmlFor="xfer-save-name" className="mb-2 block text-[15px] font-medium text-text">
               Tên người nhận
             </label>
             <input
@@ -116,7 +116,7 @@ export function TransferSaveRecipient({
         )}
 
         <div>
-          <label htmlFor="xfer-nickname" className="mb-2 block text-[13px] font-medium text-text">
+          <label htmlFor="xfer-nickname" className="mb-2 block text-[15px] font-medium text-text">
             Tên gợi nhớ
           </label>
           <input
@@ -155,7 +155,7 @@ export function TransferSaveRecipient({
       </button>
 
       {bankSheetOpen && (
-        <Sheet title="Chọn ngân hàng nhận" onClose={() => setBankSheetOpen(false)}>
+        <Sheet className="transfer-sheet" title="Chọn ngân hàng nhận" onClose={() => setBankSheetOpen(false)}>
           <ul className="flex flex-col divide-y divide-border">
             {TRANSFER_BANKS.map((b) => (
               <li key={b.id}>

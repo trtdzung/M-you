@@ -94,7 +94,7 @@ export function RecipientPicker({
     <section className="flex flex-col gap-3" aria-labelledby="recipient-heading">
       <h2 id="recipient-heading" className="sr-only">Người nhận</h2>
 
-      <div className="flex gap-6 border-b border-border" role="tablist" aria-label="Nguồn người nhận">
+      <div className="grid grid-cols-2 gap-0 border-b border-border" role="tablist" aria-label="Nguồn người nhận">
         {([ ["saved", "Đã lưu"], ["recent", "Gần đây"] ] as const).map(([value, label]) => (
           <button
             key={value}
@@ -102,7 +102,7 @@ export function RecipientPicker({
             role="tab"
             aria-selected={tab === value}
             onClick={() => { setTab(value); setSearch(""); setSelectedId(null); onChange(null); }}
-            className={`min-h-11 border-b-2 px-1 pb-3 text-base font-semibold ${tab === value ? "border-primary text-primary" : "border-transparent text-muted"}`}
+            className={`min-h-11 border-b-2 px-3 pb-3 text-base font-semibold ${tab === value ? "border-primary text-primary" : "border-transparent text-muted"}`}
           >
             {label}
           </button>
@@ -150,7 +150,7 @@ export function RecipientPicker({
                 key={option.id}
                 type="button"
                 onClick={() => select(option)}
-                className={`flex min-h-14 items-center justify-between gap-3 border-b border-border py-3 text-left last:border-b-0 ${selectedId === option.id ? "text-primary" : ""}`}
+                className={`flex min-h-[76px] items-center justify-between gap-3 border-b border-border py-3 text-left last:border-b-0 ${selectedId === option.id ? "text-primary" : ""}`}
               >
                 <span className="flex min-w-0 items-center gap-3">
                   {bank ? (
@@ -165,8 +165,8 @@ export function RecipientPicker({
                     </span>
                   )}
                   <span className="min-w-0">
-                    <span className="block truncate text-[15.5px] font-semibold text-text">{option.name}</span>
-                    <span className="mt-0.5 block truncate text-xs text-muted">
+                    <span className="block truncate text-base font-semibold text-text">{option.name}</span>
+                    <span className="mt-0.5 block truncate text-[13px] text-muted">
                       {(bank?.name ?? option.bankName) && <span>{bank?.name ?? option.bankName} · </span>}
                       <span className="tabular-nums">{option.accountNumber}</span>
                     </span>
