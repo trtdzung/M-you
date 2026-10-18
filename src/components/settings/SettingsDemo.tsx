@@ -10,8 +10,11 @@ import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
 import { useSettingsDemo } from "./SettingsDemoContext";
 import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 
-import { type SettingsSection } from "./settings-sections";
-const TITLES: Record<SettingsSection, string> = { profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
+import { isShieldSection, type SettingsSection } from "./settings-sections";
+import { SHIELD_TITLES } from "./security/shield-copy";
+import { ShieldSection } from "./security/ShieldSection";
+import { settingsParent } from "@/lib/navigation-direction";
+const TITLES: Record<SettingsSection, string> = { ...SHIELD_TITLES, profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
 const QUESTIONS = ["Thương hiệu đồ uống mà bạn yêu thích?", "Món ăn mà người thân trong gia đình bạn yêu thích nhất?", "Địa điểm du lịch mà bạn thích nhất?", "Tên quyển sách mà bạn thấy ấn tượng nhất?", "Tên người bạn mà bạn tin tưởng nhất?", "Bệnh viện nơi bạn được sinh ra?", "Tên người có ảnh hưởng nhất đến bạn?", "Chương trình truyền hình mà bạn thường xuyên xem nhất?", "Màu sắc mà bạn yêu thích nhất?", "Ngày sinh của người bạn yêu quý nhất trong gia đình?"];
 const FAQ = ["Xác thực nâng cao bằng câu hỏi bảo mật là gì?", "Tôi có thể tiếp tục thực hiện giao dịch nếu trả lời sai câu hỏi bảo mật không?", "Tôi cần làm gì nếu chức năng Xác thực nâng cao bằng câu hỏi bảo mật bị khóa?"];
 const ANSWERS = ["Bạn chọn 3 câu hỏi bảo mật và thiết lập câu trả lời. Trong luồng giả lập, đây là một bước xác nhận bổ sung cho các giao dịch bạn lựa chọn. Chức năng này không thay thế các phương thức xác thực bắt buộc.", "Trong ứng dụng thật, việc tiếp tục giao dịch phụ thuộc vào phương thức xác thực và trạng thái tài khoản. Bản giả lập chỉ mô phỏng giao diện, không xác thực hoặc thực hiện giao dịch ngân hàng.", "Liên hệ trung tâm hỗ trợ qua kênh chính thức của ngân hàng. Không cung cấp mật khẩu, mã PIN hoặc mã OTP cho người khác."];
@@ -91,12 +94,14 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
     content = <Panel><Row label="Tiếng Việt" trailing={<Check className="text-primary" size={20} />} onClick={() => finish("Tiếng Việt đang được sử dụng.")} /><Row label="English" detail="Chưa có trong bản giả lập" onClick={() => finish("Bản giả lập hiện hỗ trợ Tiếng Việt.")} /></Panel>;
   } else if (section === "privacy") {
     content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
+  } else if (isShieldSection(section)) {
+    content = <ShieldSection section={section} />;
   } else {
     content = <><Panel title={section === "support" ? "Chúng tôi có thể giúp gì cho bạn?" : "Bảo vệ tài khoản của bạn"}><Row label="Không chia sẻ mã OTP, PIN hoặc mật khẩu" icon={LockKeyhole} onClick={() => setSheet("safety")} /><Row label="Kiểm tra thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Quyền dữ liệu và trợ lý AI" icon={ShieldCheck} href={href("privacy")} /></Panel>{section === "support" && <Notice>Đây là trung tâm hỗ trợ mô phỏng. Khi cần hỗ trợ tài khoản thật, hãy sử dụng các kênh chính thức trong app MSB.</Notice>}</>;
   }
 
   return <div className={`settings-demo ${demo.appearance === "simple" ? "settings-simple" : ""}`}>
-    <header className="settings-header">{section && <Link href={["pin", "password", "face", "devices", "signature", "advanced", "knowledge"].includes(section) ? href("security") : section === "questions" ? href("advanced") : "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
+    <header className="settings-header">{section && <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
     {section && <p className="mb-4 text-xs text-muted">Giả lập MSB · Chỉ dùng thông tin mẫu</p>}
     <div className="flex flex-col gap-5">{content}</div>
     <Sheet open={faq !== null} title="Câu hỏi thường gặp" onClose={() => setFaq(null)}>{faq !== null && <><h3 className="mb-4 font-semibold">{FAQ[faq]}</h3><p className="pb-6 text-sm leading-relaxed">{ANSWERS[faq]}</p></>}</Sheet>

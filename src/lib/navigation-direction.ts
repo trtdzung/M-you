@@ -8,6 +8,13 @@ const SECURITY_CHILDREN = new Set([
   "signature",
   "advanced",
   "knowledge",
+  "protect",
+  "anti-phishing",
+  "emergency-contacts",
+  "trusted-contacts",
+  "transfer-lock",
+  "scan",
+  "sos",
 ]);
 
 function pathnameOf(href: string): string {
@@ -26,6 +33,7 @@ export function settingsParent(pathname: string): string | null {
   const section = settingsSection(pathname);
   if (!section) return null;
   if (section === "questions") return "/settings/advanced";
+  if (section === "alert-log") return "/settings/protect";
   if (SECURITY_CHILDREN.has(section)) return "/settings/security";
   return "/settings";
 }
