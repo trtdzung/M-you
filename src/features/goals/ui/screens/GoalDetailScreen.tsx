@@ -6,6 +6,7 @@ import { Card } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalDetail } from "../../client/hooks/use-goal-detail";
 import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
+import { useGoalReminder } from "../../client/hooks/use-goal-reminder";
 import type { GoalLedgerKind, GoalStatus } from "../../model/types";
 import { GOALS_COPY } from "../copy";
 import { DeleteGoalConfirm } from "../detail/DeleteGoalConfirm";
@@ -15,6 +16,7 @@ import { GoalDetailStats } from "../detail/GoalDetailStats";
 import { SavedGoalAssessment } from "../advisor/SavedGoalAssessment";
 import { GoalTimeline } from "../detail/GoalTimeline";
 import { LedgerHistory } from "../detail/LedgerHistory";
+import { GoalReminderCard } from "../reminder/GoalReminderCard";
 import { primaryButton, secondaryButton } from "../styles";
 import { EditGoalFlow } from "./EditGoalFlow";
 import { LedgerFlow } from "./LedgerFlow";
@@ -28,6 +30,10 @@ export function GoalDetailScreen({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [ledgerKind, setLedgerKind] = useState<GoalLedgerKind | null>(null);
+  const { reminder, dismiss: dismissReminder } = useGoalReminder(
+    data ? id : null,
+    data ? `${data.goal.updatedAt}:${data.goal.currentAmount}` : null,
+  );
 
   if (loading) return <SkeletonCard />;
   if (status === 404) {
@@ -73,6 +79,16 @@ export function GoalDetailScreen({ id }: { id: string }) {
       <Card className="flex flex-col gap-4 rounded-2xl">
         <GoalDetailHeader goal={goal} />
       </Card>
+      {reminder && (
+        <GoalReminderCard
+          reminder={reminder}
+          onDismiss={dismissReminder}
+          onPause={() => { void dismissReminder(); void setStatus("paused"); }}
+          onEdit={() => { void dismissReminder(); setEditing(true); }}
+          onArchive={() => { void dismissReminder(); void setStatus("archived"); }}
+          onContribute={() => { void dismissReminder(); setLedgerKind("deposit"); }}
+        />
+      )}
       <GoalActionBar
         section="actions"
         withdrawDisabled={goal.currentAmount === 0}
