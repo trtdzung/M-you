@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, IdCard } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { maskAccount } from "@/lib/mask-account";
 import { ACCOUNT_NUMBER_PATTERN, findBank } from "@/lib/transfer-banks";
@@ -63,7 +63,7 @@ export function TransferBankEntry({
           <label htmlFor="xfer-account" className="mb-2 block text-[15px] font-medium text-text">
             Số tài khoản/Số thẻ
           </label>
-          <div className="flex h-14 items-center gap-2.5 rounded-[10px] border border-[#dfe5ee] bg-white px-3.5">
+          <div className="transfer-input-frame flex h-14 items-center gap-2.5 rounded-[10px] border border-[#dfe5ee] bg-white px-3.5">
             <input
               id="xfer-account"
               value={accountNumber}
@@ -73,7 +73,6 @@ export function TransferBankEntry({
               aria-invalid={accountNumber.length > 0 && !accountValid}
               className="min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-muted"
             />
-            <IdCard size={19} className="shrink-0 text-text" aria-hidden />
           </div>
           {accountNumber.length > 0 && !accountValid && (
             <p className="mt-1.5 text-xs text-negative">Số tài khoản/thẻ cần có 8–19 chữ số.</p>

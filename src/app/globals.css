@@ -511,7 +511,7 @@ body {
   box-shadow: none;
 }
 .transfer-shell input:focus-visible,
-.transfer-shell div:has(> input):focus-within {
+.transfer-shell .transfer-input-frame:focus-within {
   outline: 2px solid #ff9b60;
   outline-offset: 1px;
 }
@@ -540,3 +540,5 @@ body {
 
 .transfer-bank-sheet { max-height: 82%; background: #fff; }
 .transfer-bank-sheet > div:first-child { position: sticky; top: -16px; z-index: 1; background: #fff; }
+
+.transfer-shell .transfer-input-frame > input:focus-visible { outline: none; }

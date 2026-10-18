@@ -147,7 +147,7 @@ export function TransferAmountStep({
           <label htmlFor="xfer-amount" className="mb-2 inline-flex items-center gap-1 text-[15px] font-medium text-text">
             Số tiền <Info size={13} className="text-muted" aria-hidden />
           </label>
-          <div className="flex h-14 items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5">
+          <div className="transfer-input-frame flex h-14 items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5">
             <input
               id="xfer-amount"
               // State holds raw digits; only the display is grouped "1,000,000".
