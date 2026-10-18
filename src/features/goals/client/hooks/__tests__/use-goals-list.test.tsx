@@ -17,6 +17,7 @@ function view(id: string, name: string): SavingsGoalView {
     flexibility: "flexible",
     monthlyContribution: null,
     status: "active",
+    pausedUntil: null,
     jarId: null,
     createdAt: "2026-09-15T00:00:00.000Z",
     updatedAt: "2026-09-15T00:00:00.000Z",

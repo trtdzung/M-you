@@ -6,7 +6,7 @@ import { buildLevers } from "../engine/levers";
 import type { GoalReminder } from "../model/reminder-types";
 import { goalCashflowInput } from "./cashflow-input";
 import { toGoalView } from "./goal-view";
-import { getGoal } from "./goals-repo";
+import { getGoal, resumeExpiredPauses } from "./goals-repo";
 import { listLedger } from "./ledger-repo";
 import { insertReminder, lastReminder, notifiedMilestones } from "./reminders-repo";
 
@@ -28,6 +28,7 @@ function incomeDropped(months: { income: number; txnCount: number }[]): boolean 
  * shown again (until dismissed) and nothing new is created; after that the engine decides afresh.
  */
 export function reminderFor(cif: string, goalId: string, now: Date): GoalReminder | null {
+  resumeExpiredPauses(cif, now);
   const goal = getGoal(cif, goalId);
   if (!goal) return null;
   const last = lastReminder(cif, goalId);

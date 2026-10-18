@@ -82,6 +82,16 @@ export function validateGoalUpdate(
       errors.status = "Trạng thái không hợp lệ";
     }
   }
+  if (has("pauseMonths")) {
+    const n = raw.pauseMonths;
+    if (value.status !== "paused") {
+      errors.pauseMonths = "Chỉ đặt thời gian tạm dừng khi tạm dừng mục tiêu";
+    } else if (typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 12) {
+      value.pauseMonths = n;
+    } else {
+      errors.pauseMonths = "Thời gian tạm dừng phải từ 1 đến 12 tháng";
+    }
+  }
   if (Object.keys(errors).length > 0) return { ok: false, value: null, errors };
   return { ok: true, errors, value };
 }

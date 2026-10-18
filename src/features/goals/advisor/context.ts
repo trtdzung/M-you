@@ -14,7 +14,7 @@ import type { CategoryAverage } from "../engine/levers/cut-category";
 import { averageSurplus } from "../engine/surplus";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { loadGoalView } from "../server/goal-view";
-import { listGoals } from "../server/goals-repo";
+import { listGoals, resumeExpiredPauses } from "../server/goals-repo";
 import { computeHealth } from "./health";
 import { computeSignals } from "./signals";
 import type { AdvisorContext, AdvisorGoal, AdvisorMonth, Amount } from "./types";
@@ -104,6 +104,7 @@ function compute(cif: string, now: Date, asOfMonth: string): AdvisorContext {
   const creditCardDebt = cardBalance === null ? null : Math.max(0, -cardBalance);
 
   const cashflowIn = goalCashflowInput(cif, now);
+  resumeExpiredPauses(cif, now);
   const existingGoals: AdvisorGoal[] = listGoals(cif)
     .filter((g) => g.status === "active")
     .map((g) => {

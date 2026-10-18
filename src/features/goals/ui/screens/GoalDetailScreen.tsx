@@ -63,8 +63,8 @@ export function GoalDetailScreen({ id }: { id: string }) {
   }
 
   const { goal, ledger } = data;
-  const setStatus = async (next: GoalStatus) => {
-    const res = await update(goal.id, { status: next });
+  const setStatus = async (next: GoalStatus, pauseMonths?: number) => {
+    const res = await update(goal.id, pauseMonths ? { status: next, pauseMonths } : { status: next });
     if (res?.ok) refresh();
   };
   const confirmDelete = async () => {
@@ -75,7 +75,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
   return (
     <div className="flex flex-col gap-5 pb-6 pt-4">
       {feedback && <p role="status" className="rounded-xl bg-primary/10 p-3 text-[14px] text-text">{feedback}</p>}
-      {(goal.status !== "active" || goal.currentAmount >= goal.targetAmount) && <p className="rounded-2xl border border-border bg-surface p-4 text-[14px] leading-6 text-muted">{goal.status === "archived" ? "Mục tiêu đã lưu trữ. Lịch sử tích lũy vẫn được giữ để bạn xem lại." : goal.status === "paused" ? "Bạn đang tạm dừng mục tiêu này. Chọn Tiếp tục trong Quản lý mục tiêu khi sẵn sàng." : "Bạn đã đạt mục tiêu! Có thể lưu trữ để giữ lịch sử và bắt đầu kế hoạch tiếp theo."}</p>}
+      {(goal.status !== "active" || goal.currentAmount >= goal.targetAmount) && <p className="rounded-2xl border border-border bg-surface p-4 text-[14px] leading-6 text-muted">{goal.status === "archived" ? "Mục tiêu đã lưu trữ. Lịch sử tích lũy vẫn được giữ để bạn xem lại." : goal.status === "paused" ? (goal.pausedUntil ? `Bạn đang tạm dừng mục tiêu này. Mục tiêu sẽ tự tiếp tục từ ngày ${goal.pausedUntil.split("-").reverse().join("/")}, hoặc chọn Tiếp tục trong Quản lý mục tiêu nếu muốn sớm hơn.` : "Bạn đang tạm dừng mục tiêu này. Chọn Tiếp tục trong Quản lý mục tiêu khi sẵn sàng.") : "Bạn đã đạt mục tiêu! Có thể lưu trữ để giữ lịch sử và bắt đầu kế hoạch tiếp theo."}</p>}
       <Card className="flex flex-col gap-4 rounded-2xl">
         <GoalDetailHeader goal={goal} />
       </Card>
@@ -83,7 +83,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
         <GoalReminderCard
           reminder={reminder}
           onDismiss={dismissReminder}
-          onPause={() => { void dismissReminder(); void setStatus("paused"); }}
+          onPause={() => { void dismissReminder(); void setStatus("paused", 1); }}
           onEdit={() => { void dismissReminder(); setEditing(true); }}
           onArchive={() => { void dismissReminder(); void setStatus("archived"); }}
           onContribute={() => { void dismissReminder(); setLedgerKind("deposit"); }}

@@ -34,6 +34,7 @@ function goal(overrides: Partial<SavingsGoal> = {}): SavingsGoal {
     flexibility: "flexible",
     monthlyContribution: null,
     status: "active",
+    pausedUntil: null,
     jarId: null,
     createdAt: NOW.toISOString(),
     updatedAt: NOW.toISOString(),

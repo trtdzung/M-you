@@ -15,6 +15,8 @@ export interface SavingsGoal {
   /** null = not set (not the same as 0). */
   monthlyContribution: number | null;
   status: GoalStatus;
+  /** "YYYY-MM-DD" (VN) on which a timed pause ends and the goal resumes; null = no timed pause. */
+  pausedUntil: string | null;
   jarId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -52,6 +54,8 @@ export interface GoalUpdateInput {
   flexibility?: GoalFlexibility;
   monthlyContribution?: number | null;
   status?: GoalStatus;
+  /** With `status: "paused"`: resume automatically after this many months (1-12). Omitted = until resumed. */
+  pauseMonths?: number;
 }
 
 export interface LedgerEntryInput {

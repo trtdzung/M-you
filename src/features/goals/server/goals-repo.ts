@@ -7,6 +7,8 @@ import type {
   GoalUpdateInput,
   SavingsGoal,
 } from "../model/types";
+import { addMonthsToDate } from "../engine/months";
+import { todayVn } from "../model/today";
 import { goalsDb } from "./db";
 
 interface GoalRow {
@@ -17,6 +19,7 @@ interface GoalRow {
   flexibility: SavingsGoal["flexibility"];
   monthly_contribution: number | null;
   status: GoalStatus;
+  paused_until: string | null;
   jar_id: string | null;
   created_at: string;
   updated_at: string;
@@ -32,6 +35,7 @@ function toGoal(r: GoalRow): SavingsGoal {
     flexibility: r.flexibility,
     monthlyContribution: r.monthly_contribution,
     status: r.status,
+    pausedUntil: r.paused_until,
     jarId: r.jar_id,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -77,7 +81,7 @@ export function insertGoal(cif: string, input: GoalCreateInput, now: Date): Savi
   return getGoal(cif, id)!;
 }
 
-const COLUMNS: Record<keyof GoalUpdateInput, string> = {
+const COLUMNS: Record<Exclude<keyof GoalUpdateInput, "pauseMonths">, string> = {
   name: "name",
   targetAmount: "target_amount",
   targetDate: "target_date",
@@ -86,22 +90,39 @@ const COLUMNS: Record<keyof GoalUpdateInput, string> = {
   status: "status",
 };
 
-/** Applies only the fields present in `patch`; null when the goal does not exist. */
+/**
+ * Applies only the fields present in `patch`; null when the goal does not exist. Any status change
+ * resets the timed pause: `paused` with `pauseMonths` sets the resume date, everything else clears it.
+ */
 export function updateGoal(
   cif: string,
   id: string,
   patch: GoalUpdateInput,
   now: Date,
 ): SavingsGoal | null {
-  const keys = (Object.keys(patch) as (keyof GoalUpdateInput)[]).filter(
-    (k) => patch[k] !== undefined && k in COLUMNS,
-  );
+  const keys = (Object.keys(COLUMNS) as (keyof typeof COLUMNS)[]).filter((k) => patch[k] !== undefined);
   const sets = [...keys.map((k) => `${COLUMNS[k]} = ?`), "updated_at = ?"];
   const values = [...keys.map((k) => patch[k] as string | number | null), now.toISOString()];
+  if (patch.status !== undefined) {
+    sets.push("paused_until = ?");
+    values.push(patch.status === "paused" && patch.pauseMonths
+      ? addMonthsToDate(todayVn(now), patch.pauseMonths)
+      : null);
+  }
   const res = goalsDb()
     .prepare(`UPDATE user_goals SET ${sets.join(", ")} WHERE cif = ? AND id = ?`)
     .run(...values, cif, id);
   return res.changes === 0 ? null : getGoal(cif, id);
+}
+
+/** Timed pauses whose resume date has come are switched back to active. Call before reading goals. */
+export function resumeExpiredPauses(cif: string, now: Date): void {
+  goalsDb()
+    .prepare(
+      `UPDATE user_goals SET status = 'active', paused_until = NULL, updated_at = ?
+       WHERE cif = ? AND status = 'paused' AND paused_until IS NOT NULL AND paused_until <= ?`,
+    )
+    .run(now.toISOString(), cif, todayVn(now));
 }
 
 /** Deletes the goal and its ledger in one transaction; false when not found. */

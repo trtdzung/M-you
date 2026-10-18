@@ -59,9 +59,10 @@ CREATE INDEX IF NOT EXISTS idx_user_goal_reminders_goal ON user_goal_reminders (
 export function ensureGoalTables(db: Database.Database): void {
   db.exec(GOAL_TABLES_SQL);
   const cols = db.prepare("PRAGMA table_info(user_goals)").all() as { name: string }[];
-  if (!cols.some((c) => c.name === "request_key")) {
+  for (const col of ["request_key", "paused_until"]) {
+    if (cols.some((c) => c.name === col)) continue;
     try {
-      db.exec("ALTER TABLE user_goals ADD COLUMN request_key TEXT");
+      db.exec(`ALTER TABLE user_goals ADD COLUMN ${col} TEXT`);
     } catch (e) {
       if (!String(e).includes("duplicate column")) throw e; // lost a race with another handle
     }
