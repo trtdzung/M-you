@@ -77,6 +77,10 @@ export function TransferCompose() {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setBeneficiaries([]);
+    setTransactions([]);
+    setAccounts([]);
+    setSource(null);
     setError(false);
     Promise.all([
       providers.listBeneficiaries(),
@@ -178,7 +182,7 @@ export function TransferCompose() {
   // Continue is allowed when: an account source has the balance, OR a jar/pool
   // source is `ok`, `topup` (popup), or goal-coverable (confirmed on Confirm).
   const canContinue = Boolean(
-    recipient &&
+    !loading && !error && recipient &&
       Number.isFinite(numericAmount) &&
       numericAmount > 0 &&
       (source?.kind === "account" ? accountSourceValid : assessment !== null && !insufficient),
@@ -232,13 +236,11 @@ export function TransferCompose() {
   }
 
   let content: React.ReactNode;
-  if (loading) {
-    content = <p role="status" className="py-6 text-sm text-muted">Đang tải thông tin chuyển tiền…</p>;
-  } else if (error) {
-    content = <p role="alert" className="rounded-xl bg-negative-soft p-3 text-sm text-negative">Không thể tải thông tin lúc này. Vui lòng thử lại.</p>;
-  } else if (step === "pick") {
+  if (step === "pick") {
     content = (
       <TransferAccountPicker
+        loading={loading}
+        loadError={error}
         beneficiaries={beneficiaries}
         transactions={transactions}
         onSelectRecipient={selectRecipient}
@@ -253,7 +255,8 @@ export function TransferCompose() {
   } else if (recipient) {
     content = (
       <>
-        {accounts.length === 0 && <p role="alert" className="mx-4 mb-2 text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
+        {loading && <p role="status" className="mx-4 mb-2 text-sm text-muted">Đang tải tài khoản nguồn…</p>}
+        {!loading && accounts.length === 0 && <p role="alert" className="mx-4 mb-2 text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
         {insufficient && (
           <p role="alert" className="mx-4 mb-2 text-sm text-negative">
             Không đủ số dư để chuyển số tiền này.
@@ -267,7 +270,7 @@ export function TransferCompose() {
           source={source}
           amount={amount}
           memo={memo}
-          canContinue={canContinue}
+          canContinue={!loading && !error && canContinue}
           onChangeRecipient={backToPick}
           onSourceChange={setSource}
           onAmountChange={setAmount}

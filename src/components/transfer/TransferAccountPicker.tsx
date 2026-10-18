@@ -13,12 +13,16 @@ import { RecipientPicker, type SelectedRecipient } from "./RecipientPicker";
  * có người nhận), không phải ở đây.
  */
 export function TransferAccountPicker({
+  loading = false,
+  loadError = false,
   beneficiaries,
   transactions,
   onSelectRecipient,
   onEnterBankDetails,
   onAddRecipient,
 }: {
+  loading?: boolean;
+  loadError?: boolean;
   beneficiaries: Beneficiary[];
   transactions: Transaction[];
   onSelectRecipient: (recipient: SelectedRecipient) => void;
@@ -49,6 +53,8 @@ export function TransferAccountPicker({
 
       <Card className="flex flex-col">
         <RecipientPicker
+          loading={loading}
+          loadError={loadError}
           beneficiaries={beneficiaries}
           transactions={transactions}
           onChange={(r) => r && onSelectRecipient(r)}

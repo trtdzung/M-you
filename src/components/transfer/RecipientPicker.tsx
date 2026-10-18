@@ -35,7 +35,11 @@ export function RecipientPicker({
   transactions,
   onChange,
   onAddRecipient,
+  loading = false,
+  loadError = false,
 }: {
+  loading?: boolean;
+  loadError?: boolean;
   beneficiaries: Beneficiary[];
   transactions: Transaction[];
   onChange: (recipient: SelectedRecipient | null) => void;
@@ -128,7 +132,11 @@ export function RecipientPicker({
         )}
       </div>
 
-      {visible.length === 0 ? (
+      {loading || loadError ? (
+        <p role={loadError ? "alert" : "status"} className="px-2 py-6 text-center text-sm text-muted">
+          {loadError ? "Không thể tải người nhận. Vui lòng mở lại màn hình để thử lại." : "Đang tải người nhận…"}
+        </p>
+      ) : visible.length === 0 ? (
         <div className="flex flex-col items-center gap-1 px-2 py-6 text-center">
           <p className="text-base font-bold text-text">Danh sách người nhận trống</p>
           <p className="max-w-[30ch] text-sm text-muted">Lưu thông tin người nhận để thao tác chuyển tiền nhanh và thuận tiện hơn.</p>
