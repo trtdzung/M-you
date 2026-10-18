@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GoalLedgerEntry, SavingsGoalView } from "../../../model/types";
 import { GoalDetailScreen } from "../GoalDetailScreen";
 
+vi.mock("../../advisor/SavedGoalAssessment", () => ({ SavedGoalAssessment: () => <section>Đánh giá của M-You</section> }));
+
 vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
 
 const nav = vi.hoisted(() => ({

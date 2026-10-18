@@ -75,15 +75,16 @@ describe("GoalsListScreen", () => {
     expect(list.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the inline form when there are no goals", () => {
+  it("opens the dedicated create screen when there are no goals", () => {
     list.data = [];
     render(<GoalsListScreen />);
-    expect(screen.getByText("Bạn muốn tích lũy cho điều gì?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tạo mục tiêu" })).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Chưa có mục tiêu nào")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Thêm mục tiêu" }));
+    expect(nav.push).toHaveBeenCalledWith("/goals/new");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
-  it("groups archived goals, opens a goal, and validates the inline form", async () => {
+  it("groups archived goals and navigates to detail or creation", async () => {
     list.data = [
       view({ id: "goal_live", name: "Mua nhà", status: "active" }),
       view({ id: "goal_old", name: "Nhà cũ", status: "archived" }),
@@ -95,13 +96,8 @@ describe("GoalsListScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Mua nhà/ }));
     expect(nav.push).toHaveBeenCalledWith("/goals/goal_live");
 
-    expect(screen.queryByText("Bạn muốn tích lũy cho điều gì?")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Thêm mục tiêu" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByText("Bạn muốn tích lũy cho điều gì?")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Mua nhà/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
-    expect(screen.getByRole("button", { name: /Mua nhà/ })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Tạo thủ công" })).not.toBeInTheDocument();
+    expect(nav.push).toHaveBeenCalledWith("/goals/new");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 });

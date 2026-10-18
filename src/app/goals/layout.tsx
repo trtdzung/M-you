@@ -20,7 +20,7 @@ export default function GoalsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <PhoneShell background={<CalmBg />} className="shell-calm" mainClassName="shell-main--goals">
+    <PhoneShell background={<CalmBg />} className="shell-calm" mainClassName="shell-main--goals no-scrollbar overflow-x-hidden">
       {children}
     </PhoneShell>
   );

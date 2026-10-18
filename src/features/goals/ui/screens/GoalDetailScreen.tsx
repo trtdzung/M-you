@@ -12,6 +12,7 @@ import { DeleteGoalConfirm } from "../detail/DeleteGoalConfirm";
 import { GoalActionBar } from "../detail/GoalActionBar";
 import { GoalDetailHeader } from "../detail/GoalDetailHeader";
 import { GoalDetailStats } from "../detail/GoalDetailStats";
+import { SavedGoalAssessment } from "../advisor/SavedGoalAssessment";
 import { GoalTimeline } from "../detail/GoalTimeline";
 import { LedgerHistory } from "../detail/LedgerHistory";
 import { primaryButton, secondaryButton } from "../styles";
@@ -84,6 +85,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
         onDelete={() => setConfirmingDelete(true)}
       />
       <Card className="rounded-2xl"><GoalDetailStats goal={goal} /></Card>
+      <SavedGoalAssessment goal={goal} onUpdated={() => { refresh(); setFeedback("Đã điều chỉnh mục tiêu. Đánh giá sẽ được cập nhật theo kế hoạch mới."); }} />
       <GoalTimeline goal={goal} ledger={ledger} />
       <Card className="rounded-2xl">
         <LedgerHistory entries={ledger} />

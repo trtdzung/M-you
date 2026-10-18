@@ -1,7 +1,9 @@
 // Fixed Vietnamese sentences for the analysis card (no LLM). Numbers come from the engine's Analysis.
-import { formatGoalMoney } from "../ui/shared/format-goal-money";
+import { formatGoalMoney as compactMoney } from "../ui/shared/format-goal-money";
 import type { CoachAdjustment } from "../coach/contracts";
 import type { Analysis, AnalyzeDraft, Plan, PlanCut } from "./analysis-types";
+
+const formatGoalMoney = (amount: number) => `${compactMoney(amount)} VND`;
 
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
 

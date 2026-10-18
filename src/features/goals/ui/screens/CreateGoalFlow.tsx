@@ -22,7 +22,7 @@ export function CreateGoalFlow({
   inline = false,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (id: string) => void;
   /** Values the Goal Coach filled in. */
   prefill?: Partial<GoalFormValues>;
   /** Idempotency key sent with the create call. */
@@ -42,7 +42,7 @@ export function CreateGoalFlow({
     const res = await create({ ...(input as GoalCreateInput), ...(requestKey ? { requestKey } : {}) });
     if (!res) return;
     if (res.ok) {
-      onCreated();
+      onCreated(res.data.goal.id);
       onClose();
       return;
     }

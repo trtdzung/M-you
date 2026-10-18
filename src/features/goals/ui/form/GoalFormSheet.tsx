@@ -48,8 +48,7 @@ export function GoalFormSheet({
       </div>
   );
   return inline ? <section className="flex flex-col gap-1">
-    <h2 className="text-[18px] leading-6 font-semibold text-text">Bạn muốn tích lũy cho điều gì?</h2>
-    <p className="mb-5 mt-1 text-[14px] leading-6 text-muted">Đặt số tiền và thời hạn. Bạn có thể điều chỉnh kế hoạch sau.</p>
+    <p className="mb-5 mt-1 text-[14px] leading-6 text-muted">Đặt số tiền và thời hạn. Sau khi tạo, M-You sẽ đánh giá kế hoạch và hướng dẫn bạn cách đạt mục tiêu.</p>
     {content}
   </section> : <Sheet title={title} onClose={onClose}>{content}</Sheet>;
 }

@@ -1,7 +1,9 @@
 // Fill a sentence's placeholders with the engine's numbers. Unknown value -> null (caller keeps the local template).
-import { formatGoalMoney } from "../ui/shared/format-goal-money";
+import { formatGoalMoney as compactMoney } from "../ui/shared/format-goal-money";
 import type { Analysis, PlanId } from "./analysis-types";
 import { isSafeNarration, type Placeholder } from "./narration-contract";
+
+const formatGoalMoney = (amount: number) => `${compactMoney(amount)} VND`;
 
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
 

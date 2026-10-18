@@ -20,12 +20,12 @@ export function VerdictCard({ analysis, narration }: { analysis: Analysis; narra
       <dl className="grid grid-cols-2 gap-3 text-[13px]">
         <div>
           <dt className="text-muted">{GOALS_COPY.feasibility.required}</dt>
-          <dd className="text-[16px] font-semibold tabular-nums text-text">{formatGoalMoney(analysis.requiredMonthly)}{GOALS_COPY.feasibility.perMonth}</dd>
+          <dd className="text-[16px] font-semibold tabular-nums text-text">{formatGoalMoney(analysis.requiredMonthly)} VND{GOALS_COPY.feasibility.perMonth}</dd>
         </div>
         <div>
           <dt className="text-muted">{GOALS_COPY.feasibility.surplus}</dt>
           <dd className="text-[16px] font-semibold tabular-nums text-text">
-            {analysis.surplus === "unknown" ? c.unknownValue : `${formatGoalMoney(analysis.surplus)}${GOALS_COPY.feasibility.perMonth}`}
+            {analysis.surplus === "unknown" ? c.unknownValue : `${formatGoalMoney(analysis.surplus)} VND${GOALS_COPY.feasibility.perMonth}`}
           </dd>
         </div>
       </dl>
