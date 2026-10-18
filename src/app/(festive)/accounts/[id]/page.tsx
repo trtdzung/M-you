@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -10,6 +11,7 @@ import { AccountDetailHeader } from "@/components/accounts/AccountDetailHeader";
 import { TransactionListSection } from "@/components/transactions/TransactionListSection";
 import { useFinancials } from "@/state/useFinancials";
 import { usePeriod } from "@/state/period";
+import { FdSettleScreen } from "@/components/security/FdSettleScreen";
 
 /** Chi tiết 1 tài khoản: header + giao dịch lọc theo account (tái dùng list dùng chung). */
 export default function AccountDetailPage() {
@@ -18,6 +20,7 @@ export default function AccountDetailPage() {
   const { loading, error, raw, transactions } = useFinancials();
   const { month } = usePeriod();
   const account = raw?.accounts.find((a) => a.id === id) ?? null;
+  const [settling, setSettling] = useState(false);
 
   return (
     <div>
@@ -40,6 +43,14 @@ export default function AccountDetailPage() {
         account ? (
           <div className="flex flex-col gap-4">
             <AccountDetailHeader account={account} />
+            {account.type === "savings" && account.balance > 0 && (
+              <>
+                <button type="button" data-shield-anchor="fd-settle" onClick={() => setSettling(true)} className="rounded-full border border-primary bg-white py-3 text-sm font-semibold text-primary">
+                  Tất toán sổ
+                </button>
+                <FdSettleScreen open={settling} accountId={account.id} balance={account.balance} onClose={() => setSettling(false)} onDone={() => setSettling(false)} />
+              </>
+            )}
             <section>
               <div className="mb-3 flex items-center justify-between">
                 <SectionHeader title="Giao dịch" />

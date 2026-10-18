@@ -8,7 +8,7 @@ import { evaluate, type EvaluateInput } from "@/lib/security/orchestrator";
  * (spec wording at once; the fraud agent may enrich them later).
  */
 
-const TRIGGERS = new Set<EvaluateTrigger>(["transfer_review", "recipient_entered", "incoming_credit", "app_open", "transfer_screen_open", "hub_open", "transfer_success"]);
+const TRIGGERS = new Set<EvaluateTrigger>(["transfer_review", "recipient_entered", "fd_settle_review", "incoming_credit", "app_open", "transfer_screen_open", "hub_open", "transfer_success"]);
 const text = (v: unknown, max: number): v is string => typeof v === "string" && v.length <= max;
 const SCORE_LEVELS = new Set(["Rất cao", "Cao", "Tiêu chuẩn"]);
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!TRIGGERS.has(body?.trigger)) return NextResponse.json({ error: "trigger is invalid" }, { status: 422 });
   const review = parseReview(body.review);
   if (review === "invalid") return NextResponse.json({ error: "review is invalid" }, { status: 422 });
-  if ((body.trigger === "transfer_review" || body.trigger === "recipient_entered") && !review) {
+  if ((body.trigger === "transfer_review" || body.trigger === "recipient_entered" || body.trigger === "fd_settle_review") && !review) {
     return NextResponse.json({ error: "review is required" }, { status: 422 });
   }
   const input: EvaluateInput = { review };

@@ -36,7 +36,7 @@ export type Intervention = {
 };
 
 export type EvaluateTrigger =
-  | "transfer_review" | "recipient_entered" | "incoming_credit" | "app_open"
+  | "transfer_review" | "recipient_entered" | "fd_settle_review" | "incoming_credit" | "app_open"
   | "transfer_screen_open" | "hub_open" | "transfer_success";
 
 /** What the app should do after a choice; the rule engine decides, never the agent. */

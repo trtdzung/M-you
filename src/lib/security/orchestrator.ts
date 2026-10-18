@@ -50,7 +50,7 @@ function store(input: Omit<NewIntervention, "createdAt">, now: number): Interven
 }
 
 /** Transfer about to be confirmed (or the recipient just entered: T2 only). */
-function evaluateTransfer(cif: string, review: TransferReview, target: "transfer-confirm" | "recipient-entry"): Intervention[] {
+function evaluateTransfer(cif: string, review: TransferReview, target: "transfer-confirm" | "recipient-entry" | "fd-settle"): Intervention[] {
   const now = engineNow(cif).getTime();
   const ctx = buildTransferContext(cif, review);
   let signals = computeSignals(ctx);
@@ -71,10 +71,14 @@ function evaluateTransfer(cif: string, review: TransferReview, target: "transfer
     scenarios: result.scenarios, classify: result.classify, evidence: evidenceOf(signals), key,
     facts: { holdEligible: result.holdEligible, amount: review.amount, recipientName: review.recipientName, recipientLast4: last4 ?? "", recipientBank: review.recipientBank ?? "" },
   };
+  const before = findOpenByDedupe(cif, dedupeKey);
   const intervention = store({
-    cif, scenario: result.primary, level: result.level, surface: result.surface, target, dedupeKey, context,
-    copy: result.copy, countdownSec: result.countdownSec,
+    cif, scenario: result.primary, level: result.level, surface: result.surface,
+    // On the FD screen the red popup is drawn by InterventionHost.
+    target, dedupeKey, context, copy: result.copy, countdownSec: result.countdownSec,
   }, now);
+  // DH5 «push người thân»: once per new warning, never the amount or recipient.
+  if (!before && result.scenarios.includes("DH5")) notifyFamily(cif, "DH5", now);
   expireOpen(cif, target, intervention.id);
   return [intervention];
 }
@@ -136,15 +140,25 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
   return out;
 }
 
+function notifyFamily(cif: string, scenario: string, at: number): void {
+  const contacts = readProfile(cif).emergencyContacts.filter(c => c.status === "active" || c.status === "removing");
+  if (!contacts.length) return;
+  recordEvent(cif, "family_push", {
+    message: "M-You, trợ lý AI của MSB, vừa cảnh báo một giao dịch có dấu hiệu lừa đảo của người thân bạn. Hãy gọi hỏi thăm họ ngay (giả lập).",
+    scenario, contactIds: contacts.map(c => c.id),
+  }, at);
+}
+
 /** Run the engine for one trigger; returns the interventions now open because of it. */
 export function evaluate(cif: string, trigger: EvaluateTrigger, input: EvaluateInput = {}): Intervention[] {
-  if (trigger === "transfer_review" || trigger === "recipient_entered") {
+  if (trigger === "transfer_review" || trigger === "recipient_entered" || trigger === "fd_settle_review") {
     if (!input.review) return [];
+    const target = trigger === "transfer_review" ? "transfer-confirm" : trigger === "recipient_entered" ? "recipient-entry" : "fd-settle";
     if (!readProfile(cif).aiProtect) {
-      expireOpen(cif, trigger === "transfer_review" ? "transfer-confirm" : "recipient-entry");
+      expireOpen(cif, target);
       return [];
     }
-    return evaluateTransfer(cif, input.review, trigger === "transfer_review" ? "transfer-confirm" : "recipient-entry");
+    return evaluateTransfer(cif, input.review, target);
   }
   return evaluateMoment(cif, trigger, input);
 }
