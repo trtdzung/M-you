@@ -13,7 +13,7 @@ import { PfmTabHost } from "@/components/pfm/PfmTabHost";
  */
 export default function PfmPage() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Suspense fallback={null}>
         <PfmTabHost />
       </Suspense>
