@@ -1,6 +1,7 @@
 import type { Analysis, AnalyzeDraft, PlanId } from "../../advisor/analysis-types";
 import { cashflowSentence, understoodSentence, verdictSentence } from "../../advisor/templates";
 import type { AdvisorOverrides } from "../../client/hooks/use-goal-advisor";
+import type { AdvisorNarration } from "../../client/hooks/use-advisor-narration";
 import { monthsLeft } from "../../engine/months";
 import { transferNow } from "@/lib/demo-clock";
 import { GOALS_COPY } from "../copy";
@@ -19,6 +20,7 @@ export interface GoalAdvisorCardProps {
   selectedPlanId: PlanId | null;
   onSelectPlan: (id: PlanId) => void;
   onReview: () => void;
+  narration?: AdvisorNarration;
 }
 
 /** Three-step analysis of a coach draft, the verdict, the plans; the form opens only when the customer asks. */
@@ -33,7 +35,7 @@ export function GoalAdvisorCard(p: GoalAdvisorCardProps) {
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
       <AnalysisSteps steps={steps} />
-      {a && <VerdictCard analysis={a} />}
+      {a && <VerdictCard analysis={a} narration={p.narration?.verdict} />}
       {a && (
         <PlanCompare
           draft={p.draft}
@@ -42,6 +44,7 @@ export function GoalAdvisorCard(p: GoalAdvisorCardProps) {
           onOverrides={p.onOverrides}
           selectedPlanId={p.selectedPlanId}
           onSelect={p.onSelectPlan}
+          narration={p.narration}
         />
       )}
       {a && (

@@ -5,6 +5,7 @@ import { MessageSquarePlus, MoreHorizontal, Sparkles } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
+import { useAdvisorNarration } from "../../client/hooks/use-advisor-narration";
 import { useGoalAdvisor } from "../../client/hooks/use-goal-advisor";
 import { coachDraftToAnalyze } from "../../advisor/to-analyze-draft";
 import { draftToForm } from "../../coach/to-form";
@@ -23,6 +24,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const coach = useGoalCoach();
   const analyzeDraft = coach.draft ? coachDraftToAnalyze(coach.draft, transferNow()) : null;
   const advisor = useGoalAdvisor(analyzeDraft, coach.requestId);
+  const narration = useAdvisorNarration(analyzeDraft ? coach.requestId : null, analyzeDraft?.name ?? null, advisor.analysis);
   // The form opens with the plan the customer picked (its date/amount), not the raw draft.
   const chosen = advisor.view.analysis && advisor.selectedPlanId ? advisor.view.analysis.plans[advisor.selectedPlanId] : null;
   const reviewPrefill = coach.draft
@@ -122,6 +124,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           selectedPlanId={advisor.selectedPlanId}
           onSelectPlan={advisor.selectPlan}
           onReview={() => setReviewing(true)}
+          narration={narration}
         />
       )}
       {coach.draft && !reviewing && (!analyzeDraft || advisor.phase === "failed") && <section className="rounded-2xl border border-border bg-surface p-5">

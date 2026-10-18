@@ -5,7 +5,7 @@ import { GOALS_COPY } from "../copy";
 import { formatGoalMoney } from "../shared/format-goal-money";
 
 /** One way to reach the goal. A radio: exactly one plan is selected at a time. */
-export function PlanCard({ plan, selected, recommended, onSelect }: { plan: Plan; selected: boolean; recommended: boolean; onSelect: () => void }) {
+export function PlanCard({ plan, selected, recommended, onSelect, narration }: { plan: Plan; selected: boolean; recommended: boolean; onSelect: () => void; narration?: string | null }) {
   const c = GOALS_COPY.advisor.plans;
   const details = [
     ...(plan.fundingFromIdle > 0 ? [c.fundingIdle(formatGoalMoney(plan.fundingFromIdle))] : []),
@@ -29,7 +29,7 @@ export function PlanCard({ plan, selected, recommended, onSelect }: { plan: Plan
       </span>
       {plan.available ? (
         <>
-          <span className="text-[14px] leading-6 text-text">{planSummary(plan)}</span>
+          <span className="text-[14px] leading-6 text-text">{narration ?? planSummary(plan)}</span>
           {details.length > 0 && (
             <ul className="list-disc pl-5 text-[13px] leading-5 text-muted">
               {details.map((d) => <li key={d}>{d}</li>)}

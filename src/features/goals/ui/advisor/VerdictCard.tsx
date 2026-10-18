@@ -11,11 +11,12 @@ const TONE: Record<Verdict, string> = {
 };
 
 /** The conclusion: verdict headline, the sentence, monthly need vs surplus, and the data source. */
-export function VerdictCard({ analysis }: { analysis: Analysis }) {
+export function VerdictCard({ analysis, narration }: { analysis: Analysis; narration?: string | null }) {
   const c = GOALS_COPY.advisor;
   return (
     <div className={`flex flex-col gap-3 rounded-2xl p-4 ${TONE[analysis.verdict]}`}>
       <p className="text-[16px] leading-6 font-semibold text-text">{c.verdict[analysis.verdict]}</p>
+      {narration && <p className="text-[14px] leading-6 text-text">{narration}</p>}
       <dl className="grid grid-cols-2 gap-3 text-[13px]">
         <div>
           <dt className="text-muted">{GOALS_COPY.feasibility.required}</dt>
