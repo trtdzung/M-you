@@ -71,7 +71,7 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           <button type="button" onClick={() => setSheet("qr")}><ScanLine size={31} /><span>Quét QR</span></button>
           <button type="button" onClick={() => setSheet("support")}><Headphones size={31} /><span>Hỗ trợ</span></button>
         </section>
-        <PromoCarousel items={[
+        <PromoCarousel inset items={[
           <PromoCard key="family" variant="image" image="/brand/banner-family.jpg" imageAlt="Ưu đãi thẻ MSB" />,
           <PromoCard key="savings" variant="image" image="/brand/banner-savings.jpg" imageAlt="Ưu đãi tiết kiệm" />,
           <PromoCard key="business" variant="image" image="/brand/banner-business.jpg" imageAlt="Ưu đãi doanh nghiệp" />,

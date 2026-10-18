@@ -30,10 +30,10 @@ export function PromoCard({
 }) {
   if (variant === "image" && image) {
     return (
-      <article className="shadow-card relative overflow-hidden rounded-[20px]">
-        {/* Hiển thị đúng tỉ lệ gốc của material — không object-cover/cắt xén. */}
+      <article className="shadow-card relative aspect-[2.5/1] overflow-hidden rounded-[20px] bg-[#fff3eb]">
+        {/* Khung banner cùng tỷ lệ; ảnh giữ tỷ lệ và cắt phần dư, không kéo méo. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image} alt={imageAlt ?? ""} className="block h-auto w-full" />
+        <img src={image} alt={imageAlt ?? ""} className="block h-full w-full object-cover" />
         <SourceBadge source="mock" className="absolute right-3 top-3" />
       </article>
     );
