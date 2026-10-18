@@ -17,7 +17,7 @@ import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { isTransferBlocked } from "@/state/security/selectors";
 import { useShallow } from "zustand/react/shallow";
-import { transferAlertLevel } from "@/lib/transfer-alert";
+import { accountLastFour, isTrustedRecipient, transferAlertLevel } from "@/lib/transfer-alert";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
@@ -274,6 +274,9 @@ export function TransferConfirm() {
   }
 
   if (done) {
+    // Trusting a recipient raises security, so it applies at once (no face check).
+    const doneAccount = done.recipientAccountNumber ?? done.recipientAccountMasked;
+    const lastFour = accountLastFour(doneAccount);
     return (
       <TransferSuccess
         done={done}
@@ -283,6 +286,10 @@ export function TransferConfirm() {
         createdSourceJarId={createdSourceJarId}
         recipientSaved={recipientSaved}
         onSaveRecipient={saveRecipient}
+        trusted={lastFour === null ? null : isTrustedRecipient(shield.trusted, done.recipientName, doneAccount)}
+        onTrust={() => {
+          if (lastFour) useSecurityStore.getState().addTrustedContact({ name: done.recipientName, bank: done.recipientBankName ?? "Chưa rõ ngân hàng", account: `••• ${lastFour}` });
+        }}
       />
     );
   }

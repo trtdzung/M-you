@@ -36,10 +36,19 @@ const AUTHORITY_WORDS: { label: string; pattern: RegExp }[] = [
 ];
 
 const normalizeName = (name: string) => normalizeText(name).replace(/\s+/g, " ").trim();
-const lastFour = (account: string | undefined) => {
+/** Last 4 digits of a full or masked account, or null when there are fewer. */
+export function accountLastFour(account: string | undefined): string | null {
   const digits = (account ?? "").replace(/\D/g, "");
   return digits.length >= 4 ? digits.slice(-4) : null;
-};
+}
+const lastFour = accountLastFour;
+
+/** Same normalized name and same last 4 account digits as a trusted contact. */
+export function isTrustedRecipient(trusted: TransferAlertInput["trusted"], name: string, account: string | undefined): boolean {
+  const key = normalizeName(name);
+  const digits = lastFour(account);
+  return digits !== null && trusted.some(contact => normalizeName(contact.name) === key && lastFour(contact.account) === digits);
+}
 
 /** Hour of day in Vietnam (UTC+7). */
 function vnHour(at: Date): number {
@@ -61,7 +70,7 @@ export function transferAlertLevel(input: TransferAlertInput): TransferAlert {
   const name = normalizeName(input.recipientName);
   const account = lastFour(input.recipientAccount);
   const sameName = input.trusted.filter(contact => normalizeName(contact.name) === name);
-  if (account !== null && sameName.some(contact => lastFour(contact.account) === account)) return { level: "green", reasons: [] };
+  if (isTrustedRecipient(input.trusted, input.recipientName, input.recipientAccount)) return { level: "green", reasons: [] };
 
   // Same name as a trusted contact but a known, different account: likely impersonation.
   const nameSpoof = account !== null && sameName.some(contact => lastFour(contact.account) !== null);

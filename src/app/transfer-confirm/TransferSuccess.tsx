@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { pushWithTransition } from "@/lib/view-transition";
-import { ChevronDown, ChevronUp, Home, Share2, UserPlus } from "lucide-react";
+import { ChevronDown, ChevronUp, Home, Share2, ShieldCheck, UserPlus } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { formatDateTime } from "@/lib/format";
 import { avatarColor, initialOf } from "@/lib/avatar";
@@ -57,6 +57,8 @@ export function TransferSuccess({
   createdSourceJarId,
   recipientSaved,
   onSaveRecipient,
+  trusted,
+  onTrust,
 }: {
   done: MockExecutedTransfer;
   fundResult: FundResult | null;
@@ -65,6 +67,9 @@ export function TransferSuccess({
   createdSourceJarId: string | null;
   recipientSaved: boolean;
   onSaveRecipient: () => void;
+  /** Already in the Scam Shield trusted list (null = no account digits to match on). */
+  trusted: boolean | null;
+  onTrust: () => void;
 }) {
   const router = useRouter();
   const [showDetails, setShowDetails] = useState(false);
@@ -174,7 +179,7 @@ export function TransferSuccess({
             </div>
           )}
 
-          <div className="flex justify-center px-5 py-5">
+          <div className="flex justify-center gap-10 px-5 py-5">
             <button
               type="button"
               onClick={onSaveRecipient}
@@ -184,6 +189,17 @@ export function TransferSuccess({
               <UserPlus size={28} strokeWidth={1.8} />
               <span className="text-sm font-medium text-text">{recipientSaved ? "Đã lưu" : "Lưu người nhận"}</span>
             </button>
+            {trusted !== null && (
+              <button
+                type="button"
+                onClick={onTrust}
+                disabled={trusted}
+                className="flex flex-col items-center gap-1.5 text-primary disabled:text-positive"
+              >
+                <ShieldCheck size={28} strokeWidth={1.8} />
+                <span className="text-sm font-medium text-text">{trusted ? "Đã trong danh bạ tin cậy" : "Thêm vào danh bạ tin cậy"}</span>
+              </button>
+            )}
           </div>
         </Card>
 
