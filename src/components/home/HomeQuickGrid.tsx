@@ -8,7 +8,6 @@ import {
   Award,
   PieChart,
   LayoutGrid,
-  Target,
 } from "lucide-react";
 import { QuickActions, type QuickAction } from "@/components/common/QuickActions";
 
@@ -17,8 +16,8 @@ const noop = () => {};
 
 /**
  * Khối quick-action Home MSB: lưới 3×2 (Chuyển tiền, Quét QR, Tiền gửi, Thẻ,
- * Thanh toán, Vay) + hàng chân Rewards · PFM · Mục tiêu · Xem thêm. Chuyển tiền → màn chuyển
- * tiền; PFM → hub PFM (lối vào PFM duy nhất từ Home); Mục tiêu → /goals. "Xem thêm" là placeholder
+ * Thanh toán, Vay) + hàng chân Rewards · PFM · Xem thêm. Chuyển tiền → màn chuyển
+ * tiền; PFM → hub PFM (lối vào PFM duy nhất từ Home). "Xem thêm" là placeholder
  * demo chưa có màn.
  */
 const ACTIONS: QuickAction[] = [
@@ -33,7 +32,6 @@ const ACTIONS: QuickAction[] = [
 const FOOTER: QuickAction[] = [
   { label: "Rewards", icon: Award, onClick: noop },
   { label: "PFM", icon: PieChart, href: "/pfm", aiBadge: true },
-  { label: "Mục tiêu", icon: Target, href: "/goals" },
   { label: "Xem thêm", icon: LayoutGrid, onClick: noop },
 ];
 
