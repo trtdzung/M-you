@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Info, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SectionHeader } from "@/components/primitives";
+import { Card, SectionHeader } from "@/components/primitives";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { summarizeGoals } from "../../engine/summary";
 import { formatGoalMoney } from "../shared/format-goal-money";
@@ -26,6 +26,7 @@ export function GoalsListScreen() {
   const [formKey, setFormKey] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showSummaryInfo, setShowSummaryInfo] = useState(false);
   const summary = summarizeGoals(data ?? []);
   const hasGoals = !!data?.length;
   const created = () => {
@@ -67,22 +68,35 @@ export function GoalsListScreen() {
     <section className="flex flex-col gap-4">
       {feedback && <p role="status" className="rounded-xl bg-primary/10 p-3 text-[14px] text-text">{feedback}</p>}
       {summary.active === 0 && <p className="rounded-2xl border border-border bg-surface p-4 text-[14px] leading-6 text-muted">Chưa có mục tiêu đang tích lũy. Bạn có thể tiếp tục một mục tiêu đã tạm dừng hoặc bấm + để tạo kế hoạch mới.</p>}
-      <div className="rounded-2xl bg-surface-tint px-4 py-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-[14px] text-muted">Tổng đã tích lũy</p><p className="text-[24px] font-semibold leading-8 tabular-nums text-text">{formatGoalMoney(summary.saved)} <span className="text-[12px] font-normal text-muted">VND</span></p></div>
-        <p className="mt-2 text-[12px] leading-5 text-muted">Bạn tự ghi nhận · {summary.count} mục tiêu · Không gồm lưu trữ</p>
-      </div>
+      <Card padding="snug">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[14px] text-muted">Tổng đã tích lũy</p>
+          <button
+            type="button"
+            aria-label="Thông tin tổng tích lũy"
+            aria-expanded={showSummaryInfo}
+            aria-controls="goals-summary-info"
+            onClick={() => setShowSummaryInfo((shown) => !shown)}
+            className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            <Info size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="text-[28px] font-semibold leading-9 tabular-nums text-text">{formatGoalMoney(summary.saved)} <span className="text-[13px] font-normal text-muted">VND</span></p>
+        <p className="mt-2 text-[13px] leading-5 text-muted">{summary.active} mục tiêu đang tích lũy</p>
+        <p id="goals-summary-info" hidden={!showSummaryInfo} className="mt-3 border-t border-border/60 pt-3 text-[12px] leading-5 text-muted">Tổng từ {summary.count} mục tiêu chưa lưu trữ, theo các khoản tích lũy bạn tự ghi nhận; chưa được ngân hàng xác nhận.</p>
+      </Card>
       <SectionHeader
         title="Mục tiêu của bạn"
-        subtitle={`${summary.active} đang tích lũy`}
         className="mb-0 pt-1"
         action={
           <button
             type="button"
-            aria-label="Tạo mục tiêu mới"
+            aria-label="Thêm mục tiêu"
             onClick={openCreate}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full bg-primary px-3 text-[13px] font-semibold text-primary-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-border bg-surface px-3 text-[13px] font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
-            <Plus size={14} aria-hidden /> Tạo mới
+            <Plus size={14} aria-hidden /> Thêm mục tiêu
           </button>
         }
       />

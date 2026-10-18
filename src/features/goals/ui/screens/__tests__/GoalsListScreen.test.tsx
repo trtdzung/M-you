@@ -96,7 +96,7 @@ describe("GoalsListScreen", () => {
     expect(nav.push).toHaveBeenCalledWith("/goals/goal_live");
 
     expect(screen.queryByText("Bạn muốn tích lũy cho điều gì?")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Tạo mục tiêu mới" }));
+    fireEvent.click(screen.getByRole("button", { name: "Thêm mục tiêu" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("Bạn muốn tích lũy cho điều gì?")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Mua nhà/ })).not.toBeInTheDocument();
