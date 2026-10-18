@@ -295,7 +295,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0">
         <div
-          className="pointer-events-auto flex w-full flex-col items-center gap-4 rounded-t-card border-t border-border bg-surface px-9 pt-5 pb-[calc(20px+var(--safe-area-bottom))] shadow-nav"
+          className="voice-panel pointer-events-auto flex w-full flex-col items-center gap-4 rounded-t-card border-t border-border bg-surface px-5 pt-5 pb-[calc(24px+var(--safe-area-bottom))] shadow-nav"
           style={{ minHeight: "48dvh" }}
         >
           <div className="flex w-full items-center justify-between">
@@ -312,21 +312,21 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
                 />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-bold leading-tight text-text">M-You</p>
-                <p className="truncate text-[11px] leading-tight text-muted">Trợ lý Tài chính của bạn</p>
+                <p className="text-lg font-bold leading-tight text-text">M-You</p>
+                <p className="truncate text-xs leading-relaxed text-muted">Trợ lý Tài chính của bạn</p>
               </div>
             </div>
             <button
               type="button"
               onClick={switchToChat}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface-tint px-3 text-xs font-semibold text-primary-strong hover:underline"
             >
-              <MessageCircle size={12} strokeWidth={2.2} />
+              <MessageCircle size={16} strokeWidth={2.2} />
               Chuyển qua Chat
             </button>
           </div>
 
-          <div className="flex w-full flex-1 flex-col items-center justify-center gap-2 overflow-y-auto rounded-2xl border border-dashed border-border bg-surface-tint p-3">
+          <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 overflow-y-auto rounded-[20px] border border-orange-100 bg-[#fff1ea] p-4">
             {voice.error ? (
               <>
                 <VoiceWaveform animated={false} />
@@ -376,7 +376,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             ) : (
               <>
                 <VoiceWaveform animated={false} />
-                <span className="text-xs text-muted">M-You sẵn sàng hỗ trợ bạn</span>
+                <span className="text-sm text-muted">M-You sẵn sàng hỗ trợ bạn</span>
               </>
             )}
             {voice.partial && voice.state !== "idle" && (
@@ -391,10 +391,12 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             disabled={voice.state !== "idle" || sending}
-            placeholder="Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây"
-            className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            aria-label="Nội dung gửi M-You"
+            placeholder="Nhập nội dung cần hỗ trợ"
+            className="min-h-12 w-full rounded-[10px] border border-border bg-surface-muted px-4 py-3 text-base text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           />
 
+          <p className="-mt-2 text-center text-xs leading-relaxed text-muted">Nhấn giữ biểu tượng M-You để nói, thả tay khi nói xong.</p>
           <div className="flex w-full items-center justify-center gap-6">
             <button
               type="button"
@@ -412,7 +414,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               onClick={() => void handleSend()}
               disabled={!transcript.trim() || sending}
               aria-label="Gửi"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-fg transition-opacity disabled:opacity-40"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#ffa54f] to-[#ee6335] text-primary-fg transition-opacity disabled:opacity-40"
             >
               <Send size={18} />
             </button>
