@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePersonaCif } from "@/providers/context";
 import type {
+  CoachAdjustment,
   CoachAnswer,
+  CoachCurrentDraft,
   CoachDraft,
   CoachQuestion,
   CoachResponse,
   CoachSlotName,
 } from "../../coach/contracts";
+import { adjustAck } from "../../advisor/templates";
 import { coachGoal } from "../goals-api";
 
 export const COACH_TIMEOUT_MS = 50_000;
@@ -34,9 +37,14 @@ interface CoachState {
   answers: CoachAnswer[];
   turns: CoachTurn[];
   response: CoachResponse | null;
+  /** Edits the customer made to the draft by words, in order. */
+  adjustments: CoachAdjustment[];
+  adjustStatus: "idle" | "busy" | "unclear" | "failed";
 }
 
-const INITIAL: CoachState = { phase: "idle", request: "", answers: [], turns: [], response: null };
+export const ADJUST_TIMEOUT_MS = 20_000;
+
+const INITIAL: CoachState = { phase: "idle", request: "", answers: [], turns: [], response: null, adjustments: [], adjustStatus: "idle" };
 
 /**
  * Goal Coach conversation: idle -> asking -> need_info <-> answering -> draft | out_of_scope | failed.
@@ -96,7 +104,36 @@ export function useGoalCoach() {
     [call, state],
   );
 
+  /** Edit the current draft by words ("lùi 6 tháng"): the agent returns a normalised adjustment. */
+  const adjustSeq = useRef(0);
+  const adjust = useCallback(
+    async (text: string, current: CoachCurrentDraft) => {
+      const sentence = text.trim();
+      if (!cif || !sentence || state.phase !== "draft") return;
+      const id = ++adjustSeq.current;
+      setState((s) => ({ ...s, adjustStatus: "busy" }));
+      const timeout = new Promise<null>((r) => setTimeout(() => r(null), ADJUST_TIMEOUT_MS));
+      const res = await Promise.race([coachGoal(cif, { request: sentence, answers: [], currentDraft: current }), timeout]);
+      if (adjustSeq.current !== id) return;
+      if (res && res.ok && res.data.status === "adjust" && res.data.adjustment) {
+        const adj = res.data.adjustment;
+        setState((s) => ({
+          ...s,
+          adjustStatus: "idle",
+          adjustments: [...s.adjustments, adj],
+          turns: [...s.turns, { role: "customer", text: sentence }, { role: "coach", text: adjustAck(adj) }],
+        }));
+      } else if (res && res.ok && res.data.message_code === "adjust_unclear") {
+        setState((s) => ({ ...s, adjustStatus: "unclear" }));
+      } else {
+        setState((s) => ({ ...s, adjustStatus: "failed" }));
+      }
+    },
+    [cif, state.phase],
+  );
+
   const reset = useCallback(() => {
+    adjustSeq.current++;
     seq.current++;
     setState(INITIAL);
   }, []);
@@ -121,6 +158,9 @@ export function useGoalCoach() {
     start,
     retry: () => { if (state.phase === "failed") void call(state, state.answers.length ? "answering" : "asking"); },
     answer,
+    adjust,
+    adjustments: state.adjustments,
+    adjustStatus: state.adjustStatus,
     reset,
   };
 }

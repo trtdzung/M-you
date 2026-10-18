@@ -7,6 +7,7 @@ import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
 import { useAdvisorNarration } from "../../client/hooks/use-advisor-narration";
 import { useGoalAdvisor } from "../../client/hooks/use-goal-advisor";
+import { applyAdjustments, toCurrentDraft } from "../../advisor/apply-adjustment";
 import { coachDraftToAnalyze } from "../../advisor/to-analyze-draft";
 import { draftToForm } from "../../coach/to-form";
 import { CoachFallback } from "../coach/CoachFallback";
@@ -22,14 +23,22 @@ import { CreateGoalFlow } from "./CreateGoalFlow";
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
 export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => void; active?: boolean }) {
   const coach = useGoalCoach();
-  const analyzeDraft = coach.draft ? coachDraftToAnalyze(coach.draft, transferNow()) : null;
-  const advisor = useGoalAdvisor(analyzeDraft, coach.requestId);
-  const narration = useAdvisorNarration(analyzeDraft ? coach.requestId : null, analyzeDraft?.name ?? null, advisor.analysis);
+  // One working draft for everything on the card: the coach's draft plus the customer's edits by words.
+  const baseDraft = coach.draft ? coachDraftToAnalyze(coach.draft, transferNow()) : null;
+  const analyzeDraft = baseDraft ? applyAdjustments(baseDraft, coach.adjustments, transferNow()) : null;
+  const draftKey = coach.requestId ? `${coach.requestId}:${coach.adjustments.length}` : null;
+  const advisor = useGoalAdvisor(analyzeDraft, draftKey);
+  const narration = useAdvisorNarration(analyzeDraft ? draftKey : null, analyzeDraft?.name ?? null, advisor.analysis);
   // The form opens with the plan the customer picked (its date/amount), not the raw draft.
   const chosen = advisor.view.analysis && advisor.selectedPlanId ? advisor.view.analysis.plans[advisor.selectedPlanId] : null;
   const reviewPrefill = coach.draft
     ? chosen && analyzeDraft
-      ? { ...draftToForm(coach.draft, transferNow()), targetAmount: String(chosen.targetAmount), targetDate: chosen.targetDate }
+      ? {
+          ...draftToForm(coach.draft, transferNow()),
+          targetAmount: String(chosen.targetAmount),
+          targetDate: chosen.targetDate,
+          openingAmount: analyzeDraft.openingAmount > 0 ? String(analyzeDraft.openingAmount) : "",
+        }
       : draftToForm(coach.draft, transferNow())
     : null;
   const [reviewing, setReviewing] = useState(false);
@@ -125,6 +134,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           onSelectPlan={advisor.selectPlan}
           onReview={() => setReviewing(true)}
           narration={narration}
+          followUp={{ status: coach.adjustStatus, onSubmit: (text) => void coach.adjust(text, toCurrentDraft(analyzeDraft, transferNow())) }}
         />
       )}
       {coach.draft && !reviewing && (!analyzeDraft || advisor.phase === "failed") && <section className="rounded-2xl border border-border bg-surface p-5">

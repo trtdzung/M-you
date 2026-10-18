@@ -39,7 +39,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid coach request" }, { status: 422 });
   }
 
-  const res = await forwardToAgent("/goal-coach", { user_id: cif, request, answers });
+  const payload: Record<string, unknown> = { user_id: cif, request, answers };
+  if (body.currentDraft !== undefined && body.currentDraft !== null) {
+    const d = body.currentDraft as { target_amount?: unknown; opening_amount?: unknown; months?: unknown };
+    const ok =
+      typeof d === "object" && Number.isInteger(d.target_amount) && (d.target_amount as number) > 0 &&
+      Number.isInteger(d.opening_amount) && (d.opening_amount as number) >= 0 &&
+      (d.months === undefined || d.months === null || (Number.isInteger(d.months) && (d.months as number) >= 1 && (d.months as number) <= 600));
+    if (!ok) return NextResponse.json({ error: "invalid coach request" }, { status: 422 });
+    payload.current_draft = { target_amount: d.target_amount, opening_amount: d.opening_amount, months: d.months ?? null };
+  }
+  const res = await forwardToAgent("/goal-coach", payload);
   if (!res.ok) return unavailable();
   const data: unknown = await res.json().catch(() => null);
   return isCoachResponse(data) ? NextResponse.json(data) : unavailable();

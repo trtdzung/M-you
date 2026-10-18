@@ -1,5 +1,6 @@
 // Fixed Vietnamese sentences for the analysis card (no LLM). Numbers come from the engine's Analysis.
 import { formatGoalMoney } from "../ui/shared/format-goal-money";
+import type { CoachAdjustment } from "../coach/contracts";
 import type { Analysis, AnalyzeDraft, Plan, PlanCut } from "./analysis-types";
 
 const dmy = (iso: string) => iso.split("-").reverse().join("/");
@@ -78,4 +79,28 @@ export function sliderSentence(a: Analysis, targetDate: string, targetAmount: nu
     case "unknown":
       return `${head}.`;
   }
+}
+
+/** Coach line shown in the transcript after an edit was applied (numbers come from the agent's adjustment). */
+export function adjustAck(adj: CoachAdjustment): string {
+  switch (adj.kind) {
+    case "extend_months":
+      return `Mình đã lùi hạn thêm ${adj.value} tháng và tính lại cho bạn.`;
+    case "reduce_amount_to":
+      return `Mình đã giảm mục tiêu còn ${formatGoalMoney(adj.value)} và tính lại cho bạn.`;
+    case "raise_saving_to":
+      return `Mình đã tính lại theo mức góp ${perMonth(adj.value)}.`;
+    case "use_savings_amount":
+      return `Mình đã tính ${formatGoalMoney(adj.value)} từ tiền tiết kiệm vào số đã có và tính lại cho bạn.`;
+  }
+}
+
+const ROUND_STEP = 5_000_000;
+
+/** Quick edit sentences the agent reads without a model: "Lùi 6 tháng", "Giảm 100 triệu". */
+export function followUpChips(d: AnalyzeDraft): string[] {
+  const chips = ["Lùi 6 tháng"];
+  const cut = Math.round((d.targetAmount * 0.1) / ROUND_STEP) * ROUND_STEP;
+  if (cut > 0 && d.targetAmount - cut > d.openingAmount) chips.push(`Giảm ${formatGoalMoney(cut)}`);
+  return chips;
 }

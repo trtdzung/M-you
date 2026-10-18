@@ -9,7 +9,7 @@ import type {
 } from "../model/types";
 import type { Analysis, AnalyzeDraft } from "../advisor/analysis-types";
 import type { NarrateInput, NarrateResult } from "../advisor/narration-contract";
-import type { CoachAnswer, CoachResponse } from "../coach/contracts";
+import type { CoachAnswer, CoachCurrentDraft, CoachResponse } from "../coach/contracts";
 import { fetchJson, jsonInit } from "./http";
 
 const enc = encodeURIComponent;
@@ -43,7 +43,7 @@ export const checkFeasibility = (cif: string, input: FeasibilityRequest) =>
 export const seedDemoGoals = (cif: string) =>
   fetchJson<{ inserted: number }>("/api/goals/demo", jsonInit("POST", { cif }));
 
-export const coachGoal = (cif: string, input: { request: string; answers: CoachAnswer[] }) =>
+export const coachGoal = (cif: string, input: { request: string; answers: CoachAnswer[]; currentDraft?: CoachCurrentDraft }) =>
   fetchJson<CoachResponse>("/api/goals/coach", jsonInit("POST", { cif, ...input }));
 
 export const analyzeGoal = (

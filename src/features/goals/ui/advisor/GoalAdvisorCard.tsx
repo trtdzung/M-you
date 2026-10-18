@@ -7,6 +7,7 @@ import { transferNow } from "@/lib/demo-clock";
 import { GOALS_COPY } from "../copy";
 import { primaryButton } from "../styles";
 import { AnalysisSteps } from "./AnalysisSteps";
+import { FollowUp } from "./FollowUp";
 import { PlanCompare } from "./PlanCompare";
 import { VerdictCard } from "./VerdictCard";
 
@@ -21,6 +22,7 @@ export interface GoalAdvisorCardProps {
   onSelectPlan: (id: PlanId) => void;
   onReview: () => void;
   narration?: AdvisorNarration;
+  followUp?: { status: "idle" | "busy" | "unclear" | "failed"; onSubmit: (text: string) => void };
 }
 
 /** Three-step analysis of a coach draft, the verdict, the plans; the form opens only when the customer asks. */
@@ -47,6 +49,7 @@ export function GoalAdvisorCard(p: GoalAdvisorCardProps) {
           narration={p.narration}
         />
       )}
+      {a && p.followUp && <FollowUp draft={p.draft} status={p.followUp.status} onSubmit={p.followUp.onSubmit} />}
       {a && (
         <button type="button" className={`${primaryButton} w-full`} onClick={p.onReview}>
           {GOALS_COPY.coach.reviewAndCreate}

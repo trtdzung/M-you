@@ -74,6 +74,14 @@ export const GOALS_COPY = {
       recalculating: "Đang tính lại…",
       failed: "Chưa tính lại được, bạn thử lại sau.",
     },
+    followUp: {
+      title: "Hỏi thêm hoặc chỉnh",
+      placeholder: "Ví dụ: lùi 6 tháng",
+      send: "Gửi",
+      busy: "Đang chỉnh…",
+      unclear: "Mình chưa hiểu cách chỉnh này. Bạn thử “Lùi 6 tháng” hoặc “Giảm 10 triệu” nhé.",
+      failed: "Chưa chỉnh được lúc này, bạn thử lại sau.",
+    },
     sourceMock: (months: number) => `Dữ liệu mô phỏng, ${months} tháng`,
     verdict: {
       feasible: "Khả thi",

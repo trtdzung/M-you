@@ -6,7 +6,7 @@ import { GoalCoachPanel } from "../GoalCoachPanel";
 const coach = vi.hoisted(() => ({ reset: vi.fn(), start: vi.fn(), phase: "need_info", draft: null as CoachDraft | null }));
 vi.mock("../../../client/hooks/use-goal-coach", () => ({ useGoalCoach: () => ({
   ...coach, turns: [{ role: "customer", text: "Mua xe" }], question: null,
-  answers: [], answer: vi.fn(),
+  answers: [], answer: vi.fn(), adjustments: [], adjustStatus: "idle", adjust: vi.fn(),
 }) }));
 vi.mock("../../../client/hooks/use-goal-advisor", () => ({ useGoalAdvisor: () => ({ phase: "failed", analysis: null, view: { phase: "failed", analysis: null }, overrides: {}, selectedPlanId: null }) }));
 beforeEach(() => { coach.reset.mockReset(); coach.start.mockReset(); coach.phase = "need_info"; coach.draft = null; });
