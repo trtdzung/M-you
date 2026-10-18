@@ -10,6 +10,7 @@ import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts } from "@/state/security/selectors";
 import { Notice } from "../../settings-ui";
 import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
+import { PendingOffNotice } from "../PendingOffNotice";
 
 const timeLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(at);
 const redButton = "flex w-full items-center justify-center gap-2 rounded-full bg-negative py-3 font-semibold text-white";
@@ -23,8 +24,8 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 /** Settings › Khẩn cấp (SC1): lock, flag transactions, call the priority hotline. */
 export function SosScreen() {
-  const security = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, accountLockedAt: state.accountLockedAt, emergencyContacts: state.emergencyContacts })));
-  const { lockAccount, unlockAccount } = useSecurityStore.getState();
+  const security = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, accountLockedAt: state.accountLockedAt, emergencyContacts: state.emergencyContacts, unlockAt: state.pendingOff.accountLock })));
+  const { lockAccount, requestOff, cancelOff, applyOff } = useSecurityStore.getState();
   const [locking, setLocking] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   // A contact being removed stays in effect until the 24h wait ends.
@@ -40,7 +41,8 @@ export function SosScreen() {
     <Step n={1} title="Khóa tạm tài khoản và thẻ">
       {security.accountLocked ? <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2 font-semibold text-positive"><CircleCheck size={20} aria-hidden />Đã khóa tạm{security.accountLockedAt !== null && ` lúc ${timeLabel(security.accountLockedAt)}`}</span>
-        <button type="button" className="text-sm font-semibold text-primary" onClick={() => setUnlocking(true)}>Mở khóa</button>
+        {security.unlockAt === undefined && <button type="button" className="text-sm font-semibold text-primary" onClick={() => setUnlocking(true)}>Mở khóa</button>}
+        {security.unlockAt !== undefined && <div className="w-full"><PendingOffNotice action="Mở khóa tài khoản" at={security.unlockAt} onCancel={() => cancelOff("accountLock")} onApply={() => applyOff("accountLock")} /></div>}
       </div> : <button type="button" className={redButton} onClick={() => setLocking(true)}>Khóa ngay</button>}
     </Step>
     <Step n={2} title="Đánh dấu giao dịch đáng ngờ">
@@ -56,9 +58,9 @@ export function SosScreen() {
       : <Link href="/settings/emergency-contacts" className="text-sm text-primary underline underline-offset-4">Thêm người thân khẩn cấp</Link>}
     <Notice>Bất kỳ ai đề nghị &apos;hỗ trợ lấy lại tiền&apos; có thu phí đều là lừa đảo. MSB chỉ cập nhật hồ sơ trong app.</Notice>
     <Sheet open={locking} title="Khóa tạm tài khoản" onClose={() => setLocking(false)}>
-      <p className="mb-5 text-sm leading-relaxed">Khóa tạm mọi giao dịch và thẻ? Bạn mở lại bằng xác thực khuôn mặt.</p>
+      <p className="mb-5 text-sm leading-relaxed">Khóa tạm mọi giao dịch và thẻ? Mở lại cần xác thực khuôn mặt và chờ 24 giờ.</p>
       <button type="button" className={redButton} onClick={() => { lockAccount(transferNow().getTime()); setLocking(false); }}>Khóa ngay</button>
     </Sheet>
-    <ConfirmFaceSheet open={unlocking} title="Mở khóa tài khoản?" message="Mở lại giao dịch và thẻ cần xác thực khuôn mặt." confirmLabel="Mở khóa" onConfirm={() => { unlockAccount(); setUnlocking(false); }} onClose={() => setUnlocking(false)} />
+    <ConfirmFaceSheet open={unlocking} title="Mở khóa tài khoản?" message="Mở lại giao dịch và thẻ cần xác thực khuôn mặt và chờ 24 giờ. Tài khoản vẫn khóa tới lúc đó." confirmLabel="Mở khóa" onConfirm={() => { requestOff("accountLock", transferNow().getTime()); setUnlocking(false); }} onClose={() => setUnlocking(false)} />
   </>;
 }

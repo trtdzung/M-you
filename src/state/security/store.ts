@@ -32,10 +32,10 @@ type SecurityActions = {
   applyRemoveContact: (id: string) => void;
   removeTrustedContact: (id: string) => void;
   addTrustedContact: (input: Omit<TrustedContact, "id">) => void;
+  /** Locking applies at once; unlocking early is `requestOff("transferLock")`. */
   lockTransfers: (days: number, now?: number) => void;
-  unlockTransfers: () => void;
+  /** Locking applies at once; unlocking is `requestOff("accountLock")`. */
   lockAccount: (now?: number) => void;
-  unlockAccount: () => void;
   setFamilyAlerts: (on: boolean) => void;
   setSecurityTips: (on: boolean) => void;
   logAlert: (entry: Omit<AlertLogEntry, "id" | "at"> & { at?: number }) => void;
@@ -45,6 +45,14 @@ type SecurityActions = {
 };
 
 export type SecurityStore = SecurityState & SecurityActions & { hasHydrated: boolean };
+
+// What each requested decrease changes once it takes effect.
+const OFF_CHANGES: Record<OffKey, Partial<SecurityState>> = {
+  aiProtect: { aiProtect: false },
+  antiPhishing: { antiPhishingCode: null },
+  transferLock: { transferLockUntil: null },
+  accountLock: { accountLocked: false, accountLockedAt: null },
+};
 
 const clockNow = () => transferNow().getTime();
 const newId = () => crypto.randomUUID();
@@ -65,10 +73,7 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     },
     requestOff: (key, now = clockNow()) => set(state => ({ pendingOff: { ...state.pendingOff, [key]: now + DAY_MS } })),
     cancelOff: key => set(state => ({ pendingOff: withoutPending(state.pendingOff, key) })),
-    applyOff: key => set(state => ({
-      ...(key === "aiProtect" ? { aiProtect: false } : { antiPhishingCode: null }),
-      pendingOff: withoutPending(state.pendingOff, key),
-    })),
+    applyOff: key => set(state => ({ ...OFF_CHANGES[key], pendingOff: withoutPending(state.pendingOff, key) })),
     saveAntiPhishingCode: code => set(state => ({ antiPhishingCode: code, pendingOff: withoutPending(state.pendingOff, "antiPhishing") })),
 
     addEmergencyContact: input => set(state => state.emergencyContacts.length >= MAX_EMERGENCY_CONTACTS ? state
@@ -87,10 +92,9 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     addTrustedContact: input => set(state => state.trustedContacts.some(contact => sameName(contact.name, input.name) && contact.account === input.account) ? state
       : { trustedContacts: [...state.trustedContacts, { ...input, id: newId() }] }),
 
-    lockTransfers: (days, now = clockNow()) => set({ transferLockUntil: now + days * DAY_MS }),
-    unlockTransfers: () => set({ transferLockUntil: null }),
-    lockAccount: (now = clockNow()) => set({ accountLocked: true, accountLockedAt: now }),
-    unlockAccount: () => set({ accountLocked: false, accountLockedAt: null }),
+    // A new lock also drops any unlock request still waiting.
+    lockTransfers: (days, now = clockNow()) => set(state => ({ transferLockUntil: now + days * DAY_MS, pendingOff: withoutPending(state.pendingOff, "transferLock") })),
+    lockAccount: (now = clockNow()) => set(state => ({ accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") })),
     setFamilyAlerts: on => set({ familyAlerts: on }),
     setSecurityTips: on => set({ securityTips: on }),
     logAlert: ({ at = clockNow(), ...entry }) => set(state => ({ alertLog: [...state.alertLog, { ...entry, id: newId(), at }] })),

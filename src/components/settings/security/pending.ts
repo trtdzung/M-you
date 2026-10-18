@@ -2,7 +2,8 @@
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type PendingOff = Partial<Record<"aiProtect" | "antiPhishing", number>>;
+/** Requested security decreases: turning a feature off, or lifting a lock early. */
+export type PendingOff = Partial<Record<"aiProtect" | "antiPhishing" | "transferLock" | "accountLock", number>>;
 
 /** True while a requested change (effective at `at`) has not taken effect yet. */
 export function isPending(at: number | undefined, now: number): at is number {
