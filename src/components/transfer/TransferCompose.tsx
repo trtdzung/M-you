@@ -10,6 +10,7 @@ import { useAutoFundWith } from "@/state/use-auto-fund";
 import { transferNow } from "@/lib/demo-clock";
 import { maskAccount } from "@/lib/mask-account";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
+import { isNavigationTransitionPending, navigateWithTransition } from "@/lib/view-transition";
 import { assessTransferRisk } from "@/lib/transfer-risk";
 import { formatVnd } from "@/lib/format";
 import { casaBalance, casaBalanceOrUnknown, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
@@ -28,6 +29,10 @@ export function TransferCompose() {
   const providers = useProviders();
   const router = useRouter();
   const params = useSearchParams();
+
+  useEffect(() => {
+    router.prefetch?.("/transfer-confirm");
+  }, [router]);
   const { config: jarConfig, loaded: jarsLoaded } = useJarConfig();
   const fin = useFinancials();
   const { financials } = fin;
@@ -192,7 +197,7 @@ export function TransferCompose() {
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
   function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation"> = {}) {
-    if (!recipient) return;
+    if (!recipient || isNavigationTransitionPending()) return;
     const id = `form_${Date.now()}`;
     putTransferDraft({
       id,
@@ -221,7 +226,10 @@ export function TransferCompose() {
       source: "mock",
       ...extras,
     });
-    router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`);
+    navigateWithTransition(
+      () => router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`),
+      "forward",
+    );
   }
 
   function continueToConfirm() {

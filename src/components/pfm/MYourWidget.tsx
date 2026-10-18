@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, Trash2, X } from "lucide-react";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
+import { prefersMotion } from "@/lib/motion";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
@@ -98,6 +99,14 @@ export function MYourWidget() {
   const assistantParam = params?.get("assistant") === "1";
 
   const isOpen = assistantParam;
+  const [visual, setVisual] = useState<"closed" | "open" | "exiting">(isOpen ? "open" : "closed");
+  if (isOpen && visual !== "open") setVisual("open");
+  else if (!isOpen && visual === "open") setVisual(prefersMotion() ? "exiting" : "closed");
+  useEffect(() => {
+    if (visual !== "exiting") return;
+    const timeout = window.setTimeout(() => setVisual("closed"), 320);
+    return () => window.clearTimeout(timeout);
+  }, [visual]);
   const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">("loading");
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -281,12 +290,22 @@ export function MYourWidget() {
 
   return (
     <>
-      {isOpen && (
+      {visual !== "closed" && (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          className="absolute inset-0 z-30 flex flex-col bg-surface"
+          role={visual === "exiting" ? undefined : "dialog"}
+          aria-modal={visual === "exiting" ? undefined : true}
+          aria-hidden={visual === "exiting" || undefined}
+          aria-labelledby={visual === "exiting" ? undefined : titleId}
+          inert={visual === "exiting"}
+          onAnimationEnd={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (!event.animationName.includes("sheet-panel-out")) return;
+            setVisual("closed");
+          }}
+          className={cn(
+            "absolute inset-0 z-30 flex flex-col bg-surface",
+            visual === "exiting" ? "sheet-panel-out" : "sheet-panel-in",
+          )}
         >
           <header className="shadow-card flex shrink-0 items-center gap-2.5 px-4 py-3">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full">

@@ -73,7 +73,7 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           <PromoCard key="business" variant="image" image="/brand/banner-business.jpg" imageAlt="Ưu đãi doanh nghiệp" />,
         ]} />
       </div>
-      {sheet === "login" && <Sheet title="Đăng nhập" description={transfer ? "Vui lòng đăng nhập trước khi sử dụng Chuyển tiền." : "Sử dụng mật khẩu demo để vào ứng dụng."} onClose={closeSheet}>
+      <Sheet open={sheet === "login"} title="Đăng nhập" description={transfer ? "Vui lòng đăng nhập trước khi sử dụng Chuyển tiền." : "Sử dụng mật khẩu demo để vào ứng dụng."} onClose={closeSheet}>
         <form onSubmit={handleLogin} className="pb-3">
           <p className="mb-4 text-sm font-semibold text-text">{customer?.label ?? "Vui lòng chọn khách hàng ở màn hình đăng nhập"}</p>
           <label className="mb-2 block text-sm font-medium" htmlFor="login-password">Mật khẩu</label>
@@ -85,15 +85,15 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           <button type="submit" className="login-submit">Đăng nhập</button>
           <button type="button" onClick={() => { setPassword(""); setError(""); setSheet("support"); }} className="mt-4 flex min-h-11 w-full items-center justify-center text-sm font-semibold text-primary">Hỗ trợ đăng nhập</button>
         </form>
-      </Sheet>}
-      {sheet === "customers" && <Sheet title="Chọn khách hàng" onClose={closeSheet}>
+      </Sheet>
+      <Sheet open={sheet === "customers"} title="Chọn khách hàng" onClose={closeSheet}>
         <p className="mb-4 text-sm text-muted">Chọn hồ sơ demo để đăng nhập.</p>
         <div className="space-y-2 pb-4">{customers.map(c => <button key={c.cif} type="button" aria-pressed={c.cif === cif} onClick={() => { setCif(c.cif); closeSheet(); }} className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left ${c.cif === cif ? "border-orange-400 bg-orange-50" : "border-border bg-white"}`}>
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-primary"><UserRound size={22} /></span>
           <span className="flex-1 font-semibold text-text">{c.label}</span>
           {c.cif === cif && <span className="text-xs font-semibold text-primary">Đang chọn</span>}
         </button>)}</div>
-      </Sheet>}
+      </Sheet>
       {sheet && sheet !== "login" && sheet !== "customers" && <Sheet title={{ "personal-qr": "QR cá nhân", qr: "Quét QR", support: "Hỗ trợ", language: "Ngôn ngữ", notifications: "Thông báo" }[sheet]} onClose={closeSheet}>
         {sheet === "personal-qr" ? <div className="pb-4 text-center"><QrCode size={120} className="mx-auto mb-4 text-text" /><p className="font-semibold">{customer?.label}</p><p className="mt-2 text-sm text-muted">QR minh hoạ cho hồ sơ demo, không dùng để nhận tiền.</p></div> : sheet === "qr" ? <div className="pb-4 text-center"><div className="mx-auto mb-5 flex h-40 w-40 items-center justify-center rounded-[20px] border-2 border-dashed border-orange-300 bg-orange-50"><ScanLine size={80} className="text-primary" /></div><p className="text-sm leading-relaxed text-muted">Khung quét QR mô phỏng. Bản demo không mở camera hoặc thực hiện thanh toán.</p></div> : sheet === "support" ? <div className="space-y-4 pb-4 text-sm leading-relaxed"><p>Chọn tên khách hàng trên thẻ chào mừng để đổi hồ sơ demo, sau đó bấm Đăng nhập và nhập mật khẩu demo đang dùng.</p><p className="text-muted">Bản giả lập không kết nối tài khoản ngân hàng thật. Không nhập thông tin đăng nhập ngân hàng của bạn.</p><button type="button" className="login-submit" onClick={() => setSheet("login")}>Quay lại đăng nhập</button></div> : sheet === "language" ? <div className="pb-4"><button type="button" className="flex min-h-12 w-full items-center justify-between text-sm font-semibold" onClick={closeSheet}>🇻🇳 Tiếng Việt <span className="text-primary">Đang sử dụng</span></button><p className="mt-3 text-xs text-muted">Bản giả lập hiện hỗ trợ Tiếng Việt.</p></div> : <p className="pb-5 text-sm text-muted">Bạn chưa có thông báo mới. Đăng nhập để xem thông báo tài khoản.</p>}
       </Sheet>}

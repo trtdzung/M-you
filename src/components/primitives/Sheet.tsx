@@ -4,6 +4,10 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { prefersMotion } from "@/lib/motion";
+import { usePanelActive } from "@/components/shell/PanelActive";
+
+const EXIT_FALLBACK_MS = 320;
 
 /** Shared accessible bottom sheet for reports, editors, and confirmations. */
 export function Sheet({
@@ -28,6 +32,19 @@ export function Sheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const panelActive = usePanelActive();
+  const [phase, setPhase] = useState<"open" | "closed" | "exiting">(open ? "open" : "closed");
+
+  // A hidden PFM tab must not keep a portaled sheet on screen. Exit animation
+  // only runs when the caller keeps the sheet mounted and sets `open` to false.
+  const live = open && panelActive;
+  if (!panelActive && phase !== "closed") {
+    setPhase("closed");
+  } else if (live && phase !== "open") {
+    setPhase("open");
+  } else if (!open && phase === "open") {
+    setPhase(prefersMotion() ? "exiting" : "closed");
+  }
 
   // Anchor the sheet inside the device frame, not the browser viewport. The
   // desktop preview applies `zoom` to `.device-canvas`, which breaks
@@ -40,7 +57,7 @@ export function Sheet({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!live) return;
 
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
@@ -83,28 +100,47 @@ export function Sheet({
       const previous = restoreFocusRef.current;
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
-  }, [onClose, open]);
+  }, [onClose, live]);
 
-  if (!open || !container) return null;
+  useEffect(() => {
+    if (phase !== "exiting") return;
+    const timeout = window.setTimeout(() => setPhase("closed"), EXIT_FALLBACK_MS);
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
+
+  if (phase === "closed" || !container) return null;
+
+  const exiting = phase === "exiting";
 
   return createPortal(
-    <div className="absolute inset-0 z-40 flex items-end justify-center" data-testid="sheet-root">
+    <div
+      className={cn("absolute inset-0 z-40 flex items-end justify-center", exiting && "pointer-events-none")}
+      data-testid="sheet-root"
+      inert={exiting}
+    >
       <button
         type="button"
         aria-label={closeLabel}
         data-sheet-backdrop="true"
         tabIndex={-1}
-        className="absolute inset-0 cursor-pointer bg-black/40"
+        className={cn("absolute inset-0 cursor-pointer bg-black/40", exiting ? "sheet-backdrop-out" : "sheet-backdrop-in")}
         onClick={onClose}
       />
       <div
         ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
+        role={exiting ? undefined : "dialog"}
+        aria-modal={exiting ? undefined : true}
+        aria-hidden={exiting || undefined}
+        aria-labelledby={exiting ? undefined : titleId}
+        aria-describedby={!exiting && description ? descriptionId : undefined}
+        onAnimationEnd={(event) => {
+          if (event.target !== panelRef.current) return;
+          if (!event.animationName.includes("sheet-panel-out")) return;
+          setPhase("closed");
+        }}
         className={cn(
           "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
+          exiting ? "sheet-panel-out" : "sheet-panel-in",
           className,
         )}
       >

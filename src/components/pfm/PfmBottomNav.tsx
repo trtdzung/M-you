@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
-import { PFM_TABS, resolveLegacyTab, type PfmTabId } from "./PfmTabs";
+import { PFM_TABS, resolveLegacyTab, withPfmTab, type PfmTabId } from "./PfmTabs";
 import { VoiceFab } from "./VoiceFab";
 
 /**
@@ -33,11 +33,7 @@ export function PfmBottomNav() {
     (PFM_TABS.some((t) => t.id === tabParam) ? (tabParam as PfmTabId) : "overview");
 
   function go(id: PfmTabId) {
-    const next = new URLSearchParams(params?.toString());
-    next.set("tab", id);
-    next.delete("dock");
-    next.delete("setup");
-    router.replace(`/pfm?${next.toString()}`, { scroll: false });
+    router.replace(`/pfm?${withPfmTab(params ?? new URLSearchParams(), id)}`, { scroll: false });
   }
 
   const left = PFM_TABS.slice(0, 2);

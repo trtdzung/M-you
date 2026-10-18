@@ -124,22 +124,18 @@ export function TransferBankEntry({
       </button>
       </div>
 
-      {recipientSheetOpen && (
-        <Sheet className="transfer-sheet" title="Người thụ hưởng" onClose={() => setRecipientSheetOpen(false)}>
-          <RecipientPicker beneficiaries={beneficiaries} transactions={transactions} loading={loading} loadError={loadError} onChange={(next) => {
-            if (!next) return;
-            const recipientBank = findBankByName(next.bankName);
-            setBankId(recipientBank?.id ?? null);
-            setAccountNumber(next.accountNumber);
-            setRecipientName(next.name);
-            setPickedRecipient(next);
-            setRecipientSheetOpen(false);
-          }} />
-        </Sheet>
-      )}
-      {bankSheetOpen && (
-        <TransferBankSheet onClose={() => setBankSheetOpen(false)} onSelect={selectBank} />
-      )}
+      <Sheet open={recipientSheetOpen} className="transfer-sheet" title="Người thụ hưởng" onClose={() => setRecipientSheetOpen(false)}>
+        <RecipientPicker beneficiaries={beneficiaries} transactions={transactions} loading={loading} loadError={loadError} onChange={(next) => {
+          if (!next) return;
+          const recipientBank = findBankByName(next.bankName);
+          setBankId(recipientBank?.id ?? null);
+          setAccountNumber(next.accountNumber);
+          setRecipientName(next.name);
+          setPickedRecipient(next);
+          setRecipientSheetOpen(false);
+        }} />
+      </Sheet>
+      <TransferBankSheet open={bankSheetOpen} onClose={() => setBankSheetOpen(false)} onSelect={selectBank} />
     </div>
   );
 }

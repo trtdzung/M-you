@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { prefersMotion } from "@/lib/motion";
 import { usePersona } from "@/providers/context";
 import { sendChatMessage, isChartUi, isClarifyOptionsUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
@@ -99,6 +100,8 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const { assignable } = useCategories();
   const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
   const [sectionOpen, setSectionOpen] = useState(false);
+  const [panelPhase, setPanelPhase] = useState<"closed" | "open" | "exiting">("closed");
+  const skipPanelExit = useRef(false);
   const [listening, setListening] = useState(false);
   // `pending` = pointer/key is down, waiting to see if this turns into a hold;
   // `holding` = the threshold passed and the mic is actually live. A press that
@@ -111,6 +114,12 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   const [sending, setSending] = useState(false);
   const [reply, setReply] = useState<{ answer: string; ui: UiPayload } | null>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (panelPhase !== "exiting") return;
+    const timeout = window.setTimeout(() => setPanelPhase("closed"), 320);
+    return () => window.clearTimeout(timeout);
+  }, [panelPhase]);
 
   const handleSend = useCallback(async (textOverride?: string) => {
     const text = (textOverride ?? transcript).trim();
@@ -225,6 +234,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     clearHoldTimer();
     pending.current = false;
     holding.current = false;
+    skipPanelExit.current = true;
     setSectionOpen(false);
     setListening(false);
     voiceRef.current.cancel();
@@ -243,7 +253,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     voiceRef.current.cancel();
   }
 
-  const micButton = (
+  const renderMic = () => (
     <button
       type="button"
       onPointerDown={(event) => { if (event.button > 0 || event.isPrimary === false) return; onPointerDown(); }}
@@ -280,22 +290,36 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     </button>
   );
 
-  if (!sectionOpen) {
-    return floating ? (
-      <div className="shell-fab pointer-events-none absolute right-5 z-20 flex justify-end">{micButton}</div>
-    ) : (
-      micButton
-    );
+  if (sectionOpen && panelPhase !== "open") setPanelPhase("open");
+  else if (!sectionOpen && panelPhase === "open") {
+    setPanelPhase(skipPanelExit.current || !prefersMotion() ? "closed" : "exiting");
+    skipPanelExit.current = false;
   }
-  if (!container) return null;
 
-  return createPortal(
-    <div className="absolute inset-0 z-40">
+  const restingMic = floating ? (
+    <div className="shell-fab pointer-events-none absolute right-5 z-20 flex justify-end">{renderMic()}</div>
+  ) : (
+    renderMic()
+  );
+
+  if (panelPhase === "closed") return restingMic;
+  if (!container) return restingMic;
+
+  const panel = createPortal(
+    <div className={cn("absolute inset-0 z-40", panelPhase === "exiting" && "pointer-events-none")} inert={panelPhase === "exiting"}>
       <button type="button" aria-label="Đóng" className="absolute inset-0 cursor-default" onClick={closeSection} />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0">
         <div
-          className="voice-panel pointer-events-auto flex w-full flex-col items-center gap-4 rounded-t-card border-t border-border bg-surface px-5 pt-5 pb-[calc(24px+var(--safe-area-bottom))] shadow-nav"
+          onAnimationEnd={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (!event.animationName.includes("sheet-panel-out")) return;
+            setPanelPhase("closed");
+          }}
+          className={cn(
+            "voice-panel pointer-events-auto flex w-full flex-col items-center gap-4 rounded-t-card border-t border-border bg-surface px-5 pt-5 pb-[calc(24px+var(--safe-area-bottom))] shadow-nav",
+            panelPhase === "exiting" ? "sheet-panel-out" : "sheet-panel-in",
+          )}
           style={{ minHeight: "48dvh" }}
         >
           <div className="flex w-full items-center justify-between">
@@ -407,7 +431,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               <RotateCcw size={18} />
             </button>
 
-            {micButton}
+            {renderMic()}
 
             <button
               type="button"
@@ -424,4 +448,14 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     </div>,
     container,
   );
+
+  if (panelPhase === "exiting") {
+    return (
+      <>
+        {restingMic}
+        {panel}
+      </>
+    );
+  }
+  return panel;
 }

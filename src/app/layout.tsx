@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "./providers";
+import { ViewTransitionCommit } from "@/components/shell/ViewTransitionCommit";
 
 const beVietnam = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -33,7 +34,10 @@ export default function RootLayout({
   return (
     <html lang="vi" className={beVietnam.variable}>
       <body>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <ViewTransitionCommit />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

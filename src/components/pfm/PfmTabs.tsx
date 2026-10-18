@@ -43,3 +43,13 @@ export function resolveLegacyTab(tab: string | null | undefined): PfmTabId | nul
   if (tab === "cashflow") return "overview";
   return null;
 }
+
+/** Tab query for the wallet nav. Leaving Hũ & danh mục drops `hu`, so a hidden panel cannot reopen its editor. */
+export function withPfmTab(current: URLSearchParams, id: PfmTabId): string {
+  const next = new URLSearchParams(current.toString());
+  next.set("tab", id);
+  next.delete("dock");
+  next.delete("setup");
+  if (id !== "settings") next.delete("hu");
+  return next.toString();
+}

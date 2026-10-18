@@ -16,11 +16,11 @@ const BANK_DESCRIPTIONS: Record<string, string> = {
 };
 const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLowerCase();
 
-export function TransferBankSheet({ onClose, onSelect }: { onClose: () => void; onSelect: (id: string) => void }) {
+export function TransferBankSheet({ open = true, onClose, onSelect }: { open?: boolean; onClose: () => void; onSelect: (id: string) => void }) {
   const [query, setQuery] = useState("");
   const banks = TRANSFER_BANKS.filter((bank) => normalize(`${bank.name} ${BANK_DESCRIPTIONS[bank.id]}`).includes(normalize(query.trim())));
   return (
-    <Sheet className="transfer-sheet transfer-bank-sheet" title="Chọn ngân hàng" onClose={onClose}>
+    <Sheet open={open} className="transfer-sheet transfer-bank-sheet" title="Chọn ngân hàng" onClose={onClose}>
       <label className="mb-3 flex h-12 items-center gap-3 rounded-[10px] border border-[#dfe5ee] bg-[#f7f8fa] px-4">
         <Search size={22} className="shrink-0 text-text" aria-hidden />
         <input aria-label="Tên ngân hàng" placeholder="Tên ngân hàng" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-base text-text outline-none placeholder:text-[#a5adbc]" />

@@ -205,8 +205,7 @@ export function TransferAmountStep({
         </div>
       </div>
 
-      {sourceSheetOpen && (
-        <Sheet className="transfer-sheet" title="Chọn tài khoản nguồn" onClose={() => setSourceSheetOpen(false)}>
+      <Sheet open={sourceSheetOpen} className="transfer-sheet" title="Chọn tài khoản nguồn" onClose={() => setSourceSheetOpen(false)}>
           {pool && (
             <button
               type="button"
@@ -320,7 +319,6 @@ export function TransferAmountStep({
             </>
           )}
         </Sheet>
-      )}
     </div>
   );
 }

@@ -242,6 +242,57 @@ body {
   animation: fade-in 0.24s ease-out;
 }
 
+@keyframes sheet-panel-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes sheet-panel-out {
+  from { transform: none; }
+  to { transform: translateY(100%); }
+}
+@keyframes sheet-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes vt-forward-old {
+  to { transform: translateX(-30%); }
+}
+@keyframes vt-forward-new {
+  from { transform: translateX(100%); }
+}
+@keyframes vt-back-old {
+  to { transform: translateX(100%); }
+}
+@keyframes vt-back-new {
+  from { transform: translateX(-30%); }
+}
+
+.sheet-panel-in { animation: sheet-panel-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.sheet-panel-out { animation: sheet-panel-out 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.sheet-backdrop-in { animation: sheet-backdrop-in 200ms ease-out both; }
+.sheet-backdrop-out { animation: sheet-backdrop-out 200ms ease-out both; }
+
+#main-content { view-transition-name: shell-main; }
+.status-bar { view-transition-name: shell-status; }
+
+html[data-vt-dir] #main-content { animation: none; }
+
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(shell-status),
+::view-transition-new(shell-status) {
+  animation: none;
+}
+::view-transition-image-pair(shell-main) { overflow: clip; }
+::view-transition-old(shell-main) { animation: vt-forward-old 300ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+::view-transition-new(shell-main) { animation: vt-forward-new 300ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+html[data-vt-dir="back"] ::view-transition-old(shell-main) { animation-name: vt-back-old; }
+html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-back-new; }
+
 /* Ẩn thanh cuộn (carousel ngang) — vẫn cuộn được, chỉ ẩn scrollbar */
 @utility no-scrollbar {
   scrollbar-width: none;
@@ -260,6 +311,12 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 

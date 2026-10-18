@@ -149,9 +149,7 @@ export function TransferSaveRecipient({
         Tiếp tục
       </button>
 
-      {bankSheetOpen && (
-        <TransferBankSheet onClose={() => setBankSheetOpen(false)} onSelect={selectBank} />
-      )}
+      <TransferBankSheet open={bankSheetOpen} onClose={() => setBankSheetOpen(false)} onSelect={selectBank} />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 const replace = vi.fn();
 const router = { replace };
@@ -57,5 +57,24 @@ describe("PfmTabHost — reflects ?tab= and resolves legacy ids", () => {
     render(<PfmTabHost />);
     expect(screen.getByText("overview panel")).toBeInTheDocument();
     expect(replace).toHaveBeenCalledWith("/pfm?tab=overview", { scroll: false });
+  });
+
+  it("keeps a visited panel mounted and restores its scroll", async () => {
+    const { rerender } = render(<PfmTabHost />);
+    const overview = document.getElementById("pfm-panel-overview") as HTMLDivElement;
+    overview.scrollTop = 140;
+    overview.dispatchEvent(new Event("scroll"));
+
+    query = "tab=budget";
+    rerender(<PfmTabHost />);
+    await waitFor(() => expect(screen.getByText("budget panel")).toBeInTheDocument());
+    expect(overview.hidden).toBe(true);
+    expect(overview.textContent).toContain("overview panel");
+    overview.scrollTop = 0;
+
+    query = "";
+    rerender(<PfmTabHost />);
+    await waitFor(() => expect(screen.getByText("overview panel")).toBeInTheDocument());
+    expect(document.getElementById("pfm-panel-overview")?.scrollTop).toBe(140);
   });
 });
