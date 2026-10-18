@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TestToolsFab } from "@/components/settings/security/test-tools/TestToolsFab";
 import { StatusBar } from "./StatusBar";
 import { cn } from "@/lib/cn";
 
@@ -62,6 +63,8 @@ export function PhoneShell({
           </div>
           {nav}
         </div>
+        {/* Tester shortcut, off unless enabled in config; outside the sliding screen so it stays put. */}
+        <TestToolsFab />
       </div>
     </div>
   );
