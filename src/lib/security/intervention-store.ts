@@ -145,10 +145,10 @@ export function setAgentCopy(cif: string, id: string, status: AgentStatus, copy?
     .run(status, copy ? JSON.stringify(copy) : null, level ?? null, cif, id);
 }
 
-/** History for the frequency rules: every intervention that reached the customer. */
+/** History for the frequency rules: every intervention shown, answered, or still waiting to show. */
 export function shownHistory(cif: string): ShownBefore[] {
   const rows = getDb()
-    .prepare("SELECT scenario, context, shown_at, created_at, choice FROM interventions WHERE cif = ? AND status IN ('shown', 'answered')")
+    .prepare("SELECT scenario, context, shown_at, created_at, choice FROM interventions WHERE cif = ? AND status IN ('pending', 'shown', 'answered')")
     .all(cif) as Pick<Row, "scenario" | "context" | "shown_at" | "created_at" | "choice">[];
   return rows.map(row => ({
     scenario: row.scenario,

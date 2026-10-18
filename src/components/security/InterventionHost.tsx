@@ -17,7 +17,7 @@ const NOTICE_MS = 4_000;
 type Place = { top: number; left: number; width: number };
 
 /** Where a tooltip goes: under its anchor inside the phone frame, or at the top when there is no anchor. */
-function useAnchorPlace(target: string): Place | null {
+function useAnchorPlace(target: string, mayFloat: boolean): Place | null {
   const [place, setPlace] = useState<Place | null>(null);
   useEffect(() => {
     const measure = () => {
@@ -27,7 +27,8 @@ function useAnchorPlace(target: string): Place | null {
       const frame = canvas.getBoundingClientRect();
       const width = Math.min(320, canvas.offsetWidth - 32);
       const anchor = document.querySelector<HTMLElement>(`[data-shield-anchor="${CSS.escape(target)}"]`);
-      if (!anchor) return setPlace(target === "global" ? { top: 56, left: (canvas.offsetWidth - width) / 2, width } : null);
+      // Money-in tips (BT4/BT5) float at the top on any screen until their row is on screen.
+      if (!anchor) return setPlace(mayFloat && (target === "global" || target.startsWith("txn:")) ? { top: 56, left: (canvas.offsetWidth - width) / 2, width } : null);
       const rect = anchor.getBoundingClientRect();
       const below = (rect.bottom - frame.top) / zoom + 8;
       const roomBelow = canvas.offsetHeight - below > 160;
@@ -43,12 +44,12 @@ function useAnchorPlace(target: string): Place | null {
       window.clearInterval(timer);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [target]);
+  }, [target, mayFloat]);
   return place;
 }
 
-function Tooltip({ item, onChoose, onShown }: { item: Intervention; onChoose: (choice: string) => void; onShown: () => void }) {
-  const place = useAnchorPlace(item.target);
+function Tooltip({ item, mayFloat, onChoose, onShown }: { item: Intervention; mayFloat: boolean; onChoose: (choice: string) => void; onShown: () => void }) {
+  const place = useAnchorPlace(item.target, mayFloat);
   const canvas = typeof document === "undefined" ? null : document.getElementById("device-canvas");
   const reported = useRef(false);
   useEffect(() => {
@@ -67,7 +68,14 @@ function Tooltip({ item, onChoose, onShown }: { item: Intervention; onChoose: (c
       style={{ top: place.top, left: place.left, width: place.width }}
     >
       <button type="button" aria-label="Đóng" className="absolute right-2 top-2 p-1 text-muted" onClick={() => onChoose("Đóng")}><X size={16} aria-hidden /></button>
-      <InterventionBody intervention={item} onChoose={onChoose} />
+      <InterventionBody
+        intervention={item}
+        onChoose={onChoose}
+        extra={item.scenario === "BT4" && (
+          // SC1 trigger: «[Không phải tôi → khóa ngay] (BT4, DH6)».
+          <button type="button" className="mt-1 text-left text-xs font-semibold text-negative underline underline-offset-4" onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>
+        )}
+      />
     </div>,
     canvas,
   );
@@ -131,11 +139,20 @@ export function InterventionHost() {
 
   const popup = visible.find(item => item.surface === "popup");
   const tooltips = visible.filter(item => item.surface === "tooltip" || item.surface === "banner");
+  // One tooltip at a time: the newest whose anchor is on this screen, or that may float.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick(tick => tick + 1), 500);
+    return () => window.clearInterval(timer);
+  }, []);
+  const floats = (item: Intervention) => item.target === "global" || item.target.startsWith("txn:");
+  const current = typeof document === "undefined" ? undefined
+    : tooltips.find(item => floats(item) || document.querySelector(`[data-shield-anchor="${CSS.escape(item.target)}"]`));
   const canvas = typeof document === "undefined" ? null : document.getElementById("device-canvas");
 
   return (
     <>
-      {tooltips.map(item => <Tooltip key={item.id} item={item} onChoose={choose(item)} onShown={() => shown(item.id)} />)}
+      {current && <Tooltip key={current.id} item={current} mayFloat onChoose={choose(current)} onShown={() => shown(current.id)} />}
       {popup && <Popup key={popup.id} item={popup} onChoose={choose(popup)} onShown={() => shown(popup.id)} />}
       {notice && canvas && createPortal(
         <p role="status" className="absolute inset-x-4 top-14 z-50 rounded-[16px] bg-text p-3 text-center text-sm text-white">{notice}</p>,

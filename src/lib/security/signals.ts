@@ -271,9 +271,12 @@ function largeCreditSignal(ctx: SignalContext, now: number): Signal | null {
   );
   const large = newCreditsFrom(ctx, now, ALERT_RULES.largeCreditWindowMs).filter(c => c.amount >= threshold);
   if (!large.length) return null;
-  const received = Math.max(...large.map(c => c.amount));
+  const biggest = large.reduce((a, b) => (b.amount > a.amount ? b : a));
+  const received = biggest.amount;
   const shareOfRecent = received > 0 ? Math.round((ctx.amount / received) * 100) / 100 : 0;
-  return signal("T7b", `Vừa nhận ${fmtVnd(received)} từ tài khoản chưa từng giao dịch, không phải lương hay thu nhập định kỳ`, { received, shareOfRecent });
+  return signal("T7b", `Vừa nhận ${fmtVnd(received)} từ tài khoản chưa từng giao dịch, không phải lương hay thu nhập định kỳ`, {
+    received, shareOfRecent, senderKey: accountKey(biggest.sender.last4, biggest.sender.bank), receivedAt: biggest.at,
+  });
 }
 
 function contextSignal(ctx: SignalContext): Signal | null {

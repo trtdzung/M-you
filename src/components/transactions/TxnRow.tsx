@@ -36,6 +36,7 @@ export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: 
   return (
     <button
       type="button"
+      data-shield-anchor={`txn:${txn.id}`}
       onClick={() => onEdit(txn)}
       className="txn-row flex min-h-16 w-full items-center gap-3 rounded-row px-1 py-2.5 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
     >

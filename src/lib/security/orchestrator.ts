@@ -95,9 +95,17 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
   const ctx: MomentContext = { now, trigger, ...input.moment };
   let incomingSignals: Signal[] = [];
   if (trigger === "incoming_credit") {
-    incomingSignals = computeIncomingSignals(buildIncomingContext(cif));
+    const incoming = buildIncomingContext(cif);
     const latest = (eventsSince(cif, now - 5 * MINUTE_MS, ["incoming_credit"]) as SecurityEvent<"incoming_credit">[]).at(-1);
     ctx.credit = latest ? { amount: latest.payload.amount, kind: latest.payload.kind } : null;
+    // BT4/BT5 speak about the credit that just arrived: T7a for its sender, T7b for that credit alone.
+    const latestKey = latest ? accountKey(latest.payload.senderLast4, latest.payload.senderBank) : null;
+    const bait = computeIncomingSignals(incoming).filter(s => s.code === "T7a" && s.facts.senderKey === latestKey);
+    const large = latest
+      ? computeIncomingSignals({ ...incoming, credits: (incoming.credits ?? []).filter(c => c.at === latest.at && accountKey(c.sender.last4, c.sender.bank) === latestKey) })
+        .filter(s => s.code === "T7b")
+      : [];
+    incomingSignals = [...bait, ...large];
     ctx.hasActiveEmergencyContact = profile.emergencyContacts.some(c => c.status === "active" || c.status === "removing");
     ctx.incomingSignals = incomingSignals;
   }

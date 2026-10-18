@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { creditAccount, CreditAccountNotFoundError } from "@/lib/security/credit-store";
+import { evaluate } from "@/lib/security/orchestrator";
 
 /**
  * POST /api/accounts/credit — money IN for a demo persona (simulated bank
  * credit): body `{ cif, accountId, amount, sender: { name, account, bank },
  * memo?, kind: "salary" | "income" | "transfer", txnId? }`. Adds to `balance` +
  * `available_balance`, stores the credit, logs `incoming_credit`, and returns
- * `{ accounts, transaction }`. Only the test tools call this route.
+ * `{ accounts, transaction, interventions }` (the Scam Shield tips the credit
+ * raised: BT3–BT5). Only the test tools call this route.
  */
 
 const KINDS = new Set(["salary", "income", "transfer"]);
@@ -30,14 +32,22 @@ export async function POST(req: NextRequest) {
   if (!KINDS.has(body?.kind)) return NextResponse.json({ error: "kind is invalid" }, { status: 422 });
   if (body.txnId !== undefined && !text(body.txnId, 80)) return NextResponse.json({ error: "txnId is invalid" }, { status: 422 });
   try {
-    return NextResponse.json(creditAccount(body.cif, {
+    const result = creditAccount(body.cif, {
       accountId: body.accountId,
       amount: body.amount,
       sender: { name: sender.name.trim(), account: sender.account.trim(), bank: sender.bank.trim() },
       memo: typeof body.memo === "string" && body.memo.trim() ? body.memo.trim() : undefined,
       kind: body.kind,
       txnId: body.txnId,
-    }));
+    });
+    // Scam Shield: money in is an engine event (BT3–BT5). The engine failing never undoes the credit.
+    let interventions: unknown[] = [];
+    try {
+      interventions = evaluate(body.cif, "incoming_credit", { txnId: result.transaction.id });
+    } catch (err) {
+      console.error("Scam Shield evaluate after credit failed", err);
+    }
+    return NextResponse.json({ ...result, interventions });
   } catch (err) {
     if (err instanceof CreditAccountNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 });
     console.error("Account credit failed", err);
