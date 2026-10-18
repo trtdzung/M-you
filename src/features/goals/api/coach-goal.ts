@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forwardToAgent } from "@/lib/agent-proxy-auth";
+import { transferNow } from "@/lib/demo-clock";
+import { agentAlias, agentContext } from "../advisor/agent-identity";
 import {
   COACH_ANSWERS_MAX,
   COACH_ANSWER_VALUE_MAX,
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid coach request" }, { status: 422 });
   }
 
-  const payload: Record<string, unknown> = { user_id: cif, request, answers };
+  const payload: Record<string, unknown> = { user_id: agentAlias(cif), request, answers };
   if (body.currentDraft !== undefined && body.currentDraft !== null) {
     const d = body.currentDraft as { target_amount?: unknown; opening_amount?: unknown; months?: unknown };
     const ok =
@@ -48,6 +50,11 @@ export async function POST(req: NextRequest) {
       (d.months === undefined || d.months === null || (Number.isInteger(d.months) && (d.months as number) >= 1 && (d.months as number) <= 600));
     if (!ok) return NextResponse.json({ error: "invalid coach request" }, { status: 422 });
     payload.current_draft = { target_amount: d.target_amount, opening_amount: d.opening_amount, months: d.months ?? null };
+  }
+  // Chips are shaped by the customer's real figures; only for a fresh goal (an edit of a draft needs none).
+  if (!payload.current_draft) {
+    const context = agentContext(cif, transferNow());
+    if (context) payload.context = context;
   }
   const res = await forwardToAgent("/goal-coach", payload);
   if (!res.ok) return unavailable();

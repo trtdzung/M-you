@@ -3,7 +3,8 @@
 import { useState } from "react";
 import type { CoachQuestion as Question } from "../../coach/contracts";
 import { GOALS_COPY } from "../copy";
-import { chip, input, secondaryButton } from "../styles";
+import { formatMonths } from "../shared/format-months";
+import { chip, hint, input, secondaryButton } from "../styles";
 
 /** One catalog question: quick-pick chips plus an optional free-text box. */
 export function CoachQuestion({
@@ -21,6 +22,13 @@ export function CoachQuestion({
   return (
     <div className="flex flex-col gap-3">
       <p className="rounded-2xl rounded-tl-sm bg-surface-tint p-4 text-[16px] leading-6 text-text">{question.text}</p>
+      {question.hint && (
+        <p role="note" className={`rounded-2xl bg-warning-soft px-3.5 py-3 ${hint}`}>
+          {question.hint.code === "far_beyond" && question.hint.months
+            ? GOALS_COPY.coach.hint.far_beyond(formatMonths(question.hint.months))
+            : GOALS_COPY.coach.hint.no_surplus}
+        </p>
+      )}
       {question.options.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {question.options.map((o) => (

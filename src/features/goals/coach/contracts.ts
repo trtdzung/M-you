@@ -24,12 +24,19 @@ export interface CoachAnswer {
   source: "option" | "text";
 }
 
+export interface CoachHint {
+  code: "far_beyond" | "no_surplus";
+  months?: number | null;
+}
+
 export interface CoachQuestion {
   slot: CoachSlotName;
   code: CoachMessageCode;
   text: string;
   options: { label: string; value: string }[];
   allow_free_text: boolean;
+  /** Early warning decided by the agent's code; the wording lives in `ui/copy.ts`. */
+  hint?: CoachHint | null;
 }
 
 export interface CoachDraft {
@@ -106,6 +113,10 @@ function isAdjustment(x: unknown): x is CoachAdjustment {
   return isObj(x) && ADJUST_KINDS.includes(x.kind as string) && isPosInt(x.value) && (x.evidence == null || typeof x.evidence === "string");
 }
 
+function isHint(x: unknown): x is CoachHint {
+  return isObj(x) && (x.code === "far_beyond" || x.code === "no_surplus") && (x.months == null || isPosInt(x.months));
+}
+
 function isQuestion(x: unknown): x is CoachQuestion {
   return (
     isObj(x) &&
@@ -113,6 +124,7 @@ function isQuestion(x: unknown): x is CoachQuestion {
     CODES.includes(x.code as string) &&
     isStr(x.text) &&
     typeof x.allow_free_text === "boolean" &&
+    (x.hint == null || isHint(x.hint)) &&
     Array.isArray(x.options) &&
     x.options.every((o) => isObj(o) && isStr(o.label) && isStr(o.value))
   );

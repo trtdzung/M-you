@@ -37,6 +37,10 @@ export const GOALS_COPY = {
     manual: "Tự nhập",
     yourSentence: (text: string) => `Bạn đã nói: “${text}”`,
     reviewAndCreate: "Kiểm tra và tạo mục tiêu",
+    hint: {
+      far_beyond: (period: string) => `Với phần dư hiện tại, mục tiêu này cần khoảng ${period}. Bạn có thể giảm số tiền hoặc kéo dài thời gian nhé.`,
+      no_surplus: "Hiện bạn chưa có phần dư mỗi tháng, mình vẫn cùng bạn tính thử các cách khả thi.",
+    },
   },
 
   advisor: {

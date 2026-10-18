@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forwardToAgent } from "@/lib/agent-proxy-auth";
+import { agentAlias } from "../advisor/agent-identity";
 import {
   DIALOGUE_ACTIONS,
   NARRATION_DEADLINE_MS,
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   const started = Date.now();
   const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), NARRATION_DEADLINE_MS));
-  const call = forwardToAgent("/goal-coach/narrate", { user_id: cif, ...payload }).then((r) => (r.ok ? r.json().catch(() => null) : null)).catch(() => null);
+  const call = forwardToAgent("/goal-coach/narrate", { user_id: agentAlias(cif), ...payload }).then((r) => (r.ok ? r.json().catch(() => null) : null)).catch(() => null);
   const data: unknown = await Promise.race([call, timeout]);
   const ms = Date.now() - started;
   const blocks = (data as { blocks?: unknown } | null)?.blocks;
