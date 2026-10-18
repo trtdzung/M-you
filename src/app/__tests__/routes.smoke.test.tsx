@@ -111,7 +111,8 @@ describe("route smoke — all screens mount", () => {
 
   it("Settings (/settings)", async () => {
     const { default: Page } = await import("../(festive)/settings/page");
-    expect(() => renderScreen(<Page />)).not.toThrow();
+    const { default: Layout } = await import("../(festive)/settings/layout");
+    expect(() => renderScreen(<Layout><Page /></Layout>)).not.toThrow();
   });
 
   it("Transfer confirm (/transfer-confirm)", async () => {

@@ -1,4 +1,7 @@
+"use client";
+
 import { Suspense } from "react";
+import { usePathname } from "next/navigation";
 import { PhoneShell } from "@/components/shell/PhoneShell";
 import { BottomNav } from "@/components/shell/BottomNav";
 import { VoiceFab } from "@/components/pfm/VoiceFab";
@@ -34,12 +37,17 @@ export default function FestiveLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const settings = pathname?.startsWith("/settings");
+  const settingsDetail = settings && pathname !== "/settings";
   return (
     <PhoneShell
-      background={<FestiveBg />}
-      nav={<BottomNav />}
+      className={settings ? "shell-calm settings-shell" : undefined}
+      mainClassName={settingsDetail ? "settings-main-detail" : undefined}
+      background={settings ? <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[#fce0d5] to-[#fbd0d4]" /> : <FestiveBg />}
+      nav={settingsDetail ? undefined : <BottomNav />}
       fab={
-        <Suspense fallback={null}>
+        !settings && <Suspense fallback={null}>
           <VoiceFab floating />
         </Suspense>
       }
