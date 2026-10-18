@@ -49,6 +49,22 @@ export function getDb(): Database.Database {
   } catch {
     // column already gone — nothing to do
   }
+  // Migration (plan 261013): `agent_preferences.interests`/`.financial_habits` were
+  // merged into one `about` field (fewer, bigger free-text boxes on the form). A DB
+  // from before the merge still has the old columns and no `about` — rename one into
+  // it (keeping whichever of the two had content) and drop the other; both ALTERs
+  // throw once already migrated/on a fresh DB (no `agent_preferences` table yet or
+  // already merged), which we swallow (idempotent).
+  try {
+    const cols = db.prepare("PRAGMA table_info(agent_preferences)").all() as { name: string }[];
+    if (cols.some((c) => c.name === "interests") && !cols.some((c) => c.name === "about")) {
+      db.exec("ALTER TABLE agent_preferences RENAME COLUMN financial_habits TO about");
+      db.exec("UPDATE agent_preferences SET about = TRIM(interests || ' ' || about) WHERE interests != ''");
+      db.exec("ALTER TABLE agent_preferences DROP COLUMN interests");
+    }
+  } catch {
+    // already migrated, or the table doesn't exist yet — schema.sql below creates it fresh
+  }
   instance = db;
   return db;
 }

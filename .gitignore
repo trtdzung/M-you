@@ -40,7 +40,10 @@
 /.superpowers/
 
 # local reference docs for the real Agent backend (not part of the codebase)
-/agent_backend_docs/
+# 2026-10-13: backend_docs/pfm-read-api.md is now a symlink to
+# ../agent-docs/backend-to-agent/pfm-read-api.md (single source of truth, outside
+# both repos) -- git rm --cached'd and ignored here, not just blocking new files.
+/backend_docs/
 
 # debug logs
 npm-debug.log*

@@ -244,3 +244,27 @@ git-ignored (`data/*.bak-*`).
 To restore: stop the dev server, delete `data/pfm.sqlite3` together with
 `data/pfm.sqlite3-wal` / `data/pfm.sqlite3-shm`, then rename the `.bak-*` file
 back to `data/pfm.sqlite3`. (The next start migrates it again.)
+
+## `agent_preferences`
+
+At most one row per persona (`cif`) — standing instructions the customer gives M-You,
+read by `pfm` (never written by the Agent) and folded into the hidden preamble of the
+customer's first chat/voice message of a thread (`src/lib/agent-preference-seed.ts`).
+These are **style/context preferences, self-reported by the customer** — never financial
+facts, and never a way to bypass the AI product contract (no OTP/consent bypass, no
+invented numbers): see `src/domain/models/agent-preferences.ts` for the full doc comment.
+
+| column | type | notes |
+|---|---|---|
+| `cif` | TEXT PK | owner; a persona with no saved row reads back as every field unset |
+| `response_length` | TEXT, nullable | `concise` / `balanced` / `detailed`. `NULL` = chưa chọn |
+| `tone` | TEXT, nullable | `friendly` / `formal` / `playful`. `NULL` = chưa chọn |
+| `risk_appetite` | TEXT, nullable | `cautious` / `balanced` / `aggressive` — how to frame savings/investing examples, NOT a KYC risk profile or an unlock for specific product advice. `NULL` = chưa chọn |
+| `address_as` | TEXT | how M-You should address the customer; `''` = unset, ≤ 60 ký tự |
+| `about` | TEXT | personal interests + self-reported financial habits, one free-text field (e.g. "Tôi thích đầu tư cổ phiếu, tần suất theo dõi là 2 ngày 1 lần"); `''` = unset, ≤ 500 ký tự |
+| `notes` | TEXT | anything else, free text; `''` = unset, ≤ 600 ký tự |
+| `updated_at` | TEXT | ISO timestamp of the last save |
+
+Endpoint: `GET`/`PUT /api/agent-preferences?cif=` (`src/app/api/agent-preferences/route.ts`),
+backed by `src/lib/agent-preferences-store.ts`. `PUT` is a whole-row upsert (the settings
+sheet always saves every field together) — no partial PATCH.
