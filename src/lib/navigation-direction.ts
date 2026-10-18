@@ -14,6 +14,7 @@ const SECURITY_CHILDREN = new Set([
   "trusted-contacts",
   "transfer-lock",
   "scan",
+  "lookup",
   "sos",
   "test-tools",
 ]);

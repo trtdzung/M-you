@@ -6,6 +6,7 @@ import { AlertLogScreen } from "./screens/AlertLogScreen";
 import { AntiPhishingScreen } from "./screens/AntiPhishingScreen";
 import { EmergencyContactsScreen } from "./screens/EmergencyContactsScreen";
 import { ProtectScreen } from "./screens/ProtectScreen";
+import { LookupScreen } from "./screens/LookupScreen";
 import { ScanScreen } from "./screens/ScanScreen";
 import { SosScreen } from "./screens/SosScreen";
 import { TestToolsScreen } from "./screens/TestToolsScreen";
@@ -20,6 +21,7 @@ const SCREENS: Record<Section, () => React.JSX.Element> = {
   "trusted-contacts": TrustedContactsScreen,
   "transfer-lock": TransferLockScreen,
   scan: ScanScreen,
+  lookup: LookupScreen,
   "alert-log": AlertLogScreen,
   sos: SosScreen,
   "test-tools": TestToolsScreen,

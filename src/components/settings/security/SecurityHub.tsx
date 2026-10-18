@@ -58,6 +58,7 @@ export function SecurityHub() {
       <Row label="Mã chống giả mạo" href={href("anti-phishing")} detail="Hiện trong mọi tin nhắn, email của MSB. Không có mã là giả" trailing={<Badge good={security.antiPhishingCode !== null}>{security.antiPhishingCode !== null ? "Đã bật" : "Chưa bật"}</Badge>} />
       <Row label="Người thân khẩn cấp" href={href("emergency-contacts")} detail="Nhận báo khi bạn gặp cảnh báo Đỏ. Không xem được số dư" trailing={<Badge good={activeContacts > 0}>{activeContacts > 0 ? `${activeContacts} người` : pendingContacts ? "Chờ đồng ý" : "Chưa có"}</Badge>} />
       <Row label="Danh bạ tin cậy" href={href("trusted-contacts")} detail="Chuyển cho người trong danh bạ không bị cảnh báo" trailing={<span className="shrink-0 text-sm text-muted">{security.trustedContacts.length} người</span>} />
+      <Row label="Tra cứu tài khoản lừa đảo" href={href("lookup")} detail="Kiểm tra số tài khoản trước khi chuyển · dữ liệu giả lập" />
       <Row label="Tự khóa chuyển tiền" href={href("transfer-lock")} detail="Tạm khóa chuyển tiền ra ngoài khi bạn muốn" trailing={lockUntil !== null ? <Badge tone="danger">Đang khóa đến {dateLabel(lockUntil)}</Badge> : <Badge tone="neutral">Đang tắt</Badge>} />
     </Panel>
     <Panel title="Thiết lập khác"><Row label="Quản lý thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Chữ ký số" icon={PenLine} href={href("signature")} /></Panel>
