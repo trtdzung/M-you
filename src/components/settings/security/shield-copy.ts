@@ -9,4 +9,5 @@ export const SHIELD_TITLES: Record<ShieldSection, string> = {
   scan: "Kiểm tra tin nhắn lạ",
   "alert-log": "Nhật ký cảnh báo",
   sos: "Khẩn cấp",
+  "test-tools": "Công cụ test (demo)",
 };

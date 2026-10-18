@@ -8,6 +8,7 @@ import { EmergencyContactsScreen } from "./screens/EmergencyContactsScreen";
 import { ProtectScreen } from "./screens/ProtectScreen";
 import { ScanScreen } from "./screens/ScanScreen";
 import { SosScreen } from "./screens/SosScreen";
+import { TestToolsScreen } from "./screens/TestToolsScreen";
 import { TransferLockScreen } from "./screens/TransferLockScreen";
 import { TrustedContactsScreen } from "./screens/TrustedContactsScreen";
 import { SecurityLoading } from "./SecurityLoading";
@@ -21,6 +22,7 @@ const SCREENS: Record<Section, () => React.JSX.Element> = {
   scan: ScanScreen,
   "alert-log": AlertLogScreen,
   sos: SosScreen,
+  "test-tools": TestToolsScreen,
 };
 
 /** Picks the Scam Shield screen for a settings section. */

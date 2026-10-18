@@ -15,6 +15,7 @@ const SECURITY_CHILDREN = new Set([
   "transfer-lock",
   "scan",
   "sos",
+  "test-tools",
 ]);
 
 function pathnameOf(href: string): string {
