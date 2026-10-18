@@ -7,7 +7,9 @@ import { CircleCheck, X } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { canvasZoom } from "@/lib/motion";
 import type { Intervention, RespondAction } from "@/lib/security/intervention-types";
+import { HandbookSheet } from "./HandbookSheet";
 import { InterventionBody } from "./InterventionCopy";
+import type { HandbookContext } from "@/lib/security/handbook";
 import { useInterventions } from "./useInterventions";
 import { useRecovery } from "./useRecovery";
 import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
@@ -118,6 +120,7 @@ export function InterventionHost() {
   const router = useRouter();
   const pathname = usePathname();
   const [notice, setNotice] = useState<string | null>(null);
+  const [handbook, setHandbook] = useState<HandbookContext | null>(null);
 
   useEffect(() => {
     if (!notice) return;
@@ -127,7 +130,8 @@ export function InterventionHost() {
 
   const act = (action: RespondAction | null) => {
     if (!action) return;
-    if (action.kind === "navigate") router.push(action.href);
+    if (action.kind === "handbook") setHandbook(action.context);
+    else if (action.kind === "navigate") router.push(action.href);
     else if (action.kind === "emergency") router.push("/settings/sos");
     else if (action.kind === "case") router.push("/settings/case");
     else if (action.kind === "callback") setNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập).");
@@ -162,6 +166,7 @@ export function InterventionHost() {
     <>
       {current && <Tooltip key={current.id} item={current} mayFloat onChoose={choose(current)} onShown={() => shown(current.id)} />}
       {popup && <Popup key={popup.id} item={popup} onChoose={choose(popup)} onShown={() => shown(popup.id)} />}
+      {handbook && <HandbookSheet context={handbook} onClose={() => setHandbook(null)} />}
       {notice && canvas && createPortal(
         <p role="status" className="absolute inset-x-4 top-14 z-50 rounded-[16px] bg-text p-3 text-center text-sm text-white">{notice}</p>,
         canvas,

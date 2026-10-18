@@ -1,12 +1,17 @@
 // What a Scam Shield chip or button does. Shared by the server (orchestrator)
 // and the confirm screen, which must still act when the engine is unreachable.
 
+import type { HandbookContext } from "./handbook";
 import type { RespondAction } from "./intervention-types";
 
+const HANDBOOK: Record<string, HandbookContext> = {
+  "Xem 3 thủ đoạn phổ biến": "new_customer",
+  "Xem thủ đoạn": "warned_account",
+  "Xem thủ đoạn tương tự": "warned_scan",
+};
+
 const NAVIGATE: Record<string, string> = {
-  "Xem 3 thủ đoạn phổ biến": "/settings/knowledge",
-  "Xem thủ đoạn": "/settings/knowledge",
-  "Xem thủ đoạn tương tự": "/settings/knowledge",
+  "Link bài đầy đủ": "/settings/knowledge?article=msb_security",
   "Trung tâm bảo mật": "/settings/security",
   "Bật mã": "/settings/anti-phishing",
   "Thêm người thân": "/settings/emergency-contacts",
@@ -31,6 +36,7 @@ export function actionFor(choice: string): RespondAction {
   if (choice === "Để MSB gọi lại") return { kind: "callback" };
   if (choice === "Yêu cầu MSB tra soát") return { kind: "case" };
   if (choice === "Lưu vào danh bạ tin cậy") return { kind: "trust" };
+  if (HANDBOOK[choice]) return { kind: "handbook", context: HANDBOOK[choice] };
   if (NAVIGATE[choice]) return { kind: "navigate", href: NAVIGATE[choice] };
   return { kind: "dismiss" };
 }

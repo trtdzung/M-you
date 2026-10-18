@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     // The payload shape per type is a contract of the callers; the route only bounds it.
     const event = recordEvent(body.cif, body.type, payload as never);
     // Opening Home or the transfer screen is an engine moment (BT1). The Hub sends its score itself.
-    if (body.type === "app_open" || body.type === "transfer_screen_open") {
+    if (body.type === "app_open" || body.type === "transfer_screen_open" || body.type === "device_login") {
       try {
         evaluate(body.cif, body.type);
       } catch (err) {

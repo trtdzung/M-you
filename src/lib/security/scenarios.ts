@@ -154,6 +154,8 @@ export const FREQUENCY: Record<ScenarioId, FrequencyRule> = {
   SC2: { kind: "once" },
   SC3: { kind: "always" },
   SC4: { kind: "untilDone" },
+  EDU: { kind: "window", ms: 7 * DAY_MS },
+  HUB: { kind: "perKey" },
 };
 
 /** One earlier showing of a scenario: when, for which key (recipient…), and whether the customer confirmed. */
@@ -182,7 +184,7 @@ export function frequencyAllows(id: ScenarioId, history: ShownBefore[], now: num
 
 export type MomentContext = {
   now: number;
-  trigger: "app_open" | "transfer_screen_open" | "hub_open" | "incoming_credit" | "transfer_success";
+  trigger: "app_open" | "transfer_screen_open" | "hub_open" | "incoming_credit" | "transfer_success" | "device_login";
   /** BT1: days since the account was opened. */
   accountAgeDays?: number | null;
   /** BT2: current security score, level and the quickest steps up (Hub's own score). */
@@ -200,7 +202,7 @@ export type MomentContext = {
   recoveryStepsLeft?: number | null;
 };
 
-export type Moment = { scenario: ScenarioId; key: string | null; copy: Rendered };
+export type Moment = { scenario: ScenarioId; key: string | null; copy: Rendered; urgent?: boolean };
 
 const BT3_MIN = 50_000_000;
 
@@ -221,6 +223,20 @@ function renderBt2(score: NonNullable<MomentContext["score"]>): Rendered {
   const head = phrase(first);
   return {
     message: `Điểm bảo mật: ${score.total}/100. ${head.charAt(0).toUpperCase()}${head.slice(1)} (+${first.points}) và ${phrase(second)} (+${second.points}) để lên mức Cao.`,
+    question: null,
+    chips: [first.cta, second.cta],
+    emphasis: [],
+  };
+}
+
+/** UC11: two fastest score steps. Uses the gauge total when the Hub sent it. */
+export function renderHubGuide(steps: { label: string; points: number; cta: string }[], total: number | null): Rendered {
+  if (total != null) return renderBt2({ total, level: "Tiêu chuẩn", steps });
+  const [first, second] = steps;
+  if (!first || !second) return { message: "", question: null, chips: [], emphasis: [] };
+  const phrase = (step: { label: string }) => STEP_PHRASE[step.label] ?? step.label.toLowerCase();
+  return {
+    message: `Hai việc tăng điểm nhanh nhất: ${phrase(first)} (+${first.points}) và ${phrase(second)} (+${second.points}).`,
     question: null,
     chips: [first.cta, second.cta],
     emphasis: [],

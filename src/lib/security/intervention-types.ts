@@ -1,6 +1,7 @@
 // What the Scam Shield engine shows the customer, and what the app may send
 // back. Shared by the server (orchestrator) and the client (InterventionHost).
 
+import type { HandbookContext } from "./handbook";
 import type { ScenarioId, ScenarioLevel, Surface } from "./scenario-copy";
 
 export type InterventionStatus = "pending" | "shown" | "answered" | "expired";
@@ -37,7 +38,7 @@ export type Intervention = {
 
 export type EvaluateTrigger =
   | "transfer_review" | "recipient_entered" | "fd_settle_review" | "incoming_credit" | "app_open"
-  | "transfer_screen_open" | "hub_open" | "transfer_success";
+  | "transfer_screen_open" | "hub_open" | "transfer_success" | "device_login";
 
 /** What the app should do after a choice; the rule engine decides, never the agent. */
 export type RespondAction =
@@ -48,4 +49,5 @@ export type RespondAction =
   | { kind: "emergency" }
   | { kind: "case" }
   | { kind: "trust" }
-  | { kind: "navigate"; href: string };
+  | { kind: "navigate"; href: string }
+  | { kind: "handbook"; context: HandbookContext };

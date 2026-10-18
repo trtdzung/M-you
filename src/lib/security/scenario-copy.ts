@@ -7,7 +7,8 @@
 export type ScenarioId =
   | "BT1" | "BT2" | "BT3" | "BT4" | "BT5" | "BT6" | "BT7"
   | "DH1" | "DH2" | "DH3" | "DH3-2" | "DH4" | "DH5" | "DH6" | "DH7" | "DH8" | "DH-T5"
-  | "SC1" | "SC2" | "SC3" | "SC4";
+  | "SC1" | "SC2" | "SC3" | "SC4"
+  | "EDU" | "HUB";
 
 export type Surface = "tooltip" | "banner" | "popup" | "fullscreen" | "chat" | "form";
 export type ScenarioLevel = "green" | "yellow" | "red";
@@ -207,7 +208,27 @@ export const SCENARIO_COPY: Record<ScenarioId, ScenarioCopy> = {
     screen: "- Security hub", display: "Tooltip · Hub Security, hiện đến khi hoàn tất", frequency: "Đến khi xong",
     content: "Checklist: ① đổi mật khẩu → ② đăng xuất mọi thiết bị lạ → ③ bật mã chống giả mạo → ④ thêm người thân khẩn cấp. Điểm bảo mật tăng sau mỗi bước",
     message: "Checklist: ① đổi mật khẩu → ② đăng xuất mọi thiết bị lạ → ③ bật mã chống giả mạo → ④ thêm người thân khẩn cấp. Điểm bảo mật tăng sau mỗi bước", question: null,
-    emphasis: [], chips: ["Làm bước tiếp theo"], classify: false, surface: "tooltip", countdownSec: null,
+    emphasis: [],     chips: ["Làm bước tiếp theo"], classify: false, surface: "tooltip", countdownSec: null,
+  },
+  // UC11 handbook. The three lines come from the library at run time.
+  EDU: {
+    id: "EDU", level: "green", situation: "Cẩm nang theo ngữ cảnh",
+    trigger: "KH mới trong 7 ngày đầu, đăng nhập thiết bị mới, hoặc vừa giao dịch với tài khoản nghi ngờ",
+    screen: "Mọi màn", display: "Tooltip · tóm tắt 3 dòng", frequency: "Tối đa 1 lần/tuần, trừ trường hợp khẩn cấp",
+    content: "Hiện bản tóm tắt 3 dòng kèm link bài đầy đủ.",
+    message: "Hiện bản tóm tắt 3 dòng kèm link bài đầy đủ.", question: null, emphasis: [],
+    chips: ["Link bài đầy đủ"], classify: false, surface: "tooltip", countdownSec: null,
+    derived: "UC11 cẩm nang theo ngữ cảnh",
+  },
+  // UC11 hub coach. The two steps and the score are filled from the gauge.
+  HUB: {
+    id: "HUB", level: "green", situation: "Hướng dẫn dùng Hub Security",
+    trigger: "Lần đầu dùng, số dư tăng lớn, sau một sự cố",
+    screen: "Security hub", display: "Tooltip · đồng hồ cấp độ bảo mật", frequency: "Mỗi lần kích hoạt",
+    content: "Gợi ý 2 việc tăng điểm nhanh nhất, kèm chip bật ngay.",
+    message: "Gợi ý 2 việc tăng điểm nhanh nhất, kèm chip bật ngay.", question: null, emphasis: [],
+    chips: ["Bật mã", "Thêm người thân"], classify: false, surface: "tooltip", countdownSec: null,
+    derived: "UC11 hướng dẫn Hub",
   },
 };
 

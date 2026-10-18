@@ -7,6 +7,7 @@ import "server-only";
  * the customer's choice is logged and becomes the next event.
  */
 
+import { educateMoments } from "./educate-moments";
 import { enrich } from "./enrich";
 export { enrich } from "./enrich";
 
@@ -84,7 +85,9 @@ function evaluateTransfer(cif: string, review: TransferReview, target: "transfer
   return [intervention];
 }
 
-function momentTarget(id: ScenarioId, txnId?: string): InterventionTarget {
+function momentTarget(id: ScenarioId, txnId?: string, key?: string | null): InterventionTarget {
+  if (id === "EDU") return "global";
+  if (id === "HUB") return key === "balance" ? "home-balance" : "hub-gauge";
   if (id === "BT1") return "home-transfer";
   if (id === "BT2" || id === "SC4") return "hub-gauge";
   if (id === "BT3" || id === "SC3") return "home-balance";
@@ -98,6 +101,7 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
   const profile = readProfile(cif);
   if (!profile.aiProtect) return [];
   const ctx: MomentContext = { now, trigger, ...input.moment };
+  const gauge = ctx.score;
   if (trigger === "hub_open") {
     const recovery = recoveryState(cif);
     if (recovery.incidentAt !== null) {
@@ -135,16 +139,19 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
   }
   const history = shownHistory(cif);
   const out: Intervention[] = [];
-  for (const moment of resolveMoment(ctx)) {
-    if (!frequencyAllows(moment.scenario, history, now, moment.key)) continue;
+  for (const moment of [...resolveMoment(ctx), ...educateMoments(cif, ctx, gauge)]) {
+    // EDU weekly cap lives here. An open incident (khẩn cấp) may show again.
+    if (!moment.urgent && !frequencyAllows(moment.scenario, history, now, moment.key)) continue;
     const copy = SCENARIO_COPY[moment.scenario];
-    const target = momentTarget(moment.scenario, input.txnId);
+    const target = momentTarget(moment.scenario, input.txnId, moment.key);
+    // Hub coach sits behind a money or recovery tip created in the same pass.
+    const at = moment.scenario === "HUB" ? now - 1 : now;
     out.push(store({
       cif, scenario: moment.scenario, level: copy.level, surface: copy.surface, target,
       dedupeKey: `${target}|${moment.scenario}|${moment.key ?? ""}|${input.txnId ?? ""}`,
       context: { scenarios: [moment.scenario], classify: false, evidence: evidenceOf(incomingSignals), key: moment.key },
       copy: moment.copy, countdownSec: null,
-    }, now));
+    }, at));
   }
   return out;
 }

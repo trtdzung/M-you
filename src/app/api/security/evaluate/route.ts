@@ -8,7 +8,7 @@ import { evaluate, type EvaluateInput } from "@/lib/security/orchestrator";
  * (spec wording at once; the fraud agent may enrich them later).
  */
 
-const TRIGGERS = new Set<EvaluateTrigger>(["transfer_review", "recipient_entered", "fd_settle_review", "incoming_credit", "app_open", "transfer_screen_open", "hub_open", "transfer_success"]);
+const TRIGGERS = new Set<EvaluateTrigger>(["transfer_review", "recipient_entered", "fd_settle_review", "incoming_credit", "app_open", "transfer_screen_open", "hub_open", "transfer_success", "device_login"]);
 const text = (v: unknown, max: number): v is string => typeof v === "string" && v.length <= max;
 const SCORE_LEVELS = new Set(["Rất cao", "Cao", "Tiêu chuẩn"]);
 

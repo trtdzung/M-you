@@ -31,7 +31,7 @@ export function InterventionBody({ intervention, onChoose, extra }: {
   return (
     <div className="flex flex-col gap-2">
       <SourceLine intervention={intervention} />
-      {copy.message && <p className="text-sm leading-relaxed"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
+      {copy.message && <p className="whitespace-pre-line text-sm leading-relaxed"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
       {copy.question && <p className="text-sm font-semibold leading-relaxed">{copy.question}</p>}
       {copy.chips.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-2">

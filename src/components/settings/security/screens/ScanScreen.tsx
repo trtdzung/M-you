@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { actionFor } from "@/lib/security/actions";
+import { HandbookSheet } from "@/components/security/HandbookSheet";
 import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
 import { useSecurityStore } from "@/state/security/store";
 import { Action } from "../../settings-ui";
@@ -18,7 +18,6 @@ const SAMPLES = [
 const chip = "rounded-full border border-primary px-3 py-1.5 text-xs font-semibold text-primary";
 const RANK: Record<ScanLevel, number> = { clear: 0, suspicious: 1, danger: 2 };
 const [reportLabel, similarLabel] = SCENARIO_COPY.BT7.chips;
-const similar = actionFor(similarLabel);
 
 type View = ScanResult & { manipulationSigns: string[]; source: "rule" | "agent" };
 
@@ -35,6 +34,7 @@ export function ScanScreen() {
   const [text, setText] = useState("");
   const [checked, setChecked] = useState<{ text: string; result: View } | null>(null);
   const [reported, setReported] = useState(false);
+  const [handbook, setHandbook] = useState(false);
   const generation = useRef(0);
   const flagged = checked !== null && checked.result.level !== "clear";
 
@@ -67,7 +67,7 @@ export function ScanScreen() {
         : <div className="flex flex-wrap items-center gap-2 text-sm leading-relaxed text-muted"><span>Bật mã chống giả mạo để nhận ra tin nhắn giả ngay.</span><Link href="/settings/anti-phishing" className={chip}>Bật mã chống giả mạo</Link></div>}
       {flagged && <div className="flex flex-wrap gap-2">
         <button type="button" className={chip} onClick={() => setReported(true)}>{reportLabel}</button>
-        {similar.kind === "navigate" && <Link href={similar.href} className={chip}>{similarLabel}</Link>}
+        <button type="button" className={chip} onClick={() => setHandbook(true)}>{similarLabel}</button>
       </div>}
     </div>}
     <section className="settings-panel p-4">
@@ -78,6 +78,7 @@ export function ScanScreen() {
       <div className="mb-4 flex flex-col gap-2">{SAMPLES.map((sample, i) => <button key={sample} type="button" onClick={() => setText(sample)} className="truncate rounded-full border border-border bg-white px-3 py-2 text-left text-xs" title={sample}>Mẫu {i + 1}: {sample}</button>)}</div>
       <Action disabled={text.trim().length === 0} onClick={check}>Kiểm tra</Action>
     </section>
+    {handbook && <HandbookSheet context="warned_scan" onClose={() => setHandbook(false)} />}
     <Sheet open={reported} title="Báo cáo tin nhắn" onClose={() => setReported(false)}>
       <p className="mb-5 text-sm leading-relaxed" role="status">Đã ghi nhận báo cáo trong bản giả lập. Cảm ơn bạn.</p>
       <Action onClick={() => setReported(false)}>Đã hiểu</Action>

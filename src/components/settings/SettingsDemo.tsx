@@ -17,6 +17,7 @@ import { SHIELD_TITLES } from "./security/shield-copy";
 import { ShieldSection } from "./security/ShieldSection";
 import { RecoveryDeviceAction } from "./security/RecoveryDeviceAction";
 import { SecurityHub } from "./security/SecurityHub";
+import { KnowledgeScreen } from "./security/screens/KnowledgeScreen";
 import { settingsParent } from "@/lib/navigation-direction";
 const TITLES: Record<SettingsSection, string> = { ...SHIELD_TITLES, profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
 const QUESTIONS = ["Thương hiệu đồ uống mà bạn yêu thích?", "Món ăn mà người thân trong gia đình bạn yêu thích nhất?", "Địa điểm du lịch mà bạn thích nhất?", "Tên quyển sách mà bạn thấy ấn tượng nhất?", "Tên người bạn mà bạn tin tưởng nhất?", "Bệnh viện nơi bạn được sinh ra?", "Tên người có ảnh hưởng nhất đến bạn?", "Chương trình truyền hình mà bạn thường xuyên xem nhất?", "Màu sắc mà bạn yêu thích nhất?", "Ngày sinh của người bạn yêu quý nhất trong gia đình?"];
@@ -86,6 +87,8 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
     content = <><Panel title="Widget truy cập nhanh">{["Số dư tài khoản", "Chuyển tiền", "Quét QR"].map(label => <div className="settings-row" key={label}><span className="flex-1 font-semibold">{label}</span><Toggle label={label} checked={demo.widgets.includes(label)} onChange={() => demo.update({ widgets: demo.widgets.includes(label) ? demo.widgets.filter(x => x !== label) : [...demo.widgets, label] })} /></div>)}</Panel><Notice>Đây là bản xem trước cấu hình Widget. Bản giả lập web không cài Widget lên màn hình điện thoại.</Notice></>;
   } else if (section === "language") {
     content = <Panel><Row label="Tiếng Việt" trailing={<Check className="text-primary" size={20} />} onClick={() => finish("Tiếng Việt đang được sử dụng.")} /><Row label="English" detail="Chưa có trong bản giả lập" onClick={() => finish("Bản giả lập hiện hỗ trợ Tiếng Việt.")} /></Panel>;
+  } else if (section === "knowledge") {
+    content = <KnowledgeScreen />;
   } else if (section === "privacy") {
     content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
   } else if (isShieldSection(section)) {
