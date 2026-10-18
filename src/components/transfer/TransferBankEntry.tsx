@@ -15,10 +15,8 @@ import type { SelectedRecipient } from "./RecipientPicker";
  */
 export function TransferBankEntry({
   onContinue,
-  onBack,
 }: {
   onContinue: (recipient: SelectedRecipient) => void;
-  onBack: () => void;
 }) {
   const [bankId, setBankId] = useState<string | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
@@ -43,10 +41,6 @@ export function TransferBankEntry({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
-      <button type="button" onClick={onBack} className="self-start text-sm font-semibold text-primary">
-        ‹ Quay lại
-      </button>
-
       <Card className="transfer-card flex flex-col gap-4">
         <div>
           <label className="mb-2 block text-[15px] font-medium text-text">Ngân hàng nhận</label>

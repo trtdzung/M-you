@@ -249,9 +249,9 @@ export function TransferCompose() {
       />
     );
   } else if (step === "bank-entry") {
-    content = <TransferBankEntry onContinue={selectRecipient} onBack={() => setStep("pick")} />;
+    content = <TransferBankEntry onContinue={selectRecipient} />;
   } else if (step === "save-recipient") {
-    content = <TransferSaveRecipient onContinue={saveAndSelectRecipient} onBack={() => setStep("pick")} />;
+    content = <TransferSaveRecipient onContinue={saveAndSelectRecipient} />;
   } else if (recipient) {
     content = (
       <>
@@ -302,7 +302,7 @@ export function TransferCompose() {
         <TransferHeader onBack={() => router.back()} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
       ) : (
         <TransferHeader
-          onBack={() => router.back()}
+          onBack={backToPick}
           title={step === "save-recipient" ? "Lưu người nhận" : "Chuyển tiền"}
           rightIcon={<Home size={20} strokeWidth={2} />}
           rightLabel="Về trang chủ"

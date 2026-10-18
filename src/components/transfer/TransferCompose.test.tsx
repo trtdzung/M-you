@@ -105,7 +105,7 @@ describe("TransferCompose", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" }));
     expect(screen.getByRole("button", { name: "Ngân hàng nhận" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "‹ Quay lại" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
     expect(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" })).toBeInTheDocument();
   });
 

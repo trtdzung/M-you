@@ -26,10 +26,8 @@ const RESOLVED_NAME = "Tran Duc Dao Nguyen";
  */
 export function TransferSaveRecipient({
   onContinue,
-  onBack,
 }: {
   onContinue: (recipient: SelectedRecipient) => void;
-  onBack: () => void;
 }) {
   const [bankId, setBankId] = useState<string | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
@@ -62,10 +60,6 @@ export function TransferSaveRecipient({
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-6">
-      <button type="button" onClick={onBack} className="self-start text-sm font-semibold text-primary">
-        ‹ Quay lại
-      </button>
-
       <Card className="transfer-card flex flex-col gap-4">
         <div>
           <label className="mb-2 block text-[15px] font-medium text-text">Ngân hàng nhận</label>

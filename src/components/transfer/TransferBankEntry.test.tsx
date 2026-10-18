@@ -4,9 +4,8 @@ import { TransferBankEntry } from "./TransferBankEntry";
 
 function renderEntry() {
   const onContinue = vi.fn();
-  const onBack = vi.fn();
-  render(<TransferBankEntry onContinue={onContinue} onBack={onBack} />);
-  return { onContinue, onBack };
+  render(<TransferBankEntry onContinue={onContinue} />);
+  return { onContinue };
 }
 
 function pickBank(name: string | RegExp) {
@@ -15,12 +14,6 @@ function pickBank(name: string | RegExp) {
 }
 
 describe("TransferBankEntry", () => {
-  it("calls onBack when the back link is tapped", () => {
-    const { onBack } = renderEntry();
-    fireEvent.click(screen.getByRole("button", { name: /Quay lại/ }));
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
-
   it("only lists banks with a real logo — no branch step for any of them", () => {
     renderEntry();
     fireEvent.click(screen.getByRole("button", { name: "Ngân hàng nhận" }));
