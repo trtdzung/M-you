@@ -124,6 +124,13 @@ export function TransferConfirm() {
   const [shieldNotice, setShieldNotice] = useState<string | null>(null);
   const banner = shieldState.intervention?.level === "yellow" && shieldState.intervention.id !== hiddenBanner ? shieldState.intervention : null;
 
+  useEffect(() => {
+    const current = shieldState.intervention;
+    if (!current) return;
+    setRedFor(previous => previous?.id === current.id ? current : previous);
+    setClassifyFor(previous => previous?.id === current.id ? current : previous);
+  }, [shieldState.intervention]);
+
   /** One place for every Scam Shield choice: engine log, alert log, then the action. */
   async function chooseShield(intervention: Intervention, choice: string) {
     const action = (await respondIntervention(persona.cif, intervention.id, choice)) ?? actionFor(choice);

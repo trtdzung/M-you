@@ -7,6 +7,9 @@ import "server-only";
  * the customer's choice is logged and becomes the next event.
  */
 
+import { enrich } from "./enrich";
+export { enrich } from "./enrich";
+
 import { redactSecurityText } from "./redact";
 import { recoveryState } from "./recovery";
 import { readProfile } from "./profile-store";
@@ -37,11 +40,6 @@ export type EvaluateInput = {
   recipient?: { last4: string; bank: string };
 };
 
-/** Hook for the fraud agent (A04): enrich an intervention's copy after it is stored. */
-export function enrich(_cif: string, _interventionId: string): void {
-  // No agent yet: the spec wording stays.
-}
-
 const evidenceOf = (signals: Signal[]) => signals.map(s => ({ code: s.code, evidence: s.evidence }));
 
 function store(input: Omit<NewIntervention, "createdAt">, now: number): Intervention {
@@ -49,7 +47,7 @@ function store(input: Omit<NewIntervention, "createdAt">, now: number): Interven
   if (existing) return existing;
   const created = insertIntervention({ ...input, createdAt: now });
   enrich(input.cif, created.id);
-  return created;
+  return getIntervention(input.cif, created.id)!;
 }
 
 /** Transfer about to be confirmed (or the recipient just entered: T2 only). */

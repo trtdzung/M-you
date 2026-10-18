@@ -163,3 +163,11 @@ export function clearInterventions(cif: string, scenario?: string): void {
   if (scenario) getDb().prepare("DELETE FROM interventions WHERE cif = ? AND scenario = ?").run(cif, scenario);
   else getDb().prepare("DELETE FROM interventions WHERE cif = ?").run(cif);
 }
+
+/** Temporary AI journal until A10: metadata only, no customer payload. */
+export function recordAgentTrace(cif: string, id: string, entry: { status: string; matched_playbook: string | null; trace: unknown[] }): void {
+  const context = getInterventionContext(cif, id);
+  if (!context) return;
+  context.facts = { ...context.facts, agent: entry };
+  getDb().prepare("UPDATE interventions SET context = ? WHERE cif = ? AND id = ?").run(JSON.stringify(context), cif, id);
+}
