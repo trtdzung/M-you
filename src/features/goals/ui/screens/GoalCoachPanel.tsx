@@ -67,7 +67,14 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
 
   let body;
   if (coach.phase === "idle") body = null;
-  else if (coach.phase === "out_of_scope") body = <CoachOutOfScope />;
+  else if (coach.phase === "out_of_scope") {
+    body = (
+      <div className="flex flex-col gap-3">
+        <CoachTranscript turns={coach.turns} />
+        <CoachOutOfScope reply={coach.reply} disabled={busy} onPick={coach.start} />
+      </div>
+    );
+  }
   else if (coach.phase === "failed") {
     body = <CoachFallback request={coach.request} onManual={() => setManual(true)} onRetry={coach.retry} />;
   } else {

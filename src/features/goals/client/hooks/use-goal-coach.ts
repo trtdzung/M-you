@@ -8,6 +8,7 @@ import type {
   CoachCurrentDraft,
   CoachDraft,
   CoachQuestion,
+  CoachReply,
   CoachResponse,
   CoachSlotName,
 } from "../../coach/contracts";
@@ -90,9 +91,14 @@ export function useGoalCoach() {
     (request: string) => {
       const text = request.trim();
       if (!text) return;
-      void call({ ...INITIAL, conversationId: newConversationId(), request: text, turns: [{ role: "customer", text }] }, "asking");
+      // After a greeting / "gợi ý giúp tôi" the chat goes on: keep what was said and the same conversation id.
+      const said = state.phase === "out_of_scope" && state.response?.reply
+        ? [...state.turns, { role: "coach" as const, text: state.response.reply.text }]
+        : [];
+      const conversationId = said.length ? state.conversationId : newConversationId();
+      void call({ ...INITIAL, conversationId, request: text, turns: [...said, { role: "customer", text }] }, "asking");
     },
-    [call],
+    [call, state.phase, state.response, state.turns, state.conversationId],
   );
 
   const answer = useCallback(
@@ -154,6 +160,7 @@ export function useGoalCoach() {
 
   const question: CoachQuestion | null = state.phase === "need_info" ? (state.response?.question ?? null) : null;
   const draft: CoachDraft | null = state.phase === "draft" ? (state.response?.draft ?? null) : null;
+  const reply: CoachReply | null = state.phase === "out_of_scope" ? (state.response?.reply ?? null) : null;
   return {
     phase: state.phase,
     request: state.request,
@@ -161,6 +168,7 @@ export function useGoalCoach() {
     turns: state.turns,
     question,
     draft,
+    reply,
     requestId: state.response?.request_id ?? null,
     conversationId: state.conversationId || null,
     messageCode: state.response?.message_code ?? null,

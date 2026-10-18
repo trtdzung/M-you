@@ -63,6 +63,13 @@ export interface CoachCurrentDraft {
   months?: number | null;
 }
 
+/** What the coach says when the message is not a goal yet (greeting, asks for ideas...); suggestions are goal sentences. */
+export interface CoachReply {
+  kind: "greeting" | "advice" | "frustrated" | "other";
+  text: string;
+  suggestions: string[];
+}
+
 export interface CoachResponse {
   version: "goal-coach/v1";
   request_id: string;
@@ -72,6 +79,7 @@ export interface CoachResponse {
   question: CoachQuestion | null;
   message_code: CoachMessageCode;
   adjustment?: CoachAdjustment | null;
+  reply?: CoachReply | null;
 }
 
 export const COACH_REQUEST_MAX = 500;
@@ -117,6 +125,16 @@ function isHint(x: unknown): x is CoachHint {
   return isObj(x) && (x.code === "far_beyond" || x.code === "no_surplus") && (x.months == null || isPosInt(x.months));
 }
 
+function isReply(x: unknown): x is CoachReply {
+  return (
+    isObj(x) &&
+    ["greeting", "advice", "frustrated", "other"].includes(x.kind as string) &&
+    isStr(x.text) && x.text.length <= 400 &&
+    Array.isArray(x.suggestions) && x.suggestions.length <= 4 &&
+    x.suggestions.every((s) => isStr(s) && s.length <= 80)
+  );
+}
+
 function isQuestion(x: unknown): x is CoachQuestion {
   return (
     isObj(x) &&
@@ -136,6 +154,7 @@ export function isCoachResponse(x: unknown): x is CoachResponse {
   if (x.version !== "goal-coach/v1" || !isStr(x.request_id) || !isObj(x.slots)) return false;
   if (!CODES.includes(x.message_code as string)) return false;
   const noAdjustment = x.adjustment === undefined || x.adjustment === null;
+  if (x.reply != null && !(x.status === "out_of_scope" && isReply(x.reply))) return false;
   if (x.status === "draft") return isDraft(x.draft) && x.question === null && noAdjustment;
   if (x.status === "need_info") return x.draft === null && isQuestion(x.question) && noAdjustment;
   if (x.status === "out_of_scope") return x.draft === null && x.question === null && noAdjustment;
