@@ -10,6 +10,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { QuickActions, type QuickAction } from "@/components/common/QuickActions";
+import { useScreenEvent } from "@/components/security/useScreenEvent";
 
 /** Hành động demo chưa có màn riêng — no-op, giữ vỏ để khớp ref (source: mock). */
 const noop = () => {};
@@ -36,5 +37,7 @@ const FOOTER: QuickAction[] = [
 ];
 
 export function HomeQuickGrid() {
+  // Scam Shield: opening the app (Home) once per tab session.
+  useScreenEvent("app_open", { oncePerSession: true });
   return <QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" />;
 }

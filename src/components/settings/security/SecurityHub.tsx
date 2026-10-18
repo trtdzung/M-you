@@ -11,6 +11,7 @@ import { Badge, Panel, Row, Toggle } from "../settings-ui";
 import { SecurityGauge } from "./SecurityGauge";
 import { SecurityLoading } from "./SecurityLoading";
 import { securityScore } from "./security-score";
+import { useScreenEvent } from "@/components/security/useScreenEvent";
 
 const href = (target: string) => `/settings/${target}`;
 const timeLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(at);
@@ -18,6 +19,7 @@ const dateLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { day: "2-dig
 
 /** Settings › Bảo mật: score, Scam Shield entry points and the existing auth rows. */
 export function SecurityHub() {
+  useScreenEvent("hub_open");
   const demo = useSettingsDemo();
   const security = useSecurityStore(useShallow(state => ({ hasHydrated: state.hasHydrated, aiProtect: state.aiProtect, antiPhishingCode: state.antiPhishingCode, emergencyContacts: state.emergencyContacts, trustedContacts: state.trustedContacts, transferLockUntil: state.transferLockUntil, pendingOff: state.pendingOff })));
   if (!security.hasHydrated) return <SecurityLoading />;

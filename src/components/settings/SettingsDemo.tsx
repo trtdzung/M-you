@@ -8,6 +8,7 @@ import { usePersona } from "@/providers/context";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
 import { clearSecurityStorage } from "@/state/security/storage";
+import { postSecurityEvent } from "@/lib/security/post-event";
 import { useSettingsDemo } from "./SettingsDemoContext";
 import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 
@@ -61,7 +62,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "security") {
     content = <SecurityHub />;
   } else if (section === "pin" || section === "password") {
-    content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") demo.update({ passwordUpdated: true }); finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
+    content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") { demo.update({ passwordUpdated: true }); postSecurityEvent("password_changed", {}); } finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
   } else if (section === "face") {
     content = <><Panel><div className="flex items-center justify-between py-4"><strong>Trạng thái</strong><Badge good>Đã xác minh</Badge></div></Panel><Notice><strong className="text-blue-600">Thông tin thêm</strong><ul className="mt-3 list-disc space-y-4 pl-4"><li>Xác thực khuôn mặt áp dụng cho chuyển tiền, thanh toán giá trị cao và các cài đặt quan trọng.</li><li>Nhìn thẳng vào camera, đảm bảo khuôn mặt rõ nét và đủ ánh sáng.</li>Trạng thái trong màn này là dữ liệu demo. Bản giả lập không mở camera hoặc thu thập khuôn mặt.</ul></Notice></>;
   } else if (section === "advanced") {

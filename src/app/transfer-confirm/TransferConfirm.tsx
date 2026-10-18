@@ -19,6 +19,7 @@ import { isTransferBlocked } from "@/state/security/selectors";
 import { alertClock, useTestToolsStore } from "@/state/security/test-tools";
 import { useShallow } from "zustand/react/shallow";
 import { accountLastFour, isTrustedRecipient, transferAlertLevel, transferHistory } from "@/lib/transfer-alert";
+import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
@@ -246,6 +247,14 @@ export function TransferConfirm() {
     // The money moved — from here on the receipt is true. Consume the draft now so
     // a reload/replay can't resubmit (F#2).
     if (draftIdParam) deleteTransferDraft(draftIdParam);
+    postSecurityEvent("transfer_out", {
+      txnId: primaryTxnId,
+      amount,
+      recipientName: name.trim(),
+      recipientLast4: lastFourDigits(draft?.accountNumber ?? acct),
+      recipientBank: draft?.recipientBankName ?? "",
+      isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
+    });
     setCreatedTxnId(primaryTxnId);
     setCreatedSourceJarId(targetJarId); // seeds the categorize picker; null for pool/account
 

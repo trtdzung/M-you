@@ -11,6 +11,7 @@ import { transferNow } from "@/lib/demo-clock";
 import { DAY_MS, withoutPending, type PendingOff } from "@/components/settings/security/pending";
 import { SECURITY_DEFAULTS } from "./defaults";
 import { securityStorage, setSecurityCif } from "./storage";
+import { postSecurityEvent } from "@/lib/security/post-event";
 import type { AlertLogEntry, EmergencyContact, SecurityState, TrustedContact } from "./types";
 
 export const MAX_EMERGENCY_CONTACTS = 2;
@@ -94,7 +95,10 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
 
     // A new lock also drops any unlock request still waiting.
     lockTransfers: (days, now = clockNow()) => set(state => ({ transferLockUntil: now + days * DAY_MS, pendingOff: withoutPending(state.pendingOff, "transferLock") })),
-    lockAccount: (now = clockNow()) => set(state => ({ accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") })),
+    lockAccount: (now = clockNow()) => {
+      set(state => ({ accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") }));
+      postSecurityEvent("account_locked", {});
+    },
     setFamilyAlerts: on => set({ familyAlerts: on }),
     setSecurityTips: on => set({ securityTips: on }),
     logAlert: ({ at = clockNow(), ...entry }) => set(state => ({ alertLog: [...state.alertLog, { ...entry, id: newId(), at }] })),
