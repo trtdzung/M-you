@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Bell, Check, ChevronRight, Eye, EyeOff, FileCheck2, FileText, Headphones, Info, Languages, LayoutGrid, LockKeyhole, LogOut, Palette, PenLine, ShieldCheck, Smartphone, Wallet, CircleHelp, KeyRound, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Bell, Check, ChevronRight, Eye, EyeOff, FileCheck2, FileText, Headphones, Languages, LayoutGrid, LockKeyhole, LogOut, Palette, PenLine, ShieldCheck, Smartphone, Wallet, CircleHelp, KeyRound } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { usePersona } from "@/providers/context";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
 import { useSettingsDemo } from "./SettingsDemoContext";
+import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 
 import { type SettingsSection } from "./settings-sections";
 const TITLES: Record<SettingsSection, string> = { profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
@@ -15,25 +16,6 @@ const QUESTIONS = ["Thương hiệu đồ uống mà bạn yêu thích?", "Món 
 const FAQ = ["Xác thực nâng cao bằng câu hỏi bảo mật là gì?", "Tôi có thể tiếp tục thực hiện giao dịch nếu trả lời sai câu hỏi bảo mật không?", "Tôi cần làm gì nếu chức năng Xác thực nâng cao bằng câu hỏi bảo mật bị khóa?"];
 const ANSWERS = ["Bạn chọn 3 câu hỏi bảo mật và thiết lập câu trả lời. Trong luồng giả lập, đây là một bước xác nhận bổ sung cho các giao dịch bạn lựa chọn. Chức năng này không thay thế các phương thức xác thực bắt buộc.", "Trong ứng dụng thật, việc tiếp tục giao dịch phụ thuộc vào phương thức xác thực và trạng thái tài khoản. Bản giả lập chỉ mô phỏng giao diện, không xác thực hoặc thực hiện giao dịch ngân hàng.", "Liên hệ trung tâm hỗ trợ qua kênh chính thức của ngân hàng. Không cung cấp mật khẩu, mã PIN hoặc mã OTP cho người khác."];
 
-function Panel({ children, title }: { children: ReactNode; title?: string }) {
-  return <section className="settings-panel">{title && <h2 className="settings-panel-title">{title}</h2>}<div className="px-4">{children}</div></section>;
-}
-function Row({ label, icon: Icon, href, onClick, detail, trailing }: { label: string; icon?: LucideIcon; href?: string; onClick?: () => void; detail?: string; trailing?: ReactNode }) {
-  const content = <>{Icon && <Icon size={27} className="shrink-0 text-text" aria-hidden />}<span className="min-w-0 flex-1"><span className="block font-semibold">{label}</span>{detail && <span className="mt-1 block text-sm font-normal leading-relaxed text-muted">{detail}</span>}</span>{trailing}<ChevronRight size={21} className="shrink-0" aria-hidden /></>;
-  return href ? <Link className="settings-row" href={href}>{content}</Link> : <button type="button" className="settings-row" onClick={onClick}>{content}</button>;
-}
-function Badge({ children, good = false }: { children: ReactNode; good?: boolean }) {
-  return <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${good ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700"}`}>{children}</span>;
-}
-function Notice({ children }: { children: ReactNode }) {
-  return <div className="flex gap-3 rounded-[20px] border border-blue-400 bg-blue-50 p-4 text-sm leading-relaxed"><Info size={21} className="shrink-0 text-blue-500" /><div>{children}</div></div>;
-}
-function Action({ children, disabled, onClick }: { children: ReactNode; disabled?: boolean; onClick?: () => void }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className="settings-action">{children}</button>;
-}
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
-  return <button type="button" role="switch" aria-label={label} aria-checked={checked} onClick={onChange} className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-primary" : "bg-slate-300"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${checked ? "left-1 translate-x-5" : "left-1"}`} /></button>;
-}
 function SecretField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   const [visible, setVisible] = useState(false);
   return <label className="mb-5 block"><span className="mb-2 block text-sm font-medium">{label}</span><span className="settings-input flex items-center"><input aria-label={label} type={visible ? "text" : "password"} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder ?? label} autoComplete="off" className="min-w-0 flex-1 bg-transparent outline-none" /><button type="button" aria-label={`${visible ? "Ẩn" : "Hiện"} ${label.toLowerCase()}`} onClick={() => setVisible(!visible)} className="flex h-10 w-10 items-center justify-center">{visible ? <EyeOff size={22} /> : <Eye size={22} />}</button></span></label>;
