@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Bell, Check, ChevronRight, Eye, EyeOff, FileCheck2, FileText, Headphones, Languages, LayoutGrid, LockKeyhole, LogOut, Palette, PenLine, ShieldCheck, Smartphone, Wallet, CircleHelp, KeyRound } from "lucide-react";
+import { ArrowLeft, Bell, Check, ChevronRight, Eye, EyeOff, FileCheck2, FileText, Headphones, Languages, LayoutGrid, LockKeyhole, LogOut, Palette, PenLine, ShieldCheck, Smartphone, Wallet, KeyRound } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { usePersona } from "@/providers/context";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
@@ -13,6 +13,7 @@ import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 import { isShieldSection, type SettingsSection } from "./settings-sections";
 import { SHIELD_TITLES } from "./security/shield-copy";
 import { ShieldSection } from "./security/ShieldSection";
+import { SecurityHub } from "./security/SecurityHub";
 import { settingsParent } from "@/lib/navigation-direction";
 const TITLES: Record<SettingsSection, string> = { ...SHIELD_TITLES, profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
 const QUESTIONS = ["Thương hiệu đồ uống mà bạn yêu thích?", "Món ăn mà người thân trong gia đình bạn yêu thích nhất?", "Địa điểm du lịch mà bạn thích nhất?", "Tên quyển sách mà bạn thấy ấn tượng nhất?", "Tên người bạn mà bạn tin tưởng nhất?", "Bệnh viện nơi bạn được sinh ra?", "Tên người có ảnh hưởng nhất đến bạn?", "Chương trình truyền hình mà bạn thường xuyên xem nhất?", "Màu sắc mà bạn yêu thích nhất?", "Ngày sinh của người bạn yêu quý nhất trong gia đình?"];
@@ -57,17 +58,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
       <Link href={href("privacy")} className="block text-center text-xs text-muted underline underline-offset-4">Quyền dữ liệu & trợ lý AI</Link>
     </>;
   } else if (section === "security") {
-    content = <>
-      <Panel><div className="py-6 text-center"><SecurityGauge high={demo.advanced} /><p className="mt-3 text-sm leading-relaxed">Hoàn tất thêm các thiết lập khác để đạt mức bảo mật cao nhất</p></div>
-        <Row label="Mã PIN" href={href("pin")} detail="Dùng để đăng nhập và xác thực giao dịch" trailing={<Badge good>Đã thiết lập</Badge>} />
-        <div className="settings-row"><span className="flex-1"><strong>Sinh trắc học Face ID</strong><span className="mt-1 block text-sm text-muted">Xác thực nhanh chóng trên thiết bị</span></span><Toggle label="Sinh trắc học Face ID" checked={demo.faceId} onChange={() => demo.update({ faceId: !demo.faceId })} /></div>
-        <Row label="Mật khẩu" href={href("password")} trailing={<Badge good={demo.passwordUpdated}>{demo.passwordUpdated ? "Đã cập nhật" : "Đã hết hạn"}</Badge>} />
-        <Row label="Xác thực khuôn mặt" href={href("face")} detail="Dùng cho giao dịch giá trị lớn và cài đặt quan trọng" trailing={<Badge good>Đã xác minh</Badge>} />
-        <Row label="Xác thực nâng cao" href={href("advanced")} detail="Thêm lớp xác thực câu hỏi bảo mật khi giao dịch" trailing={<Badge good={demo.advanced}>{demo.advanced ? "Đã thiết lập" : "Chưa thiết lập"}</Badge>} />
-      </Panel>
-      <Panel title="Thiết lập khác"><Row label="Quản lý thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Chữ ký số" icon={PenLine} href={href("signature")} /></Panel>
-      <Panel><Row label="Kiến thức bảo mật hữu ích" icon={CircleHelp} href={href("knowledge")} detail="Trang bị kiến thức để bảo vệ tài sản" /></Panel>
-    </>;
+    content = <SecurityHub />;
   } else if (section === "pin" || section === "password") {
     content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") demo.update({ passwordUpdated: true }); finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
   } else if (section === "face") {
@@ -136,16 +127,4 @@ function QuestionForm({ onSuccess }: { onSuccess: () => void }) {
   const change = (values: string[], index: number, value: string, setter: (values: string[]) => void) => setter(values.map((v, i) => i === index ? value : v));
   if (step) return <><Panel title="Chọn giao dịch áp dụng">{["Chuyển tiền", "Thanh toán", "Cài đặt quan trọng"].map(label => <label key={label} className="settings-row"><span className="flex-1">{label}</span><input type="checkbox" checked={transactions.includes(label)} onChange={() => setTransactions(transactions.includes(label) ? transactions.filter(v => v !== label) : [...transactions, label])} className="h-5 w-5 accent-orange-500" /></label>)}</Panel><Notice>Chỉ lưu trạng thái đã thiết lập trong phiên demo. Câu trả lời và gợi ý sẽ được xóa sau khi hoàn tất.</Notice><Action disabled={!transactions.length} onClick={() => { setAnswers(["", "", ""]); setHints(["", "", ""]); setStep(false); onSuccess(); }}>Xác nhận thiết lập</Action><button className="text-sm text-primary" onClick={() => setStep(false)}>Quay lại câu hỏi</button></>;
   return <><Notice><strong>Lưu ý</strong><p className="mt-2">Dùng câu trả lời mẫu không dấu, từ 5–50 ký tự. Chọn 3 câu hỏi khác nhau. Gợi ý không bắt buộc, tối đa 50 ký tự.</p></Notice>{questions.map((question, i) => <Panel key={i} title={`Câu hỏi bảo mật ${i + 1}`}><div className="pt-5"><label className="mb-5 block"><span className="mb-2 block text-sm font-medium">Câu hỏi</span><button type="button" aria-label={`Chọn câu hỏi ${i + 1}`} onClick={() => setSelecting(i)} className="settings-input flex w-full items-center justify-between gap-2 text-left"><span className={!question ? "text-muted" : ""}>{question || "Chọn câu hỏi"}</span><ChevronRight size={20} className="shrink-0 rotate-90" /></button></label><SecretField label={`Câu trả lời ${i + 1}`} value={answers[i]} onChange={v => change(answers, i, v, setAnswers)} placeholder="Nhập câu trả lời mẫu" /><label className="mb-5 block"><span className="mb-2 block text-sm">Gợi ý câu trả lời (Không bắt buộc)</span><input className="settings-input w-full" value={hints[i]} maxLength={50} onChange={e => change(hints, i, e.target.value, setHints)} placeholder="Nhập gợi ý" /></label></div></Panel>)}<Action disabled={!valid} onClick={() => setStep(true)}>Tiếp tục</Action><Sheet open={selecting !== null} title="Chọn câu hỏi" onClose={() => setSelecting(null)}>{selecting !== null && QUESTIONS.map(q => <button key={q} disabled={questions.some((v, i) => i !== selecting && v === q)} className="block w-full border-b border-border py-4 text-left text-sm leading-relaxed disabled:opacity-35" onClick={() => { change(questions, selecting, q, setQuestions); setSelecting(null); }}>{q}</button>)}</Sheet></>;
-}
-
-function SecurityGauge({ high }: { high: boolean }) {
-  return <div className="relative mx-auto h-40 max-w-72">
-    <svg viewBox="0 0 300 160" className="h-full w-full" aria-hidden="true">
-      <path d="M 35 135 A 115 115 0 0 1 265 135" fill="none" stroke="#dfe6ef" strokeWidth="22" strokeLinecap="round" />
-      <path d="M 35 135 A 115 115 0 0 1 265 135" fill="none" stroke="#20b779" strokeWidth="22" strokeLinecap="round" pathLength="100" strokeDasharray={high ? "100 100" : "78 100"} />
-      <text x="28" y="66" fill="#64748b" fontSize="12" transform="rotate(-52 28 66)">Tiêu chuẩn</text>
-      <text x="205" y="37" fill="#64748b" fontSize="12" transform="rotate(33 205 37)">Cao</text>
-    </svg>
-    <div className="absolute inset-x-0 bottom-2 text-center"><p className="text-sm text-muted">Cấp độ bảo mật</p><p className="mt-1 text-2xl font-bold text-emerald-600">{high ? "Rất cao" : "Cao"}</p></div>
-  </div>;
 }
