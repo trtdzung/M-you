@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Home, QrCode } from "lucide-react";
+import { Home, Lock, QrCode } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
@@ -12,6 +14,9 @@ import { maskAccount } from "@/lib/mask-account";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
 import { isNavigationTransitionPending, navigateWithTransition, backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { assessTransferRisk } from "@/lib/transfer-risk";
+import { useSecurityStore } from "@/state/security/store";
+import { isTransferBlocked } from "@/state/security/selectors";
+import { formatPendingAt } from "@/components/settings/security/pending";
 import { formatVnd } from "@/lib/format";
 import { casaBalance, casaBalanceOrUnknown, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
@@ -196,10 +201,13 @@ export function TransferCompose() {
   const [topupOpen, setTopupOpen] = useState(false);
   const heldTopup = useRetained(topupOpen && assessment?.tier === "topup" ? assessment : null);
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
+  // Scam Shield: a lock the customer set blocks the flow before confirm.
+  const lockState = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, transferLockUntil: state.transferLockUntil })));
+  const block = isTransferBlocked(lockState, transferNow().getTime());
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
   function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation"> = {}) {
-    if (!recipient || isNavigationTransitionPending()) return;
+    if (!recipient || block.blocked || isNavigationTransitionPending()) return;
     const id = `form_${Date.now()}`;
     putTransferDraft({
       id,
@@ -280,7 +288,7 @@ export function TransferCompose() {
           source={source}
           amount={amount}
           memo={memo}
-          canContinue={!loading && !error && canContinue}
+          canContinue={!loading && !error && canContinue && !block.blocked}
           onChangeRecipient={backToPick}
           onSourceChange={setSource}
           onAmountChange={setAmount}
@@ -321,6 +329,17 @@ export function TransferCompose() {
           rightLabel="Về trang chủ"
           onRightClick={() => pushWithTransition((href) => router.push(href), "/")}
         />
+      )}
+      {block.blocked && (
+        <div role="status" className="mx-4 mb-2 flex gap-3 rounded-[20px] bg-negative-soft p-4 text-sm leading-relaxed">
+          <Lock size={20} className="shrink-0 text-negative" aria-hidden />
+          <p className="min-w-0 flex-1">
+            {block.reason === "transfer-locked" && block.until !== undefined
+              ? `Bạn đang khóa chuyển tiền ra ngoài đến ${formatPendingAt(block.until)}.`
+              : "Tài khoản đang khóa tạm theo yêu cầu của bạn."}{" "}
+            <Link href={block.reason === "transfer-locked" ? "/settings/transfer-lock" : "/settings/sos"} className="font-semibold text-primary underline underline-offset-4">Quản lý</Link>
+          </p>
+        </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col">{content}</div>
     </div>

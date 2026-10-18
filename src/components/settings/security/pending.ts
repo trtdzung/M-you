@@ -12,8 +12,10 @@ export function isPending(at: number | undefined, now: number): at is number {
 /** "HH:mm dd/MM" in Vietnamese locale. */
 export function formatPendingAt(at: number): string {
   const time = new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(at);
-  const date = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).format(at);
-  return `${time} ${date}`;
+  // vi-VN joins day and month with "-", so build "dd/MM" from parts.
+  const parts = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).formatToParts(at);
+  const part = (type: "day" | "month") => parts.find(item => item.type === type)?.value;
+  return `${time} ${part("day")}/${part("month")}`;
 }
 
 /** Copy of `pending` without `key`. */

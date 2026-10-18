@@ -14,6 +14,8 @@ import { useFinancials } from "@/state/useFinancials";
 import { useAutoFund, type FundResult } from "@/state/use-auto-fund";
 import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
+import { useSecurityStore } from "@/state/security/store";
+import { isTransferBlocked } from "@/state/security/selectors";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
@@ -133,6 +135,10 @@ export function TransferConfirm() {
     if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
+    // Scam Shield: re-check the customer's lock here too (confirm URL opened directly).
+    if (isTransferBlocked(useSecurityStore.getState(), transferNow().getTime()).blocked) {
+      return setError("Chuyển tiền đang bị khóa theo yêu cầu của bạn. Mở khóa trong Cài đặt › Bảo mật.");
+    }
     setError(null);
 
     const postedAt = transferNow().toISOString();
