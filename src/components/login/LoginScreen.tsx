@@ -1,7 +1,7 @@
 "use client";
 
 import { AnniversaryHero } from "@/components/home/AnniversaryHero";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ArrowUpRight, Bell, ChevronDown, Eye, EyeOff, Headphones, QrCode, ScanFace, ScanLine, UserRound } from "lucide-react";
 import { PhoneShell } from "@/components/shell/PhoneShell";
 import { Sheet } from "@/components/primitives";
@@ -23,12 +23,12 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
   const [transfer, setTransfer] = useState(false);
   const customer = customers.find(c => c.cif === cif);
 
-  function closeSheet() {
+  const closeSheet = useCallback(() => {
     setSheet(null);
     setPassword("");
     setShowPassword(false);
     setError("");
-  }
+  }, []);
   function handleLogin(event: React.FormEvent) {
     event.preventDefault();
     const result = validateLogin(cif, password, customers);

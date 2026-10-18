@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { PersonaProvider, usePersona } from "@/providers/context";
 import { LOGIN_PASSWORD } from "@/lib/auth";
 import { LoginScreen } from "../LoginScreen";
@@ -35,6 +35,21 @@ beforeEach(() => {
 });
 
 describe("LoginGate", () => {
+  it("keeps password focus after each keystroke", async () => {
+    renderGate();
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+    const input = screen.getByPlaceholderText("Nhập mật khẩu");
+    input.focus();
+    fireEvent.change(input, { target: { value: "a" } });
+    await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: "ab" } });
+    await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("ab");
+  });
+
   it("shows the login screen instead of children before logging in", () => {
     renderGate();
     expect(screen.getByRole("button", { name: "Chọn khách hàng" })).toBeInTheDocument();
