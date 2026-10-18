@@ -7,7 +7,7 @@ import { VoiceFab } from "./VoiceFab";
 
 /**
  * BIDV-style wallet bottom nav for `/pfm/*` (plan 260910-1626): 4 destinations —
- * Tổng quan · Giao dịch · (M-You) · Ngân sách · Cài đặt — with a raised center
+ * Tổng quan · Giao dịch · (M-You) · Ngân sách · Mục tiêu — with a raised center
  * agent icon (`VoiceFab`, Feature 5; a second copy floats on the main screen).
  * Pinned to the
  * device-canvas bottom via the PhoneShell `nav` slot (same pattern as the
@@ -28,6 +28,8 @@ export function PfmBottomNav() {
   const active: PfmTabId =
     (tabParam === "cashflow" && dockParam === "hu" ? "budget" : null) ??
     resolveLegacyTab(tabParam) ??
+    // "Hũ & danh mục" has no nav slot; it is opened from Ngân sách, so Ngân sách stays lit.
+    (tabParam === "settings" ? "budget" : null) ??
     (PFM_TABS.some((t) => t.id === tabParam) ? (tabParam as PfmTabId) : "overview");
 
   function go(id: PfmTabId) {

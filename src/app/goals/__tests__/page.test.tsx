@@ -1,18 +1,12 @@
-import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import GoalsPage from "../page";
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
-}));
+const redirect = vi.fn();
+vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 
 describe("/goals page", () => {
-  it("shows the title and the empty state", () => {
-    render(<GoalsPage />);
-    expect(screen.getByRole("heading", { name: "Mục tiêu" })).toBeInTheDocument();
-    expect(screen.getByText("Chưa có mục tiêu nào")).toBeInTheDocument();
-    expect(
-      screen.getByText("Tạo mục tiêu đầu tiên để bắt đầu tích lũy."),
-    ).toBeInTheDocument();
+  it("redirects to the Mục tiêu tab of /pfm", () => {
+    GoalsPage();
+    expect(redirect).toHaveBeenCalledWith("/pfm?tab=goals");
   });
 });

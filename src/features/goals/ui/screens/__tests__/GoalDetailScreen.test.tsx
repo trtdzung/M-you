@@ -101,7 +101,7 @@ describe("GoalDetailScreen", () => {
     render(<GoalDetailScreen id="missing" />);
     expect(screen.getByText("Không tìm thấy mục tiêu")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Về danh sách mục tiêu" }));
-    expect(nav.replace).toHaveBeenCalledWith("/goals");
+    expect(nav.replace).toHaveBeenCalledWith("/pfm?tab=goals");
   });
 
   it("pauses, resumes and archives through update", async () => {
@@ -126,7 +126,7 @@ describe("GoalDetailScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Xóa" }));
     fireEvent.click(await screen.findByRole("button", { name: "Xóa mục tiêu" }));
     await waitFor(() => expect(mutations.remove).toHaveBeenCalledWith("goal_1"));
-    expect(nav.replace).toHaveBeenCalledWith("/goals");
+    expect(nav.replace).toHaveBeenCalledWith("/pfm?tab=goals");
   });
 
   it("opens the contribute sheet", async () => {

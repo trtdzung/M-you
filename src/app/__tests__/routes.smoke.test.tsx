@@ -162,7 +162,7 @@ describe("chrome separation — PFM wallet shell vs festive shell", () => {
 
     // The 4-tab wallet bottom nav is the sole PFM navigation (supersedes 260908)
     const nav = screen.getByRole("navigation", { name: "Điều hướng PFM" });
-    for (const label of ["Tổng quan", "Giao dịch", "Ngân sách", "Cài đặt"]) {
+    for (const label of ["Tổng quan", "Giao dịch", "Ngân sách", "Mục tiêu"]) {
       expect(within(nav).getByText(label)).toBeInTheDocument();
     }
     // Center mic FAB opens the voice quick-action panel (Feature 5) — never

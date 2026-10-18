@@ -2,3 +2,4 @@
 export { GoalsHeader } from "./ui/GoalsHeader";
 export { GoalsListScreen } from "./ui/screens/GoalsListScreen";
 export { GoalDetailScreen } from "./ui/screens/GoalDetailScreen";
+export { GOALS_TAB_HREF } from "./ui/routes";

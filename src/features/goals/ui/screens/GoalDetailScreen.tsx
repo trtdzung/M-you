@@ -17,6 +17,7 @@ import { LedgerHistory } from "../detail/LedgerHistory";
 import { primaryButton, secondaryButton } from "../styles";
 import { EditGoalFlow } from "./EditGoalFlow";
 import { LedgerFlow } from "./LedgerFlow";
+import { GOALS_TAB_HREF } from "../routes";
 
 export function GoalDetailScreen({ id }: { id: string }) {
   const router = useRouter();
@@ -34,7 +35,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
         title={GOALS_COPY.notFoundTitle}
         description={GOALS_COPY.notFoundDescription}
         action={
-          <button type="button" className={primaryButton} onClick={() => router.replace("/goals")}>
+          <button type="button" className={primaryButton} onClick={() => router.replace(GOALS_TAB_HREF)}>
             {GOALS_COPY.backToList}
           </button>
         }
@@ -61,7 +62,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
   };
   const confirmDelete = async () => {
     const res = await remove(goal.id);
-    if (res?.ok) router.replace("/goals");
+    if (res?.ok) router.replace(GOALS_TAB_HREF);
   };
 
   return (

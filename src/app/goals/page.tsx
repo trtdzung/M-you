@@ -1,9 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
+import { GOALS_TAB_HREF } from "@/features/goals";
 
-import { GoalsListScreen } from "@/features/goals";
-
+/** Goals moved into the "Mục tiêu" tab of /pfm; old links (Home quick grid) land there. */
 export default function GoalsPage() {
-  return (
-    <GoalsListScreen />
-  );
+  redirect(GOALS_TAB_HREF);
 }
