@@ -2,7 +2,7 @@
 
 export type CoachSlotName = "name" | "target_amount" | "horizon" | "flexibility" | "opening_amount";
 export type CoachFlexibility = "fixed" | "flexible";
-export type CoachStatus = "draft" | "need_info" | "out_of_scope";
+export type CoachStatus = "draft" | "need_info" | "out_of_scope" | "adjust";
 export type CoachMessageCode =
   | "draft_ready"
   | "need_name"
@@ -12,7 +12,9 @@ export type CoachMessageCode =
   | "need_opening"
   | "not_a_goal"
   | "amount_unclear"
-  | "horizon_unclear";
+  | "horizon_unclear"
+  | "adjust_ready"
+  | "adjust_unclear";
 
 export type CoachHorizon = { months: number } | { target_month: string };
 
@@ -38,6 +40,22 @@ export interface CoachDraft {
   opening_amount: number;
 }
 
+export type CoachAdjustKind = "extend_months" | "reduce_amount_to" | "raise_saving_to" | "use_savings_amount";
+
+/** Normalised edit of the current draft: months added, new target, monthly saving, or VND taken from savings. */
+export interface CoachAdjustment {
+  kind: CoachAdjustKind;
+  value: number;
+  evidence?: string | null;
+}
+
+/** Sent with a request when the customer edits the draft they are looking at. */
+export interface CoachCurrentDraft {
+  target_amount: number;
+  opening_amount: number;
+  months?: number | null;
+}
+
 export interface CoachResponse {
   version: "goal-coach/v1";
   request_id: string;
@@ -46,6 +64,7 @@ export interface CoachResponse {
   draft: CoachDraft | null;
   question: CoachQuestion | null;
   message_code: CoachMessageCode;
+  adjustment?: CoachAdjustment | null;
 }
 
 export const COACH_REQUEST_MAX = 500;
@@ -55,8 +74,9 @@ export const COACH_ANSWER_VALUE_MAX = 200;
 const SLOTS: readonly string[] = ["name", "target_amount", "horizon", "flexibility", "opening_amount"];
 const CODES: readonly string[] = [
   "draft_ready", "need_name", "need_amount", "need_horizon", "need_flexibility",
-  "need_opening", "not_a_goal", "amount_unclear", "horizon_unclear",
+  "need_opening", "not_a_goal", "amount_unclear", "horizon_unclear", "adjust_ready", "adjust_unclear",
 ];
+const ADJUST_KINDS: readonly string[] = ["extend_months", "reduce_amount_to", "raise_saving_to", "use_savings_amount"];
 const isObj = (x: unknown): x is Record<string, unknown> =>
   typeof x === "object" && x !== null && !Array.isArray(x);
 const isStr = (x: unknown): x is string => typeof x === "string" && x !== "";
@@ -82,6 +102,10 @@ function isDraft(x: unknown): x is CoachDraft {
   );
 }
 
+function isAdjustment(x: unknown): x is CoachAdjustment {
+  return isObj(x) && ADJUST_KINDS.includes(x.kind as string) && isPosInt(x.value) && (x.evidence == null || typeof x.evidence === "string");
+}
+
 function isQuestion(x: unknown): x is CoachQuestion {
   return (
     isObj(x) &&
@@ -99,8 +123,10 @@ export function isCoachResponse(x: unknown): x is CoachResponse {
   if (!isObj(x)) return false;
   if (x.version !== "goal-coach/v1" || !isStr(x.request_id) || !isObj(x.slots)) return false;
   if (!CODES.includes(x.message_code as string)) return false;
-  if (x.status === "draft") return isDraft(x.draft) && x.question === null;
-  if (x.status === "need_info") return x.draft === null && isQuestion(x.question);
-  if (x.status === "out_of_scope") return x.draft === null && x.question === null;
+  const noAdjustment = x.adjustment === undefined || x.adjustment === null;
+  if (x.status === "draft") return isDraft(x.draft) && x.question === null && noAdjustment;
+  if (x.status === "need_info") return x.draft === null && isQuestion(x.question) && noAdjustment;
+  if (x.status === "out_of_scope") return x.draft === null && x.question === null && noAdjustment;
+  if (x.status === "adjust") return x.draft === null && x.question === null && isAdjustment(x.adjustment);
   return false;
 }

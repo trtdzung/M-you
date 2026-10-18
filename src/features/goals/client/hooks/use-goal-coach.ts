@@ -62,7 +62,8 @@ export function useGoalCoach() {
       if (seq.current !== id) return;
       setState({
         ...base,
-        phase: res.ok ? res.data.status : "failed",
+        // "adjust" only answers a request with `current_draft`, which this hook does not send yet (G17).
+        phase: res.ok && res.data.status !== "adjust" ? res.data.status : "failed",
         response: res.ok ? res.data : null,
       });
     },
