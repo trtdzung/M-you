@@ -168,7 +168,7 @@ describe("TransferCompose — jar funding verdicts", () => {
     expect(screen.queryByText("Không đủ số dư để chuyển số tiền này.")).not.toBeInTheDocument();
     fireEvent.click(continueButton);
     const sheet = await screen.findByRole("dialog");
-    expect(within(sheet).getByText(/còn thiếu 2\.000\.000/)).toBeInTheDocument();
+    expect(within(sheet).getByText(/còn thiếu 2,000,000/)).toBeInTheDocument();
     expect(within(sheet).getByText("Hũ Du lịch")).toBeInTheDocument();
   });
 
@@ -191,7 +191,7 @@ describe("TransferCompose — jar funding verdicts", () => {
     await waitFor(() => expect(continueButton).toBeEnabled());
     fireEvent.click(continueButton);
     // September's drained jar → short by the full 500k (an October view would be `ok`).
-    expect(within(await screen.findByRole("dialog")).getByText(/còn thiếu 500\.000/)).toBeInTheDocument();
+    expect(within(await screen.findByRole("dialog")).getByText(/còn thiếu 500,000/)).toBeInTheDocument();
   });
 
   it("shows the pool as 'Chưa rõ' (never a fabricated 0) when there is no CASA account", async () => {

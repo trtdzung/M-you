@@ -68,12 +68,12 @@ export function TransferSaveRecipient({
 
       <Card className="flex flex-col gap-4">
         <div>
-          <label className="mb-2 block text-[13px] font-medium text-muted">Ngân hàng nhận</label>
+          <label className="mb-2 block text-[13px] font-medium text-text">Ngân hàng nhận</label>
           <button
             type="button"
             onClick={() => setBankSheetOpen(true)}
             aria-label="Ngân hàng nhận"
-            className="flex h-14 w-full items-center gap-2.5 rounded-2xl border border-border bg-surface px-3.5"
+            className="flex h-14 w-full items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3.5"
           >
             {bank && <BankLogo bank={bank} />}
             <span className="min-w-0 flex-1 truncate text-left text-[15px] font-semibold text-text">
@@ -84,7 +84,7 @@ export function TransferSaveRecipient({
         </div>
 
         <div>
-          <label htmlFor="xfer-save-account" className="mb-2 block text-[13px] font-medium text-muted">
+          <label htmlFor="xfer-save-account" className="mb-2 block text-[13px] font-medium text-text">
             Số tài khoản/Số thẻ
           </label>
           <input
@@ -94,7 +94,7 @@ export function TransferSaveRecipient({
             inputMode="numeric"
             placeholder="Nhập số tài khoản/số thẻ"
             aria-invalid={accountNumber.length > 0 && !accountValid}
-            className="h-14 w-full rounded-2xl border border-border bg-surface px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
+            className="h-14 w-full rounded-[10px] border border-border bg-surface px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
           />
           {accountNumber.length > 0 && !accountValid && (
             <p className="mt-1.5 text-xs text-negative">Số tài khoản/thẻ cần có 8–19 chữ số.</p>
@@ -103,20 +103,20 @@ export function TransferSaveRecipient({
 
         {accountValid && (
           <div>
-            <label htmlFor="xfer-save-name" className="mb-2 block text-[13px] font-medium text-muted">
+            <label htmlFor="xfer-save-name" className="mb-2 block text-[13px] font-medium text-text">
               Tên người nhận
             </label>
             <input
               id="xfer-save-name"
               value={recipientName}
               onChange={(event) => setRecipientName(event.target.value)}
-              className="h-14 w-full rounded-2xl border border-border bg-surface px-3.5 text-[15px] text-muted outline-none"
+              className="h-14 w-full rounded-[10px] border border-border bg-surface px-3.5 text-[15px] text-muted outline-none"
             />
           </div>
         )}
 
         <div>
-          <label htmlFor="xfer-nickname" className="mb-2 block text-[13px] font-medium text-muted">
+          <label htmlFor="xfer-nickname" className="mb-2 block text-[13px] font-medium text-text">
             Tên gợi nhớ
           </label>
           <input
@@ -124,7 +124,7 @@ export function TransferSaveRecipient({
             value={nickname}
             onChange={(event) => setNickname(event.target.value)}
             placeholder="Đặt tên gợi nhớ cho người nhận"
-            className="h-14 w-full rounded-2xl border border-border bg-surface px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
+            className="h-14 w-full rounded-[10px] border border-border bg-surface px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
           />
         </div>
 
@@ -149,7 +149,7 @@ export function TransferSaveRecipient({
         type="button"
         disabled={!canContinue}
         onClick={submit}
-        className="mt-2 flex h-13 w-full items-center justify-center rounded-full bg-primary py-3.5 text-base font-bold text-primary-fg transition-opacity disabled:opacity-40"
+        className="login-submit mt-2 disabled:opacity-40"
       >
         Tiếp tục
       </button>

@@ -47,7 +47,7 @@ export function TransferAccountPicker({
         </div>
       </Card>
 
-      <Card className="flex flex-1 flex-col">
+      <Card className="flex flex-col">
         <RecipientPicker
           beneficiaries={beneficiaries}
           transactions={transactions}

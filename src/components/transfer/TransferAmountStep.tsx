@@ -118,12 +118,12 @@ export function TransferAmountStep({
 
       <Card className="flex flex-col gap-4">
         <div>
-          <label className="mb-2 block text-[13px] font-medium text-muted">Tài khoản nguồn</label>
+          <label className="mb-2 block text-[13px] font-medium text-text">Tài khoản nguồn</label>
           <button
             type="button"
             onClick={() => setSourceSheetOpen(true)}
             aria-label="Tài khoản nguồn"
-            className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-surface px-3.5 py-3"
+            className="flex w-full items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3.5 py-3"
           >
             <div className="min-w-0 flex-1 text-left">
               <p className="truncate text-xs text-muted">
@@ -144,25 +144,25 @@ export function TransferAmountStep({
         </div>
 
         <div>
-          <label htmlFor="xfer-amount" className="mb-2 inline-flex items-center gap-1 text-[13px] font-medium text-muted">
+          <label htmlFor="xfer-amount" className="mb-2 inline-flex items-center gap-1 text-[13px] font-medium text-text">
             Số tiền <Info size={13} className="text-muted" aria-hidden />
           </label>
-          <div className="flex h-14 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5">
+          <div className="flex h-14 items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5">
             <input
               id="xfer-amount"
-              // State holds raw digits; only the display is grouped "1.000.000".
+              // State holds raw digits; only the display is grouped "1,000,000".
               value={groupThousands(amount)}
               onChange={(event) => onAmountChange(event.target.value.replace(/\D/g, ""))}
               inputMode="numeric"
               placeholder="Nhập số tiền"
               className="min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-muted"
             />
-            <span className="shrink-0 text-sm font-medium text-muted">VND</span>
+            <span className="shrink-0 text-sm font-medium text-text">VND</span>
           </div>
         </div>
 
         <div>
-          <label htmlFor="xfer-memo" className="mb-2 block text-[13px] font-medium text-muted">
+          <label htmlFor="xfer-memo" className="mb-2 block text-[13px] font-medium text-text">
             Nội dung
           </label>
           <input
@@ -170,7 +170,7 @@ export function TransferAmountStep({
             value={memo}
             onChange={(event) => onMemoChange(event.target.value)}
             placeholder="Ví dụ: Hoàn tiền ăn trưa"
-            className="h-14 w-full rounded-2xl border border-border bg-surface px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
+            className="h-14 w-full rounded-[10px] border border-border bg-surface px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
           />
         </div>
 
@@ -196,7 +196,7 @@ export function TransferAmountStep({
           type="button"
           disabled={!canContinue}
           onClick={onContinue}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
+          className="login-submit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Tiếp tục
         </button>
@@ -327,7 +327,7 @@ export function TransferAmountStep({
 
 /** "1000000" → "1.000.000" (vi-VN grouping). String-based, so no precision loss on long input. */
 function groupThousands(digits: string): string {
-  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 /**

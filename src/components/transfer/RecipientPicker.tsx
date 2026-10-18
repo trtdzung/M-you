@@ -112,7 +112,7 @@ export function RecipientPicker({
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            className="h-[46px] w-full rounded-2xl border-none bg-surface-muted pl-10 pr-3.5 text-sm text-text outline-none placeholder:text-muted"
+            className="h-[46px] w-full rounded-[10px] border border-border bg-surface-muted pl-10 pr-3.5 text-sm text-text outline-none placeholder:text-muted"
             placeholder="Tên, số tài khoản"
           />
         </label>
