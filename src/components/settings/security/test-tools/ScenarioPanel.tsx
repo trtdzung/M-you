@@ -43,6 +43,7 @@ export function ScenarioPanel() {
   const setAlertHour = useTestToolsStore(state => state.setAlertHour);
 
   return <Panel title="Kịch bản chuyển tiền">
+    <p className="pt-4 text-sm leading-relaxed text-muted">Ở Chuyển tiền, bấm icon thêm người nhận cạnh ô tìm kiếm. Ô &ldquo;Tên người nhận&rdquo; tự điền tên tra cứu giả lập; tên dùng để chấm cảnh báo là ô &ldquo;Tên gợi nhớ&rdquo; (nếu có), nên gõ tên trên thẻ vào đó.</p>
     {TRANSFER_SCENARIOS.map(scenario => <ScenarioCard key={scenario.id} scenario={scenario} alertHour={alertHour} onSetHour={setAlertHour} />)}
   </Panel>;
 }
