@@ -9,7 +9,7 @@ import {
   isSafeNarration,
   type NarrateResult,
 } from "../advisor/narration-contract";
-import { badBody, cifOf, missingCif, readJson } from "./_http";
+import { badBody, cifOf, conversationIdOf, missingCif, readJson } from "./_http";
 
 const local = (reason: string): NextResponse => NextResponse.json({ source: "local", reason } satisfies NarrateResult & { reason: string });
 const isStr = (x: unknown): x is string => typeof x === "string";
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
   } else {
     return NextResponse.json({ error: "invalid narrate request" }, { status: 422 });
   }
+  const conversationId = conversationIdOf(body.conversationId);
+  if (conversationId) payload.conversation_id = conversationId;
   if (templateOnly()) return local("template_only");
 
   const started = Date.now();
@@ -51,9 +53,9 @@ export async function POST(req: NextRequest) {
   const blocks = (data as { blocks?: unknown } | null)?.blocks;
   const source = (data as { source?: unknown } | null)?.source;
   if (!Array.isArray(blocks) || (source !== "llm" && source !== "template") || !blocks.every((b) => b && isStr(b.id) && isSafeNarration(b.text))) {
-    console.info(`[goal-advisor] narrate local ms=${ms}`);
+    console.info(`[goal-advisor] narrate conv=${conversationId ?? "-"} local ms=${ms}`);
     return local(data === null ? "unavailable" : "invalid");
   }
-  console.info(`[goal-advisor] narrate ${source} ms=${ms}`);
+  console.info(`[goal-advisor] narrate conv=${conversationId ?? "-"} ${source} ms=${ms}`);
   return NextResponse.json({ source, blocks: blocks.map((b) => ({ id: b.id, text: b.text })) } satisfies NarrateResult);
 }

@@ -27,3 +27,8 @@ export async function readJson(req: Request): Promise<Record<string, unknown> | 
 export function cifOf(value: unknown): string | null {
   return typeof value === "string" && value !== "" ? value : null;
 }
+
+/** Conversation id for the agent's trace (same charset the agent accepts), or null. Never required. */
+export function conversationIdOf(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : null;
+}

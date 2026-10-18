@@ -33,6 +33,8 @@ export interface CoachTurn {
 
 interface CoachState {
   phase: CoachPhase;
+  /** Links this conversation's turns in the agent's trace; new for every `start`. */
+  conversationId: string;
   request: string;
   answers: CoachAnswer[];
   turns: CoachTurn[];
@@ -44,7 +46,13 @@ interface CoachState {
 
 export const ADJUST_TIMEOUT_MS = 20_000;
 
-const INITIAL: CoachState = { phase: "idle", request: "", answers: [], turns: [], response: null, adjustments: [], adjustStatus: "idle" };
+/** Short random id, same charset the agent accepts ([A-Za-z0-9_-]). */
+function newConversationId(): string {
+  const raw = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `gcv_${raw.replace(/[^A-Za-z0-9_-]/g, "")}`.slice(0, 64);
+}
+
+const INITIAL: CoachState = { phase: "idle", conversationId: "", request: "", answers: [], turns: [], response: null, adjustments: [], adjustStatus: "idle" };
 
 /**
  * Goal Coach conversation: idle -> asking -> need_info <-> answering -> draft | out_of_scope | failed.
@@ -65,7 +73,7 @@ export function useGoalCoach() {
         seq.current++;
         setState((s) => ({ ...s, phase: "failed" }));
       }, COACH_TIMEOUT_MS);
-      const res = await coachGoal(cif, { request: base.request, answers: base.answers });
+      const res = await coachGoal(cif, { request: base.request, answers: base.answers, conversationId: base.conversationId });
       clearTimeout(timer);
       if (seq.current !== id) return;
       setState({
@@ -82,7 +90,7 @@ export function useGoalCoach() {
     (request: string) => {
       const text = request.trim();
       if (!text) return;
-      void call({ ...INITIAL, request: text, turns: [{ role: "customer", text }] }, "asking");
+      void call({ ...INITIAL, conversationId: newConversationId(), request: text, turns: [{ role: "customer", text }] }, "asking");
     },
     [call],
   );
@@ -113,7 +121,7 @@ export function useGoalCoach() {
       const id = ++adjustSeq.current;
       setState((s) => ({ ...s, adjustStatus: "busy" }));
       const timeout = new Promise<null>((r) => setTimeout(() => r(null), ADJUST_TIMEOUT_MS));
-      const res = await Promise.race([coachGoal(cif, { request: sentence, answers: [], currentDraft: current }), timeout]);
+      const res = await Promise.race([coachGoal(cif, { request: sentence, answers: [], currentDraft: current, conversationId: state.conversationId }), timeout]);
       if (adjustSeq.current !== id) return;
       if (res && res.ok && res.data.status === "adjust" && res.data.adjustment) {
         const adj = res.data.adjustment;
@@ -129,7 +137,7 @@ export function useGoalCoach() {
         setState((s) => ({ ...s, adjustStatus: "failed" }));
       }
     },
-    [cif, state.phase],
+    [cif, state.phase, state.conversationId],
   );
 
   const reset = useCallback(() => {
@@ -154,6 +162,7 @@ export function useGoalCoach() {
     question,
     draft,
     requestId: state.response?.request_id ?? null,
+    conversationId: state.conversationId || null,
     messageCode: state.response?.message_code ?? null,
     start,
     retry: () => { if (state.phase === "failed") void call(state, state.answers.length ? "answering" : "asking"); },

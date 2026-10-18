@@ -8,7 +8,7 @@ import {
   COACH_REQUEST_MAX,
   isCoachResponse,
 } from "../coach/contracts";
-import { badBody, cifOf, missingCif, readJson } from "./_http";
+import { badBody, cifOf, conversationIdOf, missingCif, readJson } from "./_http";
 
 const SLOTS = ["name", "target_amount", "horizon", "flexibility", "opening_amount"];
 const unavailable = () => NextResponse.json({ error: "coach_unavailable" }, { status: 502 });
@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
   }
 
   const payload: Record<string, unknown> = { user_id: agentAlias(cif), request, answers };
+  const conversationId = conversationIdOf(body.conversationId);
+  if (conversationId) payload.conversation_id = conversationId;
   if (body.currentDraft !== undefined && body.currentDraft !== null) {
     const d = body.currentDraft as { target_amount?: unknown; opening_amount?: unknown; months?: unknown };
     const ok =
@@ -56,8 +58,10 @@ export async function POST(req: NextRequest) {
     const context = agentContext(cif, transferNow());
     if (context) payload.context = context;
   }
+  const started = Date.now();
   const res = await forwardToAgent("/goal-coach", payload);
-  if (!res.ok) return unavailable();
-  const data: unknown = await res.json().catch(() => null);
-  return isCoachResponse(data) ? NextResponse.json(data) : unavailable();
+  const data: unknown = res.ok ? await res.json().catch(() => null) : null;
+  const ok = isCoachResponse(data);
+  console.info(`[goal-coach] conv=${conversationId ?? "-"} ${ok ? `${data.status}/${data.message_code} rid=${data.request_id}` : "unavailable"} ms=${Date.now() - started}`);
+  return ok ? NextResponse.json(data) : unavailable();
 }

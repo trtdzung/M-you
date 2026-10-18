@@ -18,9 +18,10 @@ export const NARRATION_MAX_LEN = 280;
 /** Hard deadline for the LLM sentences; after it the local template stays. */
 export const NARRATION_DEADLINE_MS = 2000;
 
-export type NarrateInput =
+export type NarrateInput = (
   | { mode: "explain"; verdict: Verdict; planIds: PlanId[]; categoryNames?: string[]; goalName?: string | null }
-  | { mode: "converse"; action: DialogueAction; goalName?: string | null };
+  | { mode: "converse"; action: DialogueAction; goalName?: string | null }
+) & { conversationId?: string | null };
 
 export interface NarrationBlock {
   id: string;

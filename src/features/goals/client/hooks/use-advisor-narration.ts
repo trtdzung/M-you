@@ -31,7 +31,12 @@ async function narrate(cif: string, input: NarrateInput): Promise<NarrateResult>
  * later. The lead-in starts with the draft (in parallel with the engine), the explanation as soon as
  * the verdict exists. Anything late, missing or unsafe is simply not shown.
  */
-export function useAdvisorNarration(draftKey: string | null, goalName: string | null, analysis: Analysis | null): AdvisorNarration {
+export function useAdvisorNarration(
+  draftKey: string | null,
+  goalName: string | null,
+  analysis: Analysis | null,
+  conversationId: string | null = null,
+): AdvisorNarration {
   const cif = usePersonaCif();
   const [intro, setIntro] = useState<{ key: string; text: string } | null>(null);
   const [explain, setExplain] = useState<{ analysis: Analysis; value: AdvisorNarration } | null>(null);
@@ -39,20 +44,20 @@ export function useAdvisorNarration(draftKey: string | null, goalName: string | 
   useEffect(() => {
     if (!cif || !draftKey) return;
     let live = true;
-    void narrate(cif, { mode: "converse", action: "present_plans", goalName }).then((r) => {
+    void narrate(cif, { mode: "converse", action: "present_plans", goalName, conversationId }).then((r) => {
       const text = r.source !== "local" ? r.blocks.find((b) => b.id === "say")?.text : undefined;
       if (live && text && !text.includes("{")) setIntro({ key: draftKey, text });
     });
     return () => {
       live = false;
     };
-  }, [cif, draftKey, goalName]);
+  }, [cif, draftKey, goalName, conversationId]);
 
   useEffect(() => {
     if (!cif || !analysis) return;
     let live = true;
     const planIds = PLAN_IDS.filter((id) => analysis.plans[id].available);
-    void narrate(cif, { mode: "explain", verdict: analysis.verdict, planIds, goalName }).then((r) => {
+    void narrate(cif, { mode: "explain", verdict: analysis.verdict, planIds, goalName, conversationId }).then((r) => {
       if (!live || r.source === "local") return;
       const byId = new Map(r.blocks.map((b) => [b.id, b.text]));
       const fill = (id: string, plan: PlanId | null) => {
@@ -69,7 +74,7 @@ export function useAdvisorNarration(draftKey: string | null, goalName: string | 
     return () => {
       live = false;
     };
-  }, [cif, analysis, goalName]);
+  }, [cif, analysis, goalName, conversationId]);
 
   const current = explain && explain.analysis === analysis ? explain.value : EMPTY;
   return { ...current, intro: intro && intro.key === draftKey ? intro.text : null };

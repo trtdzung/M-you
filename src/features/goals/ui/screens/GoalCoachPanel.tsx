@@ -30,7 +30,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const analyzeDraft = baseDraft ? applyAdjustments(baseDraft, coach.adjustments, transferNow()) : null;
   const draftKey = coach.requestId ? `${coach.requestId}:${coach.adjustments.length}` : null;
   const advisor = useGoalAdvisor(analyzeDraft, draftKey);
-  const narration = useAdvisorNarration(analyzeDraft ? draftKey : null, analyzeDraft?.name ?? null, advisor.analysis);
+  const narration = useAdvisorNarration(analyzeDraft ? draftKey : null, analyzeDraft?.name ?? null, advisor.analysis, coach.conversationId);
   // The form opens with the plan the customer picked (its date/amount), not the raw draft.
   const chosenPlanId = advisor.selectedPlanId;
   const chosen = advisor.view.analysis && advisor.selectedPlanId ? advisor.view.analysis.plans[advisor.selectedPlanId] : null;

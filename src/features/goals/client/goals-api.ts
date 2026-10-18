@@ -44,7 +44,10 @@ export const checkFeasibility = (cif: string, input: FeasibilityRequest) =>
 export const seedDemoGoals = (cif: string) =>
   fetchJson<{ inserted: number }>("/api/goals/demo", jsonInit("POST", { cif }));
 
-export const coachGoal = (cif: string, input: { request: string; answers: CoachAnswer[]; currentDraft?: CoachCurrentDraft }) =>
+export const coachGoal = (
+  cif: string,
+  input: { request: string; answers: CoachAnswer[]; currentDraft?: CoachCurrentDraft; conversationId?: string },
+) =>
   fetchJson<CoachResponse>("/api/goals/coach", jsonInit("POST", { cif, ...input }));
 
 export const analyzeGoal = (
