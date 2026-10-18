@@ -347,6 +347,27 @@ export async function deleteChatHistory(cif: string): Promise<void> {
   await readJsonOrThrow(res);
 }
 
+/** One fact the agent itself remembered from chat (`GET /memory/preferences`), not a form field. */
+export interface AgentMemoryRecord {
+  id: string;
+  fact: string;
+  created_at: string | null;
+}
+
+export async function getAgentMemory(cif: string): Promise<AgentMemoryRecord[]> {
+  const res = await fetch(`/api/agent/memory?user_id=${encodeURIComponent(cif)}`);
+  const data = (await readJsonOrThrow(res)) as { records?: AgentMemoryRecord[] };
+  return data.records ?? [];
+}
+
+export async function deleteAgentMemory(cif: string, recordId: string): Promise<void> {
+  const res = await fetch(
+    `/api/agent/memory?user_id=${encodeURIComponent(cif)}&record_id=${encodeURIComponent(recordId)}`,
+    { method: "DELETE" },
+  );
+  await readJsonOrThrow(res);
+}
+
 /**
  * Ask the agent how to split an unallocated amount across jars
  * (`POST /jar-distribute`, no chat thread). `ui` is `distribute_amount` or `null`

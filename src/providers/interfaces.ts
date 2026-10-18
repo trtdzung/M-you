@@ -8,6 +8,7 @@
 
 import type {
   Account,
+  AgentPreferences,
   Asset,
   Beneficiary,
   Budget,
@@ -104,6 +105,17 @@ export interface BeneficiaryDataProvider {
   createBeneficiary(record: { name: string; accountNumber: string; bankName: string }): Promise<Beneficiary[]>;
 }
 
+export interface AgentPreferencesProvider {
+  /**
+   * The persona's standing instructions for M-You (plan 261013) — every field
+   * unset if never saved. Backed by `data/pfm.sqlite3` via
+   * `/api/agent-preferences`, not a fixture (invariant #4).
+   */
+  getAgentPreferences(): Promise<AgentPreferences>;
+  /** Save the whole form at once (no partial PATCH). Returns the saved row. REJECTS with an `ApiError` on an invalid field (422). */
+  saveAgentPreferences(prefs: AgentPreferences): Promise<AgentPreferences>;
+}
+
 /**
  * The full provider bundle consumed by the app. Composes every data provider
  * plus budgets and goals, so screens receive a single `Providers` object.
@@ -115,7 +127,8 @@ export interface Providers
     LiabilityDataProvider,
     GoalDataProvider,
     MarketDataProvider,
-    BeneficiaryDataProvider {
+    BeneficiaryDataProvider,
+    AgentPreferencesProvider {
   getBudgets(): Promise<Budget[]>;
   /**
    * Read the user's current spending-jar configuration. Backed by

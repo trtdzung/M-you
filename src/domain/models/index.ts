@@ -22,6 +22,14 @@ export {
   categoryLabel,
 } from "./categories";
 export type { CategoryDef, CategoryKind, StoredCategory } from "./categories";
+export {
+  AGENT_PREFERENCES_MAX,
+  AGENT_TONES,
+  EMPTY_AGENT_PREFERENCES,
+  RESPONSE_LENGTHS,
+  RISK_APPETITES,
+} from "./agent-preferences";
+export type { AgentPreferences, AgentTone, ResponseLength, RiskAppetite } from "./agent-preferences";
 
 /** Provenance of a record or value. Never present non-`msb` as bank-verified. */
 export type DataSource = "msb" | "self_reported" | "estimated" | "mock";

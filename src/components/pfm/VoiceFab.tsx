@@ -10,8 +10,10 @@ import { usePersona } from "@/providers/context";
 import { sendChatMessage, isChartUi, isClarifyOptionsUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { jarSpeechContext } from "@/lib/speech-context";
+import { withPreferenceSeed } from "@/lib/agent-preference-seed";
 import { useJarConfig } from "@/state/jars";
 import { useCategories } from "@/state/categories";
+import { useAgentPreferences } from "@/state/agent-preferences";
 import { AgentMarkdown } from "./AgentMarkdown";
 import { AgentChartCard } from "./AgentChartCard";
 import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
@@ -99,6 +101,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   // only ever narrows what renders — it can never widen it (invariant #2).
   const { assignable } = useCategories();
   const expenseIds = useMemo(() => new Set(assignable.map((c) => c.id)), [assignable]);
+  const { preferences, status: prefStatus } = useAgentPreferences();
   const [sectionOpen, setSectionOpen] = useState(false);
   const [panelPhase, setPanelPhase] = useState<"closed" | "open" | "exiting">("closed");
   const skipPanelExit = useRef(false);
@@ -126,15 +129,19 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     if (!text || sending) return;
     setSending(true);
     setReply(null);
+    // Same hidden-preamble-on-the-first-turn delivery as the chat overlay — voice
+    // and chat share the same agent thread per persona.
+    const { payload, onSent } = withPreferenceSeed(cif, text, preferences, prefStatus);
     try {
-      const res = await sendChatMessage(text, cif);
+      const res = await sendChatMessage(payload, cif);
+      onSent();
       setReply({ answer: res.answer, ui: res.ui ?? null });
     } catch {
       setReply({ answer: "Không gửi được, vui lòng thử lại.", ui: null });
     } finally {
       setSending(false);
     }
-  }, [cif, sending, transcript]);
+  }, [cif, sending, transcript, preferences, prefStatus]);
 
   const voice = useStreamingSpeech((text, final) => {
     if (!final) return;
