@@ -19,6 +19,11 @@ export function setSecurityCif(cif: string | null): void {
   activeCif = cif;
 }
 
+/** The persona the Scam Shield state is currently bound to (null before login). */
+export function getSecurityCif(): string | null {
+  return activeCif;
+}
+
 export function securityStorageKey(cif: string): string {
   return `${SECURITY_STORAGE_PREFIX}.${cif}`;
 }

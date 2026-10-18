@@ -218,3 +218,26 @@ CREATE TABLE IF NOT EXISTS security_profiles (
   payload TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- Scam Shield engine (E02). Append-only log of what happened to a persona
+-- (money in, transfers out, savings settled, device/password changes, screen
+-- sharing, screens opened, warnings shown/answered). The signal engine reads
+-- every time-window rule (60 min, 24 h, 10 min, 2 days…) from here.
+CREATE TABLE IF NOT EXISTS security_events (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  type TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_cif_at ON security_events (cif, at);
+
+-- Scam Shield engine clock per persona (E02): test tools shift "now" and pin the
+-- hour warnings are judged at. Kept apart from `security_profiles` because the
+-- app rewrites that row whole.
+CREATE TABLE IF NOT EXISTS security_engine_state (
+  cif TEXT PRIMARY KEY,
+  clock_offset_ms INTEGER NOT NULL DEFAULT 0,
+  alert_hour INTEGER CHECK (alert_hour IS NULL OR (alert_hour BETWEEN 0 AND 23)),
+  updated_at INTEGER NOT NULL
+);
