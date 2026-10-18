@@ -22,11 +22,11 @@ beforeEach(() => {
 });
 
 describe("ensureGoalTables", () => {
-  it("can be called twice and creates both tables plus the ledger index", () => {
+  it("can be called twice and creates the goal, ledger and reminder tables plus the ledger index", () => {
     const db = holder.db!;
     ensureGoalTables(db);
     ensureGoalTables(db);
-    expect(tableNames(db)).toEqual(["user_goal_ledger", "user_goals"]);
+    expect(tableNames(db)).toEqual(["user_goal_ledger", "user_goal_reminders", "user_goals"]);
     const index = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?")
       .get("idx_user_goal_ledger_goal") as { name: string } | undefined;

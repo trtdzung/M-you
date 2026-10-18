@@ -8,6 +8,7 @@ import type {
   SavingsGoalView,
 } from "../model/types";
 import type { Analysis, AnalyzeDraft } from "../advisor/analysis-types";
+import type { GoalReminder } from "../model/reminder-types";
 import type { NarrateInput, NarrateResult } from "../advisor/narration-contract";
 import type { CoachAnswer, CoachCurrentDraft, CoachResponse } from "../coach/contracts";
 import { fetchJson, jsonInit } from "./http";
@@ -50,6 +51,12 @@ export const analyzeGoal = (
   cif: string,
   input: { draft: AnalyzeDraft; overrides?: { targetDate?: string; targetAmount?: number } },
 ) => fetchJson<Analysis>("/api/goals/advisor", jsonInit("POST", { cif, ...input }));
+
+export const fetchGoalReminder = (cif: string, goalId: string) =>
+  fetchJson<{ reminder: GoalReminder | null }>(`/api/goals/${enc(goalId)}/reminder`, jsonInit("POST", { cif }));
+
+export const dismissGoalReminder = (cif: string, goalId: string, reminderId: string) =>
+  fetchJson<{ reminder: null }>(`/api/goals/${enc(goalId)}/reminder`, jsonInit("POST", { cif, dismiss: reminderId }));
 
 export const narrateAdvisor = (cif: string, input: NarrateInput) =>
   fetchJson<NarrateResult>("/api/goals/advisor/narrate", jsonInit("POST", { cif, ...input }));

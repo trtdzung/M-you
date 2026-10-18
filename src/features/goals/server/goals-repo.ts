@@ -109,6 +109,7 @@ export function deleteGoal(cif: string, id: string): boolean {
   const db = goalsDb();
   return db.transaction(() => {
     db.prepare("DELETE FROM user_goal_ledger WHERE cif = ? AND goal_id = ?").run(cif, id);
+    db.prepare("DELETE FROM user_goal_reminders WHERE cif = ? AND goal_id = ?").run(cif, id);
     return db.prepare("DELETE FROM user_goals WHERE cif = ? AND id = ?").run(cif, id).changes > 0;
   })();
 }

@@ -31,6 +31,19 @@ CREATE TABLE IF NOT EXISTS user_goal_ledger (
   PRIMARY KEY (cif, id)
 );
 CREATE INDEX IF NOT EXISTS idx_user_goal_ledger_goal ON user_goal_ledger (cif, goal_id);
+
+-- Proactive notes already shown (feature-owned; nothing here is bank data).
+CREATE TABLE IF NOT EXISTS user_goal_reminders (
+  cif TEXT NOT NULL,
+  id TEXT NOT NULL,
+  goal_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  dismissed_at TEXT,
+  PRIMARY KEY (cif, id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_goal_reminders_goal ON user_goal_reminders (cif, goal_id, created_at);
 `;
 
 /** Idempotent: creates the goal tables when missing. */

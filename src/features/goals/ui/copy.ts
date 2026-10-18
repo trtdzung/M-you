@@ -179,6 +179,21 @@ export const GOALS_COPY = {
     cutNotEnough: "Cần kết hợp thêm cách khác.",
   },
 
+  reminder: {
+    milestone: (m: number) => `Chúc mừng, bạn đã đạt ${m}% mục tiêu! Cứ đều đặn như vậy nhé.`,
+    nudge: (amount: string) => `Mình thấy kế hoạch đang chậm một chút. Tuần này bạn thử góp thêm ${amount} để theo kịp nhé.`,
+    levers: "Mục tiêu đang lệch khá xa kế hoạch. Mình gợi ý vài cách điều chỉnh để vẫn đạt được:",
+    pause: "Gần đây thu nhập hoặc chi tiêu của bạn có biến động. Bạn có thể tạm dừng mục tiêu 1 tháng rồi quay lại khi ổn định.",
+    missed: "Mấy tháng nay bạn chưa góp vào mục tiêu này. Bạn muốn giữ nguyên, điều chỉnh lại kế hoạch hay lưu trữ?",
+    pauseAction: "Tạm dừng 1 tháng",
+    keepAction: "Giữ nguyên",
+    editAction: "Điều chỉnh",
+    archiveAction: "Lưu trữ",
+    dismiss: "Để sau",
+    ok: "Đã hiểu",
+    contribute: "Góp ngay",
+  },
+
   deleteConfirm: {
     title: "Xóa mục tiêu?",
     description: "Mục tiêu và lịch sử góp/rút sẽ bị xóa, không hoàn tác được.",
