@@ -13,7 +13,7 @@ type Tab = { href: string; label: string; icon: LucideIcon; match: string[] };
  */
 const TABS: Tab[] = [
   { href: "/", label: "Trang chủ", icon: Home, match: [] },
-  { href: "/accounts", label: "Tài sản", icon: Wallet, match: ["/accounts", "/transactions"] },
+  { href: "/accounts", label: "Tài khoản", icon: Wallet, match: ["/accounts", "/transactions"] },
   { href: "/settings", label: "Cài đặt", icon: Settings, match: ["/settings"] },
 ];
 

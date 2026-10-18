@@ -48,7 +48,7 @@ export default function FestiveLayout({
       background={settings ? <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[#fce0d5] to-[#fbd0d4]" /> : home ? <div aria-hidden className="login-background absolute inset-0 -z-10" /> : <FestiveBg />}
       nav={settingsDetail ? undefined : <BottomNav />}
       fab={
-        !settings && !home && <Suspense fallback={null}>
+        !settings && <Suspense fallback={null}>
           <VoiceFab floating />
         </Suspense>
       }

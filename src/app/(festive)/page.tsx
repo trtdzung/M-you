@@ -36,6 +36,7 @@ export default function HomePage() {
 
       {!loading && !error && (
         <div className="flex flex-col gap-4">
+          <HomeInsightWidget />
 
           {primary ? (
             <AccountSummaryCard
@@ -76,7 +77,6 @@ export default function HomePage() {
               />,
             ]}
           />
-          <HomeInsightWidget />
         </div>
       )}
     </div>
