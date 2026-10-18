@@ -36,10 +36,12 @@ export function LiabilityEditor({
   liability,
   onSubmit,
   onClose,
+  open = true,
 }: {
   liability?: Liability;
   onSubmit: (fields: LiabilityFields) => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const [draft, setDraft] = useState<LiabilityDraft>(() => draftFrom(liability));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -60,7 +62,7 @@ export function LiabilityEditor({
   }
 
   return (
-    <Sheet title={editing ? "Sửa khoản nợ" : "Thêm khoản nợ"} onClose={onClose}>
+    <Sheet open={open} title={editing ? "Sửa khoản nợ" : "Thêm khoản nợ"} onClose={onClose}>
         <form
           className="flex flex-col gap-3"
           onSubmit={(e) => {

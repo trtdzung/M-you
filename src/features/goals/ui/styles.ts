@@ -3,12 +3,12 @@ import type { GoalProgressState } from "../model/types";
 
 const ring = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
 
-export const input = `min-h-12 rounded-xl border border-border bg-surface px-4 text-[16px] text-text ${ring}`;
+export const input = `goal-field-input min-h-12 rounded-xl border border-border bg-surface px-4 text-[16px] text-text ${ring}`;
 export const label = "text-sm font-medium text-text";
 export const hint = "text-[13px] leading-5 text-muted";
 export const fieldError = "text-sm text-negative";
-export const primaryButton = `inline-flex h-12 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg disabled:opacity-50 ${ring}`;
-export const secondaryButton = `min-h-11 rounded-full border border-border px-3 text-sm font-semibold text-text transition-colors hover:bg-surface-muted ${ring}`;
+export const primaryButton = `goal-primary-button inline-flex h-12 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg disabled:opacity-50 ${ring}`;
+export const secondaryButton = `goal-secondary-button min-h-11 rounded-full border border-border px-3 text-sm font-semibold text-text transition-colors hover:bg-surface-muted ${ring}`;
 export const chip = `min-h-9 rounded-full border border-border px-3 text-xs font-semibold text-text transition-colors hover:bg-surface-muted ${ring}`;
 export const dangerButton = `flex min-h-11 items-center justify-center gap-2 rounded-full border border-negative/40 px-3 text-sm font-semibold text-negative ${ring}`;
 export const errorBox = "rounded-row border border-negative/40 bg-negative-soft/40 px-3 py-2";

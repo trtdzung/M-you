@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SheetSlot, useRetained } from "@/components/primitives";
 import type { Financials, RawData } from "@/domain/engine/finance-compose";
 import type { Transaction } from "@/domain/models";
 import { useJarConfig } from "@/state/jars";
@@ -51,6 +52,7 @@ export function HuOverviewRow({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const [transferFromId, setTransferFromId] = useState<string | null>(null);
+  const heldFrom = useRetained(transferFromId);
   const [transferDone, setTransferDone] = useState<JarTransferSummary | null>(null);
 
   useEffect(() => {
@@ -139,26 +141,34 @@ export function HuOverviewRow({
         </p>
       )}
 
-      {transferFromId && isCurrentMonth && (
-        <JarTransferSheet
-          initialFromId={transferFromId}
-          transactions={transactions}
-          raw={raw}
-          onClose={() => setTransferFromId(null)}
-          onDone={(summary) => {
-            setTransferFromId(null);
-            setTransferDone(summary);
-          }}
+      <SheetSlot open={!!transferFromId && isCurrentMonth}>
+        {heldFrom && (
+          <JarTransferSheet
+            open={!!transferFromId && isCurrentMonth}
+            initialFromId={heldFrom}
+            transactions={transactions}
+            raw={raw}
+            onClose={() => setTransferFromId(null)}
+            onDone={(summary) => {
+              setTransferFromId(null);
+              setTransferDone(summary);
+            }}
+          />
+        )}
+      </SheetSlot>
+
+      <SheetSlot open={sheetOpen && isCurrentMonth}>
+        <AllocationSheet
+          open={sheetOpen && isCurrentMonth}
+          envelope={financials.jarEnvelope}
+          jars={config.jars}
+          onClose={() => setSheetOpen(false)}
         />
-      )}
+      </SheetSlot>
 
-      {sheetOpen && isCurrentMonth && (
-        <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setSheetOpen(false)} />
-      )}
-
-      {labelSheetOpen && (
-        <UnlabeledSpendSheet items={unlabeledItems} onClose={() => setLabelSheetOpen(false)} />
-      )}
+      <SheetSlot open={labelSheetOpen}>
+        <UnlabeledSpendSheet open={labelSheetOpen} items={unlabeledItems} onClose={() => setLabelSheetOpen(false)} />
+      </SheetSlot>
     </section>
   );
 }

@@ -1,8 +1,10 @@
 import { prefersMotion } from "./motion";
+import { navigationDirection } from "./navigation-direction";
 
 type ViewTransitionLike = {
   skipTransition: () => void;
   finished: Promise<void>;
+  ready?: Promise<void>;
 };
 
 const COMMIT_TIMEOUT_MS = 1500;
@@ -16,6 +18,8 @@ export function isNavigationTransitionPending(): boolean {
 
 /** Called from the root layout after a pathname commit, so the new snapshot is the new page. */
 export function notifyNavigationCommitted(): void {
+  const main = document.getElementById("main-content");
+  if (main) main.scrollTop = 0;
   if (skipTimer) {
     window.clearTimeout(skipTimer);
     skipTimer = 0;
@@ -30,7 +34,7 @@ export function notifyNavigationCommitted(): void {
  * returns, so the view-transition callback stays pending until the pathname commits.
  * A second call while that is in flight is ignored. No API, or reduced motion: navigate immediately.
  */
-export function navigateWithTransition(go: () => void, direction: "forward" | "back"): void {
+export function navigateWithTransition(go: () => void, direction: "forward" | "back" | "fade"): void {
   const start = viewTransitionStart();
   if (!start || !prefersMotion() || pending) {
     if (!pending) go();
@@ -50,11 +54,43 @@ export function navigateWithTransition(go: () => void, direction: "forward" | "b
     const resolve = pending;
     pending = null;
     resolve?.();
-    transition.skipTransition();
+    try {
+      transition.skipTransition();
+    } catch {
+      // The route committed just as the cap fired; the animation is already done.
+    }
   }, COMMIT_TIMEOUT_MS);
-  void transition.finished.finally(() => {
+  // A slow commit calls `skipTransition`, which rejects both promises. Catch them
+  // so the dev overlay does not treat that as an app error.
+  void transition.ready?.catch(() => {});
+  void transition.finished.catch(() => {}).finally(() => {
     delete document.documentElement.dataset.vtDir;
   });
+}
+
+/** `router.push` with a slide, or a crossfade between home tabs. Query swaps stay instant. */
+export function pushWithTransition(push: (href: string, options?: { scroll?: boolean }) => void, href: string): void {
+  if (typeof window === "undefined") {
+    push(href);
+    return;
+  }
+  const url = new URL(href, window.location.href);
+  const direction = navigationDirection(
+    `${window.location.pathname}${window.location.search}`,
+    `${url.pathname}${url.search}`,
+  );
+  if (direction === "none") {
+    push(href);
+    return;
+  }
+  // Next scrolls after the view-transition callback, which aborts the animation.
+  // `#main-content` is reset to the top inside `notifyNavigationCommitted` instead.
+  navigateWithTransition(() => push(href, { scroll: false }), direction);
+}
+
+/** Same slide as a pushed screen's back control. */
+export function backWithTransition(go: () => void): void {
+  navigateWithTransition(go, "back");
 }
 
 function viewTransitionStart(): ((update: () => Promise<void>) => ViewTransitionLike) | null {

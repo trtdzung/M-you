@@ -44,7 +44,7 @@ describe("useGoalForm", () => {
       invalid = result.current.validate();
     });
     expect(invalid).toBeNull();
-    expect(result.current.errors.targetAmount).toBe("Chỉ nhập số tiền, vd 5.000.000");
+    expect(result.current.errors.targetAmount).toBe("Chỉ nhập số tiền, vd 5,000,000");
 
     act(() => result.current.set("targetAmount", "600000000"));
     let created: unknown;

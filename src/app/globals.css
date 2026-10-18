@@ -273,18 +273,30 @@ body {
 
 .sheet-panel-in { animation: sheet-panel-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
 .sheet-panel-out { animation: sheet-panel-out 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.sheet-dragging { animation: none; touch-action: none; }
+.sheet-snap { animation: none; transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-rest { animation: none; }
 .sheet-backdrop-in { animation: sheet-backdrop-in 200ms ease-out both; }
 .sheet-backdrop-out { animation: sheet-backdrop-out 200ms ease-out both; }
 
-#main-content { view-transition-name: shell-main; }
-.status-bar { view-transition-name: shell-status; }
+.shell-screen {
+  background: var(--color-background, #fff);
+  border-radius: inherit;
+  overflow: clip;
+}
+/* Transition snapshots must clip themselves, not rely on their parent frame. */
+.shell-body {
+  border-radius: inherit;
+  overflow: clip;
+}
+html[data-vt-dir="forward"] .shell-screen,
+html[data-vt-dir="back"] .shell-screen { view-transition-name: shell-main; }
+html[data-vt-dir="fade"] .shell-body { view-transition-name: shell-body; }
+html[data-vt-dir="fade"] .shell-bottom-nav { view-transition-name: shell-nav; }
 
-html[data-vt-dir] #main-content { animation: none; }
-
+::view-transition-group(root),
 ::view-transition-old(root),
-::view-transition-new(root),
-::view-transition-old(shell-status),
-::view-transition-new(shell-status) {
+::view-transition-new(root) {
   animation: none;
 }
 ::view-transition-image-pair(shell-main) { overflow: clip; }
@@ -292,6 +304,16 @@ html[data-vt-dir] #main-content { animation: none; }
 ::view-transition-new(shell-main) { animation: vt-forward-new 300ms cubic-bezier(0.32, 0.72, 0, 1) both; }
 html[data-vt-dir="back"] ::view-transition-old(shell-main) { animation-name: vt-back-old; }
 html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-back-new; }
+
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+::view-transition-group(shell-body) { animation: none; z-index: 1; }
+::view-transition-image-pair(shell-body) { overflow: clip; }
+::view-transition-old(shell-body) { animation: vt-fade-out 220ms ease-out both; }
+::view-transition-new(shell-body) { animation: vt-fade-in 220ms ease-out both; }
+::view-transition-group(shell-nav) { animation: none; z-index: 10; }
+::view-transition-old(shell-nav) { animation: none; opacity: 0; }
+::view-transition-new(shell-nav) { animation: none; }
 
 /* Ẩn thanh cuộn (carousel ngang) — vẫn cuộn được, chỉ ẩn scrollbar */
 @utility no-scrollbar {
@@ -630,3 +652,156 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 .transfer-category-sheet > div.grid > button[aria-pressed="true"] svg {
   color: #ff650b;
 }
+
+/* Assets reference: navy type and muted currency inside peach chrome. */
+.accounts-shell {
+  --color-text: #10284b;
+  --color-muted: #596983;
+}
+.accounts-overview > header { margin-bottom: 28px; }
+.accounts-overview > header h1 { font-size: 24px; font-weight: 700; }
+
+/* Team PFM module uses the same visual language as the simulated MSB screens. */
+.pfm-app-shell {
+  --color-text: #10284b;
+  --color-muted: #596983;
+  --color-border: #dfe5ee;
+  --color-primary: #ff650b;
+}
+.pfm-app-shell .rounded-card {
+  border-radius: 18px;
+  box-shadow: none;
+}
+.pfm-app-shell #main-content h2 {
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+}
+.pfm-app-shell [role="dialog"] {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+}
+.pfm-app-shell [role="dialog"] h2 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.pfm-app-shell [role="dialog"] input,
+.pfm-app-shell [role="dialog"] select,
+.pfm-app-shell [role="dialog"] textarea {
+  border-color: #dfe5ee;
+  border-radius: 9px;
+}
+
+.pfm-transactions .txn-row {
+  min-height: 88px;
+  padding: 16px 0;
+  border-radius: 0;
+}
+.pfm-transactions .txn-row:hover { background: transparent; }
+.pfm-transactions .txn-row:active { opacity: 0.7; }
+.pfm-transactions .txn-row-title { font-size: 16px; font-weight: 600; line-height: 24px; }
+.pfm-transactions .txn-row-meta { margin-top: 4px; font-size: 13px; line-height: 20px; }
+.pfm-transactions .txn-row-amount { font-size: 15px; line-height: 22px; }
+.pfm-transaction-sheet > div:first-child {
+  border-bottom: 1px solid #dfe5ee;
+  padding-bottom: 16px;
+}
+.pfm-transaction-sheet [aria-pressed="true"] {
+  border-color: #ff650b;
+  background: #fff0e7;
+}
+
+.pfm-budget .budget-jar-card { padding: 20px; }
+.pfm-budget .budget-jar-card > div:first-child > div > div:first-child {
+  font-size: 16px;
+  line-height: 24px;
+  align-items: flex-start;
+}
+.pfm-budget .budget-jar-card > div:first-child > div > div:first-child > span:first-child {
+  font-weight: 600;
+}
+.pfm-budget .budget-jar-card > div:first-child > div > div:last-child {
+  font-size: 13px;
+  line-height: 20px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pfm-budget .budget-jar-card > div:nth-child(2) {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.goals-app-shell {
+  --color-text: #10284b;
+  --color-muted: #596983;
+  --color-border: #dfe5ee;
+  --color-primary: #ff650b;
+}
+.goals-app-shell .goal-create-fields input,
+.goals-app-shell .goal-create-fields .goal-field-input {
+  border-radius: 9px;
+  min-height: 48px;
+  background: #fff;
+  border: 1px solid #dfe5ee;
+}
+.goals-app-shell .goal-create-fields label {
+  font-size: 15px;
+  line-height: 22px;
+}
+.goals-app-shell .goal-create-fields > section {
+  border: 0;
+  border-top: 1px solid #dfe5ee;
+  border-radius: 0;
+  padding: 20px 0 0;
+}
+.goals-app-shell [role="dialog"] {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+}
+.goals-app-shell [role="dialog"] h2 { font-size: 20px; font-weight: 700; }
+
+.goals-app-shell .rounded-card {
+  border-radius: 18px;
+  box-shadow: none;
+}
+.goals-app-shell .goal-detail-screen h2 { font-size: 18px; line-height: 26px; font-weight: 600; }
+.goals-app-shell .goal-primary-button {
+  min-height: 48px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffa54f 0%, #ee6335 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.goals-app-shell .goal-secondary-button {
+  min-height: 48px;
+  border-radius: 9px;
+  background: #fff;
+  border-color: #ff650b;
+  color: #ff650b;
+  font-size: 15px;
+}
+.goals-app-shell .goal-secondary-button:disabled,
+.goals-app-shell .goal-primary-button:disabled {
+  background: #c3c8d1;
+  border-color: #c3c8d1;
+  color: #fff;
+  opacity: 1;
+}
+.goals-app-shell [role="dialog"] .goal-field-input {
+  min-height: 48px;
+  border: 1px solid #dfe5ee;
+  border-radius: 9px;
+  background: #fff;
+}
+.goals-app-shell [role="dialog"] > div:first-child {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dfe5ee;
+}
+
+.pfm-app-shell .myou-chat { border-radius: inherit; }
+.pfm-app-shell .myou-chat > header { box-shadow: none; }
+
+.pfm-app-shell .myou-chat .login-submit { width: 48px; min-width: 48px; padding: 0; }
+.pfm-app-shell .myou-chat .shadow-card { box-shadow: none; background: #fff; border: 1px solid #dfe5ee; }

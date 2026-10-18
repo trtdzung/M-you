@@ -6,3 +6,4 @@ export { ProvenanceChip } from "./ProvenanceChip";
 export { SectionHeader } from "./SectionHeader";
 export { Freshness } from "./Freshness";
 export { Sheet } from "./Sheet";
+export { SheetSlot, useRetained } from "./SheetSlot";

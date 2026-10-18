@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { pushWithTransition } from "@/lib/view-transition";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { Sheet } from "@/components/primitives/Sheet";
 import { formatVnd } from "@/lib/format";
@@ -75,7 +76,7 @@ export function HomeInsightWidget() {
   function chat() {
     if (!insight) return;
     if (!saveInsightDraft(persona.cif, insight)) { setError("Chưa mở được câu hỏi. Vui lòng thử lại."); return; }
-    router.push("/pfm?assistant=1&insight=1");
+    pushWithTransition((href) => router.push(href), "/pfm?assistant=1&insight=1");
   }
   if (!insight) {
     return <>
@@ -86,11 +87,11 @@ export function HomeInsightWidget() {
           <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
         </button>
       </section>
-      {expanded && <Sheet title="Gợi ý tài chính" onClose={close} className="home-insight-sheet">
+      <Sheet open={expanded} title="Gợi ý tài chính" onClose={close} className="home-insight-sheet">
         <p className="mb-4 text-sm text-muted">{error || (loading ? "Đang cập nhật gợi ý tài chính cho bạn." : "Hiện chưa có gợi ý mới cho bạn.")}</p>
         {error && <button type="button" onClick={() => setRefresh(n => n + 1)} className="login-submit">Thử lại</button>}
-        <button type="button" onClick={() => router.push("/pfm")} className="home-insight-secondary mt-3">Xem tổng quan tài chính</button>
-      </Sheet>}
+        <button type="button" onClick={() => pushWithTransition((href) => router.push(href), "/pfm")} className="home-insight-secondary mt-3">Xem tổng quan tài chính</button>
+      </Sheet>
     </>;
   }
   const amount = formatVnd(insight.candidate.metric.value);
@@ -104,14 +105,14 @@ export function HomeInsightWidget() {
       </button>
     </section>
     {error && <p role="alert" className="text-xs text-white">{error}</p>}
-    {expanded && <Sheet title={insight.title} onClose={close} className="home-insight-sheet">
+    <Sheet open={expanded} title={insight.title} onClose={close} className="home-insight-sheet">
       <p className="text-sm text-muted">{insight.body}</p>
       <div className="my-5 rounded-2xl border border-orange-100 bg-[#fff1ea] p-4"><p className="text-xs text-muted">{insight.candidate.metric.label}</p><p className="mt-2 text-2xl font-bold text-text">{amount}</p>
         {insight.candidate.confidence === "estimated" && <p className="mt-1 text-xs text-muted">Đây là ước tính dựa trên dữ liệu hiện có.</p>}</div>
       <div className="flex flex-col gap-2">
-        {insight.candidate.action === "overview" && <button onClick={() => router.push("/pfm")} className="login-submit">Xem tổng quan</button>}
+        {insight.candidate.action === "overview" && <button onClick={() => pushWithTransition((href) => router.push(href), "/pfm")} className="login-submit">Xem tổng quan</button>}
         <button onClick={chat} className="home-insight-secondary">{insight.candidate.topic === "allocation" ? "Chia tiền cùng M-Your" : insight.candidate.topic === "investment" ? "Tìm hiểu cùng M-Your" : "Xem cụ thể cùng M-Your"}</button>
       </div>
-    </Sheet>}
+    </Sheet>
   </>;
 }

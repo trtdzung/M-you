@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
-import { SectionHeader } from "@/components/primitives";
+import { SectionHeader, SheetSlot, useRetained } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/states";
 import { AllocationSheet } from "@/components/hu-envelope/AllocationSheet";
 import { useFinancials } from "@/state/useFinancials";
@@ -34,9 +34,12 @@ export function BudgetTab() {
   const { config, error: jarError } = useJarConfig();
   const router = useRouter();
   const [coverOpen, setCoverOpen] = useState(false);
+  const heldEnvelope = useRetained(
+    coverOpen && financials && financials.monthKey === currentMonthKey() && financials.jarEnvelope ? financials.jarEnvelope : null,
+  );
 
   function openEditor(huId: string) {
-    router.replace(`/pfm?tab=settings&hu=${huId}`, { scroll: false });
+    router.replace(`/pfm?tab=settings&hu=${huId}&from=budget`, { scroll: false });
   }
   function openSettings() {
     router.replace("/pfm?tab=settings", { scroll: false });
@@ -64,10 +67,10 @@ export function BudgetTab() {
   const cardProps = { onEdit: openEditor, onCover: openCover, onAllocate: openCover };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="pfm-budget flex flex-col gap-5">
       <div className="flex items-center justify-between gap-2">
         <PeriodPicker />
-        <span className="shadow-card inline-flex min-h-[36px] items-center rounded-full bg-surface px-3 text-xs font-semibold text-muted">
+        <span className="inline-flex min-h-[36px] items-center rounded-full bg-surface px-3 text-xs font-semibold text-muted">
           VND
         </span>
       </div>
@@ -100,7 +103,7 @@ export function BudgetTab() {
               <button
                 type="button"
                 onClick={openSettings}
-                className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-border bg-surface px-3 text-[13px] font-semibold text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-primary bg-white px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 <Plus size={14} aria-hidden /> Thêm ngân sách
               </button>
@@ -132,9 +135,16 @@ export function BudgetTab() {
 
       <GoalJars />
 
-      {coverOpen && isCurrentMonth && financials.jarEnvelope && (
-        <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setCoverOpen(false)} />
-      )}
+      <SheetSlot open={coverOpen && isCurrentMonth && !!financials.jarEnvelope}>
+        {heldEnvelope && (
+          <AllocationSheet
+            open={coverOpen && isCurrentMonth && !!financials.jarEnvelope}
+            envelope={heldEnvelope}
+            jars={config.jars}
+            onClose={() => setCoverOpen(false)}
+          />
+        )}
+      </SheetSlot>
     </div>
   );
 }

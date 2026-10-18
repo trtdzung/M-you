@@ -24,7 +24,7 @@ export function HomeHeader({ notifications = 0 }: { notifications?: number }) {
         <IconButton icon={Bell} label="Thông báo" badge={notifications} onClick={() => setPanel("Thông báo")} />
       </div>
     </div>
-    {panel && <Sheet title={panel} onClose={() => setPanel(null)}>{panel === "Thông báo" ? <p className="pb-5 text-sm text-muted">Bạn chưa có thông báo mới trong phiên demo.</p> : <div className="flex flex-col gap-2 pb-4">{[["Chuyển tiền", "/transfer"], ["Tài sản", "/accounts"], ["Cài đặt", "/settings"], ["Quản lý tài chính PFM", "/pfm"]].map(([label, href]) => <Link key={href} href={href} className="rounded-xl bg-orange-50 px-4 py-3 text-sm font-semibold">{label}</Link>)}</div>}</Sheet>}
+    <Sheet open={panel !== null} title={panel ?? " "} onClose={() => setPanel(null)}>{panel === "Thông báo" ? <p className="pb-5 text-sm text-muted">Bạn chưa có thông báo mới trong phiên demo.</p> : panel ? <div className="flex flex-col gap-2 pb-4">{[["Chuyển tiền", "/transfer"], ["Tài sản", "/accounts"], ["Cài đặt", "/settings"], ["Quản lý tài chính PFM", "/pfm"]].map(([label, href]) => <Link key={href} href={href} className="rounded-xl bg-orange-50 px-4 py-3 text-sm font-semibold">{label}</Link>)}</div> : null}</Sheet>
     </>
   );
 }

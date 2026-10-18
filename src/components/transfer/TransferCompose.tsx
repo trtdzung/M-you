@@ -10,7 +10,7 @@ import { useAutoFundWith } from "@/state/use-auto-fund";
 import { transferNow } from "@/lib/demo-clock";
 import { maskAccount } from "@/lib/mask-account";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
-import { isNavigationTransitionPending, navigateWithTransition } from "@/lib/view-transition";
+import { isNavigationTransitionPending, navigateWithTransition, backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { assessTransferRisk } from "@/lib/transfer-risk";
 import { formatVnd } from "@/lib/format";
 import { casaBalance, casaBalanceOrUnknown, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
@@ -21,6 +21,7 @@ import { TransferAccountPicker } from "./TransferAccountPicker";
 import { TransferBankEntry } from "./TransferBankEntry";
 import { TransferSaveRecipient } from "./TransferSaveRecipient";
 import { TransferAmountStep, POOL_SOURCE_LABEL, type TransferSource } from "./TransferAmountStep";
+import { SheetSlot, useRetained } from "@/components/primitives";
 import { AgentTopupSheet } from "./AgentTopupSheet";
 
 type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
@@ -193,6 +194,7 @@ export function TransferCompose() {
       (source?.kind === "account" ? accountSourceValid : assessment !== null && !insufficient),
   );
   const [topupOpen, setTopupOpen] = useState(false);
+  const heldTopup = useRetained(topupOpen && assessment?.tier === "topup" ? assessment : null);
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
@@ -285,9 +287,11 @@ export function TransferCompose() {
           onMemoChange={setMemo}
           onContinue={continueToConfirm}
         />
-        {topupOpen && assessment?.tier === "topup" && (
+        <SheetSlot open={topupOpen && assessment?.tier === "topup"}>
+          {heldTopup && heldTopup.tier === "topup" && (
           <AgentTopupSheet
-            assessment={assessment}
+            open={topupOpen && assessment?.tier === "topup"}
+            assessment={heldTopup}
             jarId={selectedJar?.id ?? null}
             targetLabel={selectedJar ? `Hũ ${selectedJar.label}` : POOL_SOURCE_LABEL}
             jars={jarSpendables ?? []}
@@ -299,7 +303,8 @@ export function TransferCompose() {
             }}
             onChooseAnother={() => setTopupOpen(false)}
           />
-        )}
+          )}
+        </SheetSlot>
       </>
     );
   }
@@ -307,14 +312,14 @@ export function TransferCompose() {
   return (
     <div className="flex h-full flex-col">
       {step === "pick" ? (
-        <TransferHeader onBack={() => router.back()} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
+        <TransferHeader onBack={() => backWithTransition(() => router.back())} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
       ) : (
         <TransferHeader
           onBack={backToPick}
           title={step === "save-recipient" ? "Lưu người nhận" : "Chuyển tiền"}
           rightIcon={<Home size={20} strokeWidth={2} />}
           rightLabel="Về trang chủ"
-          onRightClick={() => router.push("/")}
+          onRightClick={() => pushWithTransition((href) => router.push(href), "/")}
         />
       )}
       <div className="flex min-h-0 flex-1 flex-col">{content}</div>

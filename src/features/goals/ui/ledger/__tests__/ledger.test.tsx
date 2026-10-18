@@ -10,7 +10,7 @@ import { WithdrawSheet } from "../WithdrawSheet";
 describe("parseAmount", () => {
   it("returns nothing for a blank field, an error for junk or zero, and a value for a positive amount", () => {
     expect(parseAmount("  ")).toEqual({});
-    expect(parseAmount("abc").error).toBe("Chỉ nhập số tiền, vd 5.000.000");
+    expect(parseAmount("abc").error).toBe("Chỉ nhập số tiền, vd 5,000,000");
     expect(parseAmount("0")).toEqual({ error: "Số tiền phải lớn hơn 0" });
     expect(parseAmount("5.000.000")).toEqual({ value: 5_000_000 });
   });

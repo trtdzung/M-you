@@ -61,7 +61,7 @@ export function HuBudgetCard({
   const color = line.categoryIds[0] ? categoryColor(line.categoryIds[0]) : CATEGORY_COLOR_FALLBACK;
 
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="budget-jar-card flex flex-col gap-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <PressureRow

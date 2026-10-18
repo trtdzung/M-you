@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { pushWithTransition } from "@/lib/view-transition";
 import { Card, SectionHeader } from "@/components/primitives";
 import { useGoalsList } from "../../client/hooks/use-goals-list";
 import { formatGoalMoney } from "../shared/format-goal-money";
@@ -16,7 +17,7 @@ export function GoalJars() {
   if (!goals.length) return null;
   return <section className="flex flex-col gap-3">
     <SectionHeader title="Hũ mục tiêu" subtitle="Tích lũy bạn tự ghi nhận · Không tính vào hạn mức chi tiêu" />
-    {goals.map(goal => <button key={goal.jarId} type="button" onClick={() => router.push(`/goals/${goal.id}`)} className="w-full rounded-card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+    {goals.map(goal => <button key={goal.jarId} type="button" onClick={() => pushWithTransition((href) => router.push(href), `/goals/${goal.id}?from=budget`)} className="w-full rounded-card text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
       <Card padding="snug" className="flex flex-col gap-2">
         <p className="font-semibold text-text">{goal.name}</p>
         <p className="text-sm text-muted">Đã tích lũy <strong className="text-text">{formatGoalMoney(goal.currentAmount)} VND</strong> / {formatGoalMoney(goal.targetAmount)} VND</p>

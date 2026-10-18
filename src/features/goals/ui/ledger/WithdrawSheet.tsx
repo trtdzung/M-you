@@ -21,6 +21,7 @@ export function WithdrawSheet({
   formError,
   onSubmit,
   onClose,
+  open = true,
 }: {
   goalName: string;
   currentAmount: number;
@@ -31,6 +32,7 @@ export function WithdrawSheet({
   formError?: string | null;
   onSubmit: (entry: { amount: number; note: string }) => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const [raw, setRaw] = useState("");
   const [typed, setTyped] = useState("");
@@ -41,7 +43,7 @@ export function WithdrawSheet({
   const canSubmit = valid && phraseMatches(typed, phrase) && !pending;
   const c = GOALS_COPY.ledger;
   return (
-    <Sheet title={c.withdrawTitle} onClose={onClose}>
+    <Sheet open={open} title={c.withdrawTitle} onClose={onClose}>
       <div className="flex flex-col gap-5">
         {goal && <LedgerPreview goal={goal} amount={value} kind="withdraw" />}
         <MoneyField

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card } from "@/components/primitives";
+import { Card, SheetSlot, useRetained } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonCard } from "@/components/states";
 import { useGoalDetail } from "../../client/hooks/use-goal-detail";
 import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
@@ -30,6 +30,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [ledgerKind, setLedgerKind] = useState<GoalLedgerKind | null>(null);
+  const heldLedger = useRetained(ledgerKind);
   const { reminder, dismiss: dismissReminder } = useGoalReminder(
     data ? id : null,
     data ? `${data.goal.updatedAt}:${data.goal.currentAmount}` : null,
@@ -73,7 +74,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-5 pb-6 pt-4">
+    <div className="goal-detail-screen flex flex-col gap-6 pb-6 pt-4">
       {feedback && <p role="status" className="rounded-xl bg-primary/10 p-3 text-[14px] text-text">{feedback}</p>}
       {(goal.status !== "active" || goal.currentAmount >= goal.targetAmount) && <p className="rounded-2xl border border-border bg-surface p-4 text-[14px] leading-6 text-muted">{goal.status === "archived" ? "Mục tiêu đã lưu trữ. Lịch sử tích lũy vẫn được giữ để bạn xem lại." : goal.status === "paused" ? (goal.pausedUntil ? `Bạn đang tạm dừng mục tiêu này. Mục tiêu sẽ tự tiếp tục từ ngày ${goal.pausedUntil.split("-").reverse().join("/")}, hoặc chọn Tiếp tục trong Quản lý mục tiêu nếu muốn sớm hơn.` : "Bạn đang tạm dừng mục tiêu này. Chọn Tiếp tục trong Quản lý mục tiêu khi sẵn sàng.") : "Bạn đã đạt mục tiêu! Có thể lưu trữ để giữ lịch sử và bắt đầu kế hoạch tiếp theo."}</p>}
       <Card className="flex flex-col gap-4 rounded-2xl">
@@ -118,25 +119,27 @@ export function GoalDetailScreen({ id }: { id: string }) {
         onArchive={() => setStatus("archived")}
         onDelete={() => setConfirmingDelete(true)}
       />
-      {ledgerKind && (
-        <LedgerFlow
-          goal={goal}
-          kind={ledgerKind}
-          onClose={() => setLedgerKind(null)}
-          onDone={() => { refresh(); setFeedback(ledgerKind === "deposit" ? "Đã ghi nhận khoản góp. Tiến độ đã được cập nhật." : "Đã ghi nhận khoản rút. Tiến độ đã được cập nhật."); }}
-        />
-      )}
-      {editing && (
-        <EditGoalFlow goal={goal} onClose={() => setEditing(false)} onSaved={() => { refresh(); setFeedback("Đã lưu thay đổi mục tiêu."); }} />
-      )}
-      {confirmingDelete && (
-        <DeleteGoalConfirm
-          pending={pending}
-          error={errors ? (errors._form ?? "") : null}
-          onConfirm={confirmDelete}
-          onClose={() => setConfirmingDelete(false)}
-        />
-      )}
+      <SheetSlot open={!!ledgerKind}>
+        {heldLedger && (
+          <LedgerFlow
+            open={!!ledgerKind}
+            goal={goal}
+            kind={heldLedger}
+            onClose={() => setLedgerKind(null)}
+            onDone={() => { refresh(); setFeedback(heldLedger === "deposit" ? "Đã ghi nhận khoản góp. Tiến độ đã được cập nhật." : "Đã ghi nhận khoản rút. Tiến độ đã được cập nhật."); }}
+          />
+        )}
+      </SheetSlot>
+      <SheetSlot open={editing}>
+        <EditGoalFlow open={editing} goal={goal} onClose={() => setEditing(false)} onSaved={() => { refresh(); setFeedback("Đã lưu thay đổi mục tiêu."); }} />
+      </SheetSlot>
+      <DeleteGoalConfirm
+        open={confirmingDelete}
+        pending={pending}
+        error={errors ? (errors._form ?? "") : null}
+        onConfirm={confirmDelete}
+        onClose={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

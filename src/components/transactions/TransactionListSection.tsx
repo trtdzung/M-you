@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { isoInPeriod, monthPeriodFromKey } from "@/domain/engine";
-import { Card } from "@/components/primitives";
+import { Card, SheetSlot, useRetained } from "@/components/primitives";
 import { Empty, SkeletonRow, SkeletonScreen } from "@/components/states";
 import { TxnRow } from "./TxnRow";
 import { CategoryEditor } from "./CategoryEditor";
@@ -35,6 +35,7 @@ export function TransactionListSection({
       : DEFAULT_FILTERS,
   );
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const heldEditing = useRetained(editing);
   const period = monthPeriodFromKey(month);
 
   useEffect(() => {
@@ -103,7 +104,9 @@ export function TransactionListSection({
           ) : undefined}
         />
       )}
-      {editing && <CategoryEditor txn={editing} onClose={() => setEditing(null)} />}
+      <SheetSlot open={!!editing}>
+        {heldEditing && <CategoryEditor open={!!editing} txn={heldEditing} onClose={() => setEditing(null)} />}
+      </SheetSlot>
     </div>
   );
 }

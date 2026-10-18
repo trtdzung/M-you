@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { prefersMotion } from "@/lib/motion";
+import { canvasZoom, prefersMotion } from "@/lib/motion";
 import { usePanelActive } from "@/components/shell/PanelActive";
 
 const EXIT_FALLBACK_MS = 320;
@@ -32,8 +32,12 @@ export function Sheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const skipExitRef = useRef(false);
+  const dragRef = useRef<{ id: number; origin: number; lastY: number; lastT: number } | null>(null);
   const panelActive = usePanelActive();
   const [phase, setPhase] = useState<"open" | "closed" | "exiting">(open ? "open" : "closed");
+  const [dragY, setDragY] = useState(0);
+  const [dragMode, setDragMode] = useState<"idle" | "drag" | "snap" | "rest">("idle");
 
   // A hidden PFM tab must not keep a portaled sheet on screen. Exit animation
   // only runs when the caller keeps the sheet mounted and sets `open` to false.
@@ -43,8 +47,18 @@ export function Sheet({
   } else if (live && phase !== "open") {
     setPhase("open");
   } else if (!open && phase === "open") {
-    setPhase(prefersMotion() ? "exiting" : "closed");
+    const instant = skipExitRef.current || !prefersMotion();
+    skipExitRef.current = false;
+    setPhase(instant ? "closed" : "exiting");
   }
+  if (phase === "closed" && dragMode !== "idle") {
+    setDragMode("idle");
+    setDragY(0);
+  }
+
+  const frameRef = useRef({ title, description, children, className });
+  if (live) frameRef.current = { title, description, children, className };
+  const frame = live ? { title, description, children, className } : frameRef.current;
 
   // Anchor the sheet inside the device frame, not the browser viewport. The
   // desktop preview applies `zoom` to `.device-canvas`, which breaks
@@ -112,6 +126,52 @@ export function Sheet({
 
   const exiting = phase === "exiting";
 
+  function pointY(clientY: number) {
+    return clientY / canvasZoom();
+  }
+
+  function onHandlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!prefersMotion() || exiting || event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest("button, a, input, textarea, select")) return;
+    dragRef.current = { id: event.pointerId, origin: pointY(event.clientY), lastY: pointY(event.clientY), lastT: event.timeStamp };
+    setDragMode("drag");
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Capture is unavailable for this pointer. Move and up still arrive on the handle.
+    }
+  }
+
+  function onHandlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const y = pointY(event.clientY);
+    drag.lastY = y;
+    drag.lastT = event.timeStamp;
+    setDragY(Math.max(0, y - drag.origin));
+  }
+
+  function onHandlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    dragRef.current = null;
+    const y = pointY(event.clientY);
+    const dy = Math.max(0, y - drag.origin);
+    const velocity = (y - drag.lastY) / Math.max(16, event.timeStamp - drag.lastT);
+    if (dy > 96 || (dy > 48 && velocity > 0.65)) {
+      skipExitRef.current = true;
+      setDragMode("idle");
+      onClose();
+      return;
+    }
+    if (dy === 0) {
+      setDragMode("rest");
+      return;
+    }
+    setDragY(0);
+    setDragMode("snap");
+  }
+
   return createPortal(
     <div
       className={cn("absolute inset-0 z-40 flex items-end justify-center", exiting && "pointer-events-none")}
@@ -138,20 +198,40 @@ export function Sheet({
           if (!event.animationName.includes("sheet-panel-out")) return;
           setPhase("closed");
         }}
+        onTransitionEnd={(event) => {
+          if (event.target !== panelRef.current || event.propertyName !== "transform") return;
+          if (dragMode === "snap") setDragMode("rest");
+        }}
+        style={dragMode === "drag" || dragMode === "snap" ? { transform: `translateY(${dragY}px)` } : undefined}
         className={cn(
           "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
-          exiting ? "sheet-panel-out" : "sheet-panel-in",
-          className,
+          exiting
+            ? "sheet-panel-out"
+            : dragMode === "drag"
+              ? "sheet-dragging"
+              : dragMode === "snap"
+                ? "sheet-snap"
+                : dragMode === "rest"
+                  ? "sheet-rest"
+                  : "sheet-panel-in",
+          frame.className,
         )}
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div
+          data-sheet-handle
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+          className="mb-4 flex cursor-grab touch-none items-start justify-between gap-3"
+        >
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-text">
-              {title}
+              {frame.title}
             </h2>
-            {description && (
+            {frame.description && (
               <p id={descriptionId} className="mt-1 text-sm text-muted">
-                {description}
+                {frame.description}
               </p>
             )}
           </div>
@@ -165,7 +245,7 @@ export function Sheet({
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        {children}
+        {frame.children}
       </div>
     </div>,
     container,

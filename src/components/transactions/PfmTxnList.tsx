@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { EyeOff } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { monthPeriodFromKey, categoryToJarMap, isoInPeriod, jarChipList, KHAC_JAR_ID, VN_UTC_OFFSET_MS } from "@/domain/engine";
-import { Card } from "@/components/primitives";
+import { Card, SheetSlot, useRetained } from "@/components/primitives";
 import { Empty, ErrorState, SkeletonScreen, SkeletonRow } from "@/components/states";
 import { PeriodPicker } from "@/components/common/PeriodPicker";
 import { useFinancials } from "@/state/useFinancials";
@@ -60,6 +60,7 @@ export function PfmTxnList() {
   const { config } = useJarConfig();
   const { month } = usePeriod();
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const heldTxn = useRetained(selected);
   const [jar, setJar] = useState<string>(ALL);
 
   const catToJar = useMemo(() => categoryToJarMap(config), [config]);
@@ -83,7 +84,7 @@ export function PfmTxnList() {
   if (error) return <ErrorState />;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="pfm-transactions flex flex-col gap-5">
       <PeriodPicker />
 
       <AutoCategorizeBar />
@@ -98,8 +99,8 @@ export function PfmTxnList() {
               aria-pressed={active}
               onClick={() => setJar(chip.jarId)}
               className={cn(
-                "inline-flex min-h-[40px] items-center rounded-full border px-3 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                active ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-surface text-muted hover:text-text",
+                "inline-flex min-h-[40px] items-center rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                active ? "border-primary bg-[#fff0e7] text-primary" : "border-border bg-surface text-muted hover:text-text",
               )}
             >
               {chip.label}
@@ -119,9 +120,9 @@ export function PfmTxnList() {
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map(({ key, rows }) => (
-            <section key={key}>
-              <h3 className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{dayLabel(key)}</h3>
-              <Card className="divide-y divide-border">
+            <section key={key} className="overflow-hidden rounded-[18px] bg-white">
+              <h3 className="bg-[#f5f7f9] px-5 py-3 text-sm font-medium text-muted">{dayLabel(key)}</h3>
+              <Card padding="none" className="divide-y divide-border px-5">
                 {rows.map((t) => {
                   const correction = corrections[t.id];
                   const hidden = correction?.hidden === true;
@@ -162,7 +163,9 @@ export function PfmTxnList() {
         </div>
       )}
 
-      {selected && <TxnDetail txn={selected} onClose={() => setSelected(null)} />}
+      <SheetSlot open={!!selected}>
+        {heldTxn && <TxnDetail open={!!selected} txn={heldTxn} onClose={() => setSelected(null)} />}
+      </SheetSlot>
     </div>
   );
 }

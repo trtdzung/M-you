@@ -9,16 +9,18 @@ export function DeleteGoalConfirm({
   error,
   onConfirm,
   onClose,
+  open = true,
 }: {
   pending: boolean;
   /** Failure message ("" = show the default). */
   error: string | null;
   onConfirm: () => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const c = GOALS_COPY.deleteConfirm;
   return (
-    <Sheet title={c.title} description={c.description} onClose={onClose}>
+    <Sheet open={open} title={c.title} description={c.description} onClose={onClose}>
       <div className="flex flex-col gap-3">
         {error !== null && (
           <p role="alert" className={`${errorBox} text-sm text-negative`}>

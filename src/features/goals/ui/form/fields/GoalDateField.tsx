@@ -57,7 +57,7 @@ export function GoalDateField({
           <span className={value ? "text-text" : "text-muted"}>{value ? value.split("-").reverse().join("/") : "Chọn ngày hoàn thành"}</span>
           <CalendarDays size={20} className="text-muted" aria-hidden="true" />
         </button>
-        {open && <Sheet title="Ngày hoàn thành" description="Chọn ngày bạn muốn đạt mục tiêu." onClose={() => setOpen(false)}>
+        <Sheet open={open} title="Ngày hoàn thành" description="Chọn ngày bạn muốn đạt mục tiêu." onClose={() => setOpen(false)}>
           <div className="mb-4 flex h-11 items-center justify-between gap-1">
             <button type="button" aria-label="Tháng trước" disabled={month <= min.slice(0, 7)} onClick={() => shift(-1)} className="flex h-11 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-muted disabled:opacity-30"><ChevronLeft size={20} /></button>
             <div className="flex items-center justify-center gap-1">
@@ -101,7 +101,7 @@ export function GoalDateField({
           </div>}
           </div>
           <button type="button" disabled={!selected || selected < min} className={`${primaryButton} mt-5 w-full`} onClick={() => { onChange(selected); setOpen(false); }}>Chọn ngày này</button>
-        </Sheet>}
+        </Sheet>
       </> : <input
         id={id}
         type="date"

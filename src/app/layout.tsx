@@ -24,9 +24,8 @@ export const viewport: Viewport = {
 };
 
 /**
- * Thin root: `<html><body>` + app providers only. No chrome — each route group
- * ((festive) and pfm) mounts its own `PhoneShell` skin, so PFM can drop the
- * festive photo + bottom nav while every other route keeps them.
+ * Thin root: `<html><body>` + app providers. Signed-in routes share one
+ * `AppChrome` frame so the status bar stays put while the screen slides.
  */
 export default function RootLayout({
   children,

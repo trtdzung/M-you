@@ -37,7 +37,7 @@ function toDonutData(groups: JarSpendGroup[]): JarDonutDatum[] {
  * (`groupSpendingByJar`) — không bịa, danh mục lẻ rơi vào "Khác" (H4). Chỉ trình
  * bày; không tính toán tài chính ở đây.
  */
-export function SpendingReport({ monthKey, onClose }: { monthKey: string; onClose: () => void }) {
+export function SpendingReport({ monthKey, onClose, open = true }: { monthKey: string; onClose: () => void; open?: boolean }) {
   const { loading, error, financials, transactions } = useFinancials();
   const { config } = useJarConfig();
 
@@ -49,7 +49,7 @@ export function SpendingReport({ monthKey, onClose }: { monthKey: string; onClos
   const total = groups.reduce((s, g) => s + g.amount, 0);
 
   return (
-    <Sheet title="Báo cáo chi tiêu" description={`${monthKeyLabel(monthKey)} · theo hũ`} onClose={onClose}>
+    <Sheet open={open} title="Báo cáo chi tiêu" description={`${monthKeyLabel(monthKey)} · theo hũ`} onClose={onClose}>
       {error ? (
         <p role="alert" className="rounded-row bg-surface-muted px-4 py-3 text-sm text-muted">
           Không tải được báo cáo. Thử lại sau.

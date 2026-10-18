@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { pushWithTransition } from "@/lib/view-transition";
 import { ChevronDown, ChevronUp, Home, Share2, UserPlus } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { formatDateTime } from "@/lib/format";
@@ -72,13 +73,13 @@ export function TransferSuccess({
   const memoText = done.memo ?? `${toPlainUpper(done.senderName)} chuyen tien`;
 
   return (
-    <div className="transfer-receipt flex min-h-full flex-col">
+    <div data-block-edge-swipe="" className="transfer-receipt flex min-h-full flex-col">
       <header className="flex shrink-0 items-center justify-between px-4 pb-6 pt-[calc(var(--safe-area-top)+0.25rem)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/msb-logo.png" alt="MSB" className="h-8 w-auto" />
         <button
           type="button"
-          onClick={() => router.push("/")}
+          onClick={() => pushWithTransition((href) => router.push(href), "/")}
           aria-label="Về trang chủ"
           className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-text transition-colors hover:bg-surface/80"
         >
@@ -193,7 +194,7 @@ export function TransferSuccess({
           </button>
           <button
             type="button"
-            onClick={() => router.push("/transfer")}
+            onClick={() => router.replace("/transfer")}
             className="login-submit"
           >
             Giao dịch khác

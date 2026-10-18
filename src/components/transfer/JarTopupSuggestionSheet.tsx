@@ -32,6 +32,7 @@ export function JarTopupSuggestionSheet({
   onChooseAnother,
   onClose,
   agent = { status: "idle" },
+  open = true,
 }: {
   assessment: FundingAssessment;
   /** Optional agent suggestion: shown (and used by "Đồng ý rót") once `ready`. */
@@ -41,6 +42,7 @@ export function JarTopupSuggestionSheet({
   onAccept: () => void;
   onChooseAnother: () => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   // Double-tap guard (RT#10): latch on the first tap so a second synchronous tap
   // can't fire a second navigation / draft. Mirrors confirm()'s committedRef.
@@ -62,6 +64,7 @@ export function JarTopupSuggestionSheet({
 
   return (
     <Sheet
+      open={open}
       title={poolSource ? "Tiền chưa phân bổ không đủ" : "Hũ chưa đủ tiền"}
       description={
         poolSource

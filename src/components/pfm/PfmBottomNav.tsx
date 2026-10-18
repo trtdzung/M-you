@@ -44,7 +44,7 @@ export function PfmBottomNav() {
       aria-label="Điều hướng PFM"
       className="shell-bottom-nav pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-shell-main-inset"
     >
-      <div className="shadow-nav pointer-events-auto relative flex w-full items-stretch justify-between gap-1 rounded-full border border-surface/60 bg-surface/80 px-2 py-2 backdrop-blur-xl">
+      <div className="pointer-events-auto relative flex w-full items-stretch justify-between gap-1 rounded-full border border-white bg-white px-2 py-2">
         {left.map((tab) => (
           <NavItem key={tab.id} tab={tab} active={tab.id === active} onSelect={() => go(tab.id)} />
         ))}
@@ -79,7 +79,7 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       className={cn(
         "flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-        active ? "bg-primary-soft text-primary" : "text-muted hover:text-text",
+        active ? "bg-[#fff0e7] text-primary" : "text-muted hover:text-text",
       )}
     >
       <Icon

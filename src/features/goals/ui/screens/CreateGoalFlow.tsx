@@ -20,6 +20,7 @@ export function CreateGoalFlow({
   requestKey,
   suggestion,
   inline = false,
+  open = true,
 }: {
   onClose: () => void;
   onCreated: (id: string) => void;
@@ -30,6 +31,7 @@ export function CreateGoalFlow({
   /** The customer's own sentence, shown as a hint above the form. */
   suggestion?: string;
   inline?: boolean;
+  open?: boolean;
 }) {
   const form = useGoalForm(undefined, prefill);
   const [estimate, setEstimate] = useState("");
@@ -52,6 +54,7 @@ export function CreateGoalFlow({
 
   return (
     <GoalFormSheet
+      open={open}
       inline={inline}
       form={form}
       pending={pending}

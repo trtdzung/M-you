@@ -24,9 +24,11 @@ import { Sheet } from "@/components/primitives";
 export function CategoryDeleteSheet({
   category,
   onClose,
+  open = true,
 }: {
   category: StoredCategory;
   onClose: () => void;
+  open?: boolean;
 }) {
   const { removeCategory, setArchived, mutationError, mutationUsedBy, clearMutationError } = useCategories();
   const [busy, setBusy] = useState(false);
@@ -49,7 +51,7 @@ export function CategoryDeleteSheet({
 
   if (usedBy != null) {
     return (
-      <Sheet title="Không xoá được danh mục" description={category.label} onClose={close}>
+      <Sheet open={open} title="Không xoá được danh mục" description={category.label} onClose={close}>
         <div className="flex flex-col gap-4">
           <p role="alert" className="rounded-row bg-surface-muted px-3 py-2.5 text-sm text-text">
             Đang dùng ở {usedBy} giao dịch nên không xoá được. Bạn có thể ẩn danh mục — lịch sử vẫn giữ
@@ -78,7 +80,7 @@ export function CategoryDeleteSheet({
   }
 
   return (
-    <Sheet title="Xoá danh mục" description={category.label} onClose={close}>
+    <Sheet open={open} title="Xoá danh mục" description={category.label} onClose={close}>
       <div className="flex flex-col gap-4">
         <p className="text-sm text-text">
           Xoá danh mục “{category.label}”? Danh mục sẽ biến mất khỏi mọi bộ chọn và không khôi phục được.

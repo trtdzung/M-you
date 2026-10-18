@@ -11,11 +11,13 @@ export function LedgerFlow({
   kind,
   onClose,
   onDone,
+  open = true,
 }: {
   goal: SavingsGoalView;
   kind: GoalLedgerKind;
   onClose: () => void;
   onDone: () => void;
+  open?: boolean;
 }) {
   const { add, pending, errors } = useLedgerMutation();
 
@@ -35,11 +37,12 @@ export function LedgerFlow({
     onClose,
   };
   if (kind === "deposit") {
-    return <ContributeSheet {...common} onSubmit={(amount) => submit({ amount })} />;
+    return <ContributeSheet {...common} open={open} onSubmit={(amount) => submit({ amount })} />;
   }
   return (
     <WithdrawSheet
       {...common}
+      open={open}
       goalName={goal.name}
       currentAmount={goal.currentAmount}
       monthlyPace={

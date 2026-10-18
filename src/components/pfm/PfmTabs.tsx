@@ -50,6 +50,6 @@ export function withPfmTab(current: URLSearchParams, id: PfmTabId): string {
   next.set("tab", id);
   next.delete("dock");
   next.delete("setup");
-  if (id !== "settings") next.delete("hu");
+  if (id !== "settings") { next.delete("hu"); next.delete("from"); }
   return next.toString();
 }

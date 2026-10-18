@@ -45,19 +45,23 @@ export function PhoneShell({
           className,
         )}
       >
-        {background}
-        <StatusBar />
-        <main
-          id="main-content"
-          className={cn(
-            "shell-main fade-in min-h-0 flex-1 overflow-y-auto px-shell-main-inset pt-1",
-            mainClassName,
-          )}
-        >
-          {children}
-        </main>
-        {fab}
-        {nav}
+        <div className="shell-screen absolute inset-0 isolate flex flex-col">
+          <div className="shell-body absolute inset-0 flex min-h-0 flex-col">
+            {background}
+            <StatusBar />
+            <main
+              id="main-content"
+              className={cn(
+                "shell-main min-h-0 flex-1 overflow-y-auto px-shell-main-inset pt-1",
+                mainClassName,
+              )}
+            >
+              {children}
+            </main>
+            {fab}
+          </div>
+          {nav}
+        </div>
       </div>
     </div>
   );

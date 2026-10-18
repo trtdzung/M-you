@@ -34,11 +34,13 @@ export function HuCreateSheet({
   funds,
   onCreated,
   onClose,
+  open = true,
 }: {
   funds: CurrentJarFunds;
   /** The new jar's id — the tab opens its editor to pick categories. */
   onCreated: (jarId: string) => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const { addJar, mutationError } = useJarConfig();
   const [name, setName] = useState("");
@@ -98,7 +100,7 @@ export function HuCreateSheet({
   };
 
   return (
-    <Sheet title="Thêm hũ" description="Hạn mức chi mỗi tháng và số dư ban đầu có thể để trống (hạn mức chưa đặt, số dư 0)." onClose={onClose}>
+    <Sheet open={open} title="Thêm hũ" description="Hạn mức chi mỗi tháng và số dư ban đầu có thể để trống (hạn mức chưa đặt, số dư 0)." onClose={onClose}>
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-text">Tên hũ</span>

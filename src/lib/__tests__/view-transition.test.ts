@@ -23,7 +23,7 @@ describe("navigateWithTransition", () => {
       configurable: true,
       value: (cb: () => Promise<void>) => {
         update = cb();
-        return { skipTransition() {}, finished: new Promise<void>(() => {}) };
+        return { skipTransition() {}, ready: Promise.resolve(), finished: new Promise<void>(() => {}) };
       },
     });
 
@@ -41,5 +41,19 @@ describe("navigateWithTransition", () => {
     return update?.then(() => {
       expect(isNavigationTransitionPending()).toBe(false);
     });
+  });
+
+  it("marks a home-tab change as a crossfade", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      value: (cb: () => Promise<void>) => {
+        void cb();
+        return { skipTransition() {}, ready: Promise.resolve(), finished: new Promise<void>(() => {}) };
+      },
+    });
+
+    navigateWithTransition(vi.fn(), "fade");
+    expect(document.documentElement.dataset.vtDir).toBe("fade");
   });
 });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Info, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { pushWithTransition } from "@/lib/view-transition";
 import { Card, SectionHeader } from "@/components/primitives";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { summarizeGoals } from "../../engine/summary";
@@ -37,13 +38,13 @@ export function GoalsListScreen() {
   else {
     body = (
       <div className="flex flex-col gap-4">
-        <GoalList goals={data} onOpen={(id) => router.push("/goals/" + id)} />
+        <GoalList goals={data} onOpen={(id) => pushWithTransition((href) => router.push(href), "/goals/" + id)} />
 
       </div>
     );
   }
 
-  const openCreate = () => router.push("/goals/new");
+  const openCreate = () => pushWithTransition((href) => router.push(href), "/goals/new");
   if (loading || error !== null) return <div className="flex flex-col gap-5">{body}</div>;
   if (!hasGoals) return (
     <Card className="flex flex-col gap-3">

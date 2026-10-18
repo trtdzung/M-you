@@ -18,7 +18,7 @@ import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
-import { navigateWithTransition } from "@/lib/view-transition";
+import { backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
 import type { FundingAssessment } from "@/domain/engine";
 import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
@@ -262,7 +262,7 @@ export function TransferConfirm() {
           <p className="mt-1 text-xs text-muted">Bản nháp này đã được sử dụng. Không thể xác nhận lại.</p>
         </Card>
         <div className="flex gap-2">
-          <button type="button" onClick={() => router.push("/")} className="flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text">
+          <button type="button" onClick={() => pushWithTransition((href) => router.push(href), "/")} className="flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text">
             Về trang chủ
           </button>
           <button type="button" onClick={() => router.replace("/transfer")} className="flex-1 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
@@ -290,7 +290,7 @@ export function TransferConfirm() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <TransferHeader title="Chuyển tiền" onBack={() => navigateWithTransition(() => router.back(), "back")} rightIcon={<Home size={22} />} rightLabel="Về trang chủ" onRightClick={() => router.push("/")} />
+      <TransferHeader title="Chuyển tiền" onBack={() => backWithTransition(() => router.back())} rightIcon={<Home size={22} />} rightLabel="Về trang chủ" onRightClick={() => pushWithTransition((href) => router.push(href), "/")} />
       <div className="flex flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
       <Card className="transfer-card flex flex-col gap-5">
         <div className="border-b border-[#dfe5ee] pb-5">

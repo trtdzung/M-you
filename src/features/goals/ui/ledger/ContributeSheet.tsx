@@ -16,6 +16,7 @@ export function ContributeSheet({
   formError,
   onSubmit,
   onClose,
+  open = true,
 }: {
   goal?: SavingsGoalView;
   pending: boolean;
@@ -25,12 +26,13 @@ export function ContributeSheet({
   formError?: string | null;
   onSubmit: (amount: number) => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const [raw, setRaw] = useState("");
   const { value, error: parseError } = parseAmount(raw);
   const c = GOALS_COPY.ledger;
   return (
-    <Sheet title={c.contributeTitle} onClose={onClose} className="flex h-[85%] max-h-[85%] flex-col overflow-hidden [&>div:first-child]:shrink-0">
+    <Sheet open={open} title={c.contributeTitle} onClose={onClose} className="flex h-[85%] max-h-[85%] flex-col overflow-hidden [&>div:first-child]:shrink-0">
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className="flex flex-col gap-5 pb-44">
         {goal && <LedgerPreview goal={goal} amount={value ?? 0} kind="deposit" />}

@@ -122,19 +122,19 @@ export function SavedGoalAssessment({ goal, onUpdated }: { goal: SavingsGoalView
         <button type="button" className={secondaryButton} disabled={!selected || advisor.view.phase !== "ready" || adjustStatus === "busy"} onClick={() => { if (selected) { setError(""); setReview(selected); } }}>Xem điều chỉnh mục tiêu</button>
 
       </>}
-      {review && <Sheet title="Xem điều chỉnh mục tiêu" onClose={() => { if (!pending) setReview(null); }}>
+      <Sheet open={!!review} title="Xem điều chỉnh mục tiêu" onClose={() => { if (!pending) setReview(null); }}>
         <div className="flex flex-col gap-4 text-sm leading-6">
           <p className="font-semibold">{goal.name}</p>
-          <p>Số tiền: {money(goal.targetAmount)} → <strong>{money(review.targetAmount)}</strong></p>
-          <p>Thời hạn: {goal.targetDate.split("-").reverse().join("/")} → <strong>{review.targetDate.split("-").reverse().join("/")}</strong></p>
+          <p>Số tiền: {money(goal.targetAmount)} → <strong>{money(review?.targetAmount ?? goal.targetAmount)}</strong></p>
+          <p>Thời hạn: {goal.targetDate.split("-").reverse().join("/")} → <strong>{(review ?? goal).targetDate.split("-").reverse().join("/")}</strong></p>
           <p>Mức góp mỗi tháng: <strong>{money(reviewMonthly)}</strong></p>
-          {review.cuts.length > 0 && <p>Gợi ý giảm chi {review.cuts[0].label}: <strong>{money(review.cuts[0].perMonth)}/tháng</strong>. {review.cutsCoverGap ? "Đủ bù phần thiếu theo dòng tiền hiện tại." : "Chưa đủ bù phần thiếu, cần thêm điều chỉnh."} Việc lưu kế hoạch không tự đổi hạn mức chi tiêu.</p>}
+          {review && review.cuts.length > 0 && <p>Gợi ý giảm chi {review.cuts[0].label}: <strong>{money(review.cuts[0].perMonth)}/tháng</strong>. {review.cutsCoverGap ? "Đủ bù phần thiếu theo dòng tiền hiện tại." : "Chưa đủ bù phần thiếu, cần thêm điều chỉnh."} Việc lưu kế hoạch không tự đổi hạn mức chi tiêu.</p>}
           <p className="text-muted">Mức góp tính từ số đã tích lũy hiện tại, chưa tính lãi hoặc các nguồn tiền bổ sung gợi ý. Bạn cần tự thực hiện và ghi nhận các khoản góp.</p>
           {error && <p role="alert" className="text-negative">{error}</p>}
           <button type="button" className={primaryButton} disabled={pending} onClick={apply}>{pending ? "Đang lưu…" : "Xác nhận điều chỉnh"}</button>
           <button type="button" className={secondaryButton} disabled={pending} onClick={() => setReview(null)}>Tiếp tục chỉnh</button>
         </div>
-      </Sheet>}
+      </Sheet>
     </Card>
   );
 }

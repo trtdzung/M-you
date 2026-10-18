@@ -30,6 +30,7 @@ export function AgentTopupSheet({
   onAccept,
   onChooseAnother,
   onClose,
+  open = true,
 }: {
   assessment: FundingAssessment;
   /** The short jar; `null` for the pool source (no agent call then). */
@@ -40,6 +41,7 @@ export function AgentTopupSheet({
   onAccept: (planned: { donors: DonorProposal[]; targetJarId: string | null; by?: "agent" }) => void;
   onChooseAnother: () => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const { persona } = usePersona();
   const cif = persona.cif;
@@ -81,6 +83,7 @@ export function AgentTopupSheet({
 
   return (
     <JarTopupSuggestionSheet
+      open={open}
       assessment={assessment}
       targetLabel={targetLabel}
       agent={agent}

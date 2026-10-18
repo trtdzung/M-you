@@ -17,6 +17,7 @@ export function GoalFormSheet({
   onSubmit,
   onClose,
   inline = false,
+  open = true,
 }: {
   form: GoalFormState;
   pending: boolean;
@@ -26,6 +27,7 @@ export function GoalFormSheet({
   onSubmit: (input: GoalCreateInput | GoalUpdateInput) => void;
   onClose: () => void;
   inline?: boolean;
+  open?: boolean;
 }) {
   const title = form.mode === "create" ? GOALS_COPY.create : GOALS_COPY.edit;
   const submit = () => {
@@ -40,8 +42,8 @@ export function GoalFormSheet({
             {formError || GOALS_COPY.actionError}
           </p>
         )}
-        <div className={inline ? "sticky bottom-0 z-10 border-t border-border/60 bg-surface/95 py-3 backdrop-blur" : ""}>
-        <button type="button" onClick={submit} disabled={pending} className={`${primaryButton} min-h-12 w-full ${inline ? "h-12 text-[16px]" : ""}`}>
+        <div className={inline ? "sticky bottom-0 z-10 bg-[#fbd0d4] py-3" : ""}>
+        <button type="button" onClick={submit} disabled={pending} className={`${inline ? "login-submit" : primaryButton} min-h-12 w-full ${inline ? "h-12 text-[16px]" : ""}`}>
           {pending ? GOALS_COPY.saving : inline ? GOALS_COPY.create : GOALS_COPY.save}
         </button>
         </div>
@@ -50,5 +52,5 @@ export function GoalFormSheet({
   return inline ? <section className="flex flex-col gap-1">
     <p className="mb-5 mt-1 text-[14px] leading-6 text-muted">Đặt số tiền và thời hạn. Mỗi mục tiêu có một hũ tích lũy riêng. Sau khi tạo, M-You đánh giá kế hoạch và gợi ý cách đạt mục tiêu.</p>
     {content}
-  </section> : <Sheet title={title} onClose={onClose}>{content}</Sheet>;
+  </section> : <Sheet open={open} title={title} onClose={onClose}>{content}</Sheet>;
 }

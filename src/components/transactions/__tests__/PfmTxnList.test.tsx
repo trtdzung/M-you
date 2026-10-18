@@ -166,7 +166,7 @@ describe("PfmTxnList", () => {
     expect(within(dialog).getByText("Ngày")).toBeInTheDocument();
     expect(within(dialog).getByText("Trạng thái")).toBeInTheDocument();
     // A money value is rendered (VND formatted amount, credit or debit sign).
-    expect(dialog.textContent).toMatch(/₫/);
+    expect(dialog.textContent).toMatch(/VND/);
   });
 
   it("changing category via the inline picker persists a user correction", async () => {

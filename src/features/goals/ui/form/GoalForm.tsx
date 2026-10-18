@@ -18,7 +18,7 @@ export function GoalForm({ form, slot, compact = false }: { form: GoalFormState;
     <MoneyField label={f.monthlyContribution} hint={f.monthlyHint} value={values.monthlyContribution} onChange={(v) => set("monthlyContribution", v)} error={errors.monthlyContribution} />
   </div>);
   return (
-    <div className={`flex flex-col gap-5 ${compact ? "[&_input]:min-w-0 [&_input]:w-full" : ""}`}>
+    <div className={`flex flex-col gap-5 ${compact ? "goal-create-fields rounded-[18px] bg-white p-5 [&_input]:min-w-0 [&_input]:w-full" : ""}`}>
       <GoalNameField value={values.name} onChange={(v) => set("name", v)} error={errors.name} />
       <MoneyField
         label={f.targetAmount}

@@ -94,9 +94,9 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           {c.cif === cif && <span className="text-xs font-semibold text-primary">Đang chọn</span>}
         </button>)}</div>
       </Sheet>
-      {sheet && sheet !== "login" && sheet !== "customers" && <Sheet title={{ "personal-qr": "QR cá nhân", qr: "Quét QR", support: "Hỗ trợ", language: "Ngôn ngữ", notifications: "Thông báo" }[sheet]} onClose={closeSheet}>
+      <Sheet open={sheet === "personal-qr" || sheet === "qr" || sheet === "support" || sheet === "language" || sheet === "notifications"} title={sheet === "personal-qr" ? "QR cá nhân" : sheet === "qr" ? "Quét QR" : sheet === "support" ? "Hỗ trợ" : sheet === "language" ? "Ngôn ngữ" : "Thông báo"} onClose={closeSheet}>
         {sheet === "personal-qr" ? <div className="pb-4 text-center"><QrCode size={120} className="mx-auto mb-4 text-text" /><p className="font-semibold">{customer?.label}</p><p className="mt-2 text-sm text-muted">QR minh hoạ cho hồ sơ demo, không dùng để nhận tiền.</p></div> : sheet === "qr" ? <div className="pb-4 text-center"><div className="mx-auto mb-5 flex h-40 w-40 items-center justify-center rounded-[20px] border-2 border-dashed border-orange-300 bg-orange-50"><ScanLine size={80} className="text-primary" /></div><p className="text-sm leading-relaxed text-muted">Khung quét QR mô phỏng. Bản demo không mở camera hoặc thực hiện thanh toán.</p></div> : sheet === "support" ? <div className="space-y-4 pb-4 text-sm leading-relaxed"><p>Chọn tên khách hàng trên thẻ chào mừng để đổi hồ sơ demo, sau đó bấm Đăng nhập và nhập mật khẩu demo đang dùng.</p><p className="text-muted">Bản giả lập không kết nối tài khoản ngân hàng thật. Không nhập thông tin đăng nhập ngân hàng của bạn.</p><button type="button" className="login-submit" onClick={() => setSheet("login")}>Quay lại đăng nhập</button></div> : sheet === "language" ? <div className="pb-4"><button type="button" className="flex min-h-12 w-full items-center justify-between text-sm font-semibold" onClick={closeSheet}>🇻🇳 Tiếng Việt <span className="text-primary">Đang sử dụng</span></button><p className="mt-3 text-xs text-muted">Bản giả lập hiện hỗ trợ Tiếng Việt.</p></div> : <p className="pb-5 text-sm text-muted">Bạn chưa có thông báo mới. Đăng nhập để xem thông báo tài khoản.</p>}
-      </Sheet>}
+      </Sheet>
     </PhoneShell>
   );
 }

@@ -29,6 +29,7 @@ export function ConfirmPlan({
   onConfirm,
   onEdit,
   onClose,
+  open = true,
 }: {
   values: ConfirmPlanValues;
   pending: boolean;
@@ -36,6 +37,7 @@ export function ConfirmPlan({
   onConfirm: () => void;
   onEdit: () => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const c = GOALS_COPY.advisor.confirm;
   const rows: [string, string][] = [
@@ -48,7 +50,7 @@ export function ConfirmPlan({
     ...(values.sourceHint ? [[c.source, values.sourceHint] as [string, string]] : []),
   ];
   return (
-    <Sheet title={c.title} description={c.notice} onClose={onClose}>
+    <Sheet open={open} title={c.title} description={c.notice} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <dl className="flex flex-col gap-3">
           {rows.map(([label, value]) => (

@@ -10,7 +10,7 @@ import {
   type AssetFields,
   type LiabilityFields,
 } from "@/domain/models/asset-liability-input";
-import { Money, ProvenanceChip, SectionHeader, Sheet } from "@/components/primitives";
+import { Money, ProvenanceChip, SectionHeader, Sheet, SheetSlot, useRetained } from "@/components/primitives";
 import { AllocationList } from "@/components/wealth/AllocationList";
 import { AssetEditor } from "@/components/wealth/AssetEditor";
 import { LiabilityEditor } from "@/components/wealth/LiabilityEditor";
@@ -58,6 +58,9 @@ export function WealthManager() {
   const [editing, setEditing] = useState<Editing>(null);
   const [deleting, setDeleting] = useState<Deleting>(null);
   const [detail, setDetail] = useState<Detail>(null);
+  const heldEditing = useRetained(editing);
+  const heldDeleting = useRetained(deleting);
+  const heldDetail = useRetained(detail);
 
   // Seed (non-editable) records = engine breakdown minus the user records.
   const userIds = useMemo(
@@ -153,44 +156,55 @@ export function WealthManager() {
         </>
       )}
 
-      {editing?.kind === "asset" && (
-        <AssetEditor
-          asset={editing.record}
-          onClose={() => setEditing(null)}
-          onSubmit={(fields: AssetFields) =>
-            editing.record ? updateAsset(editing.record.id, fields) : createAsset(fields)
-          }
-        />
-      )}
-      {editing?.kind === "liability" && (
-        <LiabilityEditor
-          liability={editing.record}
-          onClose={() => setEditing(null)}
-          onSubmit={(fields: LiabilityFields) =>
-            editing.record ? updateLiability(editing.record.id, fields) : createLiability(fields)
-          }
-        />
-      )}
+      <SheetSlot open={editing?.kind === "asset"}>
+        {heldEditing?.kind === "asset" && (
+          <AssetEditor
+            open={editing?.kind === "asset"}
+            asset={heldEditing.record}
+            onClose={() => setEditing(null)}
+            onSubmit={(fields: AssetFields) =>
+              heldEditing.record ? updateAsset(heldEditing.record.id, fields) : createAsset(fields)
+            }
+          />
+        )}
+      </SheetSlot>
+      <SheetSlot open={editing?.kind === "liability"}>
+        {heldEditing?.kind === "liability" && (
+          <LiabilityEditor
+            open={editing?.kind === "liability"}
+            liability={heldEditing.record}
+            onClose={() => setEditing(null)}
+            onSubmit={(fields: LiabilityFields) =>
+              heldEditing.record ? updateLiability(heldEditing.record.id, fields) : createLiability(fields)
+            }
+          />
+        )}
+      </SheetSlot>
 
-      {deleting && (
-        <DeleteConfirm name={deleting.name} onCancel={() => setDeleting(null)} onConfirm={confirmDelete} />
-      )}
+      <SheetSlot open={!!deleting}>
+        {heldDeleting && (
+          <DeleteConfirm open={!!deleting} name={heldDeleting.name} onCancel={() => setDeleting(null)} onConfirm={confirmDelete} />
+        )}
+      </SheetSlot>
 
-      {detail && (
-        <RecordDetail
-          detail={detail}
-          onClose={() => setDetail(null)}
-          onEdit={() => {
-            if (detail.kind === "asset") setEditing({ kind: "asset", record: detail.record });
-            else setEditing({ kind: "liability", record: detail.record });
-            setDetail(null);
-          }}
-          onDelete={() => {
-            setDeleting({ kind: detail.kind, id: detail.record.id, name: detail.record.name });
-            setDetail(null);
-          }}
-        />
-      )}
+      <SheetSlot open={!!detail}>
+        {heldDetail && (
+          <RecordDetail
+            open={!!detail}
+            detail={heldDetail}
+            onClose={() => setDetail(null)}
+            onEdit={() => {
+              if (heldDetail.kind === "asset") setEditing({ kind: "asset", record: heldDetail.record });
+              else setEditing({ kind: "liability", record: heldDetail.record });
+              setDetail(null);
+            }}
+            onDelete={() => {
+              setDeleting({ kind: heldDetail.kind, id: heldDetail.record.id, name: heldDetail.record.name });
+              setDetail(null);
+            }}
+          />
+        )}
+      </SheetSlot>
     </div>
   );
 }
@@ -263,9 +277,9 @@ function Section({
   );
 }
 
-function DeleteConfirm({ name, onCancel, onConfirm }: { name: string; onCancel: () => void; onConfirm: () => void }) {
+function DeleteConfirm({ name, onCancel, onConfirm, open = true }: { name: string; onCancel: () => void; onConfirm: () => void; open?: boolean }) {
   return (
-    <Sheet title={`Xóa “${name}”?`} description="Bản ghi này sẽ bị xóa khỏi hồ sơ tự khai của bạn." onClose={onCancel} closeLabel="Hủy">
+    <Sheet open={open} title={`Xóa “${name}”?`} description="Bản ghi này sẽ bị xóa khỏi hồ sơ tự khai của bạn." onClose={onCancel} closeLabel="Hủy">
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-full border border-border text-sm font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
           Hủy
@@ -283,17 +297,19 @@ function RecordDetail({
   onClose,
   onEdit,
   onDelete,
+  open = true,
 }: {
   detail: Exclude<Detail, null>;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  open?: boolean;
 }) {
   const isAsset = detail.kind === "asset";
   const amount = isAsset ? detail.record.value : detail.record.outstandingPrincipal;
   const type = isAsset ? ASSET_TYPE_LABEL[detail.record.type] : LIABILITY_TYPE_LABEL[detail.record.type];
   return (
-    <Sheet title={detail.record.name} description={`${isAsset ? "Tài sản" : "Khoản nợ"} · ${type}`} onClose={onClose}>
+    <Sheet open={open} title={detail.record.name} description={`${isAsset ? "Tài sản" : "Khoản nợ"} · ${type}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <div className="rounded-2xl bg-surface-muted p-4">
           <p className="text-xs text-muted">Giá trị hiện tại</p>

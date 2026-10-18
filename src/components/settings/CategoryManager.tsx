@@ -8,7 +8,7 @@ import { useCategories } from "@/state/categories";
 import { useJarConfig } from "@/state/jars";
 import { AddCategoryButton } from "@/components/common/AddCategoryButton";
 import { CategoryTaxonomyNotice, taxonomyState } from "@/components/common/CategoryTaxonomyNotice";
-import { Sheet } from "@/components/primitives";
+import { Sheet, SheetSlot, useRetained } from "@/components/primitives";
 import { CategoryCreateSheet } from "./CategoryCreateSheet";
 import { CategoryDeleteSheet } from "./CategoryDeleteSheet";
 import { ArchivedCategoryRow, CategoryRow, isCustomCategory } from "./CategoryRowActions";
@@ -30,11 +30,12 @@ import { JarMutationErrorNotice } from "./JarMutationErrorNotice";
  * `useJarConfig().assignCategory` (bất biến #4). Sheet này không tự gọi
  * `/api/categories`.
  */
-export function CategoryManager({ onClose }: { onClose: () => void }) {
+export function CategoryManager({ onClose, open = true }: { onClose: () => void; open?: boolean }) {
   const { config } = useJarConfig();
   const { categories, assignable, loaded, error, retry } = useCategories();
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<StoredCategory | null>(null);
+  const heldDeleting = useRetained(deleting);
   const [showHidden, setShowHidden] = useState(false);
 
   const catToJar = useMemo(() => categoryToJarMap(config), [config]);
@@ -54,7 +55,7 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <Sheet title="Quản lý danh mục" description="Danh mục của bạn sửa được; danh mục mặc định thì khoá" onClose={onClose}>
+    <Sheet open={open} title="Quản lý danh mục" description="Danh mục của bạn sửa được; danh mục mặc định thì khoá" onClose={onClose}>
       <div className="mb-3 flex flex-col gap-2">
         <JarMutationErrorNotice />
         <CategoryMutationErrorNotice />
@@ -112,8 +113,12 @@ export function CategoryManager({ onClose }: { onClose: () => void }) {
         khứ không đổi.
       </p>
 
-      {creating && <CategoryCreateSheet onClose={() => setCreating(false)} />}
-      {deleting && <CategoryDeleteSheet category={deleting} onClose={() => setDeleting(null)} />}
+      <SheetSlot open={creating}>
+        <CategoryCreateSheet open={creating} onClose={() => setCreating(false)} />
+      </SheetSlot>
+      <SheetSlot open={!!deleting}>
+        {heldDeleting && <CategoryDeleteSheet open={!!deleting} category={heldDeleting} onClose={() => setDeleting(null)} />}
+      </SheetSlot>
     </Sheet>
   );
 }

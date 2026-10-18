@@ -14,10 +14,12 @@ export function EditGoalFlow({
   goal,
   onClose,
   onSaved,
+  open = true,
 }: {
   goal: SavingsGoalView;
   onClose: () => void;
   onSaved: () => void;
+  open?: boolean;
 }) {
   const form = useGoalForm(goal);
   const [formError, setFormError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export function EditGoalFlow({
     ? assessFeasibility({ targetAmount: parsed.value, currentAmount: goal.currentAmount, targetDate: form.values.targetDate, now: transferNow(), surplus: "unknown" }) : null;
   return (
     <GoalFormSheet
+      open={open}
       form={form}
       slot={preview && <div className="rounded-2xl bg-surface-tint p-4"><h3 className="text-[16px] font-semibold">Kế hoạch sau thay đổi</h3><p className="mt-2 text-[14px] leading-6">Cần góp khoảng <strong>{preview.requiredMonthly.toLocaleString("en-US")} VND/tháng</strong> trong {preview.monthsLeft} tháng.</p><p className="mt-2 text-[12px] leading-5 text-muted">Ước tính từ số đã tích lũy hiện tại, chưa tính lãi. Lịch sử góp/rút được giữ nguyên.</p></div>}
       pending={pending}

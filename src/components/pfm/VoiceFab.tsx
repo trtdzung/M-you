@@ -306,7 +306,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
   if (!container) return restingMic;
 
   const panel = createPortal(
-    <div className={cn("absolute inset-0 z-40", panelPhase === "exiting" && "pointer-events-none")} inert={panelPhase === "exiting"}>
+    <div data-block-edge-swipe="" className={cn("absolute inset-0 z-40", panelPhase === "exiting" && "pointer-events-none")} inert={panelPhase === "exiting"}>
       <button type="button" aria-label="Đóng" className="absolute inset-0 cursor-default" onClick={closeSection} />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0">

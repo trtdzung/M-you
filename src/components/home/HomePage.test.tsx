@@ -4,7 +4,10 @@ import HomePage from "@/app/(festive)/page";
 const state = vi.hoisted(() => ({ provider: { listAccounts: vi.fn() } }));
 vi.mock("@/providers/context", () => ({ useProviders: () => state.provider, usePersona: () => ({ persona: { cif: "CIF_0001", tier: "M-STANDARD" } }) }));
 vi.mock("./HomeInsightWidget", () => ({ HomeInsightWidget: () => <div>Gợi ý tài chính</div> }));
-vi.mock("@/components/primitives", () => ({ SourceBadge: () => null }));
+vi.mock("@/components/primitives", () => ({
+  SourceBadge: () => null,
+  Sheet: ({ children }: { children?: unknown }) => children ?? null,
+}));
 
 describe("Home loading", () => {
   it("shows shortcuts and banners before the account request finishes", async () => {

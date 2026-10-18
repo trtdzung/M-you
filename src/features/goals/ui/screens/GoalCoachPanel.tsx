@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { MessageSquarePlus, MoreHorizontal, Sparkles } from "lucide-react";
-import { Sheet } from "@/components/primitives";
+import { Sheet, SheetSlot, useRetained } from "@/components/primitives";
 import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
 import { useAdvisorNarration } from "../../client/hooks/use-advisor-narration";
@@ -49,6 +49,18 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const { create, pending: creating } = useGoalMutations();
   const [manual, setManual] = useState(false);
+  const heldPlan = useRetained(confirming && chosen && analyzeDraft ? {
+    name: analyzeDraft.name,
+    targetAmount: chosen.targetAmount,
+    targetDate: chosen.targetDate,
+    flexibility: analyzeDraft.flexibility,
+    openingAmount: analyzeDraft.openingAmount,
+    monthly: chosen.monthly,
+    sourceHint: chosen.fundingFromJars[0]
+      ? GOALS_COPY.advisor.confirm.jar(chosen.fundingFromJars[0].label)
+      : chosen.fundingFromIdle > 0 ? GOALS_COPY.advisor.confirm.idle : null,
+  } : null);
+  const heldPrefill = useRetained(reviewing && reviewPrefill ? reviewPrefill : null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   const [composerKey, setComposerKey] = useState(0);
@@ -150,12 +162,12 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
           else if (coach.question) coach.answer(coach.question.slot, text, "text");
         }}
       />
-      {active && confirmNew && <Sheet title="Bắt đầu cuộc trò chuyện mới?" description="Nội dung trao đổi và mục tiêu chưa lưu sẽ bị bỏ. Mục tiêu đã lưu vẫn được giữ." onClose={() => setConfirmNew(false)}>
+      <Sheet open={!!(active && confirmNew)} title="Bắt đầu cuộc trò chuyện mới?" description="Nội dung trao đổi và mục tiêu chưa lưu sẽ bị bỏ. Mục tiêu đã lưu vẫn được giữ." onClose={() => setConfirmNew(false)}>
         <div className="flex flex-col gap-3">
           <button type="button" onClick={restart} className={`${primaryButton} w-full`}>Bắt đầu mới</button>
           <button type="button" onClick={() => setConfirmNew(false)} className={secondaryButton}>Tiếp tục trò chuyện</button>
         </div>
-      </Sheet>}
+      </Sheet>
       {coach.draft && !reviewing && analyzeDraft && advisor.phase !== "failed" && (
         <GoalAdvisorCard
           draft={analyzeDraft}
@@ -178,37 +190,33 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         <p className="mt-3 text-[13px] leading-5 text-muted">M-You đã điền thông tin từ cuộc trò chuyện. Bạn kiểm tra và chỉnh sửa trước khi lưu.</p>
         <button type="button" className={`${primaryButton} mt-4 w-full`} onClick={() => setReviewing(true)}>Kiểm tra và tạo mục tiêu</button>
       </section>}
-      {confirming && chosen && analyzeDraft && (
-        <ConfirmPlan
-          values={{
-            name: analyzeDraft.name,
-            targetAmount: chosen.targetAmount,
-            targetDate: chosen.targetDate,
-            flexibility: analyzeDraft.flexibility,
-            openingAmount: analyzeDraft.openingAmount,
-            monthly: chosen.monthly,
-            sourceHint: chosen.fundingFromJars[0]
-              ? GOALS_COPY.advisor.confirm.jar(chosen.fundingFromJars[0].label)
-              : chosen.fundingFromIdle > 0 ? GOALS_COPY.advisor.confirm.idle : null,
-          }}
-          pending={creating}
-          error={confirmError}
-          onConfirm={() => void confirmCreate()}
-          onEdit={() => { setConfirming(false); setReviewing(true); }}
-          onClose={() => setConfirming(false)}
-        />
-      )}
-      {coach.draft && reviewPrefill && reviewing && (
-        <CreateGoalFlow
-          prefill={reviewPrefill}
-          requestKey={coach.requestId ? `coach:${coach.requestId}` : undefined}
-          onCreated={done}
-          onClose={() => setReviewing(false)}
-        />
-      )}
-      {manual && (
-        <CreateGoalFlow suggestion={coach.request} onCreated={done} onClose={() => setManual(false)} />
-      )}
+      <SheetSlot open={!!(confirming && chosen && analyzeDraft)}>
+        {heldPlan && (
+          <ConfirmPlan
+            open={!!(confirming && chosen && analyzeDraft)}
+            values={heldPlan}
+            pending={creating}
+            error={confirmError}
+            onConfirm={() => void confirmCreate()}
+            onEdit={() => { setConfirming(false); setReviewing(true); }}
+            onClose={() => setConfirming(false)}
+          />
+        )}
+      </SheetSlot>
+      <SheetSlot open={!!(coach.draft && heldPrefill && reviewing)}>
+        {heldPrefill && (
+          <CreateGoalFlow
+            open={reviewing}
+            prefill={heldPrefill}
+            requestKey={coach.requestId ? `coach:${coach.requestId}` : undefined}
+            onCreated={done}
+            onClose={() => setReviewing(false)}
+          />
+        )}
+      </SheetSlot>
+      <SheetSlot open={manual}>
+        <CreateGoalFlow open={manual} suggestion={coach.request} onCreated={done} onClose={() => setManual(false)} />
+      </SheetSlot>
     </section>
   );
 }
