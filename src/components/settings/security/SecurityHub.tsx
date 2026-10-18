@@ -15,7 +15,8 @@ const dateLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { day: "2-dig
 /** Settings › Bảo mật: score, Scam Shield entry points and the existing auth rows. */
 export function SecurityHub() {
   const demo = useSettingsDemo();
-  const activeContacts = demo.emergencyContacts.filter(contact => contact.status === "active").length;
+  // A contact being removed stays in effect until the 24h wait ends.
+  const activeContacts = demo.emergencyContacts.filter(contact => contact.status !== "pending").length;
   const pendingContacts = demo.emergencyContacts.some(contact => contact.status === "pending");
   const score = securityScore({ passwordUpdated: demo.passwordUpdated, faceId: demo.faceId, advanced: demo.advanced, aiProtect: demo.aiProtect, antiPhishing: demo.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: demo.trustedContacts.length });
   const lockUntil = demo.transferLockUntil !== null && demo.transferLockUntil > transferNow().getTime() ? demo.transferLockUntil : null;

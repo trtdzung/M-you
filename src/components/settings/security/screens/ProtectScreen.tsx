@@ -27,7 +27,8 @@ export function ProtectScreen() {
   const [confirming, setConfirming] = useState(false);
   const offAt = demo.pendingOff.aiProtect;
   const pending = isPending(offAt, transferNow().getTime());
-  const hasActiveContact = demo.emergencyContacts.some(contact => contact.status === "active");
+  // A contact being removed stays in effect until the 24h wait ends.
+  const hasActiveContact = demo.emergencyContacts.some(contact => contact.status !== "pending");
   const on = demo.aiProtect;
 
   const toggle = () => {
