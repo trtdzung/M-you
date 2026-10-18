@@ -46,5 +46,5 @@ export function HomeQuickGrid() {
   useEffect(() => {
     ref.current?.querySelector('a[href="/transfer"]')?.setAttribute("data-shield-anchor", "home-transfer");
   });
-  return <div ref={ref}><CaseBanner /><QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" /></div>;
+  return <div ref={ref}><CaseBanner /><div data-shield-slot="home-transfer" /><QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" /></div>;
 }

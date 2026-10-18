@@ -16,7 +16,7 @@ import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
 import { PendingOffNotice } from "../PendingOffNotice";
 
 const timeLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false }).format(at);
-const redButton = "flex w-full items-center justify-center gap-2 rounded-full bg-negative py-3 font-semibold text-white";
+const redButton = "shield-danger-primary flex items-center justify-center gap-2";
 
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return <section className="settings-panel flex gap-3 p-4">
@@ -58,7 +58,7 @@ export function SosScreen() {
     <div>
       <p className="text-xs font-bold tracking-wide text-negative">CHẾ ĐỘ KHẨN CẤP</p>
       <h2 className="mt-1 text-2xl font-bold">Bình tĩnh, M-You ở đây</h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted">{SCENARIO_COPY.SC1.message}</p>
+      <p className="mt-2 text-base leading-relaxed text-muted">Khóa tạm để bảo vệ tài khoản, kiểm tra giao dịch và liên hệ hỗ trợ.</p>
       <SourceLine intervention={{ source: "rule" }} />
     </div>
     <Step n={1} title="Khóa tạm tài khoản và thẻ">
@@ -69,12 +69,12 @@ export function SosScreen() {
       </div> : <button type="button" className={redButton} onClick={() => setLocking(true)}>{SCENARIO_COPY.SC1.chips[0]}</button>}
     </Step>
     <Link href="/settings/case" className="text-sm font-semibold text-primary">{SCENARIO_COPY.SC2.situation}</Link>
-    <Step n={2} title="Đánh dấu giao dịch đáng ngờ">
-      <p className="text-muted">Chọn các giao dịch bạn không thực hiện hoặc bị dẫn dắt để thực hiện.</p>
-      <Link href="/transactions" className="mt-3 inline-block rounded-full border border-primary px-4 py-2 font-semibold text-primary">{SCENARIO_COPY.SC1.chips[1]}</Link>
+    <Step n={2} title="Kiểm tra giao dịch đáng ngờ">
+      <p className="text-muted">Mở lịch sử để đối chiếu số tiền, thời gian và người nhận. Ghi lại các thông tin này khi lập hồ sơ tra soát.</p>
+      <Link href="/transactions" className="shield-action mt-3 inline-flex items-center">Xem lịch sử giao dịch</Link>
     </Step>
     <Step n={3} title="Nói chuyện với tổng đài viên">
-      <p className="text-muted">M-You soạn sẵn tóm tắt, bạn không cần kể lại từ đầu.</p>
+      <p className="text-muted">Bản tóm tắt dưới đây giúp bạn chuẩn bị khi gọi. Việc tạo tóm tắt chưa có nghĩa tổng đài đã tiếp nhận hồ sơ.</p>
       {brief && <p className="mt-3 text-sm leading-relaxed" role="status">{brief}</p>}
       <a href="tel:1900545426" className={`${redButton} mt-3`}><Phone size={18} aria-hidden />{SCENARIO_COPY.SC1.chips[2]}</a>
     </Step>

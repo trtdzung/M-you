@@ -42,8 +42,8 @@ export function TransferLockScreen() {
       <Panel><div className="py-5">
         <p className="text-sm leading-relaxed">Khóa mọi lệnh chuyển tiền ra ngoài trong thời gian bạn chọn, ví dụ khi đi du lịch hoặc khi nghi có người theo dõi tài khoản. Chuyển giữa các tài khoản của bạn và thanh toán hóa đơn vẫn dùng được.</p>
         <p className="mt-5 mb-2 text-sm font-medium" id="transfer-lock-duration">Thời hạn khóa</p>
-        <div role="radiogroup" aria-labelledby="transfer-lock-duration" className="grid grid-cols-3 gap-2">
-          {DURATIONS.map(option => <button key={option} type="button" role="radio" aria-checked={days === option} onClick={() => setDays(option)} className={`rounded-full border py-2.5 text-sm font-semibold ${days === option ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-white"}`}>{option} ngày</button>)}
+        <div role="radiogroup" aria-labelledby="transfer-lock-duration" className="shield-options">
+          {DURATIONS.map(option => <button key={option} type="button" role="radio" aria-checked={days === option} onClick={() => setDays(option)} className={`shield-option border py-2.5 text-sm font-semibold ${days === option ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-white"}`}>{option} ngày</button>)}
         </div>
       </div></Panel>
       <Action onClick={() => lockTransfers(days, transferNow().getTime())}>Khóa chuyển tiền</Action>
@@ -75,10 +75,10 @@ function HoldPanel() {
       </div>
       <div className="py-4">
         <p className="mb-2 text-sm font-medium" id="hold-threshold">Ngưỡng giữ</p>
-        <div role="radiogroup" aria-labelledby="hold-threshold" className="grid grid-cols-3 gap-2">
+        <div role="radiogroup" aria-labelledby="hold-threshold" className="shield-options">
           {THRESHOLDS.map(value => {
             const raises = hold.on && value > hold.threshold;
-            return <button key={value} type="button" role="radio" aria-checked={hold.threshold === value} disabled={raises} onClick={() => (hold.on ? lowerHoldThreshold(value) : useSecurityStore.setState({ holdThreshold: value }))} className={`rounded-full border py-2.5 text-sm font-semibold disabled:opacity-40 ${hold.threshold === value ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-white"}`}>{formatVnd(value)}</button>;
+            return <button key={value} type="button" role="radio" aria-checked={hold.threshold === value} disabled={raises} onClick={() => (hold.on ? lowerHoldThreshold(value) : useSecurityStore.setState({ holdThreshold: value }))} className={`shield-option border py-2.5 text-sm font-semibold disabled:opacity-40 ${hold.threshold === value ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-white"}`}>{formatVnd(value)}</button>;
           })}
         </div>
         {hold.on && <p className="mt-2 text-xs leading-relaxed text-muted">Hạ ngưỡng có hiệu lực ngay. Nâng ngưỡng là giảm bảo mật: tắt rồi bật lại (chờ 24 giờ).</p>}

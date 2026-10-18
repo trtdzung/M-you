@@ -11,7 +11,7 @@ const PROCEED = "Vẫn tiếp tục";
 const STOP = "Dừng lại";
 const SCAMMED = "Tôi nghĩ mình bị lừa";
 
-const outline = "w-full rounded-full border border-border bg-white py-3 text-sm font-semibold text-text";
+const outline = "shield-action w-full";
 
 /**
  * Red Scam Shield popup (spec section 2: «Popup + câu hỏi phân loại + thông điệp
@@ -45,17 +45,17 @@ export function TransferAlertSheet({ cif, open, intervention, classifyOnly = fal
   const chips = classifyOnly ? ["Để MSB gọi lại"] : copy.chips;
 
   return (
-    <Sheet open={open} title="Khoan đã" onClose={onClose}>
-      <div data-testid="shield-red" className="flex flex-col gap-3">
+    <Sheet open={open} title="Kiểm tra trước khi chuyển" onClose={onClose}>
+      <div data-testid="shield-red" className="shield-alert-content">
         {intervention.source === "agent" && <AiSessionNote />}
         <SourceLine intervention={intervention} />
-        {!classifyOnly && <p className="text-sm font-semibold leading-relaxed text-negative"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
-        {open && <Diagnosis cif={cif} id={intervention.id} sessionLine={intervention.source !== "agent"} onChoose={onChoose} onProposals={setProposed} />}
+        {!classifyOnly && <p className="shield-red-reason"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
+        {open && <Diagnosis cif={cif} id={intervention.id} sessionLine={intervention.source !== "agent"} sourceLine={false} onChoose={onChoose} onProposals={setProposed} />}
       </div>
-      <div className="mt-5 flex flex-col gap-2">
-        <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => onChoose(STOP)}>{STOP}</button>
+      <div className="shield-alert-actions mt-5">
+        <button type="button" className="shield-danger-primary" onClick={() => onChoose(STOP)}>{STOP}</button>
         {chips.filter(chip => !proposed.includes(chip)).map(chip => <button key={chip} type="button" className={outline} onClick={() => onChoose(chip)}>{chip}</button>)}
-        {!proposed.includes(SCAMMED) && <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={() => onChoose(SCAMMED)}>{SCAMMED}</button>}
+        {!proposed.includes(SCAMMED) && <button type="button" className="shield-danger-secondary" onClick={() => onChoose(SCAMMED)}>{SCAMMED}</button>}
         {intervention.scenario === "DH6" && <button type="button" className={outline} onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>}
         {!classifyOnly && (
           <button type="button" className={`${outline} disabled:opacity-50`} disabled={seconds > 0} onClick={() => onChoose(PROCEED)}>

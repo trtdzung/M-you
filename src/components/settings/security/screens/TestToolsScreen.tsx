@@ -27,20 +27,21 @@ export function TestToolsScreen() {
 
   return <>
     <Notice>Công cụ dành cho người test. Dữ liệu giả lập ghi trên server của persona này, không ảnh hưởng tài khoản thật.</Notice>
+    <nav aria-label="Công cụ kiểm thử" className="flex flex-wrap gap-2"><a className="shield-action" href="#shield-test-scenarios">Thẻ kịch bản</a><a className="shield-action" href="#shield-test-clock">Giờ mô phỏng</a><a className="shield-action" href="#shield-test-reset">Đặt lại dữ liệu</a></nav>
     <EngineBoard />
     <FraudAgentPanel />
     <FabTogglePanel />
     <StateSummary />
     <PresetPanel />
-    <ClockPanel />
+    <div id="shield-test-clock"><ClockPanel /></div>
     <IncomingPanel />
     <EventsPanel />
     <WarnedPanel />
     <FrequencyPanel />
     <HoldSkipPanel />
     <CaseUpdatePanel />
-    <ScenarioPanel />
-    <ResetPanel />
+    <div id="shield-test-scenarios"><ScenarioPanel /></div>
+    <div id="shield-test-reset"><ResetPanel /></div>
     <SkipWaitPanel />
     <AlertLogPanel />
   </>;

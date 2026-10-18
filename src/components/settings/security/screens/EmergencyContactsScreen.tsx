@@ -32,6 +32,7 @@ export function EmergencyContactsScreen() {
     {contacts.length === 0 ? <Panel><div className="py-8 text-center"><Users size={40} className="mx-auto mb-3 text-muted" aria-hidden /><p className="font-semibold">Chưa có người thân khẩn cấp</p><p className="mt-1 text-sm leading-relaxed text-muted">Thêm tối đa 2 người để họ được báo khi bạn gặp sự cố.</p></div></Panel>
       : <Panel>{contacts.map(contact => <div key={contact.id} className="settings-row"><div className="w-full">
         <div className="flex items-start gap-3"><span className="min-w-0 flex-1"><strong className="block">{contact.name}</strong><span className="mt-1 block text-sm text-muted">{contact.relation} · {maskPhone(contact.phone)}</span></span><StatusBadge contact={contact} /></div>
+        {contact.status === "pending" && <p className="mt-3 text-sm leading-relaxed text-muted">Đang chờ người thân chấp nhận lời mời trong app MSB hoặc SMS. Liên hệ chưa hoạt động.</p>}
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           {contact.status === "pending" && <button type="button" className="text-muted underline underline-offset-4" onClick={() => approveContact(contact.id)}>Giả lập: người thân đã đồng ý</button>}
           {contact.status === "active" && <button type="button" className="font-semibold text-negative" onClick={() => setRemoving(contact)}>Gỡ</button>}

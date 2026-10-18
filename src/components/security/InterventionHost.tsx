@@ -1,91 +1,53 @@
 "use client";
 
+import "./shield-ui.css";
+
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { CircleCheck, X } from "lucide-react";
 import { Sheet } from "@/components/primitives";
-import { canvasZoom } from "@/lib/motion";
 import type { Intervention, RespondAction } from "@/lib/security/intervention-types";
 import { HandbookSheet } from "./HandbookSheet";
 import { AiSessionNote, InterventionBody } from "./InterventionCopy";
 import type { HandbookContext } from "@/lib/security/handbook";
 import { useInterventions } from "./useInterventions";
 import { useRecovery } from "./useRecovery";
-import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
 import { SHIELD_TRUST_EVENT } from "./afterTransfer";
 
 // The confirm screen draws its own banner and popup (E10).
 const SELF_DRAWN = new Set(["transfer-confirm"]);
 const NOTICE_MS = 4_000;
 
-type Place = { top: number; left: number; width: number };
-
-/** Where a tooltip goes: under its anchor inside the phone frame, or at the top when there is no anchor. */
-function useAnchorPlace(target: string, mayFloat: boolean): Place | null {
-  const [place, setPlace] = useState<Place | null>(null);
-  useEffect(() => {
-    const measure = () => {
-      const canvas = document.getElementById("device-canvas");
-      if (!canvas) return setPlace(null);
-      const zoom = canvasZoom(canvas);
-      const frame = canvas.getBoundingClientRect();
-      const width = Math.min(320, canvas.offsetWidth - 32);
-      const anchor = document.querySelector<HTMLElement>(`[data-shield-anchor="${CSS.escape(target)}"]`);
-      // Money-in tips (BT4/BT5) float at the top on any screen until their row is on screen.
-      if (!anchor) return setPlace(mayFloat && (target === "global" || target.startsWith("txn:")) ? { top: 56, left: (canvas.offsetWidth - width) / 2, width } : null);
-      const rect = anchor.getBoundingClientRect();
-      const below = (rect.bottom - frame.top) / zoom + 8;
-      const roomBelow = canvas.offsetHeight - below > 160;
-      const top = roomBelow ? below : Math.max(56, (rect.top - frame.top) / zoom - 168);
-      const center = (rect.left + rect.width / 2 - frame.left) / zoom;
-      const left = Math.min(Math.max(16, center - width / 2), canvas.offsetWidth - width - 16);
-      setPlace({ top, left, width });
-    };
-    measure();
-    const timer = window.setInterval(measure, 400);
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [target, mayFloat]);
-  return place;
-}
-
-function Tooltip({ item, mayFloat, onChoose, onShown }: { item: Intervention; mayFloat: boolean; onChoose: (choice: string) => void; onShown: () => void }) {
+/** A notice lives in the document flow at its own context, never above unrelated controls. */
+function InlineNotice({ item, slot, onChoose, onShown }: { item: Intervention; slot: HTMLElement; onChoose: (choice: string) => void; onShown: () => void }) {
   const recovery = useRecovery();
-  const labels = SCENARIO_COPY.SC4.message.split(": ")[1].split(". ")[0].split(" → ");
-  const place = useAnchorPlace(item.target, mayFloat);
-  const canvas = typeof document === "undefined" ? null : document.getElementById("device-canvas");
+  const [trustChoice, setTrustChoice] = useState<string | null>(null);
+  const select = (choice: string) => {
+    if (item.scenario === "BT6" && choice === "Lưu vào danh bạ tin cậy") setTrustChoice(choice);
+    else onChoose(choice);
+  };
   const reported = useRef(false);
   useEffect(() => {
-    if (place && !reported.current) {
-      reported.current = true;
-      onShown();
-    }
-  }, [place, onShown]);
-  if (!place || !canvas) return null;
-  return createPortal(
-    <div
-      role="dialog"
-      aria-label="Gợi ý bảo mật của M-You"
-      data-testid="shield-tooltip"
-      className="absolute z-40 rounded-[20px] border border-border bg-white p-4 shadow-card"
-      style={{ top: place.top, left: place.left, width: place.width }}
-    >
-      {item.scenario !== "SC4" && <button type="button" aria-label="Đóng" className="absolute right-2 top-2 p-1 text-muted" onClick={() => onChoose("Đóng")}><X size={16} aria-hidden /></button>}
-      <InterventionBody
-        intervention={item}
-        onChoose={onChoose}
-        extra={item.scenario === "SC4" ? <ul className="text-xs leading-relaxed">{labels.map((label, index) => <li key={label} className="flex items-center gap-1">{recovery.steps[index] && <CircleCheck size={14} aria-hidden />}{label}</li>)}</ul> : item.scenario === "BT4" && (
-          // SC1 trigger: «[Không phải tôi → khóa ngay] (BT4, DH6)».
-          <button type="button" className="mt-1 text-left text-xs font-semibold text-negative underline underline-offset-4" onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>
-        )}
-      />
-    </div>,
-    canvas,
-  );
+    if (!reported.current) { reported.current = true; onShown(); }
+  }, [onShown]);
+  const recoveryLabels = ["Đổi mật khẩu", "Kiểm tra thiết bị truy cập", "Bật mã chống giả mạo", "Thêm người thân khẩn cấp"];
+  const content = item.scenario === "SC4" ? <details className="shield-recovery" open>
+    <summary className="shield-recovery-summary">Hoàn thiện bảo vệ sau sự cố <span>{recovery.steps.filter(Boolean).length}/4 bước</span></summary>
+    <ul className="shield-checklist">{recoveryLabels.map((label, index) => <li key={label}><CircleCheck size={18} aria-hidden className={recovery.steps[index] ? "text-positive" : "text-muted"} /><span>{label}</span></li>)}</ul>
+    <div className="shield-notice-actions">{item.copy.chips.map(chip => <button key={chip} type="button" onClick={() => onChoose(chip)}>{chip}</button>)}</div>
+  </details> : <>
+    <button type="button" aria-label="Đóng gợi ý bảo mật" className="shield-notice-close" onClick={() => onChoose("Đóng")}><X size={18} aria-hidden /></button>
+    <InterventionBody intervention={item} onChoose={select} extra={item.scenario === "BT4" && <button type="button" className="shield-danger-link" onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>} />
+  </>;
+  return createPortal(<>
+    <section aria-label="Gợi ý bảo mật của M-You" data-testid="shield-tooltip" className="shield-inline-notice">{content}</section>
+    <Sheet open={trustChoice !== null} title="Lưu vào danh bạ tin cậy?" onClose={() => setTrustChoice(null)}>
+      <p className="mb-5 text-base leading-relaxed">Người nhận của giao dịch này sẽ được áp dụng ngoại lệ với một số cảnh báo và giữ giao dịch theo cài đặt. Hãy xác minh người nhận trước khi lưu. Bạn có thể gỡ trong Trung tâm bảo mật.</p>
+      <button type="button" className="login-submit" onClick={() => { if (trustChoice) onChoose(trustChoice); setTrustChoice(null); }}>Xác nhận lưu</button>
+      <button type="button" className="shield-action mt-3 w-full" onClick={() => setTrustChoice(null)}>Để sau</button>
+    </Sheet>
+  </>, slot);
 }
 
 function Popup({ item, onChoose, onShown }: { item: Intervention; onChoose: (choice: string) => void; onShown: () => void }) {
@@ -96,13 +58,13 @@ function Popup({ item, onChoose, onShown }: { item: Intervention; onChoose: (cho
     onShown();
   }, [onShown]);
   return (
-    <Sheet open title={item.level === "red" ? "Khoan đã" : "M-You nhắc bạn"} onClose={() => onChoose("Đóng")}>
+    <Sheet open title={item.level === "red" ? "Kiểm tra dấu hiệu rủi ro" : "M-You nhắc bạn"} onClose={() => onChoose("Đóng")}>
       {item.source === "agent" && <AiSessionNote />}
       <InterventionBody
         intervention={item}
         onChoose={onChoose}
         extra={item.level === "red" && (
-          <button type="button" className="mt-3 w-full rounded-full border-2 border-negative py-3 text-sm font-semibold text-negative" onClick={() => onChoose(item.scenario === "DH6" ? "Không phải tôi → khóa ngay" : "Tôi nghĩ mình bị lừa")}>
+          <button type="button" className="shield-danger-secondary mt-3" onClick={() => onChoose(item.scenario === "DH6" ? "Không phải tôi → khóa ngay" : "Tôi nghĩ mình bị lừa")}>
             {item.scenario === "DH6" ? "Không phải tôi → khóa ngay" : "Tôi nghĩ mình bị lừa"}
           </button>
         )}
@@ -154,20 +116,22 @@ export function InterventionHost() {
 
   const popup = visible.find(item => item.surface === "popup");
   const tooltips = visible.filter(item => item.surface === "tooltip" || item.surface === "banner");
-  // One tooltip at a time: the newest whose anchor is on this screen, or that may float.
+  // One notice at a time, only in a slot owned by this screen. A popup takes visual priority.
   const [, setTick] = useState(0);
   useEffect(() => {
     const timer = window.setInterval(() => setTick(tick => tick + 1), 500);
     return () => window.clearInterval(timer);
   }, []);
-  const floats = (item: Intervention) => item.target === "global" || item.target.startsWith("txn:");
-  const current = typeof document === "undefined" ? undefined
-    : tooltips.find(item => floats(item) || document.querySelector(`[data-shield-anchor="${CSS.escape(item.target)}"]`));
+  const findSlot = (item: Intervention) => item.target === "global"
+    ? document.getElementById("main-content")
+    : document.querySelector<HTMLElement>(`[data-shield-slot="${CSS.escape(item.target)}"]`);
+  const current = typeof document === "undefined" || popup ? undefined : tooltips.find(item => findSlot(item));
+  const slot = current ? findSlot(current) : null;
   const canvas = typeof document === "undefined" ? null : document.getElementById("device-canvas");
 
   return (
     <>
-      {current && <Tooltip key={current.id} item={current} mayFloat onChoose={choose(current)} onShown={() => shown(current.id)} />}
+      {current && slot && <InlineNotice key={current.id} item={current} slot={slot} onChoose={choose(current)} onShown={() => shown(current.id)} />}
       {popup && <Popup key={popup.id} item={popup} onChoose={choose(popup)} onShown={() => shown(popup.id)} />}
       {handbook && <HandbookSheet context={handbook} onClose={() => setHandbook(null)} />}
       {notice && canvas && createPortal(

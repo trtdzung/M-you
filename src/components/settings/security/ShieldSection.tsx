@@ -35,5 +35,5 @@ const SCREENS: Record<Section, () => React.JSX.Element> = {
 export function ShieldSection({ section }: { section: Section }) {
   const hydrated = useSecurityStore(state => state.hasHydrated);
   const Screen = SCREENS[section];
-  return hydrated ? <Screen /> : <SecurityLoading />;
+  return <div className="shield-screen">{hydrated ? <Screen /> : <SecurityLoading />}</div>;
 }

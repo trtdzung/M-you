@@ -95,10 +95,10 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
         <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} />
       </div>
       {notice && <p role="status" className="text-sm leading-relaxed">{notice}</p>}
-      <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => void cancel()}>Hủy giao dịch</button>
-      {!proposed.includes("Tôi nghĩ mình bị lừa") && <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={onScam}>Tôi nghĩ mình bị lừa</button>}
+      <button type="button" className="shield-danger-primary" onClick={() => void cancel()}>Hủy giao dịch</button>
+      {!proposed.includes("Tôi nghĩ mình bị lừa") && <button type="button" className="shield-danger-secondary" onClick={onScam}>Tôi nghĩ mình bị lừa</button>}
       <button type="button" disabled={!released} className="login-submit disabled:opacity-50" onClick={() => void send()}>
-        {released ? "Chuyển ngay" : `Chuyển sau ${mmss(left)}`}
+        {released ? "Chuyển ngay" : `Chờ kiểm tra · ${mmss(left)}`}
       </button>
       <p className="text-xs leading-relaxed text-muted">M-You không tự chặn tiền của bạn. Việc giữ giao dịch do hệ thống MSB thực hiện theo cài đặt của bạn.</p>
     </div>

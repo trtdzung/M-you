@@ -56,6 +56,7 @@ export function TxnDetail({ txn, onClose, open = true }: { txn: Transaction; onC
   return (
     <Sheet className="pfm-transaction-sheet" open={open} title="Chi tiết giao dịch" description={txn.merchantName} onClose={onClose}>
       <div className="flex flex-col gap-4" data-shield-anchor={`txn:${txn.id}`}>
+        <div data-shield-slot={`txn:${txn.id}`} />
         {unsaved && (
           <p className="rounded-row bg-negative-soft px-3 py-2 text-xs text-negative">
             Chưa lưu được — thay đổi có thể mất khi tải lại trang.

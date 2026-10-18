@@ -25,6 +25,7 @@ export function AccountSummaryCard({
   const [hidden, setHidden] = useState(true);
 
   return (
+    <>
     <section
       data-shield-anchor="home-balance"
       className="home-account rounded-[24px] border border-white bg-[#ffecef] p-4"
@@ -74,5 +75,7 @@ export function AccountSummaryCard({
         </button>
       </div>
     </section>
+    <div data-shield-slot="home-balance" />
+    </>
   );
 }

@@ -34,6 +34,7 @@ export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: 
   const isCredit = txn.direction === "credit";
 
   return (
+    <>
     <button
       type="button"
       data-shield-anchor={`txn:${txn.id}`}
@@ -60,5 +61,7 @@ export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: 
         className={cn("txn-row-amount shrink-0 text-sm font-semibold", txn.status === "reversed" && "line-through opacity-60")}
       />
     </button>
+    <div data-shield-slot={`txn:${txn.id}`} />
+    </>
   );
 }

@@ -17,7 +17,7 @@ const SAMPLES = [
   "Cuc thue thong bao ong/ba co khoan no thue, de nghi cung cap ma OTP de xac minh.",
   "MSB: Giao dich 150.000d tai GRAB thanh cong. Chi tiet tai msb.com.vn",
 ];
-const chip = "rounded-full border border-primary px-3 py-1.5 text-xs font-semibold text-primary";
+const chip = "shield-action";
 const RANK: Record<ScanLevel, number> = { clear: 0, suspicious: 1, danger: 2 };
 const [reportLabel, similarLabel] = SCENARIO_COPY.BT7.chips;
 
@@ -66,8 +66,8 @@ export function ScanScreen() {
       <p className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-tr-md bg-primary-soft p-4 text-sm leading-relaxed">{checked.text}</p>
       <ScanResultBubble result={checked.result} />
       {antiPhishingCode !== null
-        ? <p className="text-sm leading-relaxed text-muted">Tin nhắn thật từ MSB luôn có mã <strong className="text-text">{antiPhishingCode}</strong>.</p>
-        : <div className="flex flex-wrap items-center gap-2 text-sm leading-relaxed text-muted"><span>Bật mã chống giả mạo để nhận ra tin nhắn giả ngay.</span><Link href="/settings/anti-phishing" className={chip}>Bật mã chống giả mạo</Link></div>}
+        ? <p className="text-sm leading-relaxed text-muted">Trên kênh hỗ trợ, đối chiếu mã riêng <strong className="text-text">{antiPhishingCode}</strong>.</p>
+        : <div className="flex flex-wrap items-center gap-2 text-sm leading-relaxed text-muted"><span>Thêm mã riêng để hỗ trợ nhận diện thông điệp.</span><Link href="/settings/anti-phishing" className={chip}>Bật mã chống giả mạo</Link></div>}
       {flagged && <div className="flex flex-wrap gap-2">
         <button type="button" className={chip} onClick={() => setReported(true)}>{reportLabel}</button>
         <button type="button" className={chip} onClick={() => setHandbook(true)}>{similarLabel}</button>
@@ -75,11 +75,13 @@ export function ScanScreen() {
     </div>}
     <section className="settings-panel p-4">
       <label className="block"><span className="mb-2 block text-sm font-medium">Nội dung cần kiểm tra</span>
-        <textarea className="settings-input min-h-28 w-full resize-y py-3" value={text} onChange={e => setText(e.target.value)} placeholder="Dán tin nhắn, link hoặc số điện thoại" />
+        <textarea className="settings-input min-h-36 w-full resize-y py-3" value={text} onChange={e => setText(e.target.value)} placeholder="Dán tin nhắn, link hoặc số điện thoại" />
       </label>
-      <p className="mt-3 mb-2 text-xs text-muted">Thử với tin nhắn mẫu</p>
-      <div className="mb-4 flex flex-col gap-2">{SAMPLES.map((sample, i) => <button key={sample} type="button" onClick={() => setText(sample)} className="truncate rounded-full border border-border bg-white px-3 py-2 text-left text-xs" title={sample}>Mẫu {i + 1}: {sample}</button>)}</div>
       <Action disabled={text.trim().length === 0} onClick={check}>Kiểm tra</Action>
+      <details className="mt-4"><summary className="shield-details-summary">Thử với tin nhắn mẫu</summary>
+      <div className="mb-4 flex flex-col gap-2">{SAMPLES.map((sample, i) => <button key={sample} type="button" onClick={() => setText(sample)} className="shield-sample" title={sample}>Mẫu {i + 1}: {sample}</button>)}</div>
+      </details>
+      <p className="mt-3 text-sm leading-relaxed text-muted">Kết quả giúp nhận diện dấu hiệu đáng ngờ, không thay thế xác minh từ ngân hàng. Tin nhắn mẫu chỉ phục vụ mô phỏng.</p>
     </section>
     {handbook && <HandbookSheet context="warned_scan" onClose={() => setHandbook(false)} />}
     <Sheet open={reported} title="Báo cáo tin nhắn" onClose={() => setReported(false)}>

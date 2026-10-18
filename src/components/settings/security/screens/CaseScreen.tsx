@@ -108,7 +108,9 @@ export function CaseScreen() {
     {error && <Notice>{error}</Notice>}
     {!item ? <Notice>{busy ? "Đang tải hồ sơ…" : "Hồ sơ chưa tải được."}</Notice> : <>
       <Panel title={step === CASE_FIELDS.length ? CASE_DOSSIER_TITLE : SCENARIO_COPY.SC2.situation}>
-        <p className="py-3 text-xs text-muted">{item.id} · {item.status === "draft" ? "Bổ sung sau" : item.status === "submitted" ? "Đã gửi hồ sơ" : "Hồ sơ có cập nhật"}</p>
+        <p className="pt-3 text-sm font-medium"> {item.status === "draft" ? "Đang soạn hồ sơ" : item.status === "submitted" ? "Đã gửi hồ sơ" : "Hồ sơ có cập nhật"}</p>
+        <details className="py-2"><summary className="shield-details-summary text-sm">Mã hồ sơ</summary><p className="break-all text-sm text-muted">{item.id}</p></details>
+        <p className="mb-4 text-sm text-muted">{step < CASE_FIELDS.length ? `Bước ${step + 1}/${CASE_FIELDS.length} · Điền thông tin sự cố` : "Kiểm tra thông tin trước khi gửi"}</p>
         {step < CASE_FIELDS.length ? <div className="pb-4">
           <label htmlFor="case-answer" className="mb-2 block font-semibold">{question}</label>
           <input id="case-answer" type={step === 1 ? "number" : "text"}
@@ -116,14 +118,17 @@ export function CaseScreen() {
             onChange={event => setAnswers(current => current.map((value, i) => i === step ? event.target.value : value))}
             className="h-12 w-full rounded-[10px] border border-border bg-surface-muted px-3 text-base" />
           <Action disabled={busy || !answers[step].trim() || (step === 1 && !(Number(answers[step]) > 0))} onClick={() => void next()}>Tiếp theo</Action>
-        </div> : <dl className="space-y-3 py-4">{CASE_FIELDS.map((field, i) => <div key={field}><dt className="text-sm text-muted">{field}</dt><dd className="break-words font-semibold">{i === 1 && Number.isFinite(Number(answers[i])) ? `${Number(answers[i]).toLocaleString("en-US")} VND` : answers[i]}</dd></div>)}</dl>}
-        <div className="flex flex-wrap gap-2 pb-4">
-          <Action disabled={busy || answers.some(value => !value.trim())} onClick={() => void request("submit", { answers })}>{SCENARIO_COPY.SC2.chips[0]}</Action>
-          <Action disabled={busy || item.attachments.length >= 3} onClick={() => setUploading(true)}>{SCENARIO_COPY.SC2.chips[1]}</Action>
+          {step > 0 && <button type="button" disabled={busy} className="shield-action mt-3" onClick={() => { setAsked(null); setStep(step - 1); }}>Quay lại thông tin trước</button>}
+          {step === 4 && <p className="mt-3 text-sm leading-relaxed text-muted">Mô tả ảnh hoặc ghi chú tại đây. Dùng nút Tải ảnh để đính kèm tệp.</p>}
+        </div> : <dl className="space-y-3 py-4">{CASE_FIELDS.map((field, i) => <div key={field}><dt className="text-sm text-muted">{field}</dt><dd className="break-words font-semibold">{i === 1 && Number.isFinite(Number(answers[i])) ? `${Number(answers[i]).toLocaleString("en-US")} VND` : answers[i]}</dd><button type="button" disabled={busy} className="shield-action mt-2" aria-label={`Sửa ${field}`} onClick={() => { setAsked(null); setStep(i); }}>Chỉnh sửa</button></div>)}</dl>}
+        {item.attachments.length > 0 && <ul className="shield-attachments">{item.attachments.map((file, index) => <li key={index}><span>Ảnh {index + 1}</span><span className="break-all">{file.name}</span></li>)}</ul>}
+        <div className="shield-case-actions pb-4">
+          {step === CASE_FIELDS.length && <Action disabled={busy || answers.some(value => !value.trim())} onClick={() => void request("submit", { answers })}>{item.status === "draft" ? SCENARIO_COPY.SC2.chips[0] : "Gửi lại hồ sơ"}</Action>}
+          <Action disabled={busy || item.attachments.length >= 3} onClick={() => setUploading(true)}>Tải ảnh ({item.attachments.length}/3)</Action>
           <button type="button" disabled={busy} className="text-sm font-semibold text-primary" onClick={() => void request("save", { answers })}>{SCENARIO_COPY.SC2.chips[2]}</button>
         </div>
       </Panel>
-      {(guidance || item.status !== "draft") && <Notice>{guidance ?? CASE_GUIDANCE}</Notice>}
+      {(guidance || item.status !== "draft") && <Notice>{(guidance && guidance !== CASE_GUIDANCE ? guidance : "Bạn có thể trình báo sự việc tới cơ quan công an và giữ lại tin nhắn, chứng từ liên quan. Theo dõi cập nhật hồ sơ trong ứng dụng; không trả phí cho người hứa lấy lại tiền.")}</Notice>}
       <Link href="/" className="text-sm font-semibold text-primary">Trang chủ</Link>
     </>}
     <Sheet open={uploading} title={SCENARIO_COPY.SC2.chips[1]} onClose={() => setUploading(false)}>

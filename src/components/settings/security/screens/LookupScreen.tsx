@@ -25,6 +25,7 @@ export function LookupScreen() {
   const [account, setAccount] = useState("");
   const [bank, setBank] = useState("");
   const [result, setResult] = useState<Result | null>(null);
+  const [resultFor, setResultFor] = useState<{ account: string; bank: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const valid = /^[\d\s.-]{6,34}$/.test(account.trim());
 
@@ -36,6 +37,7 @@ export function LookupScreen() {
       const res = await fetch(`/api/security/lookup?${query}`, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       setResult((await res.json()) as Result);
+      setResultFor({ account: account.trim(), bank });
     } catch {
       setError("Chưa tra cứu được. Bạn thử lại sau ít phút.");
     }
@@ -61,8 +63,9 @@ export function LookupScreen() {
     </div></Panel>
     <Action disabled={!valid} onClick={() => void lookup()}>Tra cứu</Action>
     {error && <p role="alert" className="px-1 text-sm text-negative">{error}</p>}
-    {result && (
+    {result && resultFor?.account === account.trim() && resultFor.bank === bank && (
       <section role="status" data-testid="lookup-result" className={`rounded-[20px] p-4 ${TONE[result.level]}`}>
+        <p className="text-sm mb-2 break-all">Kết quả cho {resultFor.account}{resultFor.bank ? ` · ${resultFor.bank}` : ""}</p>
         <p className="text-lg font-bold">{result.label}</p>
         {result.note && <p className="mt-1 text-sm">Loại cảnh báo: {result.note}</p>}
         <p className="mt-2 text-sm leading-relaxed">{HINT[result.level]}</p>

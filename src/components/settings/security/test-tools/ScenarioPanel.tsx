@@ -55,9 +55,10 @@ function ScenarioCard({ card, built, busy, error, onBuild, onOpen }: {
     <SignalStatus signals={built?.signals ?? null} required={card.signals} />
     {built?.note && <p className="mt-1 text-sm text-muted">{built.note}</p>}
     {error && <p className="mt-1 text-sm text-negative" role="alert">{error}</p>}
+    <p className="mt-3 text-sm text-muted">Dựng lại sẽ xóa trạng thái mô phỏng trước của persona hiện tại.</p>
     <div className="mt-3 flex flex-wrap gap-2">
-      <button type="button" disabled={busy} onClick={onBuild} className="rounded-full border border-primary px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-40">Dựng</button>
-      <button type="button" disabled={busy} onClick={onOpen} className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">Mở màn</button>
+      <button type="button" disabled={busy} onClick={onBuild} className="shield-action disabled:opacity-40">Dựng</button>
+      <button type="button" disabled={busy} onClick={onOpen} className="shield-action bg-primary disabled:opacity-40">Mở màn</button>
     </div>
   </article>;
 }
@@ -93,7 +94,8 @@ export function ScenarioPanel() {
 
   return <Panel title="Thẻ kịch bản">
     <p className="pt-4 text-sm leading-relaxed text-muted">Mỗi thẻ dựng lại engine của persona này (xóa dữ liệu giả lập trước), ghi đúng sự kiện rồi tắt Fraud agent để màn hiện câu nguyên văn. Mở màn đi tới chỗ cảnh báo hiện. Dòng Mong đợi lấy từ bảng kịch bản.</p>
-    {GROUPS.map(group => <section key={group}>
+    <nav aria-label="Nhóm kịch bản" className="my-4 flex flex-wrap gap-2">{GROUPS.map((group, index) => <a className="shield-action" key={group} href={`#shield-scenarios-${index}`}>{group}</a>)}</nav>
+    {GROUPS.map((group, index) => <section key={group} id={`shield-scenarios-${index}`}>
       <h2 className="pt-4 text-sm font-bold text-muted">{group}</h2>
       {SCENARIO_CARDS.filter(card => card.group === group).map(card => (
         <ScenarioCard key={card.id} card={card} built={built[card.id]} busy={busy !== null} error={errors[card.id]} onBuild={() => void run(card)} onOpen={() => open(card)} />

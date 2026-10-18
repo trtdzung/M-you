@@ -12,8 +12,8 @@ import { isPending } from "../pending";
 const VALID_CODE = /^[A-Z0-9]{4,12}$/;
 
 function SmsPreview({ code }: { code: string }) {
-  return <div className="rounded-[16px] bg-slate-100 p-4 font-mono text-xs leading-relaxed">
-    <p className="mb-2 font-sans text-[11px] font-semibold uppercase text-muted">Xem trước SMS mẫu</p>
+  return <div className="rounded-[16px] bg-slate-100 p-4 font-mono text-sm leading-relaxed">
+    <p className="mb-2 font-sans text-sm font-semibold text-muted">Xem trước SMS mẫu</p>
     MSB: Ma xac thuc giao dich cua Quy khach … Ma chong gia mao: <strong className="text-primary-strong">{code || "____"}</strong>
   </div>;
 }
@@ -41,7 +41,7 @@ export function AntiPhishingScreen() {
 
   return <>
     {code === null || editing ? <>
-      <Panel><div className="flex gap-3 py-5"><MessageSquareLock size={30} className="shrink-0 text-primary" aria-hidden /><p className="text-sm leading-relaxed">Mã chống giả mạo hiện trong mọi SMS, email, thông báo của MSB. Tin nhắn không có mã của bạn là giả.</p></div></Panel>
+      <Panel><div className="flex gap-3 py-5"><MessageSquareLock size={30} className="shrink-0 text-primary" aria-hidden /><p className="text-sm leading-relaxed">Mã riêng giúp bạn nhận diện thông điệp trên các kênh MSB có hỗ trợ. Mã chỉ là một dấu hiệu kiểm tra, không bảo đảm thông điệp an toàn. Nếu nghi ngờ, mở app để xác minh.</p></div></Panel>
       <Panel><div className="py-5">
         <label className="block"><span className="mb-2 block text-sm font-medium">Mã của bạn</span>
           <input className="settings-input w-full font-semibold tracking-widest" value={draft} maxLength={12} autoComplete="off" placeholder="VD: HOAMAI24" onChange={e => setDraft(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12))} />
