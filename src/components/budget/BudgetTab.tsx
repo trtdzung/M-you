@@ -1,5 +1,6 @@
 "use client";
 
+import { GoalJars } from "@/features/goals/ui/list/GoalJars";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -128,6 +129,8 @@ export function BudgetTab() {
           )}
         </>
       )}
+
+      <GoalJars />
 
       {coverOpen && isCurrentMonth && financials.jarEnvelope && (
         <AllocationSheet envelope={financials.jarEnvelope} jars={config.jars} onClose={() => setCoverOpen(false)} />

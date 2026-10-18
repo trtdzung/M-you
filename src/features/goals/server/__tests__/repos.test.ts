@@ -8,8 +8,8 @@ vi.mock("server-only", () => ({}));
 const holder = vi.hoisted(() => ({ db: null as InstanceType<typeof import("better-sqlite3")> | null }));
 vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));
 
-import { createGoalWithOpening } from "../create-goal";
-import { goalsDb } from "../db";
+import { createGoalOnce, createGoalWithOpening } from "../create-goal";
+import { ensureGoalTables, goalsDb } from "../db";
 import { deleteGoal, getGoal, insertGoal, listGoals, updateGoal } from "../goals-repo";
 import { appendLedger, currentAmount, InsufficientGoalFundsError, listLedger } from "../ledger-repo";
 
@@ -168,5 +168,36 @@ describe("createGoalWithOpening", () => {
     expect(listGoals("A")).toEqual([]);
     expect(count("user_goals")).toBe(0);
     expect(count("user_goal_ledger")).toBe(0);
+  });
+});
+
+
+describe("one accumulation jar per goal", () => {
+  it("creates one linked jar atomically and repeated requests reuse it", () => {
+    const first = createGoalOnce("A", input({ requestKey: "one-goal", openingAmount: 100_000 }), NOW);
+    const repeated = createGoalOnce("A", input({ requestKey: "one-goal", openingAmount: 100_000 }), NOW);
+    expect(first.goal.jarId).toBeTruthy();
+    expect(repeated.goal.jarId).toBe(first.goal.jarId);
+    expect(count("user_goal_jars", "A")).toBe(1);
+    expect(currentAmount("A", first.goal.id)).toBe(100_000);
+    appendLedger("A", first.goal.id, { kind: "deposit", amount: 50_000, note: null }, LATER);
+    expect(currentAmount("A", first.goal.id)).toBe(150_000);
+    expect(deleteGoal("A", first.goal.id)).toBe(true);
+    expect(count("user_goal_jars", "A")).toBe(0);
+  });
+  it("rolls back both the goal and jar when recording the opening amount fails", () => {
+    goalsDb().exec("CREATE TRIGGER reject_opening BEFORE INSERT ON user_goal_ledger BEGIN SELECT RAISE(ABORT, 'test failure'); END;");
+    expect(() => createGoalWithOpening("A", input({ openingAmount: 100_000 }), NOW)).toThrow("test failure");
+    expect(count("user_goals", "A")).toBe(0);
+    expect(count("user_goal_jars", "A")).toBe(0);
+  });
+  it("backfills existing goals once without changing their recorded savings", () => {
+    const old = insertGoal("A", input(), NOW);
+    appendLedger("A", old.id, { kind: "deposit", amount: 70_000, note: null }, NOW);
+    ensureGoalTables(holder.db!);
+    ensureGoalTables(holder.db!);
+    expect(getGoal("A", old.id)?.jarId).toBe(`goaljar_${old.id}`);
+    expect(count("user_goal_jars", "A")).toBe(1);
+    expect(currentAmount("A", old.id)).toBe(70_000);
   });
 });

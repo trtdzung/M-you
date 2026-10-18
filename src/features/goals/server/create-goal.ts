@@ -13,6 +13,10 @@ export function createGoalWithOpening(
 ): SavingsGoal {
   return goalsDb().transaction(() => {
     const goal = insertGoal(cif, input, now);
+    const jarId = `goaljar_${goal.id}`;
+    goalsDb().prepare("INSERT INTO user_goal_jars (cif, id, goal_id, created_at) VALUES (?, ?, ?, ?)").run(cif, jarId, goal.id, now.toISOString());
+    goalsDb().prepare("UPDATE user_goals SET jar_id = ? WHERE cif = ? AND id = ?").run(jarId, cif, goal.id);
+    goal.jarId = jarId;
     if (input.openingAmount !== null && input.openingAmount > 0) {
       appendLedger(cif, goal.id, { kind: "deposit", amount: input.openingAmount, note: null }, now);
     }

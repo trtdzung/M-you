@@ -91,32 +91,20 @@ function skeleton(b: PlanBase, id: Plan["id"]): Plan {
 export function keepDeadlinePlan(b: PlanBase): Plan {
   const { draft, now, months, surplus, ctx } = b;
   const plan = skeleton(b, "keep_deadline");
-  if (surplus === "unknown") return { ...plan, needed: false };
+  if (surplus === "unknown") return { ...plan, available: false, reason: "unknown_surplus", needed: false };
   const comfort = Math.floor(Math.max(0, surplus) * COMFORT_SHARE);
   if (plan.monthly <= comfort) return { ...plan, needed: false };
 
-  // Up-front money first, then cuts for whatever the surplus still does not cover.
-  const remaining = draft.targetAmount - draft.openingAmount;
-  let lumpWanted = Math.max(0, remaining - Math.max(0, surplus) * months);
-  const src = fundingSources(ctx);
-  const idle = Math.min(src.idle, lumpWanted);
-  lumpWanted -= idle;
-  const jars: PlanFunding[] = [];
-  for (const j of src.jars) {
-    if (lumpWanted <= 0) break;
-    const amount = Math.min(j.amount, lumpWanted);
-    jars.push({ ...j, amount });
-    lumpWanted -= amount;
-  }
-  const lump = idle + jars.reduce((s, j) => s + j.amount, 0);
-  const monthly = Math.ceil((remaining - lump) / months);
-  const gap = Math.max(0, monthly - Math.max(0, surplus));
-  const cuts = gap > 0 ? buildCuts(ctx, gap) : [];
-  const covered = cuts.reduce((s, c) => s + c.perMonth, 0);
-  return {
-    ...plan, monthly, cuts, cutsCoverGap: covered >= gap, fundingFromJars: jars, fundingFromIdle: idle,
-    series: buildSeries(now, draft.openingAmount, lump, monthly, months, draft.targetAmount),
-  };
+  // This lever changes one flexible spending group; no hypothetical upfront funding.
+  const monthly = plan.monthly;
+  const gap = Math.max(0, monthly - surplus);
+  const candidates = ctx.cuttable.filter(c => c.label && c.average > 0)
+    .map(c => ({ categoryId: c.categoryId, label: c.label ?? null, perMonth: Math.min(gap, Math.floor(c.average * CATEGORY_CUT_SHARE)), reason: "category" as const }))
+    .filter(c => c.perMonth > 0).sort((a, b) => b.perMonth - a.perMonth);
+  const cuts = candidates.slice(0, 1);
+  return { ...plan, monthly, cuts, needed: gap > 0, cutsCoverGap: cuts.reduce((total, cut) => total + cut.perMonth, 0) >= gap,
+    series: buildSeries(now, draft.openingAmount, 0, monthly, months, draft.targetAmount) };
+
 }
 
 export function extendDeadlinePlan(b: PlanBase): Plan {

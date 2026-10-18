@@ -19,6 +19,15 @@ CREATE TABLE IF NOT EXISTS user_goals (
   PRIMARY KEY (cif, id)
 );
 
+CREATE TABLE IF NOT EXISTS user_goal_jars (
+  cif TEXT NOT NULL,
+  id TEXT NOT NULL,
+  goal_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (cif, id),
+  UNIQUE (cif, goal_id)
+);
+
 CREATE TABLE IF NOT EXISTS user_goal_ledger (
   cif TEXT NOT NULL,
   id TEXT NOT NULL,
@@ -57,6 +66,12 @@ export function ensureGoalTables(db: Database.Database): void {
       if (!String(e).includes("duplicate column")) throw e; // lost a race with another handle
     }
   }
+  // One dedicated accumulation jar per goal, including goals created before this feature.
+  db.transaction(() => {
+    db.exec(`UPDATE user_goals SET jar_id = 'goaljar_' || id WHERE jar_id IS NULL;
+      INSERT OR IGNORE INTO user_goal_jars (cif, id, goal_id, created_at)
+      SELECT cif, jar_id, id, created_at FROM user_goals;`);
+  })();
   db.exec(
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_user_goals_request_key
        ON user_goals (cif, request_key) WHERE request_key IS NOT NULL`,

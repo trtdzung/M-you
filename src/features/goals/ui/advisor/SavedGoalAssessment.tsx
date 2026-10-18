@@ -106,7 +106,7 @@ export function SavedGoalAssessment({ goal, onUpdated }: { goal: SavingsGoalView
           <p className="text-muted">{analysis.verdict === "unknown" ? "Bổ sung dữ liệu thu chi để đánh giá khả năng tích lũy. " : ""}Dành khoảng {money(analysis.requiredMonthly)} mỗi tháng sau khi nhận thu nhập, rồi ghi nhận khoản góp để theo dõi tiến độ. Mức ước tính chưa tính lãi.</p>
         </div>
         {cautions.length > 0 && <div><h3 className="mb-2 text-sm font-semibold text-text">Điểm cần lưu ý</h3><ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted">{cautions.map((c, index) => <li key={index}>{cautionText(c)}</li>)}</ul></div>}
-        <p className="text-xs leading-5 text-muted">Đánh giá riêng mục tiêu này, chưa trừ khoản góp cho các mục tiêu khác. Các nguồn tiền bổ sung trong phương án là gợi ý, chưa được ghi nhận vào tích lũy.</p>
+        <p className="text-xs leading-5 text-muted">Đánh giá riêng mục tiêu này, chưa trừ khoản góp cho các mục tiêu khác. Các mức cắt chi là gợi ý, chưa thay đổi hạn mức chi tiêu.</p>
         <PlanCompare
           draft={draft}
           view={advisor.view}
@@ -128,6 +128,7 @@ export function SavedGoalAssessment({ goal, onUpdated }: { goal: SavingsGoalView
           <p>Số tiền: {money(goal.targetAmount)} → <strong>{money(review.targetAmount)}</strong></p>
           <p>Thời hạn: {goal.targetDate.split("-").reverse().join("/")} → <strong>{review.targetDate.split("-").reverse().join("/")}</strong></p>
           <p>Mức góp mỗi tháng: <strong>{money(reviewMonthly)}</strong></p>
+          {review.cuts.length > 0 && <p>Gợi ý giảm chi {review.cuts[0].label}: <strong>{money(review.cuts[0].perMonth)}/tháng</strong>. {review.cutsCoverGap ? "Đủ bù phần thiếu theo dòng tiền hiện tại." : "Chưa đủ bù phần thiếu, cần thêm điều chỉnh."} Việc lưu kế hoạch không tự đổi hạn mức chi tiêu.</p>}
           <p className="text-muted">Mức góp tính từ số đã tích lũy hiện tại, chưa tính lãi hoặc các nguồn tiền bổ sung gợi ý. Bạn cần tự thực hiện và ghi nhận các khoản góp.</p>
           {error && <p role="alert" className="text-negative">{error}</p>}
           <button type="button" className={primaryButton} disabled={pending} onClick={apply}>{pending ? "Đang lưu…" : "Xác nhận điều chỉnh"}</button>

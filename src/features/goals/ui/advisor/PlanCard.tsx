@@ -24,12 +24,12 @@ export function PlanCard({ plan, selected, recommended, onSelect, narration }: {
     >
       <span className="flex items-center gap-2">
         <span className="text-[15px] font-semibold text-text">{c[plan.id]}</span>
-        {recommended && plan.available && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary-strong">{c.recommended}</span>}
+        {recommended && plan.available && plan.needed && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary-strong">{c.recommended}</span>}
         {selected && <Check size={16} className="ml-auto text-primary" aria-label={c.selected} />}
       </span>
       {plan.available ? (
         <>
-          <span className="text-[14px] leading-6 text-text">{narration ?? planSummary(plan)}</span>
+          <span className="text-[14px] leading-6 text-text">{(plan.id === "keep_deadline" ? planSummary(plan) : narration ?? planSummary(plan))}</span>
           {details.length > 0 && (
             <ul className="list-disc pl-5 text-[13px] leading-5 text-muted">
               {details.map((d) => <li key={d}>{d}</li>)}

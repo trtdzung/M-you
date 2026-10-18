@@ -23,6 +23,7 @@ export function GoalListItem({
           <p className="min-w-0 break-words text-[16px] leading-6 font-semibold text-text">{goal.name}</p>
           <ChevronRight size={20} className="shrink-0 text-muted" aria-hidden="true" />
         </div>
+        {goal.jarId && <p className="text-[12px] text-muted">Hũ mục tiêu · Tự ghi nhận</p>}
         <div className="tabular-nums">
           <div className="mb-1 flex items-center justify-between gap-3 text-[12px] text-muted">
             <span>Đã tích lũy / Mục tiêu</span>

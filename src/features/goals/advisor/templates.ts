@@ -46,7 +46,9 @@ export function planSummary(plan: Plan): string {
   const monthly = perMonth(plan.monthly);
   switch (plan.id) {
     case "keep_deadline":
-      return `Giữ hạn ${dmy(plan.targetDate)}, góp ${monthly}.`;
+      return plan.cuts.length > 0
+        ? `Giữ hạn ${dmy(plan.targetDate)}, cần góp ${monthly}. Giảm chi ${plan.cuts[0].label} ${perMonth(plan.cuts[0].perMonth)}${plan.cutsCoverGap ? " đủ bù phần thiếu." : ", chưa đủ bù phần thiếu."}`
+        : `Giữ hạn ${dmy(plan.targetDate)}, cần góp ${monthly}. ${plan.needed ? "Chưa có nhóm chi phù hợp để cắt giảm đủ." : "Không cần cắt giảm chi theo dòng tiền hiện tại."}`;
     case "extend_deadline":
       return plan.needed
         ? `Lùi hạn đến ${dmy(plan.targetDate)} (${plan.months} tháng), góp ${monthly}.`

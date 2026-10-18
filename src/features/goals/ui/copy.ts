@@ -53,7 +53,7 @@ export const GOALS_COPY = {
     plans: {
       title: "Chọn cách thực hiện",
       recommended: "Gợi ý",
-      keep_deadline: "Giữ hạn",
+      keep_deadline: "Cắt một nhóm chi",
       extend_deadline: "Lùi hạn",
       reduce_amount: "Giảm số tiền",
       unavailable: {

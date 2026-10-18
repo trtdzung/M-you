@@ -84,6 +84,7 @@ export function GoalDetailScreen({ id }: { id: string }) {
         onArchive={() => setStatus("archived")}
         onDelete={() => setConfirmingDelete(true)}
       />
+      {goal.jarId && <p className="rounded-xl bg-surface-tint p-3 text-sm leading-6 text-muted">Hũ mục tiêu: <strong className="text-text">{goal.name}</strong>. Số dư hũ là số tích lũy bạn tự ghi nhận qua Góp/Rút. Xem hũ tại tab Ngân sách.</p>}
       <Card className="rounded-2xl"><GoalDetailStats goal={goal} /></Card>
       <SavedGoalAssessment key={`${goal.id}:${goal.updatedAt}:${goal.currentAmount}`} goal={goal} onUpdated={() => { refresh(); setFeedback("Đã điều chỉnh mục tiêu. Đánh giá sẽ được cập nhật theo kế hoạch mới."); }} />
       <GoalTimeline goal={goal} ledger={ledger} />

@@ -8,7 +8,7 @@ import { PlanCard } from "./PlanCard";
 import { PlanSliders } from "./PlanSliders";
 import { ProgressChart } from "./ProgressChart";
 
-const ORDER: PlanId[] = ["keep_deadline", "extend_deadline", "reduce_amount"];
+const ORDER: PlanId[] = ["extend_deadline", "reduce_amount", "keep_deadline"];
 
 /** The three plans side by side, their chart and the what-if sliders. */
 export function PlanCompare({
