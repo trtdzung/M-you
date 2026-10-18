@@ -16,6 +16,8 @@ import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { isTransferBlocked } from "@/state/security/selectors";
+import { useShallow } from "zustand/react/shallow";
+import { transferAlertLevel } from "@/lib/transfer-alert";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
@@ -25,6 +27,8 @@ import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
 import type { FundingAssessment } from "@/domain/engine";
 import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
 import { TransferFundingPreview } from "./TransferFundingPreview";
+import { TransferAlertBanner } from "./TransferAlertBanner";
+import { TransferAlertSheet } from "./TransferAlertSheet";
 
 /**
  * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field
@@ -86,6 +90,32 @@ export function TransferConfirm() {
   // transfer so the server's id-idempotency never double-debits a lost response.
   const attemptRef = useRef<Transaction | null>(null);
   const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
+
+  // Scam Shield (demo rules): Yellow = banner, Red = sheet before committing.
+  // Nothing is judged until the store has loaded this persona's settings.
+  const shield = useSecurityStore(useShallow((state) => ({ hydrated: state.hasHydrated, aiProtect: state.aiProtect, trusted: state.trustedContacts })));
+  const alert = useMemo(() => shield.hydrated
+    ? transferAlertLevel({
+        amount,
+        isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
+        recipientName: name,
+        recipientAccount: draft?.accountNumber ?? acct,
+        memo: memo.trim() || null,
+        postedAt: transferNow(),
+        aiProtect: shield.aiProtect,
+        trusted: shield.trusted,
+      })
+    : { level: "green" as const, reasons: [] }, [shield, amount, draft, name, acct, memo]);
+  const [redOpen, setRedOpen] = useState(false);
+  const [shieldNotice, setShieldNotice] = useState<string | null>(null);
+
+  function confirmWithShield() {
+    if (committedRef.current || submitting || done) return;
+    setShieldNotice(null);
+    if (alert.level === "red") return setRedOpen(true);
+    if (alert.level === "yellow") useSecurityStore.getState().logAlert({ level: "yellow", situation: alert.reasons.join("; "), choice: "Tiếp tục" });
+    void runConfirm();
+  }
 
   function saveRecipient() {
     if (!done || recipientSaved) return;
@@ -343,17 +373,20 @@ export function TransferConfirm() {
         />
       )}
 
+      {alert.level === "yellow" && <TransferAlertBanner reasons={alert.reasons} />}
+      {shieldNotice && <p role="status" className="text-sm text-text">{shieldNotice}</p>}
       {error && <p className="text-sm text-negative">{error}</p>}
 
       <button
         type="button"
         aria-label="Xác nhận chuyển tiền"
-        onClick={() => runConfirm()}
+        onClick={confirmWithShield}
         disabled={submitting}
         className="login-submit mt-auto disabled:opacity-60"
       >
         {submitting ? "Đang xử lý…" : "Xác nhận"}
       </button>
+      <TransferAlertSheet open={redOpen} reasons={alert.reasons} onClose={() => setRedOpen(false)} onProceed={() => void runConfirm()} onNotice={setShieldNotice} />
       </div>
     </div>
   );
