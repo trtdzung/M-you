@@ -542,3 +542,34 @@ body {
 .transfer-bank-sheet > div:first-child { position: sticky; top: -16px; z-index: 1; background: #fff; }
 
 .transfer-shell .transfer-input-frame > input:focus-visible { outline: none; }
+
+/* Transfer receipt category picker: scoped to preserve other team surfaces. */
+.transfer-category-sheet {
+  background: #fff;
+  color: #10284b;
+}
+.transfer-category-sheet > div:first-child p {
+  color: #596983;
+  font-size: 14px;
+}
+.transfer-category-sheet > div.grid {
+  max-height: 55vh;
+  gap: 10px;
+  padding-top: 16px;
+}
+.transfer-category-sheet > div.grid > button {
+  min-height: 48px;
+  border-radius: 12px;
+  border-color: #dfe5ee;
+  background: #fff;
+  color: #10284b;
+  font-size: 15px;
+}
+.transfer-category-sheet > div.grid > button[aria-pressed="true"] {
+  border-color: #ff650b;
+  background: #fff1e8;
+  font-weight: 600;
+}
+.transfer-category-sheet > div.grid > button[aria-pressed="true"] svg {
+  color: #ff650b;
+}

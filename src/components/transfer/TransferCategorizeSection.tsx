@@ -153,7 +153,7 @@ export function TransferCategorizeSection({
       </div>
 
       {pickerOpen && (
-        <Sheet title="Phân loại giao dịch" description="Tự khai báo" onClose={() => setPickerOpen(false)}>
+        <Sheet className="transfer-sheet transfer-category-sheet" title="Phân loại giao dịch" description="Tự khai báo" onClose={() => setPickerOpen(false)}>
           {sourceJar ? (
             <CategoryOptionGrid selectedId={currentCategoryId} allowedCategoryIds={sourceJar.categoryIds} onSelect={applyCategory} />
           ) : (
