@@ -19,7 +19,7 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [sheet, setSheet] = useState<"login" | "personal-qr" | "qr" | "support" | "language" | "notifications" | null>(null);
+  const [sheet, setSheet] = useState<"customers" | "login" | "personal-qr" | "qr" | "support" | "language" | "notifications" | null>(null);
   const [transfer, setTransfer] = useState(false);
   const customer = customers.find(c => c.cif === cif);
 
@@ -54,13 +54,9 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           <div className="mb-6 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="mb-2 text-sm text-muted">Chào mừng trở lại,</p>
-              <div className="relative rounded-lg focus-within:ring-2 focus-within:ring-orange-400">
-                <span aria-hidden className="flex items-center gap-3 text-lg font-bold text-[#10284b]"><span className="truncate">{customer?.label ?? "Chọn khách hàng"}</span><UserRound size={24} className="shrink-0" /></span>
-                <select aria-label="Khách hàng" value={cif} onChange={e => { setCif(e.target.value); setError(""); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
-                  <option value="" disabled>Chọn khách hàng</option>
-                  {customers.map(c => <option key={c.cif} value={c.cif}>{c.label} · {c.cif}</option>)}
-                </select>
-              </div>
+              <button type="button" aria-label="Chọn khách hàng" onClick={() => setSheet("customers")} className="flex min-h-11 w-full items-center gap-3 rounded-lg text-left text-lg font-bold text-[#10284b] focus-visible:outline-primary">
+                <span className="truncate">{customer?.label ?? "Chọn khách hàng"}</span><UserRound size={24} className="shrink-0" /><ChevronDown size={17} className="shrink-0" />
+              </button>
             </div>
             <button type="button" aria-label="QR cá nhân" onClick={() => setSheet("personal-qr")} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] border border-orange-300 bg-white/40 text-[#10284b]"><QrCode size={37} /></button>
           </div>
@@ -90,7 +86,15 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           <button type="button" onClick={() => { setPassword(""); setError(""); setSheet("support"); }} className="mt-4 flex min-h-11 w-full items-center justify-center text-sm font-semibold text-primary">Hỗ trợ đăng nhập</button>
         </form>
       </Sheet>}
-      {sheet && sheet !== "login" && <Sheet title={{ "personal-qr": "QR cá nhân", qr: "Quét QR", support: "Hỗ trợ", language: "Ngôn ngữ", notifications: "Thông báo" }[sheet]} onClose={closeSheet}>
+      {sheet === "customers" && <Sheet title="Chọn khách hàng" onClose={closeSheet}>
+        <p className="mb-4 text-sm text-muted">Chọn hồ sơ demo để đăng nhập.</p>
+        <div className="space-y-2 pb-4">{customers.map(c => <button key={c.cif} type="button" aria-pressed={c.cif === cif} onClick={() => { setCif(c.cif); closeSheet(); }} className={`flex min-h-16 w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left ${c.cif === cif ? "border-orange-400 bg-orange-50" : "border-border bg-white"}`}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-primary"><UserRound size={22} /></span>
+          <span className="flex-1 font-semibold text-text">{c.label}</span>
+          {c.cif === cif && <span className="text-xs font-semibold text-primary">Đang chọn</span>}
+        </button>)}</div>
+      </Sheet>}
+      {sheet && sheet !== "login" && sheet !== "customers" && <Sheet title={{ "personal-qr": "QR cá nhân", qr: "Quét QR", support: "Hỗ trợ", language: "Ngôn ngữ", notifications: "Thông báo" }[sheet]} onClose={closeSheet}>
         {sheet === "personal-qr" ? <div className="pb-4 text-center"><QrCode size={120} className="mx-auto mb-4 text-text" /><p className="font-semibold">{customer?.label}</p><p className="mt-2 text-sm text-muted">QR minh hoạ cho hồ sơ demo, không dùng để nhận tiền.</p></div> : sheet === "qr" ? <div className="pb-4 text-center"><div className="mx-auto mb-5 flex h-40 w-40 items-center justify-center rounded-[20px] border-2 border-dashed border-orange-300 bg-orange-50"><ScanLine size={80} className="text-primary" /></div><p className="text-sm leading-relaxed text-muted">Khung quét QR mô phỏng. Bản demo không mở camera hoặc thực hiện thanh toán.</p></div> : sheet === "support" ? <div className="space-y-4 pb-4 text-sm leading-relaxed"><p>Chọn tên khách hàng trên thẻ chào mừng để đổi hồ sơ demo, sau đó bấm Đăng nhập và nhập mật khẩu demo đang dùng.</p><p className="text-muted">Bản giả lập không kết nối tài khoản ngân hàng thật. Không nhập thông tin đăng nhập ngân hàng của bạn.</p><button type="button" className="login-submit" onClick={() => setSheet("login")}>Quay lại đăng nhập</button></div> : sheet === "language" ? <div className="pb-4"><button type="button" className="flex min-h-12 w-full items-center justify-between text-sm font-semibold" onClick={closeSheet}>🇻🇳 Tiếng Việt <span className="text-primary">Đang sử dụng</span></button><p className="mt-3 text-xs text-muted">Bản giả lập hiện hỗ trợ Tiếng Việt.</p></div> : <p className="pb-5 text-sm text-muted">Bạn chưa có thông báo mới. Đăng nhập để xem thông báo tài khoản.</p>}
       </Sheet>}
     </PhoneShell>
