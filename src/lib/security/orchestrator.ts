@@ -15,6 +15,7 @@ import {
   expireOpen, findOpenByDedupe, getIntervention, insertIntervention, markAnswered, markShown, openInterventions, shownHistory,
   type NewIntervention, type StoredContext,
 } from "./intervention-store";
+import { actionFor } from "./actions";
 import type { EvaluateTrigger, Intervention, InterventionTarget, RespondAction } from "./intervention-types";
 import { SCENARIO_COPY, type ScenarioId } from "./scenario-copy";
 import { frequencyAllows, resolveMoment, resolveTransfer, type MomentContext } from "./scenarios";
@@ -135,6 +136,8 @@ export function evaluate(cif: string, trigger: EvaluateTrigger, input: EvaluateI
   return evaluateMoment(cif, trigger, input);
 }
 
+export { actionFor };
+
 export function listOpen(cif: string, target?: string): Intervention[] {
   return openInterventions(cif, target);
 }
@@ -144,33 +147,6 @@ export function shown(cif: string, id: string): boolean {
   if (!intervention || !markShown(cif, id, engineNow(cif).getTime())) return false;
   if (intervention.status === "pending") recordEvent(cif, "intervention_shown", { interventionId: id, scenario: intervention.scenario });
   return true;
-}
-
-const NAVIGATE: Record<string, string> = {
-  "Xem 3 thủ đoạn phổ biến": "/settings/knowledge",
-  "Xem thủ đoạn": "/settings/knowledge",
-  "Xem thủ đoạn tương tự": "/settings/knowledge",
-  "Trung tâm bảo mật": "/settings/security",
-  "Bật mã": "/settings/anti-phishing",
-  "Thêm người thân": "/settings/emergency-contacts",
-  "Tự khóa chuyển tiền": "/settings/transfer-lock",
-  "Xem trạng thái hồ sơ": "/settings/case",
-  "Làm bước tiếp theo": "/settings/security",
-};
-const PROCEED = new Set(["Đã gọi, tiếp tục", "Đã kiểm tra, tiếp tục", "Tôi tự chuyển", "Tiếp tục", "Vẫn tiếp tục"]);
-const STOP = new Set(["Để tôi gọi", "Kiểm tra lại", "Có người yêu cầu → xem thêm", "Dừng lại", "Hủy giao dịch"]);
-const EMERGENCY = new Set(["Tôi nghĩ mình bị lừa", "Khóa ngay", "Không phải tôi → khóa ngay"]);
-
-/** What a chip does. Unknown choices only close the intervention. */
-export function actionFor(choice: string): RespondAction {
-  if (PROCEED.has(choice)) return { kind: "proceed" };
-  if (STOP.has(choice)) return { kind: "stop" };
-  if (EMERGENCY.has(choice)) return { kind: "emergency" };
-  if (choice === "Để MSB gọi lại") return { kind: "callback" };
-  if (choice === "Yêu cầu MSB tra soát") return { kind: "case" };
-  if (choice === "Lưu vào danh bạ tin cậy") return { kind: "trust" };
-  if (NAVIGATE[choice]) return { kind: "navigate", href: NAVIGATE[choice] };
-  return { kind: "dismiss" };
 }
 
 /** Log the customer's choice; returns the action for the app, or null when the intervention is closed. */

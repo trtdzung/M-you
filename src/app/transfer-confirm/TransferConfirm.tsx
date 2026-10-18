@@ -16,9 +16,14 @@ import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { isTransferBlocked } from "@/state/security/selectors";
-import { alertClock, useTestToolsStore } from "@/state/security/test-tools";
 import { useShallow } from "zustand/react/shallow";
-import { accountLastFour, isTrustedRecipient, transferAlertLevel, transferHistory } from "@/lib/transfer-alert";
+import { accountLastFour, isTrustedRecipient } from "@/lib/transfer-alert";
+import { effectiveContacts } from "@/state/security/selectors";
+import { actionFor } from "@/lib/security/actions";
+import type { Intervention } from "@/lib/security/intervention-types";
+import type { TransferReview } from "@/lib/security/signal-context";
+import { respondIntervention } from "@/components/security/useInterventions";
+import { useTransferShield } from "@/components/security/useTransferShield";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
@@ -59,7 +64,7 @@ export function TransferConfirm() {
   // transaction the user would then be unable to see or re-label.
   const { byId: categoryById, assignable } = useCategories();
   const { adopt: adoptManualTxn, addPersisted } = useManualTxns();
-  const { financials, transactions: historyTxns, raw } = useFinancials();
+  const { financials } = useFinancials();
   const autoFund = useAutoFund();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
@@ -93,42 +98,70 @@ export function TransferConfirm() {
   const attemptRef = useRef<Transaction | null>(null);
   const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
 
-  // Scam Shield (demo rules): Yellow = banner, Red = sheet before committing.
-  // Nothing is judged until the store has loaded this persona's settings.
-  const shield = useSecurityStore(useShallow((state) => ({ hydrated: state.hasHydrated, aiProtect: state.aiProtect, trusted: state.trustedContacts })));
-  // T1/T1b/T3 need the customer's own history and the source balance; unknown stays unknown.
-  const history = useMemo(() => transferHistory(historyTxns, transferNow()), [historyTxns]);
-  const sourceBalance = useMemo(() => {
-    const accounts = raw?.accounts ?? [];
-    const source = accounts.find((a) => a.id === draft?.sourceAccountId) ?? accounts.find((a) => a.type === "current");
-    return source?.balance ?? null;
-  }, [raw, draft]);
-  // Re-judge when a tester changes the simulated hour while this screen is open.
-  const alertHour = useTestToolsStore((state) => state.alertHour);
-  const alert = useMemo(() => shield.hydrated
-    ? transferAlertLevel({
+  // Scam Shield: the engine judges the transfer under review (rule decides,
+  // spec wording at once). Yellow = banner with its chips, Red = popup before
+  // committing. The engine failing never blocks the transfer.
+  const shield = useSecurityStore(useShallow((state) => ({ trusted: state.trustedContacts, familyAlerts: state.familyAlerts })));
+  const review = useMemo<TransferReview | null>(() => (isValidDraft && amount > 0 && name.trim()
+    ? {
         amount,
-        isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
-        recipientName: name,
+        recipientName: name.trim(),
         recipientAccount: draft?.accountNumber ?? acct,
-        recipientBank: draft?.recipientBankName,
+        recipientBank: draft?.recipientBankName ?? undefined,
         memo: memo.trim() || null,
-        postedAt: alertClock(transferNow(), alertHour),
-        aiProtect: shield.aiProtect,
-        trusted: shield.trusted,
-        pastRecipients: history.pastRecipients,
-        largestOutflow90d: history.largestOutflow90d,
-        balance: sourceBalance,
-      })
-    : { level: "green" as const, reasons: [] }, [shield, amount, draft, name, acct, memo, history, sourceBalance, alertHour]);
-  const [redOpen, setRedOpen] = useState(false);
+        sourceAccountId: draft?.sourceAccountId ?? null,
+      }
+    : null), [isValidDraft, amount, name, draft, acct, memo]);
+  const shieldState = useTransferShield(persona.cif, review);
+  const [redFor, setRedFor] = useState<Intervention | null>(null);
+  const [classifyFor, setClassifyFor] = useState<Intervention | null>(null);
+  const [hiddenBanner, setHiddenBanner] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
   const [shieldNotice, setShieldNotice] = useState<string | null>(null);
+  const banner = shieldState.intervention?.level === "yellow" && shieldState.intervention.id !== hiddenBanner ? shieldState.intervention : null;
 
-  function confirmWithShield() {
-    if (committedRef.current || submitting || done) return;
+  /** One place for every Scam Shield choice: engine log, alert log, then the action. */
+  async function chooseShield(intervention: Intervention, choice: string) {
+    const action = (await respondIntervention(persona.cif, intervention.id, choice)) ?? actionFor(choice);
+    const state = useSecurityStore.getState();
+    const family = intervention.level === "red" && action.kind === "stop" && state.familyAlerts ? effectiveContacts(state) : [];
+    const familyNote = family.length > 0 ? `Đã báo người thân ${family.map(contact => contact.name).join(", ")} (giả lập)` : null;
+    const source = `Nguồn: ${intervention.source === "agent" ? "M-You" : "tự động"} (${intervention.scenario})`;
+    state.logAlert({ level: intervention.level === "red" ? "red" : "yellow", situation: intervention.copy.message, choice, note: familyNote ? `${source}. ${familyNote}` : source });
+    setRedFor(null);
+    setClassifyFor(null);
+    if (action.kind === "proceed") {
+      setHiddenBanner(intervention.id);
+      void runConfirm();
+      return;
+    }
+    setHiddenBanner(intervention.id);
+    if (choice === "Có người yêu cầu → xem thêm") return setClassifyFor(intervention);
+    if (action.kind === "emergency") return router.push("/settings/sos");
+    if (action.kind === "case") return router.push("/settings/case");
+    if (action.kind === "callback") return setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
+    setShieldNotice(familyNote ? `${familyNote}. Giao dịch chưa được thực hiện.` : "Giao dịch chưa được thực hiện.");
+  }
+
+  /** The classify-only popup (DH3 "Có người yêu cầu"): logged locally, the intervention is already answered. */
+  function chooseClassify(choice: string) {
+    const action = actionFor(choice);
+    useSecurityStore.getState().logAlert({ level: "yellow", situation: "Có người yêu cầu chuyển thêm", choice });
+    setClassifyFor(null);
+    if (action.kind === "emergency") return router.push("/settings/sos");
+    if (action.kind === "callback") return setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
+    setShieldNotice("Giao dịch chưa được thực hiện.");
+  }
+
+  async function confirmWithShield() {
+    if (committedRef.current || submitting || done || checking) return;
     setShieldNotice(null);
-    if (alert.level === "red") return setRedOpen(true);
-    if (alert.level === "yellow") useSecurityStore.getState().logAlert({ level: "yellow", situation: alert.reasons.join("; "), choice: "Tiếp tục" });
+    setChecking(true);
+    const verdict = await shieldState.ensure();
+    setChecking(false);
+    if (verdict?.level === "red") return setRedFor(verdict);
+    // Yellow: «Bấm tiếp ngay» — confirming is the customer's answer.
+    if (verdict?.level === "yellow") return void chooseShield(verdict, "Tiếp tục");
     void runConfirm();
   }
 
@@ -403,7 +436,7 @@ export function TransferConfirm() {
         />
       )}
 
-      {alert.level === "yellow" && <TransferAlertBanner reasons={alert.reasons} />}
+      {banner && <TransferAlertBanner intervention={banner} onChoose={choice => void chooseShield(banner, choice)} />}
       {shieldNotice && <p role="status" className="text-sm text-text">{shieldNotice}</p>}
       {error && <p className="text-sm text-negative">{error}</p>}
 
@@ -411,12 +444,13 @@ export function TransferConfirm() {
         type="button"
         aria-label="Xác nhận chuyển tiền"
         onClick={confirmWithShield}
-        disabled={submitting}
+        disabled={submitting || checking}
         className="login-submit mt-auto disabled:opacity-60"
       >
-        {submitting ? "Đang xử lý…" : "Xác nhận"}
+        {submitting ? "Đang xử lý…" : checking ? "M-You đang kiểm tra giao dịch…" : "Xác nhận"}
       </button>
-      <TransferAlertSheet open={redOpen} reasons={alert.reasons} onClose={() => setRedOpen(false)} onProceed={() => void runConfirm()} onNotice={setShieldNotice} />
+      <TransferAlertSheet open={redFor !== null} intervention={redFor} onClose={() => redFor && void chooseShield(redFor, "Đóng")} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
+      <TransferAlertSheet open={classifyFor !== null} intervention={classifyFor} classifyOnly onClose={() => setClassifyFor(null)} onChoose={chooseClassify} />
       </div>
     </div>
   );

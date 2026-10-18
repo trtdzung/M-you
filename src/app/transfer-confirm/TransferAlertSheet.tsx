@@ -2,65 +2,63 @@
 
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { useSecurityStore } from "@/state/security/store";
-import { effectiveContacts } from "@/state/security/selectors";
+import { Emphasized, SourceLine } from "@/components/security/InterventionCopy";
+import { CLASSIFY_QUESTIONS } from "@/lib/security/scenario-copy";
+import type { Intervention } from "@/lib/security/intervention-types";
 
-const WAIT_SECONDS = 30;
-const CHOICES = {
-  stop: "Dừng lại",
-  call: "Để tôi gọi người nhận",
-  callback: "Để MSB gọi lại",
-  proceed: "Vẫn tiếp tục",
-} as const;
-type Choice = keyof typeof CHOICES;
+const FALLBACK_WAIT_SECONDS = 30;
+const PROCEED = "Vẫn tiếp tục";
+const STOP = "Dừng lại";
+const SCAMMED = "Tôi nghĩ mình bị lừa";
 
 const outline = "w-full rounded-full border border-border bg-white py-3 text-sm font-semibold text-text";
 
 /**
- * Red Scam Shield warning. Confirming opens this instead of committing; only
- * "Vẫn tiếp tục" (after the 30s wait) lets the transfer through. Every choice
- * is logged. M-You only asks; the customer decides.
+ * Red Scam Shield popup (spec section 2: «Popup + câu hỏi phân loại + thông điệp
+ * theo kịch bản», «Nút "Tiếp tục" đếm ngược 30–60 giây + chip action [Để MSB gọi
+ * lại]»). Confirming opens this instead of committing; only "Vẫn tiếp tục", after
+ * the scenario's wait, lets the transfer through. `classifyOnly` asks the
+ * diagnostic questions without a way to continue (DH3 "Có người yêu cầu").
  */
-export function TransferAlertSheet({ open, reasons, onClose, onProceed, onNotice }: {
+export function TransferAlertSheet({ open, intervention, classifyOnly = false, onClose, onChoose }: {
   open: boolean;
-  reasons: string[];
+  intervention: Intervention | null;
+  classifyOnly?: boolean;
   onClose: () => void;
-  onProceed: () => void;
-  /** Simulated follow-up message shown on the confirm screen after the sheet closes. */
-  onNotice: (message: string) => void;
+  onChoose: (choice: string) => void;
 }) {
-  const [seconds, setSeconds] = useState(WAIT_SECONDS);
+  const wait = intervention?.countdownSec ?? FALLBACK_WAIT_SECONDS;
+  const [seconds, setSeconds] = useState(wait);
 
   useEffect(() => {
     if (!open) return;
-    setSeconds(WAIT_SECONDS);
+    setSeconds(wait);
     const timer = window.setInterval(() => setSeconds(left => Math.max(0, left - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [open]);
+  }, [open, wait]);
 
-  const choose = (choice: Choice) => {
-    const state = useSecurityStore.getState();
-    const contacts = choice === "stop" && state.familyAlerts ? effectiveContacts(state) : [];
-    const note = contacts.length > 0 ? `Đã báo người thân ${contacts.map(contact => contact.name).join(", ")} (giả lập)` : undefined;
-    state.logAlert({ level: "red", situation: reasons.join("; "), choice: CHOICES[choice], ...(note ? { note } : {}) });
-    onClose();
-    if (choice === "proceed") onProceed();
-    else if (choice === "callback") onNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
-    else if (note) onNotice(`${note}. Giao dịch chưa được thực hiện.`);
-  };
+  if (!intervention) return null;
+  const { copy } = intervention;
+  const question = classifyOnly ? CLASSIFY_QUESTIONS[0] : copy.question ?? CLASSIFY_QUESTIONS[0];
+  const chips = classifyOnly ? ["Để MSB gọi lại"] : copy.chips;
 
   return (
     <Sheet open={open} title="Khoan đã" onClose={onClose}>
-      <p className="text-sm font-semibold leading-relaxed text-negative">M-You, trợ lý AI của MSB, thấy giao dịch này có dấu hiệu lừa đảo</p>
-      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-relaxed">{reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
-      <p className="mt-4 rounded-[16px] bg-negative-soft p-4 text-base font-semibold leading-relaxed">Có ai đang hướng dẫn bạn chuyển khoản này qua điện thoại không?</p>
+      <div data-testid="shield-red" className="flex flex-col gap-3">
+        <SourceLine intervention={intervention} />
+        {!classifyOnly && <p className="text-sm font-semibold leading-relaxed text-negative"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
+        <p className="rounded-[16px] bg-negative-soft p-4 text-base font-semibold leading-relaxed">{question}</p>
+        {classifyOnly && <p className="text-sm leading-relaxed">{CLASSIFY_QUESTIONS[1]}</p>}
+      </div>
       <div className="mt-5 flex flex-col gap-2">
-        <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => choose("stop")}>{CHOICES.stop}</button>
-        <button type="button" className={outline} onClick={() => choose("call")}>{CHOICES.call}</button>
-        <button type="button" className={outline} onClick={() => choose("callback")}>{CHOICES.callback}</button>
-        <button type="button" className={`${outline} disabled:opacity-50`} disabled={seconds > 0} onClick={() => choose("proceed")}>
-          {seconds > 0 ? `${CHOICES.proceed} (${seconds} giây)` : CHOICES.proceed}
-        </button>
+        <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => onChoose(STOP)}>{STOP}</button>
+        {chips.map(chip => <button key={chip} type="button" className={outline} onClick={() => onChoose(chip)}>{chip}</button>)}
+        <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={() => onChoose(SCAMMED)}>{SCAMMED}</button>
+        {!classifyOnly && (
+          <button type="button" className={`${outline} disabled:opacity-50`} disabled={seconds > 0} onClick={() => onChoose(PROCEED)}>
+            {seconds > 0 ? `${PROCEED} (${seconds} giây)` : PROCEED}
+          </button>
+        )}
       </div>
       <p className="mt-4 pb-2 text-xs leading-relaxed text-muted">M-You không tự chặn tiền của bạn. Bạn quyết định tiếp tục hay dừng.</p>
     </Sheet>
