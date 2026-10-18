@@ -8,6 +8,7 @@ import { useSecurityStore } from "@/state/security/store";
 import { TEST_PRESETS } from "@/state/security/test-presets";
 import { useTestToolsStore } from "@/state/security/test-tools";
 import { applyAllPending, applyPreset, pendingCount, resetTestState, setAlertLog } from "./actions";
+import { useActivePreset } from "./useActivePreset";
 
 const HOURS: { hour: number | null; label: string }[] = [
   { hour: null, label: "Giờ thật" },
@@ -27,6 +28,7 @@ export function QuickActionsSheet({ open, onClose }: { open: boolean; onClose: (
   const setAlertHour = useTestToolsStore(state => state.setAlertHour);
   const security = useSecurityStore(useShallow(state => ({ hydrated: state.hasHydrated, pendingOff: state.pendingOff, emergencyContacts: state.emergencyContacts, logCount: state.alertLog.length })));
   const [done, setDone] = useState<string | null>(null);
+  const activePreset = useActivePreset();
   const pending = pendingCount(security);
 
   const run = (action: () => void, message: string) => {
@@ -40,7 +42,7 @@ export function QuickActionsSheet({ open, onClose }: { open: boolean; onClose: (
         {HOURS.map(option => <button key={option.label} type="button" aria-pressed={alertHour === option.hour} className={chip(alertHour === option.hour)} onClick={() => run(() => setAlertHour(option.hour), `Giờ chấm: ${option.label}.`)}>{option.label}</button>)}
       </Group>
       <Group title="Đặt nhanh trạng thái">
-        {TEST_PRESETS.map(preset => <button key={preset.id} type="button" className={chip()} onClick={() => run(() => applyPreset(preset), `Đã áp dụng '${preset.label}'.`)}>{preset.label}</button>)}
+        {TEST_PRESETS.map(preset => <button key={preset.id} type="button" aria-pressed={activePreset === preset.id} className={chip(activePreset === preset.id)} onClick={() => run(() => applyPreset(preset), `Đã áp dụng '${preset.label}'.`)}>{preset.label}</button>)}
       </Group>
       <Group title="Khác">
         <button type="button" className={chip()} disabled={pending === 0} onClick={() => run(applyAllPending, "Đã áp dụng mọi yêu cầu đang chờ.")}>Bỏ qua chờ 24 giờ{pending > 0 ? ` (${pending})` : ""}</button>

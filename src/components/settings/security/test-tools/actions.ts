@@ -9,16 +9,32 @@ import { useTestToolsStore } from "@/state/security/test-tools";
 import type { SecurityState } from "@/state/security/types";
 import type { PendingOff } from "../pending";
 
+/**
+ * Scam Shield data a preset sets (everything but the alert log), as a stable
+ * string. A preset counts as "in use" only while the state still matches it, so
+ * a manual change elsewhere clears the mark.
+ */
+export function stateSignature(state: SecurityState): string {
+  return JSON.stringify((Object.keys(SECURITY_DEFAULTS) as (keyof SecurityState)[]).filter(key => key !== "alertLog").map(key => state[key]));
+}
+
+function markApplied(id: string): void {
+  useTestToolsStore.getState().setAppliedPreset({ id, signature: stateSignature(useSecurityStore.getState()) });
+}
+
 /** Replaces Scam Shield state with a preset, keeping the current alert log. */
 export function applyPreset(preset: TestPreset): void {
   const { alertLog } = useSecurityStore.getState();
   useSecurityStore.setState(preset.build({ ...SECURITY_DEFAULTS, alertLog }, transferNow().getTime()));
+  markApplied(preset.id);
 }
 
 /** Scam Shield back to defaults and the alert hour back to the real clock. */
 export function resetTestState(): void {
   useSecurityStore.getState().reset();
   useTestToolsStore.getState().setAlertHour(null);
+  // Defaults are the "Mặc định" preset.
+  markApplied("default");
 }
 
 /** Requests still waiting out the 24h delay: turn-offs plus contacts being removed. */

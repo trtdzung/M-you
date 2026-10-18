@@ -12,6 +12,9 @@ type TestToolsStore = {
   /** Hour (0–23, Vietnam time) the alert is judged at; null = the real clock. */
   alertHour: number | null;
   setAlertHour: (hour: number | null) => void;
+  /** Last preset applied, with a signature of the state it produced (see test-tools/actions.ts). */
+  appliedPreset: { id: string; signature: string } | null;
+  setAppliedPreset: (applied: { id: string; signature: string } | null) => void;
 };
 
 export const useTestToolsStore = create<TestToolsStore>()(
@@ -19,11 +22,13 @@ export const useTestToolsStore = create<TestToolsStore>()(
     (set) => ({
       alertHour: null,
       setAlertHour: (hour) => set({ alertHour: hour }),
+      appliedPreset: null,
+      setAppliedPreset: (applied) => set({ appliedPreset: applied }),
     }),
     {
       name: "msb-pfm.test-tools",
       storage: createJSONStorage(() => sessionStorage),
-      partialize: (state) => ({ alertHour: state.alertHour }),
+      partialize: (state) => ({ alertHour: state.alertHour, appliedPreset: state.appliedPreset }),
     },
   ),
 );
