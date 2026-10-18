@@ -42,7 +42,7 @@ export function TransferBankEntry({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
       <button type="button" onClick={onBack} className="self-start text-sm font-semibold text-primary">
         ‹ Quay lại
       </button>
@@ -54,7 +54,7 @@ export function TransferBankEntry({
             type="button"
             onClick={() => setBankSheetOpen(true)}
             aria-label="Ngân hàng nhận"
-            className="flex h-14 w-full items-center gap-2.5 rounded-[10px] bg-surface-muted px-3.5"
+            className="flex h-14 w-full items-center gap-2.5 rounded-[10px] border border-[#dfe5ee] bg-white px-3.5"
           >
             {bank && <BankLogo bank={bank} />}
             <span className="min-w-0 flex-1 truncate text-left text-[15px] font-semibold text-text">
@@ -68,7 +68,7 @@ export function TransferBankEntry({
           <label htmlFor="xfer-account" className="mb-2 block text-[15px] font-medium text-text">
             Số tài khoản/Số thẻ
           </label>
-          <div className="flex h-14 items-center gap-2.5 rounded-[10px] bg-surface-muted px-3.5">
+          <div className="flex h-14 items-center gap-2.5 rounded-[10px] border border-[#dfe5ee] bg-white px-3.5">
             <input
               id="xfer-account"
               value={accountNumber}
@@ -94,7 +94,7 @@ export function TransferBankEntry({
             value={recipientName}
             onChange={(event) => setRecipientName(event.target.value)}
             placeholder="Nhập tên người nhận"
-            className="flex h-14 w-full items-center rounded-[10px] bg-surface-muted px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
+            className="flex h-14 w-full items-center rounded-[10px] border border-[#dfe5ee] bg-white px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
           />
         </div>
       </Card>
@@ -103,7 +103,7 @@ export function TransferBankEntry({
         type="button"
         disabled={!canContinue}
         onClick={submit}
-        className="login-submit mt-2 disabled:opacity-40"
+        className="login-submit mt-auto shrink-0 disabled:opacity-40"
       >
         Tiếp tục
       </button>
