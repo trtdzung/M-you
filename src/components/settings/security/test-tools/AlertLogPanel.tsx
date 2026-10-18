@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { History } from "lucide-react";
 import { Sheet } from "@/components/primitives";
-import { SECURITY_DEFAULTS } from "@/state/security/defaults";
 import { useSecurityStore } from "@/state/security/store";
 import { Action, Panel, Row } from "../../settings-ui";
+import { setAlertLog } from "./actions";
 
 type LogAction = "demo" | "clear";
 const COPY: Record<LogAction, { button: string; question: string; done: string }> = {
@@ -20,7 +20,7 @@ export function AlertLogPanel() {
   const [done, setDone] = useState<string | null>(null);
 
   const run = (action: LogAction) => {
-    useSecurityStore.setState({ alertLog: action === "demo" ? SECURITY_DEFAULTS.alertLog : [] });
+    setAlertLog(action);
     setPending(null);
     setDone(COPY[action].done);
   };

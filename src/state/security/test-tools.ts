@@ -32,6 +32,9 @@ type TestToolsFabStore = {
   /** Floating shortcut to the test-tools screen on every screen; off by default. */
   showFab: boolean;
   setShowFab: (on: boolean) => void;
+  /** Where the tester dragged the button, as 0–1 of the free space in the phone frame; null = default spot. */
+  fabPos: { x: number; y: number } | null;
+  setFabPos: (pos: { x: number; y: number }) => void;
 };
 
 // Kept in localStorage (not per tab like the alert hour) so a tester switches it on once per browser.
@@ -40,11 +43,13 @@ export const useTestToolsFabStore = create<TestToolsFabStore>()(
     (set) => ({
       showFab: false,
       setShowFab: (on) => set({ showFab: on }),
+      fabPos: null,
+      setFabPos: (pos) => set({ fabPos: pos }),
     }),
     {
       name: "msb-pfm.test-tools-fab",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ showFab: state.showFab }),
+      partialize: (state) => ({ showFab: state.showFab, fabPos: state.fabPos }),
     },
   ),
 );

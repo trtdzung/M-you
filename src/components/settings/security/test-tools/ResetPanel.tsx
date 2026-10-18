@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { useSecurityStore } from "@/state/security/store";
-import { useTestToolsStore } from "@/state/security/test-tools";
 import { Action, Panel } from "../../settings-ui";
+import { resetTestState } from "./actions";
 
 /** Puts Scam Shield and the simulated alert hour back to defaults, after one confirm. */
 export function ResetPanel() {
@@ -12,8 +11,7 @@ export function ResetPanel() {
   const [done, setDone] = useState(false);
 
   const reset = () => {
-    useSecurityStore.getState().reset();
-    useTestToolsStore.getState().setAlertHour(null);
+    resetTestState();
     setConfirming(false);
     setDone(true);
   };

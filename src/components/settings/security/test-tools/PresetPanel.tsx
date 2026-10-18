@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { transferNow } from "@/lib/demo-clock";
-import { SECURITY_DEFAULTS } from "@/state/security/defaults";
-import { useSecurityStore } from "@/state/security/store";
 import { TEST_PRESETS, type TestPreset } from "@/state/security/test-presets";
 import { Action, Panel, Row } from "../../settings-ui";
+import { applyPreset } from "./actions";
 
 /** One-tap Scam Shield states for testing. Keeps the current alert log. */
 export function PresetPanel() {
@@ -14,8 +12,7 @@ export function PresetPanel() {
   const [applied, setApplied] = useState<string | null>(null);
 
   const apply = (preset: TestPreset) => {
-    const { alertLog } = useSecurityStore.getState();
-    useSecurityStore.setState(preset.build({ ...SECURITY_DEFAULTS, alertLog }, transferNow().getTime()));
+    applyPreset(preset);
     setChosen(null);
     setApplied(preset.label);
   };
