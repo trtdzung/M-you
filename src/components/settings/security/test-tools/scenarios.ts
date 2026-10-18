@@ -20,7 +20,7 @@ const NEW_ACCOUNT: ScenarioField = { label: "Số tài khoản", value: "Số b�
 export const TRANSFER_SCENARIOS: TransferScenario[] = [
   {
     id: "green", name: "Xanh", level: "green", hour: null,
-    fields: [{ label: "Người nhận", value: "NGUYEN THU HA (gõ vào ô Tên gợi nhớ)", copy: "NGUYEN THU HA" }, { label: "Số tài khoản", value: "0100002291 (chỉ cần tận cùng 2291)", copy: "0100002291" }, { label: "Số tiền", value: "500.000", copy: "500000" }, { label: "Nội dung", value: "an trua", copy: "an trua" }],
+    fields: [{ label: "Người nhận", value: "NGUYEN THU HA", copy: "NGUYEN THU HA" }, { label: "Số tài khoản", value: "0100002291 (chỉ cần tận cùng 2291)", copy: "0100002291" }, { label: "Số tiền", value: "500.000", copy: "500000" }, { label: "Nội dung", value: "an trua", copy: "an trua" }],
     expected: "Không banner, chuyển ngay, nhật ký không thêm dòng.",
   },
   {
@@ -40,7 +40,7 @@ export const TRANSFER_SCENARIOS: TransferScenario[] = [
   },
   {
     id: "spoof", name: "Giả danh người quen", level: "red", hour: null,
-    fields: [{ label: "Người nhận", value: "NGUYEN THU HA (gõ vào ô Tên gợi nhớ)", copy: "NGUYEN THU HA" }, { label: "Số tài khoản", value: "0100005678 (không tận cùng 2291)", copy: "0100005678" }, { label: "Số tiền", value: "3.000.000", copy: "3000000" }, { label: "Nội dung", value: "Bất kỳ" }],
+    fields: [{ label: "Người nhận", value: "NGUYEN THU HA", copy: "NGUYEN THU HA" }, { label: "Số tài khoản", value: "0100005678 (không tận cùng 2291)", copy: "0100005678" }, { label: "Số tiền", value: "3.000.000", copy: "3000000" }, { label: "Nội dung", value: "Bất kỳ" }],
     expected: "Đỏ, lý do \"Tên giống người quen, khác số tài khoản\".",
   },
 ];
