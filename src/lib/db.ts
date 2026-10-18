@@ -17,6 +17,7 @@ import {
   needsJarLedgerMigration,
   seedJarLedgerFromLimits,
 } from "./db-migrate-jar-ledger";
+import { migrateSecurityEngine } from "./security/db-migrate";
 
 let instance: Database.Database | null = null;
 
@@ -39,6 +40,7 @@ export function getDb(): Database.Database {
   addTransactionsSourceColumn(db);
   addJarsCreatedAtColumn(db);
   db.exec(readFileSync(schemaPath, "utf8"));
+  migrateSecurityEngine(db);
   if (migrateJarLedger) seedJarLedgerFromLimits(db, jarLedgerAnchorIso());
   mergeManualTransactions(db);
   // Migration: the `jars.role` donor-waterfall column was retired (donors are now

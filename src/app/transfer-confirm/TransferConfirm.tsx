@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { TransferHeader } from "@/components/transfer/TransferHeader";
@@ -24,6 +24,7 @@ import type { Intervention } from "@/lib/security/intervention-types";
 import type { TransferReview } from "@/lib/security/signal-context";
 import { respondIntervention } from "@/components/security/useInterventions";
 import { useTransferShield } from "@/components/security/useTransferShield";
+import { checkRepeatRecipient, SHIELD_TRUST_EVENT } from "@/components/security/afterTransfer";
 import { HoldScreen, requestTransferHold } from "@/components/security/HoldScreen";
 import type { Hold } from "@/lib/security/holds";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
@@ -290,14 +291,15 @@ export function TransferConfirm() {
     // The money moved — from here on the receipt is true. Consume the draft now so
     // a reload/replay can't resubmit (F#2).
     if (draftIdParam) deleteTransferDraft(draftIdParam);
-    postSecurityEvent("transfer_out", {
+    const sentTo = { last4: lastFourDigits(draft?.accountNumber ?? acct), bank: draft?.recipientBankName ?? "" };
+    void postSecurityEvent("transfer_out", {
       txnId: primaryTxnId,
       amount,
       recipientName: name.trim(),
-      recipientLast4: lastFourDigits(draft?.accountNumber ?? acct),
-      recipientBank: draft?.recipientBankName ?? "",
+      recipientLast4: sentTo.last4,
+      recipientBank: sentTo.bank,
       isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
-    });
+    }).then(() => checkRepeatRecipient(persona.cif, sentTo));
     setCreatedTxnId(primaryTxnId);
     setCreatedSourceJarId(targetJarId); // seeds the categorize picker; null for pool/account
 
@@ -339,6 +341,20 @@ export function TransferConfirm() {
     setSubmitting(false);
   }
 
+  // BT6 chip "Lưu vào danh bạ tin cậy" (InterventionHost) does what the success button does.
+  function trustDoneRecipient() {
+    if (!done) return;
+    const four = accountLastFour(done.recipientAccountNumber ?? done.recipientAccountMasked);
+    if (four) useSecurityStore.getState().addTrustedContact({ name: done.recipientName, bank: done.recipientBankName ?? "Chưa rõ ngân hàng", account: `••• ${four}` });
+  }
+  const trustRef = useRef(trustDoneRecipient);
+  trustRef.current = trustDoneRecipient;
+  useEffect(() => {
+    const onTrustEvent = () => trustRef.current();
+    window.addEventListener(SHIELD_TRUST_EVENT, onTrustEvent);
+    return () => window.removeEventListener(SHIELD_TRUST_EVENT, onTrustEvent);
+  }, []);
+
   if (done) {
     // Trusting a recipient raises security, so it applies at once (no face check).
     const doneAccount = done.recipientAccountNumber ?? done.recipientAccountMasked;
@@ -353,9 +369,7 @@ export function TransferConfirm() {
         recipientSaved={recipientSaved}
         onSaveRecipient={saveRecipient}
         trusted={lastFour === null ? null : isTrustedRecipient(shield.trusted, done.recipientName, doneAccount, done.recipientBankName ?? undefined)}
-        onTrust={() => {
-          if (lastFour) useSecurityStore.getState().addTrustedContact({ name: done.recipientName, bank: done.recipientBankName ?? "Chưa rõ ngân hàng", account: `••• ${lastFour}` });
-        }}
+        onTrust={trustDoneRecipient}
       />
     );
   }

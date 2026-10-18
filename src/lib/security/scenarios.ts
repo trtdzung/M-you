@@ -185,8 +185,8 @@ export type MomentContext = {
   trigger: "app_open" | "transfer_screen_open" | "hub_open" | "incoming_credit" | "transfer_success";
   /** BT1: days since the account was opened. */
   accountAgeDays?: number | null;
-  /** BT2: current security score and level. */
-  score?: { total: number; level: "Rất cao" | "Cao" | "Tiêu chuẩn" } | null;
+  /** BT2: current security score, level and the quickest steps up (Hub's own score). */
+  score?: { total: number; level: "Rất cao" | "Cao" | "Tiêu chuẩn"; steps?: { label: string; points: number; cta: string }[] } | null;
   /** BT3: the credit that just arrived (or the latest within the last day, for "lần mở app kế tiếp"). */
   credit?: { amount: number; kind: "salary" | "income" | "transfer" } | null;
   hasActiveEmergencyContact?: boolean;
@@ -204,6 +204,29 @@ export type Moment = { scenario: ScenarioId; key: string | null; copy: Rendered 
 
 const BT3_MIN = 50_000_000;
 
+// BT2 keeps the spec sentence and fills in the customer's two quickest steps (Hub score).
+const STEP_PHRASE: Record<string, string> = {
+  "Mã chống giả mạo": "bật mã chống giả mạo",
+  "Người thân khẩn cấp": "thêm người thân khẩn cấp",
+  "Đổi mật khẩu": "đổi mật khẩu",
+  "M-You bảo vệ bạn": "bật M-You bảo vệ bạn",
+  "Xác thực nâng cao": "thiết lập xác thực nâng cao",
+  "Danh bạ tin cậy": "thêm người vào danh bạ tin cậy",
+};
+
+function renderBt2(score: NonNullable<MomentContext["score"]>): Rendered {
+  const [first, second] = score.steps ?? [];
+  if (!first || !second) return renderScenario("BT2", { score: String(score.total) });
+  const phrase = (step: { label: string }) => STEP_PHRASE[step.label] ?? step.label.toLowerCase();
+  const head = phrase(first);
+  return {
+    message: `Điểm bảo mật: ${score.total}/100. ${head.charAt(0).toUpperCase()}${head.slice(1)} (+${first.points}) và ${phrase(second)} (+${second.points}) để lên mức Cao.`,
+    question: null,
+    chips: [first.cta, second.cta],
+    emphasis: [],
+  };
+}
+
 /** Every BT/SC scenario the moment matches, before the frequency check. */
 export function resolveMoment(ctx: MomentContext): Moment[] {
   const out: Moment[] = [];
@@ -211,7 +234,7 @@ export function resolveMoment(ctx: MomentContext): Moment[] {
     out.push({ scenario, key, copy: renderScenario(scenario, vars) });
 
   if ((ctx.trigger === "transfer_screen_open" || ctx.trigger === "app_open") && ctx.accountAgeDays != null && ctx.accountAgeDays <= 7) add("BT1");
-  if (ctx.trigger === "hub_open" && ctx.score && ctx.score.level === "Tiêu chuẩn") add("BT2", { score: String(ctx.score.total) });
+  if (ctx.trigger === "hub_open" && ctx.score && ctx.score.level === "Tiêu chuẩn") out.push({ scenario: "BT2", key: null, copy: renderBt2(ctx.score) });
   if ((ctx.trigger === "incoming_credit" || ctx.trigger === "app_open") && ctx.credit && ctx.credit.amount >= BT3_MIN && !ctx.hasActiveEmergencyContact) {
     add("BT3", { amount: shortVnd(ctx.credit.amount) });
   }

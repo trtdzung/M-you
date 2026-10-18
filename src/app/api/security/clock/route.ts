@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(view(cif));
 }
 
-/** PUT /api/security/clock — body `{ cif, offsetMs?, alertHour? }` (alertHour null = real hour). */
+/** PUT /api/security/clock — body `{ cif, offsetMs?, alertHour?, accountOpenedAt? }` (alertHour null = real hour; accountOpenedAt ms, BT1). */
 export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!validCif(body?.cif)) return NextResponse.json({ error: "cif is required" }, { status: 422 });
@@ -30,6 +30,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "offsetMs is invalid" }, { status: 422 });
     }
     patch.offsetMs = body.offsetMs;
+  }
+  if (body.accountOpenedAt !== undefined) {
+    if (body.accountOpenedAt !== null && !(typeof body.accountOpenedAt === "number" && Number.isFinite(body.accountOpenedAt))) {
+      return NextResponse.json({ error: "accountOpenedAt is invalid" }, { status: 422 });
+    }
+    patch.accountOpenedAt = body.accountOpenedAt;
   }
   if (body.alertHour !== undefined) {
     if (body.alertHour !== null && !(Number.isInteger(body.alertHour) && body.alertHour >= 0 && body.alertHour <= 23)) {

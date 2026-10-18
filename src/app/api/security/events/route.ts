@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isSecurityEventType, SECURITY_EVENT_TYPES, type SecurityEventType } from "@/lib/security/event-types";
 import { eventsSince, recordEvent } from "@/lib/security/events";
+import { evaluate } from "@/lib/security/orchestrator";
 
 /**
  * Scam Shield event log for one persona. The browser posts what happened
@@ -30,7 +31,16 @@ export async function POST(req: NextRequest) {
   }
   try {
     // The payload shape per type is a contract of the callers; the route only bounds it.
-    return NextResponse.json(recordEvent(body.cif, body.type, payload as never));
+    const event = recordEvent(body.cif, body.type, payload as never);
+    // Opening Home or the transfer screen is an engine moment (BT1). The Hub sends its score itself.
+    if (body.type === "app_open" || body.type === "transfer_screen_open") {
+      try {
+        evaluate(body.cif, body.type);
+      } catch (err) {
+        console.error("Scam Shield evaluate after event failed", err);
+      }
+    }
+    return NextResponse.json(event);
   } catch (err) {
     console.error("POST /api/security/events failed", err);
     return NextResponse.json({ error: "events unavailable" }, { status: 500 });

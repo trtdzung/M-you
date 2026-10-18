@@ -192,6 +192,7 @@ export function TransferSuccess({
             {trusted !== null && (
               <button
                 type="button"
+                data-shield-anchor="transfer-success"
                 onClick={onTrust}
                 disabled={trusted}
                 className="flex flex-col items-center gap-1.5 text-primary disabled:text-positive"

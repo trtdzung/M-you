@@ -50,7 +50,12 @@ export async function POST(req: NextRequest) {
     if (score !== undefined && score !== null && !(typeof score?.total === "number" && SCORE_LEVELS.has(score?.level))) {
       return NextResponse.json({ error: "moment is invalid" }, { status: 422 });
     }
-    input.moment = { accountAgeDays: age ?? null, score: score ?? null };
+    const steps = score?.steps;
+    if (steps !== undefined && !(Array.isArray(steps) && steps.length <= 6 && steps.every((s: { label?: unknown; points?: unknown; cta?: unknown }) =>
+      text(s?.label, 40) && typeof s?.points === "number" && text(s?.cta, 30)))) {
+      return NextResponse.json({ error: "moment is invalid" }, { status: 422 });
+    }
+    input.moment = { accountAgeDays: age ?? null, score: score ? { total: score.total, level: score.level, steps } : null };
   }
   if (body.recipient !== undefined) {
     if (!text(body.recipient?.last4, 4) || !/^\d{4}$/.test(body.recipient.last4) || !text(body.recipient?.bank ?? "", 80)) {

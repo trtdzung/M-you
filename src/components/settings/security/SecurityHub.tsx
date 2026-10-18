@@ -12,6 +12,10 @@ import { SecurityGauge } from "./SecurityGauge";
 import { SecurityLoading } from "./SecurityLoading";
 import { securityScore } from "./security-score";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
+import { pokeInterventions } from "@/components/security/useInterventions";
+import { useEffect } from "react";
+import { usePersona } from "@/providers/context";
+import type { SecurityScore } from "./security-score";
 
 const href = (target: string) => `/settings/${target}`;
 const timeLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(at);
@@ -38,7 +42,8 @@ export function SecurityHub() {
       <span className="flex-1 text-sm text-muted">Kiểm tra tin nhắn, link, số lạ</span>
       <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary-strong">Dán</span>
     </Link>
-    <Panel><div className="py-6 text-center"><SecurityGauge score={score.total} level={score.level} /><p className="mt-3 text-sm text-muted">Xác thực {score.auth}/50 · Bảo vệ {score.protection}/50</p></div></Panel>
+    <HubShieldCheck score={score} />
+    <Panel><div className="py-6 text-center" data-shield-anchor="hub-gauge"><SecurityGauge score={score.total} level={score.level} /><p className="mt-3 text-sm text-muted">Xác thực {score.auth}/50 · Bảo vệ {score.protection}/50</p></div></Panel>
     {first && <section className="settings-panel flex gap-3 p-4">
       <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary font-bold text-white">M</span>
       <div className="min-w-0 flex-1">
@@ -67,4 +72,22 @@ export function SecurityHub() {
     {/* Testers: shown in every build, biz test runs a production image. */}
     <Panel><Row label="Công cụ test (demo)" icon={FlaskConical} href={href("test-tools")} detail="Đặt nhanh trạng thái, giờ giả lập, kịch bản chuyển tiền" /></Panel>
   </>;
+}
+
+/** BT2: opening the Hub asks the engine, with the score the Hub shows (once per visit). */
+function HubShieldCheck({ score }: { score: SecurityScore }) {
+  const { persona } = usePersona();
+  const steps = score.nextSteps.map(({ label, points, cta }) => ({ label, points, cta }));
+  const key = JSON.stringify({ total: score.total, level: score.level, steps });
+  useEffect(() => {
+    const { total, level, steps: next } = JSON.parse(key) as { total: number; level: string; steps: typeof steps };
+    void fetch("/api/security/evaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cif: persona.cif, trigger: "hub_open", moment: { score: { total, level, steps: next } } }),
+    }).then(pokeInterventions, () => {});
+    // Once per visit: a score change while on the Hub does not ask again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persona.cif]);
+  return null;
 }

@@ -14,12 +14,12 @@ const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const VN_OFFSET_MS = 7 * HOUR_MS;
 
-export type EngineClock = { offsetMs: number; alertHour: number | null };
+export type EngineClock = { offsetMs: number; alertHour: number | null; accountOpenedAt: number | null };
 
 export function readEngineClock(cif: string): EngineClock {
-  const row = getDb().prepare("SELECT clock_offset_ms, alert_hour FROM security_engine_state WHERE cif = ?").get(cif) as
-    { clock_offset_ms: number; alert_hour: number | null } | undefined;
-  return { offsetMs: row?.clock_offset_ms ?? 0, alertHour: row?.alert_hour ?? null };
+  const row = getDb().prepare("SELECT clock_offset_ms, alert_hour, account_opened_at FROM security_engine_state WHERE cif = ?").get(cif) as
+    { clock_offset_ms: number; alert_hour: number | null; account_opened_at: number | null } | undefined;
+  return { offsetMs: row?.clock_offset_ms ?? 0, alertHour: row?.alert_hour ?? null, accountOpenedAt: row?.account_opened_at ?? null };
 }
 
 /** Changes only the fields given; `alertHour: null` returns to the real hour. */
@@ -27,10 +27,11 @@ export function writeEngineClock(cif: string, patch: Partial<EngineClock>): Engi
   const next = { ...readEngineClock(cif), ...patch };
   getDb()
     .prepare(
-      `INSERT INTO security_engine_state (cif, clock_offset_ms, alert_hour, updated_at) VALUES (?, ?, ?, ?)
-       ON CONFLICT(cif) DO UPDATE SET clock_offset_ms = excluded.clock_offset_ms, alert_hour = excluded.alert_hour, updated_at = excluded.updated_at`,
+      `INSERT INTO security_engine_state (cif, clock_offset_ms, alert_hour, account_opened_at, updated_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(cif) DO UPDATE SET clock_offset_ms = excluded.clock_offset_ms, alert_hour = excluded.alert_hour,
+         account_opened_at = excluded.account_opened_at, updated_at = excluded.updated_at`,
     )
-    .run(cif, Math.trunc(next.offsetMs), next.alertHour, Date.now());
+    .run(cif, Math.trunc(next.offsetMs), next.alertHour, next.accountOpenedAt, Date.now());
   return next;
 }
 

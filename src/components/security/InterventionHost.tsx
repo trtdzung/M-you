@@ -9,6 +9,7 @@ import { canvasZoom } from "@/lib/motion";
 import type { Intervention, RespondAction } from "@/lib/security/intervention-types";
 import { InterventionBody } from "./InterventionCopy";
 import { useInterventions } from "./useInterventions";
+import { SHIELD_TRUST_EVENT } from "./afterTransfer";
 
 // The confirm screen draws its own banner and popup (E10).
 const SELF_DRAWN = new Set(["transfer-confirm"]);
@@ -126,6 +127,7 @@ export function InterventionHost() {
     else if (action.kind === "emergency") router.push("/settings/sos");
     else if (action.kind === "case") router.push("/settings/case");
     else if (action.kind === "callback") setNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập).");
+    else if (action.kind === "trust") window.dispatchEvent(new Event(SHIELD_TRUST_EVENT));
   };
   const choose = (item: Intervention) => (choice: string) => void respond(item.id, choice).then(act);
 

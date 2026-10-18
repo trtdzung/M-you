@@ -13,6 +13,11 @@ const NAVIGATE: Record<string, string> = {
   "Tự khóa chuyển tiền": "/settings/transfer-lock",
   "Xem trạng thái hồ sơ": "/settings/case",
   "Làm bước tiếp theo": "/settings/security",
+  // BT2 chips are the Hub score steps' own buttons.
+  "Đổi mật khẩu": "/settings/password",
+  "Bật bảo vệ": "/settings/protect",
+  "Thiết lập": "/settings/advanced",
+  "Thêm danh bạ": "/settings/trusted-contacts",
 };
 const PROCEED = new Set(["Đã gọi, tiếp tục", "Đã kiểm tra, tiếp tục", "Tôi tự chuyển", "Tiếp tục", "Vẫn tiếp tục"]);
 const STOP = new Set(["Để tôi gọi", "Kiểm tra lại", "Có người yêu cầu → xem thêm", "Dừng lại", "Hủy giao dịch"]);

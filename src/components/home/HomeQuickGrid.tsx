@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   ArrowUpRight,
   ScanLine,
@@ -39,5 +40,10 @@ const FOOTER: QuickAction[] = [
 export function HomeQuickGrid() {
   // Scam Shield: opening the app (Home) once per tab session.
   useScreenEvent("app_open", { oncePerSession: true });
-  return <QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" />;
+  // BT1 points at the "Chuyển tiền" button; QuickActions renders it, so tag it after mount.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector('a[href="/transfer"]')?.setAttribute("data-shield-anchor", "home-transfer");
+  });
+  return <div ref={ref}><QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" /></div>;
 }

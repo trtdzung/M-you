@@ -239,6 +239,8 @@ CREATE TABLE IF NOT EXISTS security_engine_state (
   cif TEXT PRIMARY KEY,
   clock_offset_ms INTEGER NOT NULL DEFAULT 0,
   alert_hour INTEGER CHECK (alert_hour IS NULL OR (alert_hour BETWEEN 0 AND 23)),
+  -- E14: when the customer opened the account (BT1 «Trong 7 ngày đầu»); null = unknown.
+  account_opened_at INTEGER,
   updated_at INTEGER NOT NULL
 );
 

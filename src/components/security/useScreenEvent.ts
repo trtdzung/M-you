@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { postSecurityEvent } from "@/lib/security/post-event";
 import { usePersona } from "@/providers/context";
+import { pokeInterventions } from "./useInterventions";
 
 type ScreenEvent = "app_open" | "hub_open" | "transfer_screen_open";
 
@@ -32,6 +33,6 @@ export function useScreenEvent(type: ScreenEvent, options: { oncePerSession?: bo
     const now = Date.now();
     if (now - (lastSent.get(key) ?? 0) < DEDUPE_MS) return;
     lastSent.set(key, now);
-    postSecurityEvent(type, {}, cif);
+    void postSecurityEvent(type, {}, cif).then(pokeInterventions);
   }, [type, cif, once]);
 }

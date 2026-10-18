@@ -8,7 +8,7 @@ import "server-only";
  */
 
 import { readProfile } from "./profile-store";
-import { engineNow } from "./clock";
+import { engineNow, readEngineClock } from "./clock";
 import type { SecurityEvent } from "./event-types";
 import { eventsSince, recordEvent } from "./events";
 import {
@@ -93,6 +93,11 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
   const profile = readProfile(cif);
   if (!profile.aiProtect) return [];
   const ctx: MomentContext = { now, trigger, ...input.moment };
+  // BT1: account age from the engine state when the app did not send it.
+  if (ctx.accountAgeDays == null) {
+    const opened = readEngineClock(cif).accountOpenedAt;
+    ctx.accountAgeDays = opened == null ? null : Math.max(0, Math.floor((now - opened) / (24 * 60 * MINUTE_MS)));
+  }
   let incomingSignals: Signal[] = [];
   if (trigger === "incoming_credit") {
     const incoming = buildIncomingContext(cif);
