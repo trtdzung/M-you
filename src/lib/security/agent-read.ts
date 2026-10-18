@@ -78,8 +78,8 @@ export function agentAlerts(cif: string, days: number) {
 export function agentCase(id: string) {
   const row = getDb().prepare("SELECT cif FROM fraud_cases WHERE id=?").get(id) as { cif: string } | undefined;
   if (!row) return null;
-  // Only structured answers; no image bytes or names from free-form recipient text.
+  // Structured answers only. Recipient is the last four digits; image text is redacted, never bytes.
   const item = readCase(row.cif, id)!;
-  const answers = item.answers.map((answer, index) => index === 2 ? accountLastFour(answer) : index === 4 ? String(item.attachments.length) : redactSecurityText(answer));
-  return { id: item.id, status: item.status, opened_at: item.openedAt, answers, has_image: item.attachments.length > 0 };
+  const answers = item.answers.map((answer, index) => index === 2 ? (accountLastFour(answer) ?? redactSecurityText(answer)) : redactSecurityText(answer));
+  return { cif: row.cif, id: item.id, status: item.status, opened_at: item.openedAt, answers, has_image: item.attachments.length > 0 };
 }

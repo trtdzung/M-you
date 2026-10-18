@@ -1,23 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Sheet } from "@/components/primitives";
 import { usePersona } from "@/providers/context";
 import { CASE_FIELDS, CASE_DOSSIER_TITLE, CASE_GUIDANCE, MAX_CASE_IMAGE_BYTES, type FraudCase } from "@/lib/security/case-types";
 import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
+import { useSecurityStore } from "@/state/security/store";
 import { Action, Notice, Panel } from "../../settings-ui";
 import { SourceLine } from "@/components/security/InterventionCopy";
 
-/** Fixed rule interview; A07 can enrich the questions without receiving images. */
+type Asked = { step: number; text: string };
+
+/** Fixed rule interview, replaced by the agent only when protection is on and the reply is valid. */
 export function CaseScreen() {
   const { persona } = usePersona();
+  const aiProtect = useSecurityStore(state => state.aiProtect);
   const [item, setItem] = useState<FraudCase | null>(null);
   const [answers, setAnswers] = useState<string[]>(Array(CASE_FIELDS.length).fill(""));
   const [step, setStep] = useState(0);
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const [guidance, setGuidance] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const question = asked?.step === step ? asked.text : CASE_FIELDS[step];
+  const source = asked?.step === step || (step === CASE_FIELDS.length && guidance) ? "agent" : "rule";
+
   async function request(action: string, patch: Record<string, unknown> = {}) {
     setBusy(true);
     setError(null);
@@ -32,9 +42,22 @@ export function CaseScreen() {
     } catch { setError("Không thể lưu hồ sơ. Kiểm tra thông tin và thử lại."); return null; }
     finally { setBusy(false); }
   }
+  async function enrich(id: string, stepIndex: number, answer: string | null) {
+    if (!aiProtect) { setAsked(null); return; }
+    const token = ++generation.current;
+    try {
+      const response = await fetch("/api/security/cases/interview", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cif: persona.cif, id, ...(answer ? { answer } : {}) }) });
+      if (!response.ok || token !== generation.current) return;
+      const body = await response.json() as { source?: string; field?: number; nextQuestion?: unknown; guidance?: unknown };
+      if (token !== generation.current || body.source !== "agent" || body.field !== stepIndex) return;
+      if (typeof body.nextQuestion === "string" && body.nextQuestion.trim()) setAsked({ step: stepIndex, text: body.nextQuestion });
+      if (typeof body.guidance === "string" && body.guidance.trim()) setGuidance(body.guidance);
+    } catch { /* The fixed question stays. */ }
+  }
   useEffect(() => {
     let active = true;
-    setItem(null);
+    setItem(null); setAsked(null); setGuidance(null);
     setBusy(true);
     void fetch("/api/security/cases", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cif: persona.cif, action: "open" }) }).then(async response => {
@@ -43,14 +66,26 @@ export function CaseScreen() {
       if (!active) return;
       setItem(next); setAnswers(next.answers);
       const missing = next.answers.findIndex(value => !value.trim());
-      setStep(missing < 0 ? CASE_FIELDS.length : missing);
+      const stepIndex = missing < 0 ? CASE_FIELDS.length : missing;
+      setStep(stepIndex);
+      const stored = next.dossier?.guidance;
+      if (typeof stored === "string") setGuidance(stored);
       setError(null);
+      const filled = next.answers.map((value, index) => value.trim() ? index : -1).filter(index => index >= 0);
+      void enrich(next.id, stepIndex, filled.length ? next.answers[filled[filled.length - 1]] : null);
     }).catch(() => { if (active) setError("Không thể tải hồ sơ. Vui lòng thử lại."); })
       .finally(() => { if (active) setBusy(false); });
-    return () => { active = false; };
-  }, [persona.cif]);
+    return () => { active = false; generation.current += 1; };
+    // enrich closes over the latest aiProtect flag for this persona.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persona.cif, aiProtect]);
   async function next() {
-    if (await request("save", { answers })) setStep(current => Math.min(CASE_FIELDS.length, current + 1));
+    const saved = await request("save", { answers });
+    if (!saved) return;
+    const nextStep = Math.min(CASE_FIELDS.length, step + 1);
+    setAsked(null);
+    setStep(nextStep);
+    void enrich(saved.id, nextStep, answers[step]);
   }
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -68,13 +103,13 @@ export function CaseScreen() {
     finally { setBusy(false); }
   }
   return <>
-    <SourceLine intervention={{ source: "rule" }} />
+    <SourceLine intervention={{ source }} />
     {error && <Notice>{error}</Notice>}
     {!item ? <Notice>{busy ? "Đang tải hồ sơ…" : "Hồ sơ chưa tải được."}</Notice> : <>
       <Panel title={step === CASE_FIELDS.length ? CASE_DOSSIER_TITLE : SCENARIO_COPY.SC2.situation}>
         <p className="py-3 text-xs text-muted">{item.id} · {item.status === "draft" ? "Bổ sung sau" : item.status === "submitted" ? "Đã gửi hồ sơ" : "Hồ sơ có cập nhật"}</p>
         {step < CASE_FIELDS.length ? <div className="pb-4">
-          <label htmlFor="case-answer" className="mb-2 block font-semibold">{CASE_FIELDS[step]}</label>
+          <label htmlFor="case-answer" className="mb-2 block font-semibold">{question}</label>
           <input id="case-answer" type={step === 1 ? "number" : "text"}
             min={step === 1 ? 1 : undefined} maxLength={500} value={answers[step]} disabled={busy}
             onChange={event => setAnswers(current => current.map((value, i) => i === step ? event.target.value : value))}
@@ -87,7 +122,7 @@ export function CaseScreen() {
           <button type="button" disabled={busy} className="text-sm font-semibold text-primary" onClick={() => void request("save", { answers })}>{SCENARIO_COPY.SC2.chips[2]}</button>
         </div>
       </Panel>
-      {item.status !== "draft" && <Notice>{CASE_GUIDANCE}</Notice>}
+      {(guidance || item.status !== "draft") && <Notice>{guidance ?? CASE_GUIDANCE}</Notice>}
       <Link href="/" className="text-sm font-semibold text-primary">Trang chủ</Link>
     </>}
     <Sheet open={uploading} title={SCENARIO_COPY.SC2.chips[1]} onClose={() => setUploading(false)}>

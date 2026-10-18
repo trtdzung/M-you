@@ -42,7 +42,7 @@ export function openCase(cif: string): FraudCase {
     return readCase(cif, id)!;
   })();
 }
-export function saveCase(cif: string, id: string, patch: { answers?: string[]; attachment?: CaseAttachment; submit?: boolean; update?: boolean }): FraudCase | null {
+export function saveCase(cif: string, id: string, patch: { answers?: string[]; attachment?: CaseAttachment; submit?: boolean; update?: boolean; guidance?: string }): FraudCase | null {
   return getDb().transaction(() => {
     const item = readCase(cif, id);
     if (!item) return null;
@@ -52,7 +52,11 @@ export function saveCase(cif: string, id: string, patch: { answers?: string[]; a
     if (patch.attachment) answers[4] = attachments.map(a => a.name).join(", ");
     if (patch.submit && answers.some(a => !a.trim())) throw new Error("incomplete case");
     const now = engineNow(cif).getTime();
-    const dossier = patch.submit ? Object.fromEntries(CASE_FIELDS.map((field, i) => [field, answers[i]])) : item.dossier;
+    const prior = item.dossier && typeof item.dossier.guidance === "string" ? item.dossier.guidance : "";
+    const guidance = typeof patch.guidance === "string" ? patch.guidance.trim().slice(0, 1000) : prior;
+    const complete = answers.every(value => value.trim());
+    const filed = Object.fromEntries(CASE_FIELDS.map((field, i) => [field, answers[i]]));
+    const dossier = patch.submit || (Boolean(patch.guidance) && complete) ? (guidance ? { ...filed, guidance } : filed) : item.dossier;
     const status = patch.update ? "updated" : patch.submit ? "submitted" : item.status;
     getDb().prepare("UPDATE fraud_cases SET answers=?,attachments=?,dossier=?,status=?,updated_at=? WHERE cif=? AND id=?")
       .run(JSON.stringify(answers), JSON.stringify(attachments), dossier ? JSON.stringify(dossier) : null, status, now, cif, id);
