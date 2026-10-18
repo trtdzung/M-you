@@ -13,6 +13,14 @@ export function saveInsightDraft(cif: string, insight: HomeInsight): boolean {
   } catch { return false; }
 }
 
+/** Puts a ready-made prompt in the chat composer (same one-shot handoff, no hidden context). */
+export function saveChatDraft(cif: string, prompt: string): boolean {
+  try {
+    sessionStorage.setItem(key(cif), JSON.stringify({ draft: prompt, visibleText: prompt, expires: Date.now() + 15 * 60_000 }));
+    return true;
+  } catch { return false; }
+}
+
 export interface InsightDraftPayload {
   draft: string;      // full message to send to agent (includes hidden context)
   visibleText: string; // text to show in UI bubble
