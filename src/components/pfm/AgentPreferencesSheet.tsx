@@ -11,6 +11,7 @@ import {
   type RiskAppetite,
 } from "@/domain/models";
 import { cn } from "@/lib/cn";
+import { useAgentMemory } from "@/state/agent-memory";
 import { useAgentPreferences } from "@/state/agent-preferences";
 
 const RESPONSE_LENGTH_OPTIONS: { value: ResponseLength; label: string }[] = [
@@ -149,6 +150,73 @@ function TextField({
 }
 
 /**
+ * "M-You đã ghi nhớ" — facts the AGENT itself picked up from chat (GreenNode
+ * Long-Term Memory, `GET /memory/preferences`), as opposed to the form above
+ * that the customer fills in. Read-only except for a per-row delete. The text is
+ * free text written by the agent (often the customer's own words), so it is only
+ * ever rendered as plain text. A failed delete keeps the row and says so.
+ */
+function RememberedFacts() {
+  const { records, status, remove, reload } = useAgentMemory();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onDelete(id: string) {
+    if (deletingId) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      await remove(id);
+    } catch {
+      setError("Không xóa được. Vui lòng thử lại.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <section className="mt-4 flex flex-col gap-2 border-t border-border pt-3" aria-label="M-You đã ghi nhớ">
+      <h3 className="text-sm font-medium text-text">M-You đã ghi nhớ</h3>
+      {status === "loading" && <Loading label="Đang tải…" />}
+      {status === "error" && (
+        <p className="text-sm text-muted">
+          Không tải được.{" "}
+          <button type="button" onClick={reload} className="font-semibold text-primary">
+            Thử lại
+          </button>
+        </p>
+      )}
+      {status === "ready" && records.length === 0 && (
+        <p className="text-sm text-muted">M-You chưa ghi nhớ điều gì từ các cuộc trò chuyện.</p>
+      )}
+      {status === "ready" && records.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {records.map((r) => (
+            <li key={r.id} className="flex items-start justify-between gap-2 rounded-row bg-surface-muted px-3 py-2">
+              <span className="text-sm text-text">{r.fact}</span>
+              <button
+                type="button"
+                aria-label={`Xóa: ${r.fact}`}
+                disabled={deletingId !== null}
+                onClick={() => onDelete(r.id)}
+                className="shrink-0 text-xs font-semibold text-negative disabled:opacity-50"
+              >
+                {deletingId === r.id ? "Đang xóa…" : "Xóa"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-negative">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
  * "Hướng dẫn cho M-You" — the customer's standing instructions/preferences
  * (plan 261013), saved once per persona and applied to every future
  * conversation (`src/lib/agent-preference-seed.ts`), including ones that
@@ -283,6 +351,7 @@ export function AgentPreferencesSheet({ onClose }: { onClose: () => void }) {
           </p>
         </div>
       )}
+      <RememberedFacts />
     </Sheet>
   );
 }
