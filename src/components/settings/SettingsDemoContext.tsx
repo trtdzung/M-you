@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import type { EmergencyContact, TrustedContact } from "@/state/security/types";
 
 type DemoState = {
   faceId: boolean;
@@ -23,8 +24,7 @@ type DemoState = {
   /** When (ms) a requested "turn off" takes effect; lowering security waits 24h. */
   pendingOff: Partial<Record<"aiProtect" | "antiPhishing", number>>;
 };
-export type EmergencyContact = { id: string; name: string; relation: string; phone: string; status: "pending" | "active" | "removing"; removeAt?: number };
-export type TrustedContact = { id: string; name: string; bank: string; account: string };
+export type { EmergencyContact, TrustedContact };
 const TRUSTED_SAMPLE: TrustedContact[] = [
   { id: "trusted-1", name: "NGUYEN THU HA", bank: "MSB", account: "••• 2291" },
   { id: "trusted-2", name: "TRAN VAN NAM", bank: "Vietcombank", account: "••• 4410" },
