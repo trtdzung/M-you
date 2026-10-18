@@ -8,6 +8,7 @@ import { useSecurityStore } from "@/state/security/store";
 import { TEST_PRESETS } from "@/state/security/test-presets";
 import { useTestToolsStore } from "@/state/security/test-tools";
 import { applyAllPending, applyPreset, pendingCount, resetTestState, setAlertLog } from "./actions";
+import { EngineSheetBody } from "./EnginePanel";
 import { QuickSimGroups } from "./QuickSimGroups";
 import { useActivePreset } from "./useActivePreset";
 
@@ -29,6 +30,7 @@ export function QuickActionsSheet({ open, onClose }: { open: boolean; onClose: (
   const setAlertHour = useTestToolsStore(state => state.setAlertHour);
   const security = useSecurityStore(useShallow(state => ({ hydrated: state.hasHydrated, pendingOff: state.pendingOff, emergencyContacts: state.emergencyContacts, logCount: state.alertLog.length })));
   const [done, setDone] = useState<string | null>(null);
+  const [engine, setEngine] = useState(false);
   const activePreset = useActivePreset();
   const pending = pendingCount(security);
 
@@ -36,14 +38,17 @@ export function QuickActionsSheet({ open, onClose }: { open: boolean; onClose: (
     void Promise.resolve(action()).then(() => setDone(message)).catch(err => setDone(err instanceof Error ? err.message : "Không thực hiện được."));
   };
 
-  return <Sheet open={open} title="Thao tác nhanh (test)" onClose={() => { setDone(null); onClose(); }}>
-    {!security.hydrated ? <p className="mb-5 text-sm text-muted">Đang tải cài đặt bảo mật…</p> : <>
+  return <Sheet open={open} title={engine ? "Engine" : "Thao tác nhanh (test)"} onClose={() => { setDone(null); setEngine(false); onClose(); }}>
+    {engine ? <><EngineSheetBody /><button type="button" className={`${chip()} mb-4`} onClick={() => setEngine(false)}>Thao tác nhanh</button></> : !security.hydrated ? <p className="mb-5 text-sm text-muted">Đang tải cài đặt bảo mật…</p> : <>
       <Group title="Giờ chấm cảnh báo">
         {HOURS.map(option => <button key={option.label} type="button" aria-pressed={alertHour === option.hour} className={chip(alertHour === option.hour)} onClick={() => run(() => setAlertHour(option.hour), `Giờ chấm: ${option.label}.`)}>{option.label}</button>)}
       </Group>
       <QuickSimGroups onDone={setDone} />
       <Group title="Đặt nhanh trạng thái">
         {TEST_PRESETS.map(preset => <button key={preset.id} type="button" aria-pressed={activePreset === preset.id} className={chip(activePreset === preset.id)} onClick={() => run(() => applyPreset(preset), `Đã áp dụng '${preset.label}'.`)}>{preset.label}</button>)}
+      </Group>
+      <Group title="Engine">
+        <button type="button" className={chip()} onClick={() => setEngine(true)}>Xem Engine và hộp thư</button>
       </Group>
       <Group title="Khác">
         <button type="button" className={chip()} disabled={pending === 0} onClick={() => run(applyAllPending, "Đã áp dụng mọi yêu cầu đang chờ.")}>Bỏ qua chờ 24 giờ{pending > 0 ? ` (${pending})` : ""}</button>

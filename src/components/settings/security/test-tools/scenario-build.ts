@@ -11,6 +11,7 @@ import {
   pickAccount, postEvent, putClock, recordChain, setAccountOpened, settleFd, type AccountLite,
 } from "./sim";
 import { SCENARIO_CARDS, type ScenarioField } from "./scenarios";
+import { stageTransfer } from "./stage-draft";
 
 export type SignalProbe = { code: string; evidence: string };
 export type BuiltCard = {
@@ -56,6 +57,17 @@ async function pushProfile(cif: string): Promise<void> {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, state: profileOf() }),
   });
   if (!res.ok) throw new Error("Không lưu được hồ sơ.");
+}
+
+/** Reset wipes contacts. DH5, SC1 and a hold only notify someone who is active. */
+async function ensureSimFamily(cif: string): Promise<void> {
+  const active = useSecurityStore.getState().emergencyContacts.some(contact => contact.status === "active" || contact.status === "removing");
+  if (!active) {
+    useSecurityStore.setState({
+      emergencyContacts: [{ id: "sim-family-1", name: "Nguyễn Thị Lan", relation: "Mẹ", phone: "0900000001", status: "active" }],
+    });
+  }
+  await pushProfile(cif);
 }
 
 async function begin(cif: string): Promise<{ current: AccountLite; savings: AccountLite | null }> {
@@ -119,7 +131,8 @@ export async function buildScenario(id: string, cif: string, calmDemo: () => voi
   if (!card) throw new Error("Không có thẻ này.");
   const { current, savings } = await begin(cif);
   const large = unusualAmount(current.balance);
-  const done = async (fields: ScenarioField[], href: string, signals: SignalProbe[], note: string, draft?: StoredTransferDraft): Promise<BuiltCard> => {
+  const done = async (fields: ScenarioField[], href: string, signals: SignalProbe[], note: string, draft?: StoredTransferDraft, review?: Review): Promise<BuiltCard> => {
+    if (review) await stageTransfer(cif, review);
     const mark = verdict(signals, card.signals);
     return { fields, href, draft, signals, note: [note, mark].filter(Boolean).join(" · ") };
   };
@@ -151,7 +164,7 @@ export async function buildScenario(id: string, cif: string, calmDemo: () => voi
     await recordChain(cif, current.id, 1, CHAIN_RECIPIENT);
     const review = reviewOf(CHAIN_RECIPIENT, 200_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done([...payeeFields(CHAIN_RECIPIENT, 200_000, "tien hang"), copy("Trên màn", "Bấm Xác nhận")], opened.href, [], "Đã ghi 1 lệnh trong 5 phút", opened.draft);
+    return done([...payeeFields(CHAIN_RECIPIENT, 200_000, "tien hang"), copy("Trên màn", "Bấm Xác nhận")], opened.href, [], "Đã ghi 1 lệnh trong 5 phút", opened.draft, review);
   }
   if (id === "BT7") {
     return done(card.fields, card.href, [], "Dán tin mẫu rồi bấm Kiểm tra");
@@ -161,13 +174,13 @@ export async function buildScenario(id: string, cif: string, calmDemo: () => voi
     await recordChain(cif, current.id, 1, CHAIN_RECIPIENT);
     const review = reviewOf(CHAIN_RECIPIENT, 200_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done(payeeFields(CHAIN_RECIPIENT, 200_000, "tien hang"), opened.href, await probe(cif, review), "Lệnh thứ 2", opened.draft);
+    return done(payeeFields(CHAIN_RECIPIENT, 200_000, "tien hang"), opened.href, await probe(cif, review), "Lệnh thứ 2", opened.draft, review);
   }
   if (id === "DH1") {
     await pinHour(cif, 10);
     const review = reviewOf(SPOOF, 500_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done(payeeFields(SPOOF, 500_000, "tien hang"), opened.href, await probe(cif, review), "Tên quen, số khác", opened.draft);
+    return done(payeeFields(SPOOF, 500_000, "tien hang"), opened.href, await probe(cif, review), "Tên quen, số khác", opened.draft, review);
   }
   if (id === "DH2" || id === "DH8-night" || id === "DH8-words" || id === "DH8-screen" || id === "DH-T5") {
     const hour = id === "DH8-night" ? 23 : 10;
@@ -178,29 +191,30 @@ export async function buildScenario(id: string, cif: string, calmDemo: () => voi
     const review = reviewOf(STRANGER, large, memo, current.id);
     const opened = openTransfer(id, review, current);
     const extra = id === "DH8-night" ? [copy("Giờ chấm", "23:00")] : id === "DH8-screen" ? [copy("Màn hình", "Đang chia sẻ")] : [];
-    return done(payeeFields(STRANGER, large, memo, extra), opened.href, await probe(cif, review), id === "DH-T5" ? "Đã ghi đổi mật khẩu" : "Giờ chấm đã ghim", opened.draft);
+    return done(payeeFields(STRANGER, large, memo, extra), opened.href, await probe(cif, review), id === "DH-T5" ? "Đã ghi đổi mật khẩu" : "Giờ chấm đã ghim", opened.draft, review);
   }
   if (id === "DH3") {
     await pinHour(cif, 10);
     await recordChain(cif, current.id, 2, CHAIN_RECIPIENT);
     const review = reviewOf(CHAIN_RECIPIENT, 500_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done(payeeFields(CHAIN_RECIPIENT, 500_000, "tien hang"), opened.href, await probe(cif, review), "Lệnh thứ 3", opened.draft);
+    return done(payeeFields(CHAIN_RECIPIENT, 500_000, "tien hang"), opened.href, await probe(cif, review), "Lệnh thứ 3", opened.draft, review);
   }
   if (id === "DH4") {
     await pinHour(cif, 10);
     const review = reviewOf(WARNED, 500_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done(payeeFields(WARNED, 500_000, "tien hang"), opened.href, await probe(cif, review), "Số trong danh sách mock", opened.draft);
+    return done(payeeFields(WARNED, 500_000, "tien hang"), opened.href, await probe(cif, review), "Số trong danh sách mock", opened.draft, review);
   }
   if (id === "DH5") {
     if (!savings || savings.balance <= 0) throw new Error("Persona không có sổ tiết kiệm.");
     const settled = Math.min(savings.balance, Math.floor(savings.balance * 0.5) + 1_000);
     await pinHour(cif, 10);
+    await ensureSimFamily(cif);
     await settleFd(cif, savings.id, settled);
     const review = reviewOf(STRANGER, 2_000_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done([...payeeFields(STRANGER, 2_000_000, "tien hang"), { label: "Sổ đã tất toán", value: settled.toLocaleString("vi-VN"), copy: String(settled) }], opened.href, await probe(cif, review), "Đã tất toán sổ", opened.draft);
+    return done([...payeeFields(STRANGER, 2_000_000, "tien hang"), { label: "Sổ đã tất toán", value: settled.toLocaleString("vi-VN"), copy: String(settled) }], opened.href, await probe(cif, review), "Đã tất toán sổ và thêm người thân giả lập", opened.draft, review);
   }
   if (id === "DH6") {
     await pinHour(cif, 10);
@@ -208,16 +222,19 @@ export async function buildScenario(id: string, cif: string, calmDemo: () => voi
     await recordChain(cif, current.id, 2, CHAIN_RECIPIENT);
     const review = reviewOf(CHAIN_RECIPIENT, 500_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done(payeeFields(CHAIN_RECIPIENT, 500_000, "tien hang"), opened.href, await probe(cif, review), "3 khoản mồi và 2 lệnh trước", opened.draft);
+    return done(payeeFields(CHAIN_RECIPIENT, 500_000, "tien hang"), opened.href, await probe(cif, review), "3 khoản mồi và 2 lệnh trước", opened.draft, review);
   }
   if (id === "DH7") {
     await pinHour(cif, 10);
     await creditAccount(cif, current.id, 30_000_000, STRANGER, "transfer");
     const review = reviewOf(OTHER, 24_000_000, "chuyen tra", current.id);
     const opened = openTransfer(id, review, current);
-    return done(payeeFields(OTHER, 24_000_000, "chuyen tra"), opened.href, await probe(cif, review), "24 triệu là 80% khoản 30 triệu", opened.draft);
+    return done(payeeFields(OTHER, 24_000_000, "chuyen tra"), opened.href, await probe(cif, review), "24 triệu là 80% khoản 30 triệu", opened.draft, review);
   }
-  if (id === "SC1") return done(card.fields, card.href, [], "Màn khẩn cấp");
+  if (id === "SC1") {
+    await ensureSimFamily(cif);
+    return done(card.fields, card.href, [], "Đã thêm người thân giả lập");
+  }
   if (id === "SC2") {
     await openCase(cif);
     return done(card.fields, card.href, [], "Đã mở hồ sơ");
@@ -233,11 +250,11 @@ export async function buildScenario(id: string, cif: string, calmDemo: () => voi
   if (id === "HOLD") {
     useSecurityStore.getState().setHold(true);
     useSecurityStore.getState().lowerHoldThreshold(100_000);
-    await pushProfile(cif);
+    await ensureSimFamily(cif);
     await pinHour(cif, 10);
     const review = reviewOf(HOLD_PAYEE, 200_000, "tien hang", current.id);
     const opened = openTransfer(id, review, current);
-    return done([...payeeFields(HOLD_PAYEE, 200_000, "tien hang"), copy("Ngưỡng", "100.000"), copy("Trên màn", "Bấm Xác nhận")], opened.href, await probe(cif, review), "Giữ lệnh đang bật", opened.draft);
+    return done([...payeeFields(HOLD_PAYEE, 200_000, "tien hang"), copy("Ngưỡng", "100.000"), copy("Trên màn", "Bấm Xác nhận")], opened.href, await probe(cif, review), "Giữ lệnh đang bật, đã thêm người thân giả lập", opened.draft, review);
   }
   throw new Error("Không có thẻ này.");
 }

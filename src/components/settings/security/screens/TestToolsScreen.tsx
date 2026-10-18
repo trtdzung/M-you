@@ -5,6 +5,7 @@ import { Notice } from "../../settings-ui";
 import { SecurityLoading } from "../SecurityLoading";
 import { CaseUpdatePanel } from "../test-tools/CaseUpdatePanel";
 import { ClockPanel } from "../test-tools/ClockPanel";
+import { EngineBoard } from "../test-tools/EnginePanel";
 import { EventsPanel } from "../test-tools/EventsPanel";
 import { FraudAgentPanel } from "../test-tools/FraudAgentPanel";
 import { FrequencyPanel } from "../test-tools/FrequencyPanel";
@@ -26,6 +27,7 @@ export function TestToolsScreen() {
 
   return <>
     <Notice>Công cụ dành cho người test. Dữ liệu giả lập ghi trên server của persona này, không ảnh hưởng tài khoản thật.</Notice>
+    <EngineBoard />
     <FraudAgentPanel />
     <FabTogglePanel />
     <StateSummary />

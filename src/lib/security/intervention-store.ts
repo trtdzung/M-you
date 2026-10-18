@@ -104,13 +104,41 @@ export function getInterventionContext(cif: string, id: string): StoredContext |
   return row ? parse<StoredContext | null>(row.context, null) : null;
 }
 
-/** Open (pending or shown) interventions, newest first; optionally for one target. */
-export function openInterventions(cif: string, target?: string): Intervention[] {
-  const rows = (target
+function openRows(cif: string, target?: string): Row[] {
+  return (target
     ? getDb().prepare("SELECT * FROM interventions WHERE cif = ? AND target = ? AND status IN ('pending', 'shown') ORDER BY created_at DESC").all(cif, target)
     : getDb().prepare("SELECT * FROM interventions WHERE cif = ? AND status IN ('pending', 'shown') ORDER BY created_at DESC").all(cif)) as Row[];
+}
+
+/** Open (pending or shown) interventions, newest first; optionally for one target. */
+export function openInterventions(cif: string, target?: string): Intervention[] {
   const agentOn = fraudAgentEnabled();
-  return rows.map(row => toIntervention(row, agentOn));
+  return openRows(cif, target).map(row => toIntervention(row, agentOn));
+}
+
+export type TraceStep = { tool: string; elapsedMs: number };
+
+/** Open interventions plus the agent trace (tool name and elapsed time only). */
+export function openWithTrace(cif: string): (Intervention & { trace: TraceStep[] })[] {
+  const agentOn = fraudAgentEnabled();
+  return openRows(cif).map(row => {
+    const context = parse<StoredContext>(row.context, { scenarios: [row.scenario], classify: false, evidence: [], key: null });
+    return { ...toIntervention(row, agentOn), trace: traceSteps(context.facts?.agent) };
+  });
+}
+
+function traceSteps(agent: unknown): TraceStep[] {
+  if (!agent || typeof agent !== "object" || !Array.isArray((agent as { trace?: unknown }).trace)) return [];
+  const out: TraceStep[] = [];
+  for (const step of (agent as { trace: unknown[] }).trace) {
+    if (!step || typeof step !== "object") continue;
+    const tool = (step as { tool?: unknown }).tool;
+    const elapsed = (step as { elapsed_ms?: unknown }).elapsed_ms;
+    if (typeof tool === "string" && tool.length > 0 && typeof elapsed === "number" && Number.isFinite(elapsed)) {
+      out.push({ tool, elapsedMs: elapsed });
+    }
+  }
+  return out;
 }
 
 export function findOpenByDedupe(cif: string, dedupeKey: string): Intervention | null {
