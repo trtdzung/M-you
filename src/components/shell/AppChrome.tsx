@@ -11,6 +11,7 @@ import { edgeBackHref, navigationDirection } from "@/lib/navigation-direction";
 import { backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { BottomNav } from "./BottomNav";
 import { PhoneShell } from "./PhoneShell";
+import { InterventionHost } from "@/components/security/InterventionHost";
 
 function FestiveBg() {
   return (
@@ -51,6 +52,16 @@ function inHorizontalScroller(target: Element, canvas: HTMLElement): boolean {
  * only `#main-content` changes. Each route keeps the chrome it had in its layout.
  */
 export function AppChrome({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <AppChromeFrame>{children}</AppChromeFrame>
+      {/* Scam Shield: warnings on every signed-in screen. */}
+      <InterventionHost />
+    </>
+  );
+}
+
+function AppChromeFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
 

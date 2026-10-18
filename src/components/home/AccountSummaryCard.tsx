@@ -26,6 +26,7 @@ export function AccountSummaryCard({
 
   return (
     <section
+      data-shield-anchor="home-balance"
       className="home-account rounded-[24px] border border-white bg-[#ffecef] p-4"
       aria-label="Tài khoản chính"
       data-freshness={freshness ?? undefined}
