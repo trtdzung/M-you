@@ -209,3 +209,12 @@ CREATE TABLE IF NOT EXISTS agent_preferences (
   notes TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL
 );
+
+-- Scam Shield engine (notes: TASKS-engine E01). One row per persona (`cif`): the
+-- customer's protection settings as JSON (`SecurityState`, src/state/security/types.ts).
+-- Server-side so the rule engine and the fraud agent read the same copy the app shows.
+CREATE TABLE IF NOT EXISTS security_profiles (
+  cif TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);

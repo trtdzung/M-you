@@ -3,7 +3,7 @@
 // Scam Shield store (zustand, client only). Actions carry the business rules:
 // raising security applies at once, lowering it waits 24h (`pendingOff`,
 // contact "removing"). The store never reads React context; components pass in
-// what it needs. Persisted per persona through `storage.ts`.
+// what it needs. Persisted per persona through `storage.ts` (server API).
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
