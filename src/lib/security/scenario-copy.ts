@@ -210,3 +210,8 @@ export const SCENARIO_COPY: Record<ScenarioId, ScenarioCopy> = {
     emphasis: [], chips: ["Làm bước tiếp theo"], classify: false, surface: "tooltip", countdownSec: null,
   },
 };
+
+/** Quick diagnostic answers required by A05. */
+export const DIAGNOSE_ANSWERS = ["Có", "Không", "Không chắc"] as const;
+
+export const DIAGNOSE_PROPOSALS = { callback: SCENARIO_COPY.DH4.chips[0], emergency_lock: "Tôi nghĩ mình bị lừa", case: SCENARIO_COPY.DH7.chips[0] } as const;

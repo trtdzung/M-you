@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { Emphasized, SourceLine } from "@/components/security/InterventionCopy";
-import { CLASSIFY_QUESTIONS } from "@/lib/security/scenario-copy";
+import { Diagnosis } from "@/components/security/Diagnosis";
 import type { Intervention } from "@/lib/security/intervention-types";
 
 const FALLBACK_WAIT_SECONDS = 30;
@@ -20,7 +20,8 @@ const outline = "w-full rounded-full border border-border bg-white py-3 text-sm 
  * the scenario's wait, lets the transfer through. `classifyOnly` asks the
  * diagnostic questions without a way to continue (DH3 "Có người yêu cầu").
  */
-export function TransferAlertSheet({ open, intervention, classifyOnly = false, onClose, onChoose }: {
+export function TransferAlertSheet({ cif, open, intervention, classifyOnly = false, onClose, onChoose }: {
+  cif: string;
   open: boolean;
   intervention: Intervention | null;
   classifyOnly?: boolean;
@@ -29,7 +30,9 @@ export function TransferAlertSheet({ open, intervention, classifyOnly = false, o
 }) {
   const wait = intervention?.countdownSec ?? FALLBACK_WAIT_SECONDS;
   const [seconds, setSeconds] = useState(wait);
+  const [proposed, setProposed] = useState<string[]>([]);
 
+  useEffect(() => { setProposed([]); }, [intervention?.id]);
   useEffect(() => {
     if (!open) return;
     setSeconds(wait);
@@ -39,7 +42,6 @@ export function TransferAlertSheet({ open, intervention, classifyOnly = false, o
 
   if (!intervention) return null;
   const { copy } = intervention;
-  const question = classifyOnly ? CLASSIFY_QUESTIONS[0] : copy.question ?? CLASSIFY_QUESTIONS[0];
   const chips = classifyOnly ? ["Để MSB gọi lại"] : copy.chips;
 
   return (
@@ -47,13 +49,12 @@ export function TransferAlertSheet({ open, intervention, classifyOnly = false, o
       <div data-testid="shield-red" className="flex flex-col gap-3">
         <SourceLine intervention={intervention} />
         {!classifyOnly && <p className="text-sm font-semibold leading-relaxed text-negative"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
-        <p className="rounded-[16px] bg-negative-soft p-4 text-base font-semibold leading-relaxed">{question}</p>
-        {classifyOnly && <p className="text-sm leading-relaxed">{CLASSIFY_QUESTIONS[1]}</p>}
+        {open && <Diagnosis cif={cif} id={intervention.id} onChoose={onChoose} onProposals={setProposed} />}
       </div>
       <div className="mt-5 flex flex-col gap-2">
         <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => onChoose(STOP)}>{STOP}</button>
-        {chips.map(chip => <button key={chip} type="button" className={outline} onClick={() => onChoose(chip)}>{chip}</button>)}
-        <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={() => onChoose(SCAMMED)}>{SCAMMED}</button>
+        {chips.filter(chip => !proposed.includes(chip)).map(chip => <button key={chip} type="button" className={outline} onClick={() => onChoose(chip)}>{chip}</button>)}
+        {!proposed.includes(SCAMMED) && <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={() => onChoose(SCAMMED)}>{SCAMMED}</button>}
         {intervention.scenario === "DH6" && <button type="button" className={outline} onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>}
         {!classifyOnly && (
           <button type="button" className={`${outline} disabled:opacity-50`} disabled={seconds > 0} onClick={() => onChoose(PROCEED)}>

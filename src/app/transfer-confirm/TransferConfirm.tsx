@@ -430,9 +430,15 @@ export function TransferConfirm() {
           <HoldScreen
             cif={persona.cif}
             hold={hold}
+            notice={shieldNotice}
             onSend={() => { setHold(null); void runConfirm(); }}
             onCancelled={() => { setHold(null); setShieldNotice("Đã hủy giao dịch. Tiền chưa được chuyển."); }}
-            onScam={() => router.push("/settings/sos")}
+            onScam={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); }); }}
+            onChoose={choice => {
+              if (choice === "Tôi nghĩ mình bị lừa") void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); });
+              else if (choice === "Yêu cầu MSB tra soát") router.push("/settings/case");
+              else setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
+            }}
           />
         </div>
       </div>
@@ -501,8 +507,8 @@ export function TransferConfirm() {
       >
         {submitting ? "Đang xử lý…" : checking ? "M-You đang kiểm tra giao dịch…" : "Xác nhận"}
       </button>
-      <TransferAlertSheet open={redFor !== null} intervention={redFor} onClose={() => redFor && void chooseShield(redFor, "Đóng")} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
-      <TransferAlertSheet open={classifyFor !== null} intervention={classifyFor} classifyOnly onClose={() => setClassifyFor(null)} onChoose={chooseClassify} />
+      <TransferAlertSheet cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => redFor && void chooseShield(redFor, "Đóng")} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
+      <TransferAlertSheet cif={persona.cif} open={classifyFor !== null} intervention={classifyFor} classifyOnly onClose={() => setClassifyFor(null)} onChoose={chooseClassify} />
       </div>
     </div>
   );

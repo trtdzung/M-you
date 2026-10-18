@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Hourglass } from "lucide-react";
 import { formatVnd } from "@/lib/format";
-import { CLASSIFY_QUESTIONS } from "@/lib/security/scenario-copy";
+import { Diagnosis } from "./Diagnosis";
 import type { Hold } from "@/lib/security/holds";
 
 const POLL_MS = 3_000;
@@ -38,15 +38,19 @@ const mmss = (ms: number) => {
  * the customer's threshold. The rule releases it; the customer can cancel any
  * time. While waiting M-You asks one diagnostic question (UC 12).
  */
-export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam }: {
+export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, onChoose, notice }: {
   cif: string;
   hold: Hold;
   onSend: () => void;
   onCancelled: () => void;
   onScam: () => void;
+  onChoose: (choice: string) => void;
+  notice?: string | null;
 }) {
+  const [proposed, setProposed] = useState<string[]>([]);
   const [hold, setHold] = useState(initial);
   const [left, setLeft] = useState(initial.remainingMs);
+  useEffect(() => { setProposed([]); }, [initial.id]);
 
   // Server time is the truth (test tools may end the wait); count down locally between polls.
   useEffect(() => {
@@ -88,12 +92,11 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam }: 
         </p>
       </div>
       <div className="rounded-[20px] border border-border bg-white p-4">
-        <p className="text-xs font-semibold text-muted">Cảnh báo tự động</p>
-        <p className="mt-2 text-sm font-semibold leading-relaxed">{CLASSIFY_QUESTIONS[0]}</p>
-        <p className="mt-1 text-sm leading-relaxed">{CLASSIFY_QUESTIONS[1]}</p>
+        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} />
       </div>
+      {notice && <p role="status" className="text-sm leading-relaxed">{notice}</p>}
       <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => void cancel()}>Hủy giao dịch</button>
-      <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={onScam}>Tôi nghĩ mình bị lừa</button>
+      {!proposed.includes("Tôi nghĩ mình bị lừa") && <button type="button" className="w-full rounded-full border-2 border-negative bg-white py-3 text-sm font-semibold text-negative" onClick={onScam}>Tôi nghĩ mình bị lừa</button>}
       <button type="button" disabled={!released} className="login-submit disabled:opacity-50" onClick={() => void send()}>
         {released ? "Chuyển ngay" : `Chuyển sau ${mmss(left)}`}
       </button>

@@ -10,12 +10,21 @@ import { readProfile } from "./profile-store";
 import { readCase } from "./case-store";
 import { accountKey, accountLastFour } from "./signals";
 import { LOOKUP_LABELS, lookupAccount } from "./warned-store";
+import { readDiagnosis } from "./diagnosis";
+import { CLASSIFY_QUESTIONS } from "./scenario-copy";
 import { redactSecurityText } from "./redact";
 
 const DAY = 86400000;
 export function agentIntervention(id: string) {
   const row = getDb().prepare("SELECT cif,copy_rule FROM interventions WHERE id=?").get(id) as { cif: string; copy_rule: string } | undefined;
-  if (!row) return null;
+  if (!row) {
+    const hold = getDb().prepare("SELECT cif,review,amount,created_at FROM transfer_holds WHERE id=? AND status='holding'").get(id) as { cif: string; review: string; amount: number; created_at: number } | undefined;
+    if (!hold) return null;
+    const review = JSON.parse(hold.review);
+    return { cif: hold.cif, id, level: "green", scenario: null, signals: [{ code: "T1", evidence: "Người nhận mới, vượt ngưỡng giữ lệnh đã đặt" }], amount: hold.amount,
+      recipient_last4: accountLastFour(review.recipientAccount), bank: review.recipientBank ?? null, memo: redactSecurityText(review.memo ?? ""), at: hold.created_at,
+      rule_copy: { message: "", question: CLASSIFY_QUESTIONS[0], chips: [] }, diagnosis: readDiagnosis(hold.cif, id) };
+  }
   const rule = JSON.parse(row.copy_rule);
   const item = getIntervention(row.cif, id)!;
   const context = getInterventionContext(row.cif, id);
@@ -23,7 +32,7 @@ export function agentIntervention(id: string) {
   return { cif: row.cif, id, level: item.level, scenario: item.scenario, signals: item.evidence.map(s => ({ ...s, evidence: redactSecurityText(s.evidence) })),
     amount: facts.amount ?? null, recipient_last4: facts.recipientLast4 ?? null, bank: facts.recipientBank ?? null,
     memo: typeof facts.memo === "string" ? redactSecurityText(facts.memo) : null,
-    at: item.createdAt, countdown_sec: item.countdownSec, warned: facts.warned ?? null, rule_copy: { message: rule.message, question: rule.question, chips: rule.chips, emphasis: rule.emphasis } };
+    diagnosis: readDiagnosis(row.cif, id), at: item.createdAt, countdown_sec: item.countdownSec, warned: facts.warned ?? null, rule_copy: { message: rule.message, question: rule.question, chips: rule.chips, emphasis: rule.emphasis } };
 }
 export function agentRecipient(cif: string, account: string, bank: string) {
   const last4 = accountLastFour(account);
