@@ -1,24 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FlaskConical } from "lucide-react";
+import { useTestToolsStore } from "@/state/security/test-tools";
 
 const TEST_TOOLS_HREF = "/settings/test-tools";
 
-/**
- * Off unless the build sets `NEXT_PUBLIC_SHOW_TEST_TOOLS=true` (or `1`).
- * Inlined at build time: restart `npm run dev` after changing it.
- */
-export function isTestToolsFabEnabled(): boolean {
-  const raw = process.env.NEXT_PUBLIC_SHOW_TEST_TOOLS;
-  return raw === "true" || raw === "1";
-}
-
-/** Small floating shortcut to the tester panel, on every screen except the panel itself. */
+/** Small floating shortcut to the tester panel. Shown only when switched on in Công cụ test. */
 export function TestToolsFab() {
-  // Checked before any hook runs, so a disabled build adds nothing (not even a router read).
-  return isTestToolsFabEnabled() ? <TestToolsFabLink /> : null;
+  const showFab = useTestToolsStore(state => state.showFab);
+  // The flag lives in sessionStorage, so wait for the client to avoid a hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted && showFab ? <TestToolsFabLink /> : null;
 }
 
 function TestToolsFabLink() {
