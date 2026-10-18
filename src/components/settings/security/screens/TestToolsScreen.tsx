@@ -3,8 +3,10 @@
 import { useSecurityStore } from "@/state/security/store";
 import { Notice } from "../../settings-ui";
 import { SecurityLoading } from "../SecurityLoading";
+import { AlertHourPanel } from "../test-tools/AlertHourPanel";
 import { PresetPanel } from "../test-tools/PresetPanel";
 import { ResetPanel } from "../test-tools/ResetPanel";
+import { ScenarioPanel } from "../test-tools/ScenarioPanel";
 import { SkipWaitPanel } from "../test-tools/SkipWaitPanel";
 import { StateSummary } from "../test-tools/StateSummary";
 
@@ -17,6 +19,8 @@ export function TestToolsScreen() {
     <Notice>Công cụ dành cho người test. Chỉ đổi dữ liệu giả lập trên trình duyệt này, không ảnh hưởng tài khoản thật.</Notice>
     <StateSummary />
     <PresetPanel />
+    <AlertHourPanel />
+    <ScenarioPanel />
     <ResetPanel />
     <SkipWaitPanel />
   </>;
