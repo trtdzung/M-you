@@ -7,6 +7,7 @@ import "server-only";
  * the customer's choice is logged and becomes the next event.
  */
 
+import { redactSecurityText } from "./redact";
 import { recoveryState } from "./recovery";
 import { readProfile } from "./profile-store";
 import { engineNow, readEngineClock } from "./clock";
@@ -71,7 +72,7 @@ function evaluateTransfer(cif: string, review: TransferReview, target: "transfer
   const dedupeKey = `${target}|${result.primary}|${review.amount}|${key ?? review.recipientAccount}|${(review.memo ?? "").trim()}`;
   const context: StoredContext = {
     scenarios: result.scenarios, classify: result.classify, evidence: evidenceOf(signals), key,
-    facts: { holdEligible: result.holdEligible, amount: review.amount, recipientName: review.recipientName, recipientLast4: last4 ?? "", recipientBank: review.recipientBank ?? "" },
+    facts: { warned: ctx.warned, memo: redactSecurityText(review.memo ?? ""), holdEligible: result.holdEligible, amount: review.amount, recipientName: review.recipientName, recipientLast4: last4 ?? "", recipientBank: review.recipientBank ?? "" },
   };
   const before = findOpenByDedupe(cif, dedupeKey);
   const intervention = store({
