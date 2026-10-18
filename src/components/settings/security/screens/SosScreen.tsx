@@ -61,6 +61,7 @@ export function SosScreen() {
         {security.unlockAt !== undefined && <div className="w-full"><PendingOffNotice action="Mở khóa tài khoản" at={security.unlockAt} onCancel={() => cancelOff("accountLock")} onApply={() => applyOff("accountLock")} /></div>}
       </div> : <button type="button" className={redButton} onClick={() => setLocking(true)}>{SCENARIO_COPY.SC1.chips[0]}</button>}
     </Step>
+    <Link href="/settings/case" className="text-sm font-semibold text-primary">{SCENARIO_COPY.SC2.situation}</Link>
     <Step n={2} title="Đánh dấu giao dịch đáng ngờ">
       <p className="text-muted">Chọn các giao dịch bạn không thực hiện hoặc bị dẫn dắt để thực hiện.</p>
       <Link href="/transactions" className="mt-3 inline-block rounded-full border border-primary px-4 py-2 font-semibold text-primary">{SCENARIO_COPY.SC1.chips[1]}</Link>

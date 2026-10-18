@@ -302,3 +302,16 @@ CREATE TABLE IF NOT EXISTS transfer_holds (
   release_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_transfer_holds_cif ON transfer_holds (cif, status);
+
+-- Scam Shield incident dossiers (E17). Attachments stay local and never reach an LLM.
+CREATE TABLE IF NOT EXISTS fraud_cases (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  status TEXT NOT NULL,
+  opened_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  answers TEXT NOT NULL,
+  dossier TEXT,
+  attachments TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_fraud_cases_cif ON fraud_cases (cif, opened_at);

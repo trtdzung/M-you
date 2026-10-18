@@ -15,6 +15,7 @@ const SECURITY_CHILDREN = new Set([
   "transfer-lock",
   "scan",
   "lookup",
+  "case",
   "sos",
   "test-tools",
 ]);

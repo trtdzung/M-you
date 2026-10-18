@@ -138,7 +138,7 @@ export function InterventionHost() {
     if (!fullscreen || routedFullscreen.current === fullscreen.id) return;
     routedFullscreen.current = fullscreen.id;
     shown(fullscreen.id);
-    if (pathname !== "/settings/sos") router.push("/settings/sos");
+    if (pathname !== "/settings/sos" && pathname !== "/settings/case") router.push("/settings/sos");
   }, [fullscreen, pathname, router, shown]);
 
   const popup = visible.find(item => item.surface === "popup");

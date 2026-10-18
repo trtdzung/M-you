@@ -11,6 +11,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { QuickActions, type QuickAction } from "@/components/common/QuickActions";
+import { CaseBanner } from "@/components/security/CaseBanner";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 
 /** Hành động demo chưa có màn riêng — no-op, giữ vỏ để khớp ref (source: mock). */
@@ -45,5 +46,5 @@ export function HomeQuickGrid() {
   useEffect(() => {
     ref.current?.querySelector('a[href="/transfer"]')?.setAttribute("data-shield-anchor", "home-transfer");
   });
-  return <div ref={ref}><QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" /></div>;
+  return <div ref={ref}><CaseBanner /><QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" /></div>;
 }

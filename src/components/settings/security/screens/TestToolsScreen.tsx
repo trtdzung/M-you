@@ -3,6 +3,7 @@
 import { useSecurityStore } from "@/state/security/store";
 import { Notice } from "../../settings-ui";
 import { SecurityLoading } from "../SecurityLoading";
+import { CaseUpdatePanel } from "../test-tools/CaseUpdatePanel";
 import { AlertHourPanel } from "../test-tools/AlertHourPanel";
 import { AlertLogPanel } from "../test-tools/AlertLogPanel";
 import { FabTogglePanel } from "../test-tools/FabTogglePanel";
@@ -23,6 +24,7 @@ export function TestToolsScreen() {
     <StateSummary />
     <PresetPanel />
     <AlertHourPanel />
+    <CaseUpdatePanel />
     <ScenarioPanel />
     <ResetPanel />
     <SkipWaitPanel />
