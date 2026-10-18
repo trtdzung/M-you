@@ -37,7 +37,7 @@ export function TransferLockScreen() {
       <Action onClick={() => demo.update({ transferLockUntil: transferNow().getTime() + days * DAY_MS })}>Khóa chuyển tiền</Action>
     </>}
     <Panel title="Giữ giao dịch khi có bất thường">
-      <p className="py-4 text-sm leading-relaxed">Khi bạn chuyển cho người nhận mới với số tiền lớn bất thường, M-You giữ giao dịch vài phút và hỏi bạn một câu. Bạn có thể hủy trong lúc chờ.</p>
+      <p className="py-4 text-sm leading-relaxed">Khi bạn chuyển cho người nhận mới với số tiền lớn bất thường, hệ thống MSB giữ giao dịch vài phút và M-You, trợ lý AI của MSB, hỏi bạn một câu. Bạn có thể hủy trong lúc chờ.</p>
       <Row label="Bật cùng M-You bảo vệ bạn" icon={ShieldCheck} href="/settings/protect" />
     </Panel>
     <ConfirmFaceSheet open={confirming} title="Mở khóa sớm?" message="Mở khóa sớm cần xác thực khuôn mặt." onConfirm={() => { demo.update({ transferLockUntil: null }); setConfirming(false); }} onClose={() => setConfirming(false)} />

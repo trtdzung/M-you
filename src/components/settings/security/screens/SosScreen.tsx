@@ -32,6 +32,7 @@ export function SosScreen() {
       <p className="text-xs font-bold tracking-wide text-negative">CHẾ ĐỘ KHẨN CẤP</p>
       <h2 className="mt-1 text-2xl font-bold">Bình tĩnh, M-You ở đây</h2>
       <p className="mt-2 text-sm leading-relaxed text-muted">Đây không phải lỗi của bạn. Làm ngay 3 bước dưới đây, càng sớm càng có cơ hội giữ lại tiền.</p>
+      <p className="mt-1 text-xs text-muted">M-You là trợ lý AI của MSB · Bản giả lập</p>
     </div>
     <Step n={1} title="Khóa tạm tài khoản và thẻ">
       {demo.accountLocked ? <div className="flex flex-wrap items-center justify-between gap-2">

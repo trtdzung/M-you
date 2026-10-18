@@ -20,6 +20,6 @@ export function AlertLogScreen() {
         <span className="mt-1 block">Bạn chọn: {entry.choice}</span>
       </span>
     </div>)}</Panel>
-    <Notice>Nhật ký giúp bạn xem lại hoặc khiếu nại. Đây là dữ liệu demo.</Notice>
+    <Notice>Các cảnh báo do M-You, trợ lý AI của MSB, ghi lại. Nhật ký giúp bạn xem lại hoặc khiếu nại. Đây là dữ liệu demo.</Notice>
   </>;
 }

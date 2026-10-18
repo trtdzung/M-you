@@ -10,7 +10,7 @@ export function TrustedContactsScreen() {
   const contacts = demo.trustedContacts;
 
   return <>
-    <Notice>Chuyển tiền cho người trong danh bạ tin cậy sẽ không bị M-You giữ lại hay cảnh báo. Nếu có tài khoản giả danh họ (trùng tên, khác số tài khoản), M-You sẽ nhận ra.</Notice>
+    <Notice>Chuyển tiền cho người trong danh bạ tin cậy sẽ không bị giữ lại hay bị M-You (trợ lý AI của MSB) cảnh báo. Nếu có tài khoản giả danh họ (trùng tên, khác số tài khoản), M-You sẽ nhận ra.</Notice>
     {contacts.length === 0
       ? <Panel><div className="py-8 text-center"><BookUser size={40} className="mx-auto mb-3 text-muted" aria-hidden /><p className="font-semibold">Danh bạ tin cậy trống</p></div></Panel>
       : <Panel>{contacts.map(contact => <div key={contact.id} className="settings-row">
