@@ -241,6 +241,8 @@ CREATE TABLE IF NOT EXISTS security_engine_state (
   alert_hour INTEGER CHECK (alert_hour IS NULL OR (alert_hour BETWEEN 0 AND 23)),
   -- E14: when the customer opened the account (BT1 «Trong 7 ngày đầu»); null = unknown.
   account_opened_at INTEGER,
+  -- T01: test tools skip the UC10 hold wait (the hold releases immediately).
+  skip_hold INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
 

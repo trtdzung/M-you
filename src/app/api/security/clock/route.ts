@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { engineAlertTime, engineNow, readEngineClock, writeEngineClock, type EngineClock } from "@/lib/security/clock";
+import { skipOpenHolds } from "@/lib/security/holds";
 
 /**
  * Scam Shield engine clock for one persona (demo only): the test tools shift
@@ -13,14 +14,14 @@ function view(cif: string) {
   return { ...readEngineClock(cif), now: engineNow(cif).getTime(), alertTime: engineAlertTime(cif).getTime() };
 }
 
-/** GET /api/security/clock?cif= → `{ offsetMs, alertHour, now, alertTime }`. */
+/** GET /api/security/clock?cif= → `{ offsetMs, alertHour, accountOpenedAt, skipHold, now, alertTime }`. */
 export async function GET(req: NextRequest) {
   const cif = req.nextUrl.searchParams.get("cif");
   if (!validCif(cif)) return NextResponse.json({ error: "cif is required" }, { status: 422 });
   return NextResponse.json(view(cif));
 }
 
-/** PUT /api/security/clock — body `{ cif, offsetMs?, alertHour?, accountOpenedAt? }` (alertHour null = real hour; accountOpenedAt ms, BT1). */
+/** PUT /api/security/clock — body `{ cif, offsetMs?, alertHour?, accountOpenedAt?, skipHold? }` (alertHour null = real hour; accountOpenedAt ms, BT1; skipHold ends the UC10 wait). */
 export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!validCif(body?.cif)) return NextResponse.json({ error: "cif is required" }, { status: 422 });
@@ -43,6 +44,11 @@ export async function PUT(req: NextRequest) {
     }
     patch.alertHour = body.alertHour;
   }
+  if (body.skipHold !== undefined) {
+    if (typeof body.skipHold !== "boolean") return NextResponse.json({ error: "skipHold is invalid" }, { status: 422 });
+    patch.skipHold = body.skipHold;
+  }
   writeEngineClock(body.cif, patch);
+  if (patch.skipHold) skipOpenHolds(body.cif);
   return NextResponse.json(view(body.cif));
 }

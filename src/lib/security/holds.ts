@@ -9,7 +9,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
-import { engineNow } from "./clock";
+import { engineNow, readEngineClock } from "./clock";
 import { recordEvent } from "./events";
 import { readProfile } from "./profile-store";
 import { buildTransferContext, type TransferReview } from "./signal-context";
@@ -47,7 +47,9 @@ export function needsHold(cif: string, review: TransferReview): boolean {
 export function requestHold(cif: string, review: TransferReview): Hold | null {
   if (!needsHold(cif, review)) return null;
   const now = engineNow(cif).getTime();
-  const row: Row = { id: randomUUID(), cif, status: "holding", amount: review.amount, review: JSON.stringify(review), created_at: now, release_at: now + HOLD_MINUTES * 60 * 1000 };
+  // Test tools: "bỏ qua thời gian giữ" releases the hold at once.
+  const releaseAt = readEngineClock(cif).skipHold ? now : now + HOLD_MINUTES * 60 * 1000;
+  const row: Row = { id: randomUUID(), cif, status: "holding", amount: review.amount, review: JSON.stringify(review), created_at: now, release_at: releaseAt };
   getDb()
     .prepare("INSERT INTO transfer_holds (id, cif, status, amount, review, created_at, release_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .run(row.id, cif, row.status, row.amount, row.review, row.created_at, row.release_at);
@@ -57,6 +59,12 @@ export function requestHold(cif: string, review: TransferReview): Hold | null {
     recordEvent(cif, "family_push", { message: `MSB đang tạm giữ một giao dịch chuyển tiền của người thân bạn trong ${HOLD_MINUTES} phút để kiểm tra (giả lập).`, scenario: "HOLD", contactIds: contacts.map(c => c.id) }, now);
   }
   return view(row, now);
+}
+
+/** Test tools: every open hold of this persona may be sent now. */
+export function skipOpenHolds(cif: string): number {
+  const now = engineNow(cif).getTime();
+  return getDb().prepare("UPDATE transfer_holds SET release_at = ? WHERE cif = ? AND status = 'holding'").run(now, cif).changes;
 }
 
 export function getHold(cif: string, id: string): Hold | null {

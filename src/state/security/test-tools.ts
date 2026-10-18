@@ -8,6 +8,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { transferNow } from "@/lib/demo-clock";
+import { emitEngineChange } from "@/components/settings/security/test-tools/sim";
 import { getSecurityCif } from "./storage";
 
 type TestToolsStore = {
@@ -41,7 +42,8 @@ export const useTestToolsStore = create<TestToolsStore>()(
 
 async function saveAlertHour(cif: string, alertHour: number | null): Promise<void> {
   try {
-    await fetch("/api/security/clock", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, alertHour }) });
+    const res = await fetch("/api/security/clock", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, alertHour }) });
+    if (res.ok) emitEngineChange();
   } catch {
     // demo tool: the local copy still applies on this screen
   }

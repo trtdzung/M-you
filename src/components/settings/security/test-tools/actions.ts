@@ -6,8 +6,10 @@ import { SECURITY_DEFAULTS } from "@/state/security/defaults";
 import { useSecurityStore } from "@/state/security/store";
 import type { TestPreset } from "@/state/security/test-presets";
 import { useTestToolsStore } from "@/state/security/test-tools";
+import { getSecurityCif } from "@/state/security/storage";
 import type { SecurityState } from "@/state/security/types";
 import type { PendingOff } from "../pending";
+import { emitEngineChange } from "./sim";
 
 /**
  * Scam Shield data a preset sets (everything but the alert log), as a stable
@@ -29,12 +31,19 @@ export function applyPreset(preset: TestPreset): void {
   markApplied(preset.id);
 }
 
-/** Scam Shield back to defaults and the alert hour back to the real clock. */
-export function resetTestState(): void {
+/** Scam Shield back to defaults, and this persona's engine rows wiped on the server. */
+export async function resetTestState(): Promise<void> {
+  const cif = getSecurityCif();
+  if (cif) {
+    const res = await fetch("/api/security/reset", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif }),
+    });
+    if (!res.ok) throw new Error("Không đặt lại được dữ liệu engine.");
+  }
   useSecurityStore.getState().reset();
-  useTestToolsStore.getState().setAlertHour(null);
-  // Defaults are the "Mặc định" preset.
+  useTestToolsStore.setState({ alertHour: null });
   markApplied("default");
+  emitEngineChange();
 }
 
 /** Requests still waiting out the 24h delay: turn-offs plus contacts being removed. */
