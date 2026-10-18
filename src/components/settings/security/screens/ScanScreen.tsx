@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { HandbookSheet } from "@/components/security/HandbookSheet";
+import { AiSessionNote } from "@/components/security/InterventionCopy";
 import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
+import { usePersona } from "@/providers/context";
 import { useSecurityStore } from "@/state/security/store";
 import { Action } from "../../settings-ui";
 import { scanMessage, type ScanLevel, type ScanResult } from "../scan-message";
@@ -29,6 +31,7 @@ function agentUpgrade(value: unknown, rule: View): value is View {
 
 /** Settings › Kiểm tra tin nhắn lạ. The rule answer shows at once; the agent may replace it later. */
 export function ScanScreen() {
+  const { persona } = usePersona();
   const antiPhishingCode = useSecurityStore(state => state.antiPhishingCode);
   const aiProtect = useSecurityStore(state => state.aiProtect);
   const [text, setText] = useState("");
@@ -47,7 +50,7 @@ export function ScanScreen() {
     setText("");
     setReported(false);
     if (!aiProtect) return;
-    void fetch("/api/security/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: raw }) })
+    void fetch("/api/security/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: raw, cif: persona.cif }) })
       .then(async response => {
         if (!response.ok || id !== generation.current) return;
         const body: unknown = await response.json();
@@ -58,7 +61,7 @@ export function ScanScreen() {
   };
 
   return <>
-    <p className="text-xs text-muted">Bạn đang trò chuyện với trợ lý AI của MSB.</p>
+    <AiSessionNote />
     {checked && <div className="flex flex-col gap-3">
       <p className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-tr-md bg-primary-soft p-4 text-sm leading-relaxed">{checked.text}</p>
       <ScanResultBubble result={checked.result} />

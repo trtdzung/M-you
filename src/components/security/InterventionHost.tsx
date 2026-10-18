@@ -8,7 +8,7 @@ import { Sheet } from "@/components/primitives";
 import { canvasZoom } from "@/lib/motion";
 import type { Intervention, RespondAction } from "@/lib/security/intervention-types";
 import { HandbookSheet } from "./HandbookSheet";
-import { InterventionBody } from "./InterventionCopy";
+import { AiSessionNote, InterventionBody } from "./InterventionCopy";
 import type { HandbookContext } from "@/lib/security/handbook";
 import { useInterventions } from "./useInterventions";
 import { useRecovery } from "./useRecovery";
@@ -97,6 +97,7 @@ function Popup({ item, onChoose, onShown }: { item: Intervention; onChoose: (cho
   }, [onShown]);
   return (
     <Sheet open title={item.level === "red" ? "Khoan đã" : "M-You nhắc bạn"} onClose={() => onChoose("Đóng")}>
+      {item.source === "agent" && <AiSessionNote />}
       <InterventionBody
         intervention={item}
         onChoose={onChoose}

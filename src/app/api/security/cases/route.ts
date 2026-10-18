@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { engineNow } from "@/lib/security/clock";
 import { openCase, readCases, saveCase } from "@/lib/security/case-store";
-import { CASE_FIELDS, MAX_CASE_IMAGE_BYTES, type CaseAttachment } from "@/lib/security/case-types";
+import { CASE_FIELDS, MAX_CASE_IMAGE_BYTES, type CaseAttachment, type FraudCase } from "@/lib/security/case-types";
+import { fraudAgentEnabled } from "@/lib/security/fraud-switch";
 
 const validCif = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 64;
+
+/** Agent wording stays in the row, but a killed agent shows the fixed rule text. */
+function shown(item: FraudCase): FraudCase {
+  if (fraudAgentEnabled() || typeof item.dossier?.guidance !== "string") return item;
+  const dossier = { ...item.dossier };
+  delete dossier.guidance;
+  return { ...item, dossier: Object.keys(dossier).length ? dossier : null };
+}
 export async function GET(req: NextRequest) {
   const cif = req.nextUrl.searchParams.get("cif");
   if (!validCif(cif)) return NextResponse.json({ error: "cif is required" }, { status: 422 });
-  try { return NextResponse.json({ cases: readCases(cif), now: engineNow(cif).getTime() }); }
+  try { return NextResponse.json({ cases: readCases(cif).map(shown), now: engineNow(cif).getTime() }); }
   catch { return NextResponse.json({ error: "cases unavailable" }, { status: 500 }); }
 }
 function image(v: unknown): CaseAttachment | null {
@@ -35,7 +44,7 @@ export async function POST(req: NextRequest) {
   try {
     const item = body.action === "open" ? openCase(body.cif) : saveCase(body.cif, body.id, { answers: body.answers, attachment,
       submit: body.action === "submit", update: body.action === "update" });
-    return item ? NextResponse.json({ case: item }) : NextResponse.json({ error: "case not found" }, { status: 404 });
+    return item ? NextResponse.json({ case: shown(item) }) : NextResponse.json({ error: "case not found" }, { status: 404 });
   } catch (error) {
     if (error instanceof Error && ["incomplete case", "attachment limit"].includes(error.message)) return NextResponse.json({ error: error.message }, { status: 422 });
     return NextResponse.json({ error: "case unavailable" }, { status: 500 });

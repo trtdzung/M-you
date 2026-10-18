@@ -38,6 +38,9 @@ export type ScenarioCopy = {
   derived?: string;
 };
 
+/** UC13 opening line (Thông tư 53/2026). Scan, case review, and agent popups show it. */
+export const AI_SESSION_LINE = "Bạn đang trò chuyện với trợ lý AI của MSB.";
+
 /** UC 12 diagnostic questions ("Câu hỏi phân loại" until the agent asks its own). */
 export const CLASSIFY_QUESTIONS = [
   "Có ai đang gọi điện hướng dẫn anh/chị không?",

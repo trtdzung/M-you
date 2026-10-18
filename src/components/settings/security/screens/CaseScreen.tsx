@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Sheet } from "@/components/primitives";
+import { AiSessionNote, SourceLine } from "@/components/security/InterventionCopy";
 import { usePersona } from "@/providers/context";
 import { CASE_FIELDS, CASE_DOSSIER_TITLE, CASE_GUIDANCE, MAX_CASE_IMAGE_BYTES, type FraudCase } from "@/lib/security/case-types";
 import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
 import { useSecurityStore } from "@/state/security/store";
 import { Action, Notice, Panel } from "../../settings-ui";
-import { SourceLine } from "@/components/security/InterventionCopy";
 
 type Asked = { step: number; text: string };
 
@@ -103,6 +103,7 @@ export function CaseScreen() {
     finally { setBusy(false); }
   }
   return <>
+    <AiSessionNote />
     <SourceLine intervention={{ source }} />
     {error && <Notice>{error}</Notice>}
     {!item ? <Notice>{busy ? "Đang tải hồ sơ…" : "Hồ sơ chưa tải được."}</Notice> : <>

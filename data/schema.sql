@@ -315,3 +315,27 @@ CREATE TABLE IF NOT EXISTS fraud_cases (
   attachments TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_fraud_cases_cif ON fraud_cases (cif, opened_at);
+
+-- Scam Shield engine (A10). One row per fraud-agent call: which action ran,
+-- which tool names were used (never customer payloads), and whether the
+-- customer agreed. `customer_decision` stays null until they choose.
+CREATE TABLE IF NOT EXISTS ai_journal (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  agent TEXT NOT NULL,
+  action TEXT NOT NULL,
+  ref TEXT,
+  data_used TEXT NOT NULL,
+  output TEXT NOT NULL,
+  customer_decision TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ai_journal_cif_at ON ai_journal (cif, at);
+
+-- Kill switch for the Fraud agent (A10). No row means on. Env
+-- FRAUD_AGENT_ENABLED=0/false/off forces off and the test-tools toggle cannot override it.
+CREATE TABLE IF NOT EXISTS fraud_agent_switch (
+  agent TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+  updated_at INTEGER NOT NULL
+);

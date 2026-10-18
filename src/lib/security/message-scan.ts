@@ -2,6 +2,8 @@ import "server-only";
 
 import { forwardToAgent } from "@/lib/agent-proxy-auth";
 import { normalizeText, scanMessage, type ScanLevel, type ScanResult } from "@/components/settings/security/scan-message";
+import { clipOutput, recordAiJournal, toolNames } from "./ai-journal";
+import { fraudAgentEnabled } from "./fraud-switch";
 import { redactSecurityText } from "./redact";
 
 const RANK: Record<ScanLevel, number> = { clear: 0, suspicious: 1, danger: 2 };
@@ -49,10 +51,12 @@ function asAgent(value: unknown, floor: ScanLevel): MessageScan | null {
   return { level, reasons, manipulationSigns, source: "agent" };
 }
 
-/** Ask the model after the rule exists. Any failure keeps the rule wording. */
-export async function enrichMessageScan(text: string): Promise<MessageScan> {
+/** Ask the model after the rule exists. Any failure, or a disabled agent, keeps the rule wording. */
+export async function enrichMessageScan(text: string, cif?: string): Promise<MessageScan> {
   const rule = ruleScan(text);
+  if (!fraudAgentEnabled()) return rule;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const note = (trace: unknown, output: string) => { if (cif) recordAiJournal(cif, "scan", null, toolNames(trace), output); };
   try {
     const response = await Promise.race([
       forwardToAgent("/fraud/scan", {
@@ -61,9 +65,13 @@ export async function enrichMessageScan(text: string): Promise<MessageScan> {
       }),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), 7_000); }),
     ]);
-    if (!response.ok) return rule;
-    return asAgent(await response.json(), rule.level) ?? rule;
+    const body: unknown = response.ok ? await response.json().catch(() => null) : null;
+    const agent = asAgent(body, rule.level);
+    note(body && typeof body === "object" ? (body as { trace?: unknown }).trace : null, agent ? clipOutput(agent.reasons.join(" ")) : "thất bại");
+    if (!fraudAgentEnabled()) return rule;
+    return agent ?? rule;
   } catch {
+    note(null, "thất bại");
     return rule;
   } finally { if (timer) clearTimeout(timer); }
 }

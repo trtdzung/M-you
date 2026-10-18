@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { CLASSIFY_QUESTIONS, DIAGNOSE_ANSWERS, DIAGNOSE_PROPOSALS } from "@/lib/security/scenario-copy";
 import type { Diagnosis as State } from "@/lib/security/diagnosis";
+import { AiSessionNote } from "./InterventionCopy";
 
 const initial = (): State => ({ answers: [], pending: false, next_question: CLASSIFY_QUESTIONS[0], conclusion: null, proposals: [], source: "rule", trace: [] });
 
 /** Answers survive copy enrichment; only the customer can act on a proposal. */
-export function Diagnosis({ cif, id, onChoose, onProposals }: { cif: string; id: string; onChoose: (choice: string) => void; onProposals?: (choices: string[]) => void }) {
+export function Diagnosis({ cif, id, onChoose, onProposals, sessionLine = true }: { cif: string; id: string; onChoose: (choice: string) => void; onProposals?: (choices: string[]) => void; sessionLine?: boolean }) {
   const [state, setState] = useState<State>(initial);
   const [sending, setSending] = useState(false);
   useEffect(() => {
@@ -42,6 +43,7 @@ export function Diagnosis({ cif, id, onChoose, onProposals }: { cif: string; id:
 
   return (
     <div className="flex flex-col gap-3" data-testid="shield-diagnosis">
+      {sessionLine && state.source === "agent" && <AiSessionNote />}
       <p className="text-xs font-semibold text-muted">{state.source === "agent" ? "M-You, trợ lý AI của MSB" : "Cảnh báo tự động"}</p>
       {state.answers.map((value, index) => <p key={index} className="text-sm text-muted">{CLASSIFY_QUESTIONS[index]} {value}</p>)}
       {state.next_question && <p className="rounded-[16px] bg-negative-soft p-4 text-base font-semibold leading-relaxed">{state.next_question}</p>}

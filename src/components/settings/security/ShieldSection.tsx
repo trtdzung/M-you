@@ -4,6 +4,7 @@ import { useSecurityStore } from "@/state/security/store";
 import type { ShieldSection as Section } from "../settings-sections";
 import { CaseScreen } from "./screens/CaseScreen";
 import { AlertLogScreen } from "./screens/AlertLogScreen";
+import { AiJournalScreen } from "./screens/AiJournalScreen";
 import { AntiPhishingScreen } from "./screens/AntiPhishingScreen";
 import { EmergencyContactsScreen } from "./screens/EmergencyContactsScreen";
 import { ProtectScreen } from "./screens/ProtectScreen";
@@ -25,6 +26,7 @@ const SCREENS: Record<Section, () => React.JSX.Element> = {
   lookup: LookupScreen,
   case: CaseScreen,
   "alert-log": AlertLogScreen,
+  "ai-journal": AiJournalScreen,
   sos: SosScreen,
   "test-tools": TestToolsScreen,
 };

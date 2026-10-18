@@ -1,8 +1,10 @@
 import "server-only";
 
 import { forwardToAgent } from "@/lib/agent-proxy-auth";
+import { clipOutput, recordAiJournal, toolNames } from "./ai-journal";
 import { saveCase, readCase } from "./case-store";
 import { CASE_FIELDS, CASE_GUIDANCE } from "./case-types";
+import { fraudAgentEnabled } from "./fraud-switch";
 import { readProfile } from "./profile-store";
 
 export type CaseTurn = { source: "rule" | "agent"; field: number; nextQuestion: string | null; guidance: string | null };
@@ -39,7 +41,7 @@ export async function interviewCase(cif: string, id: string, answer: string | nu
   const item = readCase(cif, id);
   if (!item) return null;
   const rule = ruleTurn(item.answers);
-  if (!readProfile(cif).aiProtect) return rule;
+  if (!readProfile(cif).aiProtect || !fraudAgentEnabled()) return rule;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const payload: Record<string, unknown> = { case_id: id };
@@ -48,12 +50,19 @@ export async function interviewCase(cif: string, id: string, answer: string | nu
       forwardToAgent("/fraud/case", payload),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("timeout")), 7_000); }),
     ]);
-    if (!response.ok) return rule;
-    const turn = agentTurn(await response.json(), item.answers);
-    if (!turn || !readProfile(cif).aiProtect) return rule;
+    const body: unknown = response.ok ? await response.json().catch(() => null) : null;
+    const turn = agentTurn(body, item.answers);
+    const tools = toolNames(body && typeof body === "object" ? (body as { trace?: unknown }).trace : null);
+    if (!response.ok || !turn) {
+      recordAiJournal(cif, "case", id, tools, "thất bại");
+      return rule;
+    }
+    recordAiJournal(cif, "case", id, tools, clipOutput(turn.nextQuestion || "đã dựng hồ sơ"));
+    if (!readProfile(cif).aiProtect || !fraudAgentEnabled()) return rule;
     if (turn.guidance) saveCase(cif, id, { guidance: turn.guidance });
     return turn;
   } catch {
+    recordAiJournal(cif, "case", id, "", "thất bại");
     return rule;
   } finally { if (timer) clearTimeout(timer); }
 }

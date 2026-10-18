@@ -4,6 +4,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
+import { fraudAgentEnabled } from "./fraud-switch";
 import type { ScenarioId, ScenarioLevel, Surface } from "./scenario-copy";
 import type { ShownBefore } from "./scenarios";
 import type { AgentStatus, Intervention, InterventionCopy, InterventionStatus, InterventionTarget } from "./intervention-types";
@@ -59,9 +60,9 @@ function parse<T>(json: string | null, fallback: T): T {
   }
 }
 
-function toIntervention(row: Row): Intervention {
+function toIntervention(row: Row, agentOn = fraudAgentEnabled()): Intervention {
   const context = parse<StoredContext>(row.context, { scenarios: [row.scenario], classify: false, evidence: [], key: null });
-  const agent = row.agent_status === "ready" ? parse<InterventionCopy | null>(row.copy_agent, null) : null;
+  const agent = agentOn && row.agent_status === "ready" ? parse<InterventionCopy | null>(row.copy_agent, null) : null;
   return {
     id: row.id,
     scenario: row.scenario,
@@ -108,7 +109,8 @@ export function openInterventions(cif: string, target?: string): Intervention[] 
   const rows = (target
     ? getDb().prepare("SELECT * FROM interventions WHERE cif = ? AND target = ? AND status IN ('pending', 'shown') ORDER BY created_at DESC").all(cif, target)
     : getDb().prepare("SELECT * FROM interventions WHERE cif = ? AND status IN ('pending', 'shown') ORDER BY created_at DESC").all(cif)) as Row[];
-  return rows.map(toIntervention);
+  const agentOn = fraudAgentEnabled();
+  return rows.map(row => toIntervention(row, agentOn));
 }
 
 export function findOpenByDedupe(cif: string, dedupeKey: string): Intervention | null {

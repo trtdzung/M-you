@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { AI_SESSION_LINE } from "@/lib/security/scenario-copy";
 import type { Intervention } from "@/lib/security/intervention-types";
 
 /** Spec bold phrases (`emphasis`) rendered as <strong> inside the message. */
@@ -8,6 +9,11 @@ export function Emphasized({ text, emphasis }: { text: string; emphasis: string[
   if (!emphasis.length) return <>{text}</>;
   const pattern = new RegExp(`(${emphasis.map(e => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g");
   return <>{text.split(pattern).map((part, i) => emphasis.includes(part) ? <strong key={i}>{part}</strong> : part)}</>;
+}
+
+/** UC13: the customer is talking to an AI, shown on scan, case review, and agent popups. */
+export function AiSessionNote() {
+  return <p className="text-xs text-muted">{AI_SESSION_LINE}</p>;
 }
 
 /** Who wrote the words: the rule engine (spec wording) or the M-You agent. */

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives";
+import { AiSessionNote } from "@/components/security/InterventionCopy";
 import { ruleHandbook, type HandbookArticle, type HandbookContext } from "@/lib/security/handbook";
 import { usePersona } from "@/providers/context";
 import { useSecurityStore } from "@/state/security/store";
@@ -43,6 +44,7 @@ export function HandbookSheet({ context, onClose }: { context: HandbookContext; 
 
   return (
     <Sheet open title={rule.title} onClose={onClose}>
+      {source === "agent" && <AiSessionNote />}
       <p className="text-xs font-semibold text-muted">{source === "agent" ? "M-You, trợ lý AI của MSB" : "Cảnh báo tự động"}</p>
       <ol className="my-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed">
         {summary.map(line => <li key={line}>{line}</li>)}

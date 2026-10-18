@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { Emphasized, SourceLine } from "@/components/security/InterventionCopy";
+import { AiSessionNote, Emphasized, SourceLine } from "@/components/security/InterventionCopy";
 import { Diagnosis } from "@/components/security/Diagnosis";
 import type { Intervention } from "@/lib/security/intervention-types";
 
@@ -47,9 +47,10 @@ export function TransferAlertSheet({ cif, open, intervention, classifyOnly = fal
   return (
     <Sheet open={open} title="Khoan đã" onClose={onClose}>
       <div data-testid="shield-red" className="flex flex-col gap-3">
+        {intervention.source === "agent" && <AiSessionNote />}
         <SourceLine intervention={intervention} />
         {!classifyOnly && <p className="text-sm font-semibold leading-relaxed text-negative"><Emphasized text={copy.message} emphasis={copy.emphasis} /></p>}
-        {open && <Diagnosis cif={cif} id={intervention.id} onChoose={onChoose} onProposals={setProposed} />}
+        {open && <Diagnosis cif={cif} id={intervention.id} sessionLine={intervention.source !== "agent"} onChoose={onChoose} onProposals={setProposed} />}
       </div>
       <div className="mt-5 flex flex-col gap-2">
         <button type="button" className="w-full rounded-full bg-negative py-3 text-sm font-semibold text-white" onClick={() => onChoose(STOP)}>{STOP}</button>

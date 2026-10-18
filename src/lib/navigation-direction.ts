@@ -36,7 +36,7 @@ export function settingsParent(pathname: string): string | null {
   const section = settingsSection(pathname);
   if (!section) return null;
   if (section === "questions") return "/settings/advanced";
-  if (section === "alert-log") return "/settings/protect";
+  if (section === "alert-log" || section === "ai-journal") return "/settings/protect";
   if (SECURITY_CHILDREN.has(section)) return "/settings/security";
   return "/settings";
 }

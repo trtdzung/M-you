@@ -7,6 +7,7 @@ import "server-only";
  * the customer's choice is logged and becomes the next event.
  */
 
+import { decideAiJournal } from "./ai-journal";
 import { educateMoments } from "./educate-moments";
 import { enrich } from "./enrich";
 export { enrich } from "./enrich";
@@ -202,6 +203,7 @@ export function respond(cif: string, id: string, choice: string): RespondAction 
   const entering = intervention.scenario === "SC1" && action.kind === "emergency" && choice !== "Khóa ngay";
   const now = engineNow(cif).getTime();
   if (!(entering ? shown(cif, id) : markAnswered(cif, id, choice, now))) return null;
+  decideAiJournal(cif, id, choice);
   recordEvent(cif, "intervention_answered", { interventionId: id, scenario: intervention.scenario, choice });
   if (intervention.scenario === "SC1" && choice === SCENARIO_COPY.SC1.chips[0]) lockEmergency(cif);
   else if (action.kind === "emergency" && intervention.scenario !== "SC1") startEmergency(cif);

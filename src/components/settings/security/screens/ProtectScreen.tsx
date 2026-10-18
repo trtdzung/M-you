@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ScrollText } from "lucide-react";
+import { ScrollText, Bot } from "lucide-react";
 import { transferNow } from "@/lib/demo-clock";
 import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
@@ -60,7 +60,10 @@ export function ProtectScreen() {
       </Panel>
     </div>
     <p className="px-1 text-xs leading-relaxed text-muted">M-You là trợ lý AI và không tự quyết định chặn tiền của bạn. Việc tạm dừng giao dịch theo quy định do hệ thống MSB thực hiện. Mọi cảnh báo được ghi lại để bạn xem lại.</p>
-    <Panel><Row label="Nhật ký cảnh báo của M-You" icon={ScrollText} href="/settings/alert-log" /></Panel>
+    <Panel>
+      <Row label="Nhật ký cảnh báo của M-You" icon={ScrollText} href="/settings/alert-log" />
+      <Row label="Nhật ký AI" icon={Bot} href="/settings/ai-journal" />
+    </Panel>
     <ConfirmFaceSheet open={confirming} title="Tắt bảo vệ bằng AI?" message="Tắt bảo vệ cần chờ 24 giờ để kẻ gian không thể hướng dẫn bạn tắt đi trong lúc đang bị dẫn dắt." onConfirm={requestOff} onClose={() => setConfirming(false)} />
   </>;
 }
