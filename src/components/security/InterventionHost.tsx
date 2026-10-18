@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { CircleCheck, X } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { canvasZoom } from "@/lib/motion";
 import type { Intervention, RespondAction } from "@/lib/security/intervention-types";
 import { InterventionBody } from "./InterventionCopy";
 import { useInterventions } from "./useInterventions";
+import { useRecovery } from "./useRecovery";
+import { SCENARIO_COPY } from "@/lib/security/scenario-copy";
 import { SHIELD_TRUST_EVENT } from "./afterTransfer";
 
 // The confirm screen draws its own banner and popup (E10).
@@ -50,6 +52,8 @@ function useAnchorPlace(target: string, mayFloat: boolean): Place | null {
 }
 
 function Tooltip({ item, mayFloat, onChoose, onShown }: { item: Intervention; mayFloat: boolean; onChoose: (choice: string) => void; onShown: () => void }) {
+  const recovery = useRecovery();
+  const labels = SCENARIO_COPY.SC4.message.split(": ")[1].split(". ")[0].split(" → ");
   const place = useAnchorPlace(item.target, mayFloat);
   const canvas = typeof document === "undefined" ? null : document.getElementById("device-canvas");
   const reported = useRef(false);
@@ -68,11 +72,11 @@ function Tooltip({ item, mayFloat, onChoose, onShown }: { item: Intervention; ma
       className="absolute z-40 rounded-[20px] border border-border bg-white p-4 shadow-card"
       style={{ top: place.top, left: place.left, width: place.width }}
     >
-      <button type="button" aria-label="Đóng" className="absolute right-2 top-2 p-1 text-muted" onClick={() => onChoose("Đóng")}><X size={16} aria-hidden /></button>
+      {item.scenario !== "SC4" && <button type="button" aria-label="Đóng" className="absolute right-2 top-2 p-1 text-muted" onClick={() => onChoose("Đóng")}><X size={16} aria-hidden /></button>}
       <InterventionBody
         intervention={item}
         onChoose={onChoose}
-        extra={item.scenario === "BT4" && (
+        extra={item.scenario === "SC4" ? <ul className="text-xs leading-relaxed">{labels.map((label, index) => <li key={label} className="flex items-center gap-1">{recovery.steps[index] && <CircleCheck size={14} aria-hidden />}{label}</li>)}</ul> : item.scenario === "BT4" && (
           // SC1 trigger: «[Không phải tôi → khóa ngay] (BT4, DH6)».
           <button type="button" className="mt-1 text-left text-xs font-semibold text-negative underline underline-offset-4" onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>
         )}

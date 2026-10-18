@@ -9,6 +9,7 @@ export type SecurityEventPayloads = {
   fd_settled: { amount: number; savingsBefore: number; early: boolean };
   locked_jar_withdrawn: { amount: number; jarId: string; savingsBefore: number };
   device_login: { device: string };
+  devices_signed_out: Record<string, never>;
   password_changed: Record<string, never>;
   phone_changed: Record<string, never>;
   screen_share_on: { app?: string };
@@ -27,7 +28,7 @@ export type SecurityEventPayloads = {
 export type SecurityEventType = keyof SecurityEventPayloads;
 
 export const SECURITY_EVENT_TYPES = [
-  "incoming_credit", "transfer_out", "fd_settled", "locked_jar_withdrawn", "device_login", "password_changed",
+  "incoming_credit", "transfer_out", "fd_settled", "locked_jar_withdrawn", "device_login", "password_changed", "devices_signed_out",
   "phone_changed", "screen_share_on", "screen_share_off", "app_open", "hub_open", "transfer_screen_open",
   "recipient_entered", "intervention_shown", "intervention_answered", "account_locked", "case_opened", "family_push",
 ] as const satisfies readonly SecurityEventType[];

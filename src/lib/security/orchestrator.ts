@@ -7,6 +7,7 @@ import "server-only";
  * the customer's choice is logged and becomes the next event.
  */
 
+import { recoveryState } from "./recovery";
 import { readProfile } from "./profile-store";
 import { engineNow, readEngineClock } from "./clock";
 import type { SecurityEvent } from "./event-types";
@@ -98,6 +99,14 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
   const profile = readProfile(cif);
   if (!profile.aiProtect) return [];
   const ctx: MomentContext = { now, trigger, ...input.moment };
+  if (trigger === "hub_open") {
+    const recovery = recoveryState(cif);
+    if (recovery.incidentAt !== null) {
+      ctx.recoveryStepsLeft = recovery.steps.filter(done => !done).length;
+      if (ctx.recoveryStepsLeft) ctx.score = null;
+      else expireOpen(cif, "hub-gauge");
+    }
+  }
   // BT1: account age from the engine state when the app did not send it.
   if (ctx.accountAgeDays == null) {
     const opened = readEngineClock(cif).accountOpenedAt;
@@ -181,7 +190,9 @@ export function shown(cif: string, id: string): boolean {
 export function respond(cif: string, id: string, choice: string): RespondAction | null {
   const intervention = getIntervention(cif, id);
   if (!intervention) return null;
-  const action = actionFor(choice);
+  const action = intervention.scenario === "SC4" && choice === SCENARIO_COPY.SC4.chips[0]
+    ? { kind: "navigate" as const, href: ["/settings/password", "/settings/devices", "/settings/anti-phishing", "/settings/emergency-contacts"][Math.max(0, recoveryState(cif).steps.findIndex(done => !done))] }
+    : actionFor(choice);
   const entering = intervention.scenario === "SC1" && action.kind === "emergency" && choice !== "Khóa ngay";
   const now = engineNow(cif).getTime();
   if (!(entering ? shown(cif, id) : markAnswered(cif, id, choice, now))) return null;

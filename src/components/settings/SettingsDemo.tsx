@@ -15,6 +15,7 @@ import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 import { isShieldSection, type SettingsSection } from "./settings-sections";
 import { SHIELD_TITLES } from "./security/shield-copy";
 import { ShieldSection } from "./security/ShieldSection";
+import { RecoveryDeviceAction } from "./security/RecoveryDeviceAction";
 import { SecurityHub } from "./security/SecurityHub";
 import { settingsParent } from "@/lib/navigation-direction";
 const TITLES: Record<SettingsSection, string> = { ...SHIELD_TITLES, profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
@@ -70,7 +71,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "questions") {
     content = <QuestionForm onSuccess={() => { demo.update({ advanced: true }); finish("Đã thiết lập câu hỏi bảo mật trong giả lập. Câu trả lời không được lưu."); }} />;
   } else if (section === "devices") {
-    content = <>{["Apple iPhone 14 Plus", "Apple iPhone 14 Plus", "Apple iPhone 11"].map((device, i) => <Panel key={i}><div className="flex items-center gap-3 py-5"><Smartphone size={25} /><div className="flex-1"><strong>{device}</strong><p className="mt-2 text-sm text-muted">{i === 0 ? "Thiết bị hiện tại" : "Lần truy cập trước"} · Dữ liệu demo</p></div>{i === 0 ? <Badge good>Hoạt động</Badge> : <button className="text-sm text-primary" onClick={() => setSheet("device")}>Chi tiết</button>}</div></Panel>)}</>;
+    content = <><RecoveryDeviceAction />{["Apple iPhone 14 Plus", "Apple iPhone 14 Plus", "Apple iPhone 11"].map((device, i) => <Panel key={i}><div className="flex items-center gap-3 py-5"><Smartphone size={25} /><div className="flex-1"><strong>{device}</strong><p className="mt-2 text-sm text-muted">{i === 0 ? "Thiết bị hiện tại" : "Lần truy cập trước"} · Dữ liệu demo</p></div>{i === 0 ? <Badge good>Hoạt động</Badge> : <button className="text-sm text-primary" onClick={() => setSheet("device")}>Chi tiết</button>}</div></Panel>)}</>;
   } else if (section === "signature") {
     content = <Panel><Row label="Đăng ký chữ ký số" icon={FileCheck2} onClick={() => setSheet("signature-register")} /><Row label="Ký số tài liệu" icon={PenLine} onClick={() => setSheet("signature-sign")} /><Row label="Lịch sử ký số" icon={FileText} onClick={() => setSheet("signature-history")} /></Panel>;
   } else if (section === "profile") {

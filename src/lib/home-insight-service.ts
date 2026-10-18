@@ -1,7 +1,8 @@
 import "server-only";
 import { getDb } from "./db";
 import { AGENT_BASE_URL, agentAuthHeaders } from "./agent-proxy-auth";
-import { customerSnapshot } from "./financial-snapshot-service";
+import { recoveryState } from "./security/recovery";
+import { customerSnapshot, snapshotHash } from "./financial-snapshot-service";
 import { validAgentSelection, type HomeInsight, type HomeInsightResult } from "@/insights/proactive/home-contract";
 
 const inFlight = new Map<string, Promise<HomeInsight>>();
@@ -15,7 +16,11 @@ function storage() {
   return db;
 }
 export async function generateHomeInsight(cif: string, input: unknown): Promise<HomeInsightResult> {
-  const { snapshot, snapshotId } = customerSnapshot(cif, input);
+  const { snapshot, snapshotId: originalSnapshotId } = customerSnapshot(cif, input);
+  const cooldown = recoveryState(cif).cooldown;
+  if (cooldown) snapshot.candidates = snapshot.candidates.filter(candidate => candidate.topic !== "investment");
+  // Filtering changes the cache identity so a pre-incident product card cannot reappear.
+  const snapshotId = cooldown ? snapshotHash(cif, snapshot) : originalSnapshotId;
   if (!snapshot.candidates.length) return { insight: null, reason: "no_candidate", cached: false };
   const db = storage();
   const row = db.prepare("SELECT * FROM home_insight_cache WHERE cif = ? AND snapshot_id = ?").get(cif, snapshotId) as

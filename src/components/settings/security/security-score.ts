@@ -2,6 +2,7 @@
 
 export type SecurityScoreInput = {
   passwordUpdated: boolean;
+  devicesCleared?: boolean;
   faceId: boolean;
   advanced: boolean;
   aiProtect: boolean;
@@ -17,7 +18,7 @@ export function securityScore(input: SecurityScoreInput): SecurityScore {
   const hasEmergency = input.activeEmergencyContacts > 0;
   const hasTrusted = input.trustedContacts > 0;
   // PIN (10) and face verification (10) are always set up in the demo.
-  const auth = 10 + (input.passwordUpdated ? 15 : 0) + 10 + (input.faceId ? 5 : 0) + (input.advanced ? 10 : 0);
+  const auth = Math.min(50, (input.devicesCleared ? 5 : 0) + 10 + (input.passwordUpdated ? 15 : 0) + 10 + (input.faceId ? 5 : 0) + (input.advanced ? 10 : 0));
   const protection = (input.aiProtect ? 10 : 0) + (input.antiPhishing ? 15 : 0) + (hasEmergency ? 15 : 0) + (hasTrusted ? 10 : 0);
   const total = auth + protection;
   const level: SecurityLevel = total >= 85 ? "Rất cao" : total >= 60 ? "Cao" : "Tiêu chuẩn";

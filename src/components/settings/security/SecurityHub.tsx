@@ -11,6 +11,7 @@ import { Badge, Panel, Row, Toggle } from "../settings-ui";
 import { SecurityGauge } from "./SecurityGauge";
 import { SecurityLoading } from "./SecurityLoading";
 import { securityScore } from "./security-score";
+import { useRecovery } from "@/components/security/useRecovery";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 import { pokeInterventions } from "@/components/security/useInterventions";
 import { useRouter } from "next/navigation";
@@ -29,13 +30,14 @@ export function SecurityHub() {
   const router = useRouter();
   const { persona } = usePersona();
   const demo = useSettingsDemo();
+  const recovery = useRecovery();
   const security = useSecurityStore(useShallow(state => ({ hasHydrated: state.hasHydrated, aiProtect: state.aiProtect, antiPhishingCode: state.antiPhishingCode, emergencyContacts: state.emergencyContacts, trustedContacts: state.trustedContacts, transferLockUntil: state.transferLockUntil, pendingOff: state.pendingOff })));
   if (!security.hasHydrated) return <SecurityLoading />;
   // A contact being removed stays in effect until the 24h wait ends.
   const activeContacts = effectiveContacts(security).length;
   const pendingContacts = security.emergencyContacts.some(contact => contact.status === "pending");
   // Score mixes the old demo auth fields with the Scam Shield store.
-  const score = securityScore({ passwordUpdated: demo.passwordUpdated, faceId: demo.faceId, advanced: demo.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
+  const score = securityScore({ passwordUpdated: demo.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1], faceId: demo.faceId, advanced: demo.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
   const lockUntil = isTransferLocked(security, transferNow().getTime()) ? security.transferLockUntil : null;
   const offAt = security.pendingOff.aiProtect;
   const [first, second] = score.nextSteps;
