@@ -249,7 +249,7 @@ export function TransferCompose() {
       />
     );
   } else if (step === "bank-entry") {
-    content = <TransferBankEntry onContinue={selectRecipient} onChooseRecipient={backToPick} />;
+    content = <TransferBankEntry onContinue={selectRecipient} beneficiaries={beneficiaries} transactions={transactions} loading={loading} loadError={error} />;
   } else if (step === "save-recipient") {
     content = <TransferSaveRecipient onContinue={saveAndSelectRecipient} />;
   } else if (recipient) {

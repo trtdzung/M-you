@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { ChevronDown, IdCard } from "lucide-react";
-import { Card } from "@/components/primitives";
+import { Card, Sheet } from "@/components/primitives";
 import { maskAccount } from "@/lib/mask-account";
-import { ACCOUNT_NUMBER_PATTERN, findBank } from "@/lib/transfer-banks";
+import { ACCOUNT_NUMBER_PATTERN, findBank, findBankByName } from "@/lib/transfer-banks";
 import { TransferBankSheet } from "./TransferBankSheet";
 import { BankLogo } from "./BankLogo";
-import type { SelectedRecipient } from "./RecipientPicker";
+import { RecipientPicker, type SelectedRecipient } from "./RecipientPicker";
+import type { Beneficiary, Transaction } from "@/domain/models";
 
 /**
  * Bước 2 của Chuyển tiền — ngân hàng ngoài MSB. Danh sách chỉ gồm các ngân
@@ -16,29 +17,40 @@ import type { SelectedRecipient } from "./RecipientPicker";
  */
 export function TransferBankEntry({
   onContinue,
-  onChooseRecipient,
+  beneficiaries,
+  transactions,
+  loading = false,
+  loadError = false,
 }: {
   onContinue: (recipient: SelectedRecipient) => void;
-  onChooseRecipient: () => void;
+  beneficiaries: Beneficiary[];
+  transactions: Transaction[];
+  loading?: boolean;
+  loadError?: boolean;
 }) {
   const [bankId, setBankId] = useState<string | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
   const [recipientName, setRecipientName] = useState("");
+  const [recipientSheetOpen, setRecipientSheetOpen] = useState(false);
+  const [pickedRecipient, setPickedRecipient] = useState<SelectedRecipient | null>(null);
   const [bankSheetOpen, setBankSheetOpen] = useState(false);
 
   const bank = bankId ? findBank(bankId) : undefined;
   const digits = accountNumber.replace(/[\s.]/g, "");
   const accountValid = ACCOUNT_NUMBER_PATTERN.test(digits);
   const nameValid = recipientName.trim().length > 0;
-  const canContinue = Boolean(bank) && accountValid && nameValid;
+  const canContinue = Boolean(pickedRecipient || bank) && accountValid && nameValid;
 
   function selectBank(id: string) {
+    setPickedRecipient(null);
     setBankId(id);
     setBankSheetOpen(false);
   }
 
   function submit() {
-    if (!bank || !canContinue) return;
+    if (!canContinue) return;
+    if (pickedRecipient) { onContinue(pickedRecipient); return; }
+    if (!bank) return;
     onContinue({ name: recipientName.trim(), accountMasked: maskAccount(digits), accountNumber: digits, source: "user_typed", isNewPayee: true, bankName: bank.name });
   }
 
@@ -69,13 +81,13 @@ export function TransferBankEntry({
             <input
               id="xfer-account"
               value={accountNumber}
-              onChange={(event) => setAccountNumber(event.target.value)}
+              onChange={(event) => { setPickedRecipient(null); setAccountNumber(event.target.value); }}
               inputMode="numeric"
               placeholder="Nhập số tài khoản/số thẻ"
               aria-invalid={accountNumber.length > 0 && !accountValid}
               className="min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-muted"
             />
-            <button type="button" onClick={onChooseRecipient} aria-label="Chọn người nhận đã lưu hoặc gần đây" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text focus-visible:outline-2 focus-visible:outline-primary">
+            <button type="button" onClick={() => setRecipientSheetOpen(true)} aria-label="Chọn người nhận đã lưu hoặc gần đây" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text focus-visible:outline-2 focus-visible:outline-primary">
               <IdCard size={22} aria-hidden />
             </button>
           </div>
@@ -91,7 +103,7 @@ export function TransferBankEntry({
           <input
             id="xfer-recipient-name"
             value={recipientName}
-            onChange={(event) => setRecipientName(event.target.value)}
+            onChange={(event) => { setPickedRecipient(null); setRecipientName(event.target.value); }}
             placeholder="Nhập tên người nhận"
             className="flex h-14 w-full items-center rounded-[10px] border border-[#dfe5ee] bg-white px-3.5 text-[15px] text-text outline-none placeholder:text-muted"
           />
@@ -107,6 +119,19 @@ export function TransferBankEntry({
         Tiếp tục
       </button>
 
+      {recipientSheetOpen && (
+        <Sheet className="transfer-sheet" title="Người thụ hưởng" onClose={() => setRecipientSheetOpen(false)}>
+          <RecipientPicker beneficiaries={beneficiaries} transactions={transactions} loading={loading} loadError={loadError} onChange={(next) => {
+            if (!next) return;
+            const recipientBank = findBankByName(next.bankName);
+            setBankId(recipientBank?.id ?? null);
+            setAccountNumber(next.accountNumber);
+            setRecipientName(next.name);
+            setPickedRecipient(next);
+            setRecipientSheetOpen(false);
+          }} />
+        </Sheet>
+      )}
       {bankSheetOpen && (
         <TransferBankSheet onClose={() => setBankSheetOpen(false)} onSelect={selectBank} />
       )}

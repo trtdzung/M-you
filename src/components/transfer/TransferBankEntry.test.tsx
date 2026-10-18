@@ -4,7 +4,7 @@ import { TransferBankEntry } from "./TransferBankEntry";
 
 function renderEntry() {
   const onContinue = vi.fn();
-  render(<TransferBankEntry onContinue={onContinue} onChooseRecipient={vi.fn()} />);
+  render(<TransferBankEntry onContinue={onContinue} beneficiaries={[]} transactions={[]} />);
   return { onContinue };
 }
 

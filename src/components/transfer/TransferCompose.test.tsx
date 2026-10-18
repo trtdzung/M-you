@@ -75,12 +75,17 @@ beforeEach(() => {
 });
 
 describe("TransferCompose", () => {
-  it("opens the existing recipient picker from the account-number contact button", async () => {
+  it("opens a recipient sheet without leaving bank entry", async () => {
     render(<TransferCompose />);
     fireEvent.click(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" }));
     fireEvent.click(screen.getByRole("button", { name: "Chọn người nhận đã lưu hoặc gần đây" }));
     expect(screen.getByRole("tab", { name: "Đã lưu" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Gần đây" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent("Người thụ hưởng");
+    fireEvent.click(screen.getByRole("button", { name: /Lan Anh MSB/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Số tài khoản/Số thẻ")).toHaveValue("0281000556677");
+    expect(screen.getByLabelText("Tên người nhận")).toHaveValue("Lan Anh");
   });
 
   it("hands a validated saved recipient to mock confirmation without an account number", async () => {
