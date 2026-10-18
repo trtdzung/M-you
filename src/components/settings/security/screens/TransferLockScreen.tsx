@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, ShieldCheck } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
+import { Lock } from "lucide-react";
 import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
-import { Action, Panel, Row } from "../../settings-ui";
+import { Action, Panel, Toggle } from "../../settings-ui";
+import { formatVnd } from "@/lib/format";
+import { HOLD_MINUTES } from "@/lib/security/hold-rules";
 import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
 import { PendingOffNotice } from "../PendingOffNotice";
 import { DAY_MS, formatPendingAt, isPending } from "../pending";
@@ -45,10 +48,43 @@ export function TransferLockScreen() {
       </div></Panel>
       <Action onClick={() => lockTransfers(days, transferNow().getTime())}>Khóa chuyển tiền</Action>
     </>}
-    <Panel title="Giữ giao dịch khi có bất thường">
-      <p className="py-4 text-sm leading-relaxed">Khi bạn chuyển cho người nhận mới với số tiền lớn bất thường, hệ thống MSB giữ giao dịch vài phút và M-You, trợ lý AI của MSB, hỏi bạn một câu. Bạn có thể hủy trong lúc chờ.</p>
-      <Row label="Bật cùng M-You bảo vệ bạn" icon={ShieldCheck} href="/settings/protect" />
-    </Panel>
+    <HoldPanel />
     <ConfirmFaceSheet open={confirming} title="Mở khóa sớm?" message="Mở khóa sớm cần xác thực khuôn mặt và chờ 24 giờ để kẻ gian không thể hướng dẫn bạn mở khóa trong lúc đang bị dẫn dắt." onConfirm={() => { requestOff("transferLock", transferNow().getTime()); setConfirming(false); }} onClose={() => setConfirming(false)} />
+  </>;
+}
+
+const THRESHOLDS = [10_000_000, 20_000_000, 50_000_000] as const;
+
+/**
+ * UC 10 (b) "Giữ giao dịch khi có bất thường" (opt-in): a transfer to a new
+ * recipient at or above the customer's threshold waits a few minutes and can be
+ * cancelled; trusted contacts are never held. Turning it on or lowering the
+ * threshold applies now; turning it off waits 24h; raising the threshold is a
+ * decrease too, so it means turning off and on again.
+ */
+function HoldPanel() {
+  const hold = useSecurityStore(useShallow(state => ({ on: state.holdEnabled, threshold: state.holdThreshold, offAt: state.pendingOff.hold })));
+  const { setHold, lowerHoldThreshold, cancelOff, applyOff } = useSecurityStore.getState();
+  const [confirming, setConfirming] = useState(false);
+  const pending = isPending(hold.offAt, transferNow().getTime());
+  return <>
+    <Panel title="Giữ giao dịch khi có bất thường">
+      <div className="settings-row">
+        <span className="flex-1"><strong>Giữ giao dịch {HOLD_MINUTES} phút</strong><span className="mt-1 block text-sm text-muted">Chuyển cho người nhận mới từ ngưỡng bạn đặt trở lên. Bạn hủy được trong lúc chờ. Người trong danh bạ tin cậy không bị giữ.</span></span>
+        <Toggle label="Giữ giao dịch khi có bất thường" checked={hold.on} onChange={() => (hold.on ? setConfirming(true) : setHold(true))} disabled={pending} />
+      </div>
+      <div className="py-4">
+        <p className="mb-2 text-sm font-medium" id="hold-threshold">Ngưỡng giữ</p>
+        <div role="radiogroup" aria-labelledby="hold-threshold" className="grid grid-cols-3 gap-2">
+          {THRESHOLDS.map(value => {
+            const raises = hold.on && value > hold.threshold;
+            return <button key={value} type="button" role="radio" aria-checked={hold.threshold === value} disabled={raises} onClick={() => (hold.on ? lowerHoldThreshold(value) : useSecurityStore.setState({ holdThreshold: value }))} className={`rounded-full border py-2.5 text-sm font-semibold disabled:opacity-40 ${hold.threshold === value ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-white"}`}>{formatVnd(value)}</button>;
+          })}
+        </div>
+        {hold.on && <p className="mt-2 text-xs leading-relaxed text-muted">Hạ ngưỡng có hiệu lực ngay. Nâng ngưỡng là giảm bảo mật: tắt rồi bật lại (chờ 24 giờ).</p>}
+      </div>
+    </Panel>
+    {pending && hold.offAt !== undefined && <PendingOffNotice action="Tắt giữ giao dịch" at={hold.offAt} onCancel={() => cancelOff("hold")} onApply={() => applyOff("hold")} />}
+    <ConfirmFaceSheet open={confirming} title="Tắt giữ giao dịch?" message="Tắt cần xác thực khuôn mặt và chờ 24 giờ để kẻ gian không thể hướng dẫn bạn tắt đi trong lúc đang bị dẫn dắt." onConfirm={() => { setHold(false, transferNow().getTime()); setConfirming(false); }} onClose={() => setConfirming(false)} />
   </>;
 }

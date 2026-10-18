@@ -18,6 +18,10 @@ export type SecurityState = {
   emergencyContacts: EmergencyContact[];
   trustedContacts: TrustedContact[];
   transferLockUntil: number | null;
+  /** UC 10 (b): hold a transfer to a new recipient at or above `holdThreshold` (opt-in). */
+  holdEnabled: boolean;
+  /** VND; set by the customer ("ngưỡng KH đặt"). */
+  holdThreshold: number;
   accountLocked: boolean;
   accountLockedAt: number | null;
   /** When (ms) a requested "turn off" takes effect; lowering security waits 24h. */

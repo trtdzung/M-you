@@ -55,9 +55,13 @@ export function sanitizeSecurityState(v: unknown): SecurityState | { error: stri
     if (v[key] !== null && !isTime(v[key])) return { error: `${key} is invalid` };
   }
   if (typeof v.accountLocked !== "boolean") return { error: "accountLocked is invalid" };
+  // Added with the hold (E12): older saved states fall back to the defaults.
+  const holdEnabled = v.holdEnabled === undefined ? SECURITY_DEFAULTS.holdEnabled : v.holdEnabled;
+  const holdThreshold = v.holdThreshold === undefined ? SECURITY_DEFAULTS.holdThreshold : v.holdThreshold;
+  if (typeof holdEnabled !== "boolean" || typeof holdThreshold !== "number" || !(holdThreshold > 0)) return { error: "hold is invalid" };
   if (!isRecord(v.pendingOff)) return { error: "pendingOff is invalid" };
   const pendingOff: SecurityState["pendingOff"] = {};
-  for (const key of ["aiProtect", "antiPhishing", "transferLock", "accountLock"] as const) {
+  for (const key of ["aiProtect", "antiPhishing", "transferLock", "accountLock", "hold"] as const) {
     const at = v.pendingOff[key];
     if (at === undefined) continue;
     if (!isTime(at)) return { error: "pendingOff is invalid" };
@@ -71,6 +75,8 @@ export function sanitizeSecurityState(v: unknown): SecurityState | { error: stri
     emergencyContacts,
     trustedContacts,
     transferLockUntil: v.transferLockUntil as number | null,
+    holdEnabled,
+    holdThreshold,
     accountLocked: v.accountLocked,
     accountLockedAt: v.accountLockedAt as number | null,
     pendingOff,

@@ -28,6 +28,8 @@ export const SECURITY_DEFAULTS: SecurityState = {
   emergencyContacts: [],
   trustedContacts: TRUSTED_SAMPLE,
   transferLockUntil: null,
+  holdEnabled: false,
+  holdThreshold: 20_000_000,
   accountLocked: false,
   accountLockedAt: null,
   pendingOff: {},

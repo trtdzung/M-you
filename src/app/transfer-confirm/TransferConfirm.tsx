@@ -24,6 +24,8 @@ import type { Intervention } from "@/lib/security/intervention-types";
 import type { TransferReview } from "@/lib/security/signal-context";
 import { respondIntervention } from "@/components/security/useInterventions";
 import { useTransferShield } from "@/components/security/useTransferShield";
+import { HoldScreen, requestTransferHold } from "@/components/security/HoldScreen";
+import type { Hold } from "@/lib/security/holds";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
@@ -132,7 +134,7 @@ export function TransferConfirm() {
     setClassifyFor(null);
     if (action.kind === "proceed") {
       setHiddenBanner(intervention.id);
-      void runConfirm();
+      void proceed();
       return;
     }
     setHiddenBanner(intervention.id);
@@ -153,6 +155,14 @@ export function TransferConfirm() {
     setShieldNotice("Giao dịch chưa được thực hiện.");
   }
 
+  // UC 10 (b): a transfer the customer chose to send may still wait (rule, opt-in).
+  const [hold, setHold] = useState<Hold | null>(null);
+  async function proceed() {
+    const held = review ? await requestTransferHold(persona.cif, review) : null;
+    if (held) return setHold(held);
+    void runConfirm();
+  }
+
   async function confirmWithShield() {
     if (committedRef.current || submitting || done || checking) return;
     setShieldNotice(null);
@@ -162,7 +172,7 @@ export function TransferConfirm() {
     if (verdict?.level === "red") return setRedFor(verdict);
     // Yellow: «Bấm tiếp ngay» — confirming is the customer's answer.
     if (verdict?.level === "yellow") return void chooseShield(verdict, "Tiếp tục");
-    void runConfirm();
+    void proceed();
   }
 
   function saveRecipient() {
@@ -383,6 +393,23 @@ export function TransferConfirm() {
         <button type="button" onClick={() => router.replace("/transfer")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
           Tạo lại bản nháp
         </button>
+      </div>
+    );
+  }
+
+  if (hold) {
+    return (
+      <div className="flex min-h-full flex-col">
+        <TransferHeader title="Chuyển tiền" onBack={() => backWithTransition(() => router.back())} rightIcon={<Home size={22} />} rightLabel="Về trang chủ" onRightClick={() => pushWithTransition((href) => router.push(href), "/")} />
+        <div className="flex flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
+          <HoldScreen
+            cif={persona.cif}
+            hold={hold}
+            onSend={() => { setHold(null); void runConfirm(); }}
+            onCancelled={() => { setHold(null); setShieldNotice("Đã hủy giao dịch. Tiền chưa được chuyển."); }}
+            onScam={() => router.push("/settings/sos")}
+          />
+        </div>
       </div>
     );
   }

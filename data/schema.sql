@@ -286,3 +286,17 @@ CREATE TABLE IF NOT EXISTS interventions (
   choice TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_interventions_cif_status ON interventions (cif, status);
+
+-- Scam Shield engine (E12). UC 10 (b) "giữ giao dịch khi có bất thường": a
+-- transfer to a new recipient at or above the customer's threshold waits until
+-- `release_at` (engine clock); the customer can cancel meanwhile.
+CREATE TABLE IF NOT EXISTS transfer_holds (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('holding', 'cancelled', 'sent')),
+  amount REAL NOT NULL,
+  review TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  release_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_holds_cif ON transfer_holds (cif, status);
