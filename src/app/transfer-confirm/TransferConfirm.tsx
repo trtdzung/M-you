@@ -118,6 +118,7 @@ export function TransferConfirm() {
     : null), [isValidDraft, amount, name, draft, acct, memo]);
   const shieldState = useTransferShield(persona.cif, review);
   const [redFor, setRedFor] = useState<Intervention | null>(null);
+  const shownRed = useRef<string | null>(null);
   const [classifyFor, setClassifyFor] = useState<Intervention | null>(null);
   const [hiddenBanner, setHiddenBanner] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -127,7 +128,14 @@ export function TransferConfirm() {
   useEffect(() => {
     const current = shieldState.intervention;
     if (!current) return;
-    setRedFor(previous => previous?.id === current.id ? current : previous);
+    // Red opens with the confirm screen (Mở màn), not only after Xác nhận.
+    // The same id only refreshes the copy so the countdown is not restarted.
+    if (current.level === "red" && shownRed.current !== current.id) {
+      shownRed.current = current.id;
+      setRedFor(current);
+    } else {
+      setRedFor(previous => previous?.id === current.id ? current : previous);
+    }
     setClassifyFor(previous => previous?.id === current.id ? current : previous);
   }, [shieldState.intervention]);
 

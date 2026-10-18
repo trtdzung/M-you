@@ -100,7 +100,17 @@ export function buildTransferContext(cif: string, review: TransferReview): Signa
   const base = loadBase(cif);
   const now = base.now.getTime();
   const transfersOutAll = eventsSince(cif, 0, ["transfer_out"]) as SecurityEvent<"transfer_out">[];
-  const bankHistory = transferHistory(base.history, base.now);
+  const chainStart = now - ALERT_RULES.chainWindowMs;
+  // Ledger rows the test tools just wrote for this chain carry the full account number.
+  // Drop those (and any debit in the same 10-minute window) from "already paid", or T1
+  // turns off and T6 cannot fire. The 90-day largest outflow still sees them.
+  const agedForKnown = base.history.filter(txn => {
+    if (txn.direction !== "debit" || txn.type !== "transfer") return true;
+    const at = Date.parse(txn.postedAt);
+    return !Number.isFinite(at) || at < chainStart;
+  });
+  const bankHistory = transferHistory(agedForKnown, base.now);
+  const largestOutflow90d = transferHistory(base.history, base.now).largestOutflow90d;
   // Recipients paid through the app are in the event log (app records carry no account number).
   // Orders inside the current 10-minute chain do not make the recipient "known" (T1 + T6).
   const appRecipients: KnownRecipient[] = transfersOutAll
@@ -130,7 +140,7 @@ export function buildTransferContext(cif: string, review: TransferReview): Signa
     aiProtect: base.aiProtect,
     trusted: base.trusted,
     pastRecipients,
-    largestOutflow90d: bankHistory.largestOutflow90d,
+    largestOutflow90d,
     balance: source?.balance ?? null,
     warned: warned.level === "none" ? null : { level: warned.level, note: warned.note },
     savingsWithdrawals: [

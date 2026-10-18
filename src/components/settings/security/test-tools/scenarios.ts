@@ -1,56 +1,155 @@
-// Transfer scenarios for testers, named after the "AI Agent Fraud" spec (BT/DH).
-// "Expected" lines follow src/lib/transfer-alert.ts: Yellow = name spoof (T1b) or
-// new payee + unusual amount (T1 + T3); Red = any Yellow + night/keyword (T8).
-// T3 here means at least 50% of the source balance (or 3× the largest payment in
-// 90 days). Typed recipients always count as new payees. All values are demo data.
+// One-tap scenario cards for testers. "Mong đợi" is assembled from scenario-copy
+// (the spec columns), never reworded here. HOLD quotes the UC10 sentence kept
+// in holds.ts plus the diagnostic chips from scenario-copy.
+
+import { HOLD_MINUTES } from "@/lib/security/hold-rules";
+import { CLASSIFY_QUESTIONS, DIAGNOSE_ANSWERS, SCENARIO_COPY, type ScenarioId } from "@/lib/security/scenario-copy";
+import { CHAIN_RECIPIENT, STRANGER } from "./sim";
 
 export type ScenarioField = { label: string; value: string; copy?: string };
-export type TransferScenario = {
+export type ScenarioLevel = "green" | "yellow" | "red";
+export type ScenarioGroup = "BT" | "Vàng" | "Đỏ" | "SC" | "Giữ lệnh";
+
+export type ScenarioCardDef = {
   id: string;
   name: string;
-  level: "green" | "yellow" | "red";
+  group: ScenarioGroup;
+  copyId: ScenarioId | "HOLD";
+  level: ScenarioLevel;
+  /** Signal codes that mean this card was built correctly. */
+  signals: string[];
+  href: string;
   fields: ScenarioField[];
-  /** Simulated alert hour the scenario needs; null = any hour. */
-  hour: number | null;
-  expected: string;
 };
 
-const NEW_NAME: ScenarioField = { label: "Người nhận", value: "Tên bất kỳ, không trùng danh bạ tin cậy" };
-const NEW_ACCOUNT: ScenarioField = { label: "Số tài khoản", value: "Số bất kỳ chưa từng chuyển" };
-const BIG_AMOUNT: ScenarioField = { label: "Số tiền", value: "15.000.000 (từ 50% số dư trở lên)", copy: "15000000" };
-const FRIEND: ScenarioField = { label: "Người nhận", value: "NGUYEN THU HA", copy: "NGUYEN THU HA" };
-const BANK_MSB: ScenarioField = { label: "Ngân hàng", value: "MSB" };
+const copyField = (label: string, value: string): ScenarioField => ({ label, value, copy: value });
 
-// demo data
-export const TRANSFER_SCENARIOS: TransferScenario[] = [
+/** Spec UC10 (b), the sentence quoted on the hold rule. */
+const HOLD_SPEC = "giữ giao dịch khi có bất thường (UC 12): người nhận mới cộng số tiền vượt ngưỡng KH đặt → giữ X phút, KH hủy được. Chuyển cho người trong danh bạ tin cậy thì không bị giữ.";
+
+const SCAN_SAMPLE = "Tin nhắn nhắc chương trình hoàn tiền 2 triệu của MSB. Nhận ngay tại msb-hoantien.com trong 30 phút.";
+
+/** Nội dung + Chip + Màn hiển thị, read from scenario-copy (HOLD from the UC10 sentence). */
+export function expectedLine(id: ScenarioId | "HOLD"): string {
+  if (id === "HOLD") {
+    return `${HOLD_SPEC} · Chip: ${DIAGNOSE_ANSWERS.join(" · ")} · ${CLASSIFY_QUESTIONS.join(" ")} · Giữ ${HOLD_MINUTES} phút`;
+  }
+  const copy = SCENARIO_COPY[id];
+  const seconds = copy.countdownSec !== null ? ` · ${copy.countdownSec} giây` : "";
+  return `${copy.content} · Chip: ${copy.chips.join(" · ")} · ${copy.display}${seconds}`;
+}
+
+const money = (amount: number): ScenarioField => ({ label: "Số tiền", value: amount.toLocaleString("vi-VN"), copy: String(amount) });
+
+export const SCENARIO_CARDS: ScenarioCardDef[] = [
   {
-    id: "green-friend", name: "Xanh · người quen", level: "green", hour: null,
-    fields: [FRIEND, BANK_MSB, { label: "Số tài khoản", value: "0100002291 (chỉ cần tận cùng 2291)", copy: "0100002291" }, { label: "Số tiền", value: "500.000", copy: "500000" }],
-    expected: "Không banner, chuyển ngay, nhật ký không thêm dòng.",
+    id: "BT1", name: "BT1 · KH mới", group: "BT", copyId: "BT1", level: "green", signals: [], href: "/",
+    fields: [copyField("Ngày mở tài khoản", "3 ngày trước")],
   },
   {
-    id: "green-new", name: "Xanh · chỉ người nhận mới", level: "green", hour: 10,
-    fields: [NEW_NAME, NEW_ACCOUNT, { label: "Số tiền", value: "2.000.000", copy: "2000000" }, { label: "Nội dung", value: "tien hang", copy: "tien hang" }],
-    expected: "Không banner: một tín hiệu Trung bình (người nhận mới) chưa đủ để cảnh báo.",
+    id: "BT2", name: "BT2 · Điểm dưới mức Cao", group: "BT", copyId: "BT2", level: "green", signals: [], href: "/settings/security",
+    fields: [copyField("Điểm", "Dưới mức Cao")],
   },
   {
-    id: "dh1", name: "DH1 · Giả danh người quen (Vàng)", level: "yellow", hour: 10,
-    fields: [FRIEND, BANK_MSB, { label: "Số tài khoản", value: "0100005678 (không tận cùng 2291)", copy: "0100005678" }, { label: "Số tiền", value: "3.000.000", copy: "3000000" }],
-    expected: "Banner vàng với lý do \"tên giống người quen, khác số tài khoản hoặc ngân hàng\". Bấm Xác nhận chuyển ngay, nhật ký thêm dòng Vàng.",
+    id: "BT3", name: "BT3 · Số dư tăng mạnh", group: "BT", copyId: "BT3", level: "green", signals: [], href: "/",
+    fields: [money(120_000_000), copyField("Loại", "Lương"), copyField("Người gửi", EMPLOYER_LABEL())],
   },
   {
-    id: "dh2", name: "DH2 · Số tiền lớn cho người lạ (Vàng)", level: "yellow", hour: 10,
-    fields: [NEW_NAME, NEW_ACCOUNT, BIG_AMOUNT, { label: "Nội dung", value: "tien hang", copy: "tien hang" }],
-    expected: "Banner vàng: người nhận mới; số tiền từ 50% số dư trở lên.",
+    id: "BT4", name: "BT4 · 3 khoản nhỏ từ người lạ", group: "BT", copyId: "BT4", level: "green", signals: ["T7a"], href: "/transactions",
+    fields: [copyField("Tiền vào", "3 × 50.000"), copyField("Người gửi", STRANGER.name)],
   },
   {
-    id: "dh8-night", name: "DH8 · Vàng lúc nửa đêm (Đỏ)", level: "red", hour: 23,
-    fields: [NEW_NAME, NEW_ACCOUNT, BIG_AMOUNT, { label: "Nội dung", value: "tra no", copy: "tra no" }],
-    expected: "Sheet \"Khoan đã\": người nhận mới, số tiền từ 50% số dư, chuyển khoản lúc nửa đêm (23:00–01:00). \"Vẫn tiếp tục\" đếm ngược 30 giây.",
+    id: "BT5", name: "BT5 · Khoản lớn từ người lạ", group: "BT", copyId: "BT5", level: "green", signals: ["T7b"], href: "/transactions",
+    fields: [money(30_000_000), copyField("Người gửi", STRANGER.name), copyField("Số tài khoản", STRANGER.account)],
   },
   {
-    id: "dh8-word", name: "DH8 · Vàng có từ khóa (Đỏ)", level: "red", hour: 10,
-    fields: [NEW_NAME, NEW_ACCOUNT, BIG_AMOUNT, { label: "Nội dung", value: "nop thue (hoặc phat, tai khoan an toan, nhiem vu, gap)", copy: "nop thue" }],
-    expected: "Sheet \"Khoan đã\" với lý do nội dung có chữ \"thuế\" cùng người nhận mới và số tiền lớn.",
+    id: "BT6", name: "BT6 · Cùng người lần thứ 2", group: "BT", copyId: "BT6", level: "green", signals: [], href: "/transfer",
+    fields: [copyField("Người nhận", CHAIN_RECIPIENT.name), copyField("Số tài khoản", CHAIN_RECIPIENT.account), copyField("Ngân hàng", CHAIN_RECIPIENT.bank), money(200_000), copyField("Trên màn", "Bấm Xác nhận để tới màn thành công")],
+  },
+  {
+    id: "BT7", name: "BT7 · Quét tin nhắn", group: "BT", copyId: "BT7", level: "green", signals: [], href: "/settings/scan",
+    fields: [copyField("Tin nhắn", SCAN_SAMPLE), copyField("Trên màn", "Dán tin rồi bấm Kiểm tra")],
+  },
+  {
+    id: "DH3-2", name: "Vàng · lệnh thứ 2", group: "Vàng", copyId: "DH3-2", level: "yellow", signals: ["T1", "T6"], href: "/transfer",
+    fields: payeeFields(CHAIN_RECIPIENT, 200_000, "tien hang"),
+  },
+  {
+    id: "DH1", name: "DH1 · Giả danh người quen", group: "Vàng", copyId: "DH1", level: "yellow", signals: ["T1b"], href: "/transfer",
+    fields: payeeFields({ name: "NGUYEN THU HA", account: "0100005678", bank: "MSB" }, 500_000, "tien hang"),
+  },
+  {
+    id: "DH2", name: "DH2 · Số tiền lớn cho người lạ", group: "Vàng", copyId: "DH2", level: "yellow", signals: ["T1", "T3"], href: "/transfer",
+    fields: payeeFields(STRANGER, 15_000_000, "tien hang"),
+  },
+  {
+    id: "DH3", name: "DH3 · Lệnh thứ 3", group: "Vàng", copyId: "DH3", level: "yellow", signals: ["T1", "T6"], href: "/transfer",
+    fields: payeeFields(CHAIN_RECIPIENT, 500_000, "tien hang"),
+  },
+  {
+    id: "DH4", name: "DH4 · Tài khoản cảnh báo", group: "Đỏ", copyId: "DH4", level: "red", signals: ["T2"], href: "/transfer",
+    fields: payeeFields({ name: "TK CANH BAO", account: "9704000000000001", bank: "VietinBank" }, 500_000, "tien hang"),
+  },
+  {
+    id: "DH5", name: "DH5 · Tất toán sổ rồi chuyển", group: "Đỏ", copyId: "DH5", level: "red", signals: ["T1", "T4"], href: "/transfer",
+    fields: [...payeeFields(STRANGER, 2_000_000, "tien hang"), copyField("Sổ", "Tất toán từ 50% tiền tiết kiệm")],
+  },
+  {
+    id: "DH6", name: "DH6 · Làm nhiệm vụ", group: "Đỏ", copyId: "DH6", level: "red", signals: ["T1", "T6", "T7a"], href: "/transfer",
+    fields: payeeFields(CHAIN_RECIPIENT, 500_000, "tien hang"),
+  },
+  {
+    id: "DH7", name: "DH7 · Chuyển gần hết khoản vừa nhận", group: "Đỏ", copyId: "DH7", level: "red", signals: ["T1", "T7b"], href: "/transfer",
+    fields: payeeFields({ name: "LE VAN KHAC", account: "9704777700004321", bank: "ACB" }, 24_000_000, "chuyen tra"),
+  },
+  {
+    id: "DH8-night", name: "DH8 · Giờ (nửa đêm)", group: "Đỏ", copyId: "DH8", level: "red", signals: ["T1", "T3", "T8"], href: "/transfer",
+    fields: [...payeeFields(STRANGER, 15_000_000, "tien hang"), copyField("Giờ chấm", "23:00")],
+  },
+  {
+    id: "DH8-words", name: "DH8 · Từ khóa", group: "Đỏ", copyId: "DH8", level: "red", signals: ["T1", "T3", "T8"], href: "/transfer",
+    fields: payeeFields(STRANGER, 15_000_000, "nop thue"),
+  },
+  {
+    id: "DH8-screen", name: "DH8 · Chia sẻ màn hình", group: "Đỏ", copyId: "DH8", level: "red", signals: ["T1", "T3", "T8"], href: "/transfer",
+    fields: [...payeeFields(STRANGER, 15_000_000, "tien hang"), copyField("Màn hình", "Đang chia sẻ")],
+  },
+  {
+    id: "DH-T5", name: "DH-T5 · Vừa đổi mật khẩu", group: "Đỏ", copyId: "DH-T5", level: "red", signals: ["T1", "T5", "T3"], href: "/transfer",
+    fields: payeeFields(STRANGER, 15_000_000, "tien hang"),
+  },
+  {
+    id: "SC1", name: "SC1 · Khóa khẩn cấp", group: "SC", copyId: "SC1", level: "red", signals: [], href: "/settings/sos",
+    fields: [copyField("Màn", "Khẩn cấp")],
+  },
+  {
+    id: "SC2", name: "SC2 · Hồ sơ tra soát", group: "SC", copyId: "SC2", level: "red", signals: [], href: "/settings/case",
+    fields: [copyField("Màn", "Tra soát")],
+  },
+  {
+    id: "SC3", name: "SC3 · Banner hồ sơ", group: "SC", copyId: "SC3", level: "red", signals: [], href: "/",
+    fields: [copyField("Màn", "Home")],
+  },
+  {
+    id: "SC4", name: "SC4 · Phục hồi bảo mật", group: "SC", copyId: "SC4", level: "red", signals: [], href: "/settings/security",
+    fields: [copyField("Màn", "Hub Security")],
+  },
+  {
+    id: "HOLD", name: "UC10 · Giữ lệnh", group: "Giữ lệnh", copyId: "HOLD", level: "yellow", signals: ["T1"], href: "/transfer",
+    fields: [...payeeFields({ name: "NGUYEN VAN MOI", account: "9704666600007777", bank: "ACB" }, 200_000, "tien hang"), copyField("Trên màn", "Bấm Xác nhận")],
   },
 ];
+
+function EMPLOYER_LABEL(): string {
+  return "CONG TY LUONG";
+}
+
+function payeeFields(payee: { name: string; account: string; bank: string }, amount: number, memo: string): ScenarioField[] {
+  return [
+    copyField("Người nhận", payee.name),
+    copyField("Số tài khoản", payee.account),
+    copyField("Ngân hàng", payee.bank),
+    money(amount),
+    copyField("Nội dung", memo),
+  ];
+}

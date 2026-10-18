@@ -145,6 +145,8 @@ export function InterventionHost() {
   const fullscreen = visible.find(item => item.surface === "fullscreen");
   useEffect(() => {
     if (!fullscreen || routedFullscreen.current === fullscreen.id) return;
+    // Công cụ test stays put so the next card can reset the engine. Leaving it still routes to SOS.
+    if (pathname === "/settings/test-tools") return;
     routedFullscreen.current = fullscreen.id;
     shown(fullscreen.id);
     if (pathname !== "/settings/sos" && pathname !== "/settings/case") router.push("/settings/sos");
