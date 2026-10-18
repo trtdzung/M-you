@@ -37,6 +37,7 @@ export function CategoryCreateSheet({
   jarLabel,
   onCreated,
   onClose,
+  open = true,
 }: {
   /** Hũ nhận danh mục mới. Bỏ trống = danh mục chưa xếp hũ. */
   jarId?: string;
@@ -45,6 +46,7 @@ export function CategoryCreateSheet({
   /** Danh mục vừa tạo (id THẬT lấy từ taxonomy đã cập nhật, không phải id đoán). */
   onCreated?: (categoryId: string) => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const { categories, addCategory, mutationError } = useCategories();
   const [raw, setRaw] = useState("");
@@ -107,7 +109,7 @@ export function CategoryCreateSheet({
 
   if (createdLabel) {
     return (
-      <Sheet title="Đã tạo danh mục" description={createdLabel} onClose={finish}>
+      <Sheet open={open} title="Đã tạo danh mục" description={createdLabel} onClose={finish}>
         <div className="flex flex-col gap-4">
           <p role="status" className="rounded-row bg-surface-muted px-3 py-2.5 text-sm text-text">
             Danh mục đang ở “{KHAC_JAR_LABEL}” — bạn có thể xếp vào một hũ trong Cài đặt.
@@ -126,6 +128,7 @@ export function CategoryCreateSheet({
 
   return (
     <Sheet
+      open={open}
       title="Thêm danh mục"
       description={jarLabel ? `Danh mục mới sẽ nằm trong hũ “${jarLabel}”` : `Danh mục mới sẽ ở “${KHAC_JAR_LABEL}” cho tới khi bạn xếp vào một hũ`}
       onClose={onClose}

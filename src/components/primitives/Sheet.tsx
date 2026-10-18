@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { canvasZoom, prefersMotion } from "@/lib/motion";
+import { usePanelActive } from "@/components/shell/PanelActive";
+
+const EXIT_FALLBACK_MS = 320;
 
 /** Shared accessible bottom sheet for reports, editors, and confirmations. */
 export function Sheet({
@@ -28,6 +32,33 @@ export function Sheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const skipExitRef = useRef(false);
+  const dragRef = useRef<{ id: number; origin: number; lastY: number; lastT: number } | null>(null);
+  const panelActive = usePanelActive();
+  const [phase, setPhase] = useState<"open" | "closed" | "exiting">(open ? "open" : "closed");
+  const [dragY, setDragY] = useState(0);
+  const [dragMode, setDragMode] = useState<"idle" | "drag" | "snap" | "rest">("idle");
+
+  // A hidden PFM tab must not keep a portaled sheet on screen. Exit animation
+  // only runs when the caller keeps the sheet mounted and sets `open` to false.
+  const live = open && panelActive;
+  if (!panelActive && phase !== "closed") {
+    setPhase("closed");
+  } else if (live && phase !== "open") {
+    setPhase("open");
+  } else if (!open && phase === "open") {
+    const instant = skipExitRef.current || !prefersMotion();
+    skipExitRef.current = false;
+    setPhase(instant ? "closed" : "exiting");
+  }
+  if (phase === "closed" && dragMode !== "idle") {
+    setDragMode("idle");
+    setDragY(0);
+  }
+
+  const frameRef = useRef({ title, description, children, className });
+  if (live) frameRef.current = { title, description, children, className };
+  const frame = live ? { title, description, children, className } : frameRef.current;
 
   // Anchor the sheet inside the device frame, not the browser viewport. The
   // desktop preview applies `zoom` to `.device-canvas`, which breaks
@@ -40,7 +71,7 @@ export function Sheet({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!live) return;
 
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
@@ -83,39 +114,124 @@ export function Sheet({
       const previous = restoreFocusRef.current;
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
-  }, [onClose, open]);
+  }, [onClose, live]);
 
-  if (!open || !container) return null;
+  useEffect(() => {
+    if (phase !== "exiting") return;
+    const timeout = window.setTimeout(() => setPhase("closed"), EXIT_FALLBACK_MS);
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
+
+  if (phase === "closed" || !container) return null;
+
+  const exiting = phase === "exiting";
+
+  function pointY(clientY: number) {
+    return clientY / canvasZoom();
+  }
+
+  function onHandlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!prefersMotion() || exiting || event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest("button, a, input, textarea, select")) return;
+    dragRef.current = { id: event.pointerId, origin: pointY(event.clientY), lastY: pointY(event.clientY), lastT: event.timeStamp };
+    setDragMode("drag");
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Capture is unavailable for this pointer. Move and up still arrive on the handle.
+    }
+  }
+
+  function onHandlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const y = pointY(event.clientY);
+    drag.lastY = y;
+    drag.lastT = event.timeStamp;
+    setDragY(Math.max(0, y - drag.origin));
+  }
+
+  function onHandlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    dragRef.current = null;
+    const y = pointY(event.clientY);
+    const dy = Math.max(0, y - drag.origin);
+    const velocity = (y - drag.lastY) / Math.max(16, event.timeStamp - drag.lastT);
+    if (dy > 96 || (dy > 48 && velocity > 0.65)) {
+      skipExitRef.current = true;
+      setDragMode("idle");
+      onClose();
+      return;
+    }
+    if (dy === 0) {
+      setDragMode("rest");
+      return;
+    }
+    setDragY(0);
+    setDragMode("snap");
+  }
 
   return createPortal(
-    <div className="absolute inset-0 z-40 flex items-end justify-center" data-testid="sheet-root">
+    <div
+      className={cn("absolute inset-0 z-40 flex items-end justify-center", exiting && "pointer-events-none")}
+      data-testid="sheet-root"
+      inert={exiting}
+    >
       <button
         type="button"
         aria-label={closeLabel}
         data-sheet-backdrop="true"
         tabIndex={-1}
-        className="absolute inset-0 cursor-pointer bg-black/40"
+        className={cn("absolute inset-0 cursor-pointer bg-black/40", exiting ? "sheet-backdrop-out" : "sheet-backdrop-in")}
         onClick={onClose}
       />
       <div
         ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
+        role={exiting ? undefined : "dialog"}
+        aria-modal={exiting ? undefined : true}
+        aria-hidden={exiting || undefined}
+        aria-labelledby={exiting ? undefined : titleId}
+        aria-describedby={!exiting && description ? descriptionId : undefined}
+        onAnimationEnd={(event) => {
+          if (event.target !== panelRef.current) return;
+          if (!event.animationName.includes("sheet-panel-out")) return;
+          setPhase("closed");
+        }}
+        onTransitionEnd={(event) => {
+          if (event.target !== panelRef.current || event.propertyName !== "transform") return;
+          if (dragMode === "snap") setDragMode("rest");
+        }}
+        style={dragMode === "drag" || dragMode === "snap" ? { transform: `translateY(${dragY}px)` } : undefined}
         className={cn(
           "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
-          className,
+          exiting
+            ? "sheet-panel-out"
+            : dragMode === "drag"
+              ? "sheet-dragging"
+              : dragMode === "snap"
+                ? "sheet-snap"
+                : dragMode === "rest"
+                  ? "sheet-rest"
+                  : "sheet-panel-in",
+          frame.className,
         )}
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div
+          data-sheet-handle
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+          className="mb-4 flex cursor-grab touch-none items-start justify-between gap-3"
+        >
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-text">
-              {title}
+              {frame.title}
             </h2>
-            {description && (
+            {frame.description && (
               <p id={descriptionId} className="mt-1 text-sm text-muted">
-                {description}
+                {frame.description}
               </p>
             )}
           </div>
@@ -129,7 +245,7 @@ export function Sheet({
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        {children}
+        {frame.children}
       </div>
     </div>,
     container,

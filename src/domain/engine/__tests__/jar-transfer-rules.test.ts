@@ -99,8 +99,8 @@ describe("validateTransfer", () => {
   });
 
   it("rejects more than the source can give", () => {
-    expect(check("a", "b", 1_000_001)).toEqual({ ok: false, field: "amount", message: "Tối đa 1.000.000 ₫." });
-    expect(check("b", "a", 1)).toMatchObject({ ok: false, field: "amount", message: "Tối đa 0 ₫." });
+    expect(check("a", "b", 1_000_001)).toEqual({ ok: false, field: "amount", message: "Tối đa 1,000,000 VND." });
+    expect(check("b", "a", 1)).toMatchObject({ ok: false, field: "amount", message: "Tối đa 0 VND." });
   });
 
   it("an over-allocated pool cannot give anything", () => {

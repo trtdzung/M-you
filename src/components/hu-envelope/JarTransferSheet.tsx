@@ -46,12 +46,14 @@ export function JarTransferSheet({
   raw,
   onClose,
   onDone,
+  open = true,
 }: {
   initialFromId: string;
   transactions: Transaction[];
   raw: RawData | null;
   onClose: () => void;
   onDone: (summary: JarTransferSummary) => void;
+  open?: boolean;
 }) {
   const { config } = useJarConfig();
   const autoFund = useAutoFundWith({ transactions, raw });
@@ -214,7 +216,7 @@ export function JarTransferSheet({
   })();
 
   return (
-    <Sheet title="Chuyển giữa các hũ" onClose={onClose}>
+    <Sheet open={open} title="Chuyển giữa các hũ" onClose={onClose}>
       {content}
     </Sheet>
   );

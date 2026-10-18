@@ -4,7 +4,7 @@ import { useState } from "react";
 import { RotateCcw } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { useCorrections, useConfirmCategory } from "@/state/corrections";
-import { Sheet } from "@/components/primitives";
+import { Sheet, SheetSlot } from "@/components/primitives";
 import { CategoryCreateSheet } from "@/components/settings/CategoryCreateSheet";
 import { CategoryOptionGrid } from "./CategoryPickerSheet";
 
@@ -17,7 +17,7 @@ import { CategoryOptionGrid } from "./CategoryPickerSheet";
  * chưa chọn hũ nào cả, nên danh mục mới ở "Chưa xếp hũ" và sheet nói rõ
  * điều đó. Danh mục vừa tạo được gán luôn cho giao dịch này.
  */
-export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
+export function CategoryEditor({ txn, onClose, open = true }: { txn: Transaction; onClose: () => void; open?: boolean }) {
   const { clearCategory } = useCorrections();
   const confirmCategory = useConfirmCategory();
   const [adding, setAdding] = useState(false);
@@ -28,7 +28,7 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
   }
 
   return (
-    <Sheet title="Sửa danh mục" description={txn.merchantName} onClose={onClose}>
+    <Sheet open={open} title="Sửa danh mục" description={txn.merchantName} onClose={onClose}>
       <CategoryOptionGrid
         selectedId={txn.categoryId}
         kind="all"
@@ -36,12 +36,9 @@ export function CategoryEditor({ txn, onClose }: { txn: Transaction; onClose: ()
         onAddCategory={() => setAdding(true)}
       />
 
-      {adding && (
-        <CategoryCreateSheet
-          onCreated={choose}
-          onClose={() => setAdding(false)}
-        />
-      )}
+      <SheetSlot open={adding}>
+        <CategoryCreateSheet open={adding} onCreated={choose} onClose={() => setAdding(false)} />
+      </SheetSlot>
 
       {txn.userEdited && (
         <button

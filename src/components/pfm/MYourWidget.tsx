@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Mic, Square, Send, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { cn } from "@/lib/cn";
+import { prefersMotion } from "@/lib/motion";
 import { Loading } from "@/components/states";
 import { usePersona } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
@@ -27,6 +28,7 @@ import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
 import { ClarifyAnswerBubble } from "./ClarifyAnswerBubble";
+import { StatusBar } from "@/components/shell/StatusBar";
 import { takeInsightDraft } from "@/insights/proactive/chat-handoff";
 import { resetPreferenceSeed, withPreferenceSeed } from "@/lib/agent-preference-seed";
 import { useAgentPreferences } from "@/state/agent-preferences";
@@ -101,6 +103,14 @@ export function MYourWidget() {
   const assistantParam = params?.get("assistant") === "1";
 
   const isOpen = assistantParam;
+  const [visual, setVisual] = useState<"closed" | "open" | "exiting">(isOpen ? "open" : "closed");
+  if (isOpen && visual !== "open") setVisual("open");
+  else if (!isOpen && visual === "open") setVisual(prefersMotion() ? "exiting" : "closed");
+  useEffect(() => {
+    if (visual !== "exiting") return;
+    const timeout = window.setTimeout(() => setVisual("closed"), 320);
+    return () => window.clearTimeout(timeout);
+  }, [visual]);
   const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">("loading");
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -299,14 +309,26 @@ export function MYourWidget() {
 
   return (
     <>
-      {isOpen && (
+      {visual !== "closed" && (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          className="absolute inset-0 z-30 flex flex-col bg-surface"
+          role={visual === "exiting" ? undefined : "dialog"}
+          aria-modal={visual === "exiting" ? undefined : true}
+          aria-hidden={visual === "exiting" || undefined}
+          aria-labelledby={visual === "exiting" ? undefined : titleId}
+          inert={visual === "exiting"}
+          data-block-edge-swipe=""
+          onAnimationEnd={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (!event.animationName.includes("sheet-panel-out")) return;
+            setVisual("closed");
+          }}
+          className={cn(
+            "myou-chat absolute inset-0 z-30 flex flex-col overflow-hidden bg-surface",
+            visual === "exiting" ? "sheet-panel-out" : "sheet-panel-in",
+          )}
         >
-          <header className="shadow-card flex shrink-0 items-center gap-2.5 px-4 py-3">
+          <div className="shrink-0 bg-[#fce0d5]"><StatusBar /></div>
+          <header className="flex shrink-0 items-center gap-3 border-b border-[#dfe5ee] bg-white px-4 py-4">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -320,7 +342,7 @@ export function MYourWidget() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-xs text-muted">Trợ lý Tài chính của bạn</p>
-              <h2 id={titleId} className="text-base font-bold tracking-tight text-text">
+              <h2 id={titleId} className="text-[20px] font-bold text-text">
                 M-You
               </h2>
             </div>
@@ -338,7 +360,7 @@ export function MYourWidget() {
                 onClick={handleDelete}
                 disabled={deleting || voiceBusy}
                 aria-label="Xóa hội thoại"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40"
               >
                 <Trash2 size={19} strokeWidth={1.8} />
               </button>
@@ -346,14 +368,14 @@ export function MYourWidget() {
                 type="button"
                 onClick={close}
                 aria-label="Đóng"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 <X size={20} strokeWidth={2} />
               </button>
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#fff8f4] px-4 py-5">
             {historyStatus === "loading" && <Loading label="Đang tải hội thoại…" />}
 
             {deleteError && (
@@ -411,12 +433,12 @@ export function MYourWidget() {
                     <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
                       <div
                         className={cn(
-                          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm",
+                          "max-w-[85%] rounded-[18px] px-4 py-3 text-[15px] leading-6",
                           m.role === "user"
-                            ? "brand-gradient rounded-br-sm text-white"
+                            ? "rounded-br-sm border border-[#ffd3ba] bg-[#fff0e7] text-text"
                             : m.error
-                              ? "shadow-card rounded-bl-sm bg-negative-soft text-negative"
-                              : "shadow-card rounded-bl-sm bg-surface-muted text-text",
+                              ? "rounded-bl-sm bg-negative-soft text-negative"
+                              : "rounded-bl-sm border border-[#dfe5ee] bg-white text-text",
                         )}
                       >
                         {m.role === "agent" ? <AgentMarkdown text={m.text} /> : m.text}
@@ -453,7 +475,7 @@ export function MYourWidget() {
             )}
           </div>
 
-          <div className="shadow-nav shrink-0 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+var(--safe-area-bottom))]">
+          <div className="shrink-0 border-t border-[#dfe5ee] bg-white px-4 pt-3 pb-[calc(0.75rem+var(--safe-area-bottom))]">
             <div className="flex items-end gap-2">
               <textarea
                 value={inputVisible}
@@ -465,7 +487,7 @@ export function MYourWidget() {
                 rows={1}
                 disabled={composerDisabled || voiceBusy}
                 placeholder="Nhắn tin cho M-You…"
-                className="max-h-32 flex-1 resize-none rounded-2xl border border-border bg-surface-muted px-3.5 py-2.5 text-sm text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
+                className="min-h-12 max-h-32 min-w-0 flex-1 resize-none rounded-[9px] border border-[#dfe5ee] bg-white px-3.5 py-3 text-[15px] text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
               />
               <button
                 type="button"
@@ -479,18 +501,18 @@ export function MYourWidget() {
                 disabled={composerDisabled || voice.state === "finishing"}
                 aria-label={voice.state === "connecting" ? "Hủy kết nối micro" : voiceBusy ? "Dừng ghi âm" : "Nhập bằng giọng nói"}
                 aria-pressed={voiceBusy}
-                className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40", voiceBusy ? "bg-negative-soft text-negative" : "bg-surface-muted text-primary")}
+                className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40", voiceBusy ? "bg-negative-soft text-negative" : "border border-[#ffd3ba] bg-[#fff0e7] text-primary")}
               >
-                {voiceBusy ? <Square size={16} /> : <Mic size={18} />}
+                {voiceBusy ? <Square size={16} /> : <Mic size={20} />}
               </button>
               <button
                 type="button"
                 onClick={send}
                 disabled={composerDisabled || voiceBusy || !inputVisible.trim()}
                 aria-label="Gửi"
-                className="brand-gradient flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity disabled:opacity-40"
+                className="login-submit flex h-12 w-12 shrink-0 items-center justify-center rounded-[9px] text-white disabled:opacity-50"
               >
-                <Send size={16} />
+                <Send size={20} />
               </button>
             </div>
             {(voiceBusy || voice.error) && (

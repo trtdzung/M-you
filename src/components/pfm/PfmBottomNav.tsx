@@ -2,12 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
-import { PFM_TABS, resolveLegacyTab, type PfmTabId } from "./PfmTabs";
+import { PFM_TABS, resolveLegacyTab, withPfmTab, type PfmTabId } from "./PfmTabs";
 import { VoiceFab } from "./VoiceFab";
 
 /**
  * BIDV-style wallet bottom nav for `/pfm/*` (plan 260910-1626): 4 destinations —
- * Tổng quan · Giao dịch · (M-You) · Ngân sách · Cài đặt — with a raised center
+ * Tổng quan · Giao dịch · (M-You) · Ngân sách · Mục tiêu — with a raised center
  * agent icon (`VoiceFab`, Feature 5; a second copy floats on the main screen).
  * Pinned to the
  * device-canvas bottom via the PhoneShell `nav` slot (same pattern as the
@@ -28,14 +28,12 @@ export function PfmBottomNav() {
   const active: PfmTabId =
     (tabParam === "cashflow" && dockParam === "hu" ? "budget" : null) ??
     resolveLegacyTab(tabParam) ??
+    // "Hũ & danh mục" has no nav slot; it is opened from Ngân sách, so Ngân sách stays lit.
+    (tabParam === "settings" ? "budget" : null) ??
     (PFM_TABS.some((t) => t.id === tabParam) ? (tabParam as PfmTabId) : "overview");
 
   function go(id: PfmTabId) {
-    const next = new URLSearchParams(params?.toString());
-    next.set("tab", id);
-    next.delete("dock");
-    next.delete("setup");
-    router.replace(`/pfm?${next.toString()}`, { scroll: false });
+    router.replace(`/pfm?${withPfmTab(params ?? new URLSearchParams(), id)}`, { scroll: false });
   }
 
   const left = PFM_TABS.slice(0, 2);
@@ -46,7 +44,7 @@ export function PfmBottomNav() {
       aria-label="Điều hướng PFM"
       className="shell-bottom-nav pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-shell-main-inset"
     >
-      <div className="shadow-nav pointer-events-auto relative flex w-full items-stretch justify-between gap-1 rounded-full border border-surface/60 bg-surface/80 px-2 py-2 backdrop-blur-xl">
+      <div className="pointer-events-auto relative flex w-full items-stretch justify-between gap-1 rounded-full border border-white bg-white px-2 py-2">
         {left.map((tab) => (
           <NavItem key={tab.id} tab={tab} active={tab.id === active} onSelect={() => go(tab.id)} />
         ))}
@@ -81,7 +79,7 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       className={cn(
         "flex min-h-[52px] flex-1 flex-col items-center justify-center gap-1 rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-        active ? "bg-primary-soft text-primary" : "text-muted hover:text-text",
+        active ? "bg-[#fff0e7] text-primary" : "text-muted hover:text-text",
       )}
     >
       <Icon

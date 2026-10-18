@@ -10,6 +10,7 @@ import { GoalProvider } from "@/state/goals";
 import { JarConfigProvider } from "@/state/jars";
 import { PeriodProvider } from "@/state/period";
 import { setConsent } from "@/lib/consent";
+import { AppChrome } from "@/components/shell/AppChrome";
 
 /**
  * Route smoke tests (Red Team #7): every screen in the 3-tab MSB IA must mount
@@ -19,11 +20,11 @@ import { setConsent } from "@/lib/consent";
  * router; redirect routes assert they call `redirect()`.
  */
 
-const redirect = vi.fn();
+const routeMock = vi.hoisted(() => ({ pathname: "/", redirect: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  redirect: (...args: unknown[]) => redirect(...args),
+  redirect: (...args: unknown[]) => routeMock.redirect(...args),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
-  usePathname: () => "/",
+  usePathname: () => routeMock.pathname,
   useSearchParams: () => new URLSearchParams("draftId=demo"),
   useParams: () => ({ id: "acc-current" }),
 }));
@@ -41,6 +42,8 @@ beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
   setConsent(); // grant full consent so data-backed screens render
+  routeMock.pathname = "/";
+    routeMock.redirect.mockClear();
 });
 
 function renderScreen(ui: ReactElement) {
@@ -90,17 +93,17 @@ describe("route smoke — all screens mount", () => {
   }, 20_000); // mounts the chart-heavy overview tab directly (no setup gate); give it headroom under parallel load
 
   it("PFM jars setup (/pfm/jars) redirects to the Ngân sách tab", async () => {
-    redirect.mockClear();
+    routeMock.redirect.mockClear();
     const { default: Page } = await import("../pfm/jars/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=budget");
+    expect(routeMock.redirect).toHaveBeenCalledWith("/pfm?tab=budget");
   });
 
   it("PFM cashflow (/pfm/cashflow) redirects to the overview tab", async () => {
-    redirect.mockClear();
+    routeMock.redirect.mockClear();
     const { default: Page } = await import("../pfm/cashflow/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=overview");
+    expect(routeMock.redirect).toHaveBeenCalledWith("/pfm?tab=overview");
   });
 
   it("PFM wealth (/pfm/wealth) mounts the Tài sản & Nợ manager", async () => {
@@ -111,7 +114,8 @@ describe("route smoke — all screens mount", () => {
 
   it("Settings (/settings)", async () => {
     const { default: Page } = await import("../(festive)/settings/page");
-    expect(() => renderScreen(<Page />)).not.toThrow();
+    const { default: Layout } = await import("../(festive)/settings/layout");
+    expect(() => renderScreen(<Layout><Page /></Layout>)).not.toThrow();
   });
 
   it("Transfer confirm (/transfer-confirm)", async () => {
@@ -125,17 +129,17 @@ describe("route smoke — all screens mount", () => {
   });
 
   it("legacy /cashflow redirects directly to /pfm?tab=overview", async () => {
-    redirect.mockClear();
+    routeMock.redirect.mockClear();
     const { default: Page } = await import("../(festive)/cashflow/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm?tab=overview");
+    expect(routeMock.redirect).toHaveBeenCalledWith("/pfm?tab=overview");
   });
 
   it("legacy /wealth redirects to the /pfm/wealth manager", async () => {
-    redirect.mockClear();
+    routeMock.redirect.mockClear();
     const { default: Page } = await import("../(festive)/wealth/page");
     Page();
-    expect(redirect).toHaveBeenCalledWith("/pfm/wealth");
+    expect(routeMock.redirect).toHaveBeenCalledWith("/pfm/wealth");
   });
 });
 
@@ -149,20 +153,23 @@ describe("route smoke — all screens mount", () => {
  */
 describe("chrome separation — PFM wallet shell vs festive shell", () => {
   it("PFM: PfmHeader + own 4-tab wallet nav + ＋ FAB, no festive nav/bg", async () => {
+    routeMock.pathname = "/pfm";
     const { default: PfmLayout } = await import("../pfm/layout");
     const { default: PfmPage } = await import("../pfm/page");
     const { container } = renderScreen(
-      <PfmLayout>
-        <PfmPage />
-      </PfmLayout>,
+      <AppChrome>
+        <PfmLayout>
+          <PfmPage />
+        </PfmLayout>
+      </AppChrome>,
     );
 
     // Back-arrow sub-app header → Home
-    expect(screen.getByLabelText("Về Trang chủ")).toHaveAttribute("href", "/");
+    expect(screen.getByRole("button", { name: "Quay lại" })).toBeInTheDocument();
 
     // The 4-tab wallet bottom nav is the sole PFM navigation (supersedes 260908)
     const nav = screen.getByRole("navigation", { name: "Điều hướng PFM" });
-    for (const label of ["Tổng quan", "Giao dịch", "Ngân sách", "Cài đặt"]) {
+    for (const label of ["Tổng quan", "Giao dịch", "Ngân sách", "Mục tiêu"]) {
       expect(within(nav).getByText(label)).toBeInTheDocument();
     }
     // Center mic FAB opens the voice quick-action panel (Feature 5) — never
@@ -175,15 +182,16 @@ describe("chrome separation — PFM wallet shell vs festive shell", () => {
     expect(container.innerHTML).not.toContain("bg-2-9");
   });
 
-  it("Festive: BottomNav + 2/9 festive bg still present (regression guard)", async () => {
-    const { default: FestiveLayout } = await import("../(festive)/layout");
+  it("Accounts: BottomNav remains on the peach app background", async () => {
+    routeMock.pathname = "/accounts";
     const { container } = renderScreen(
-      <FestiveLayout>
+      <AppChrome>
         <div />
-      </FestiveLayout>,
+      </AppChrome>,
     );
 
     expect(screen.getByLabelText("Điều hướng chính")).toBeInTheDocument();
-    expect(container.innerHTML).toContain("bg-2-9");
+    expect(container.innerHTML).toContain("accounts-shell");
+    expect(container.innerHTML).toContain("from-[#fce0d5]");
   });
 });

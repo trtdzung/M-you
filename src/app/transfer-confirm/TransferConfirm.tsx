@@ -2,7 +2,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { TransferHeader } from "@/components/transfer/TransferHeader";
+import { Home } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { usePersona, useProviders } from "@/providers/context";
 import { useCategories } from "@/state/categories";
@@ -12,14 +14,22 @@ import { useFinancials } from "@/state/useFinancials";
 import { useAutoFund, type FundResult } from "@/state/use-auto-fund";
 import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
+import { useSecurityStore } from "@/state/security/store";
+import { isTransferBlocked } from "@/state/security/selectors";
+import { alertClock, useTestToolsStore } from "@/state/security/test-tools";
+import { useShallow } from "zustand/react/shallow";
+import { accountLastFour, isTrustedRecipient, transferAlertLevel, transferHistory } from "@/lib/transfer-alert";
 import { typeForCategory } from "@/lib/category-txn-type";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
+import { backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
 import type { FundingAssessment } from "@/domain/engine";
 import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
 import { TransferFundingPreview } from "./TransferFundingPreview";
+import { TransferAlertBanner } from "./TransferAlertBanner";
+import { TransferAlertSheet } from "./TransferAlertSheet";
 
 /**
  * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field
@@ -48,7 +58,7 @@ export function TransferConfirm() {
   // transaction the user would then be unable to see or re-label.
   const { byId: categoryById, assignable } = useCategories();
   const { adopt: adoptManualTxn, addPersisted } = useManualTxns();
-  const { financials } = useFinancials();
+  const { financials, transactions: historyTxns, raw } = useFinancials();
   const autoFund = useAutoFund();
   const { persona } = usePersona();
   const senderName = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label;
@@ -81,6 +91,45 @@ export function TransferConfirm() {
   // transfer so the server's id-idempotency never double-debits a lost response.
   const attemptRef = useRef<Transaction | null>(null);
   const sourceLabel = draft?.sourceLabel ?? "Tài khoản MSB";
+
+  // Scam Shield (demo rules): Yellow = banner, Red = sheet before committing.
+  // Nothing is judged until the store has loaded this persona's settings.
+  const shield = useSecurityStore(useShallow((state) => ({ hydrated: state.hasHydrated, aiProtect: state.aiProtect, trusted: state.trustedContacts })));
+  // T1/T1b/T3 need the customer's own history and the source balance; unknown stays unknown.
+  const history = useMemo(() => transferHistory(historyTxns, transferNow()), [historyTxns]);
+  const sourceBalance = useMemo(() => {
+    const accounts = raw?.accounts ?? [];
+    const source = accounts.find((a) => a.id === draft?.sourceAccountId) ?? accounts.find((a) => a.type === "current");
+    return source?.balance ?? null;
+  }, [raw, draft]);
+  // Re-judge when a tester changes the simulated hour while this screen is open.
+  const alertHour = useTestToolsStore((state) => state.alertHour);
+  const alert = useMemo(() => shield.hydrated
+    ? transferAlertLevel({
+        amount,
+        isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
+        recipientName: name,
+        recipientAccount: draft?.accountNumber ?? acct,
+        recipientBank: draft?.recipientBankName,
+        memo: memo.trim() || null,
+        postedAt: alertClock(transferNow(), alertHour),
+        aiProtect: shield.aiProtect,
+        trusted: shield.trusted,
+        pastRecipients: history.pastRecipients,
+        largestOutflow90d: history.largestOutflow90d,
+        balance: sourceBalance,
+      })
+    : { level: "green" as const, reasons: [] }, [shield, amount, draft, name, acct, memo, history, sourceBalance, alertHour]);
+  const [redOpen, setRedOpen] = useState(false);
+  const [shieldNotice, setShieldNotice] = useState<string | null>(null);
+
+  function confirmWithShield() {
+    if (committedRef.current || submitting || done) return;
+    setShieldNotice(null);
+    if (alert.level === "red") return setRedOpen(true);
+    if (alert.level === "yellow") useSecurityStore.getState().logAlert({ level: "yellow", situation: alert.reasons.join("; "), choice: "Tiếp tục" });
+    void runConfirm();
+  }
 
   function saveRecipient() {
     if (!done || recipientSaved) return;
@@ -130,6 +179,10 @@ export function TransferConfirm() {
     if (!isValidDraft) return setError("Không tìm thấy bản nháp chuyển tiền hợp lệ.");
     if (!name.trim()) return setError("Vui lòng nhập tên người nhận.");
     if (!Number.isFinite(amount) || amount <= 0) return setError("Số tiền không hợp lệ.");
+    // Scam Shield: re-check the customer's lock here too (confirm URL opened directly).
+    if (isTransferBlocked(useSecurityStore.getState(), transferNow().getTime()).blocked) {
+      return setError("Chuyển tiền đang bị khóa theo yêu cầu của bạn. Mở khóa trong Cài đặt › Bảo mật.");
+    }
     setError(null);
 
     const postedAt = transferNow().toISOString();
@@ -235,6 +288,9 @@ export function TransferConfirm() {
   }
 
   if (done) {
+    // Trusting a recipient raises security, so it applies at once (no face check).
+    const doneAccount = done.recipientAccountNumber ?? done.recipientAccountMasked;
+    const lastFour = accountLastFour(doneAccount);
     return (
       <TransferSuccess
         done={done}
@@ -244,6 +300,10 @@ export function TransferConfirm() {
         createdSourceJarId={createdSourceJarId}
         recipientSaved={recipientSaved}
         onSaveRecipient={saveRecipient}
+        trusted={lastFour === null ? null : isTrustedRecipient(shield.trusted, done.recipientName, doneAccount, done.recipientBankName ?? undefined)}
+        onTrust={() => {
+          if (lastFour) useSecurityStore.getState().addTrustedContact({ name: done.recipientName, bank: done.recipientBankName ?? "Chưa rõ ngân hàng", account: `••• ${lastFour}` });
+        }}
       />
     );
   }
@@ -259,10 +319,10 @@ export function TransferConfirm() {
           <p className="mt-1 text-xs text-muted">Bản nháp này đã được sử dụng. Không thể xác nhận lại.</p>
         </Card>
         <div className="flex gap-2">
-          <button type="button" onClick={() => router.push("/")} className="flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text">
+          <button type="button" onClick={() => pushWithTransition((href) => router.push(href), "/")} className="flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-text">
             Về trang chủ
           </button>
-          <button type="button" onClick={() => router.push("/transfer")} className="flex-1 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
+          <button type="button" onClick={() => router.replace("/transfer")} className="flex-1 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
             Giao dịch khác
           </button>
         </div>
@@ -278,7 +338,7 @@ export function TransferConfirm() {
           <p className="text-sm font-semibold text-warning">Không tìm thấy bản nháp hợp lệ</p>
           <p className="mt-1 text-xs text-warning">Để bảo vệ thông tin người nhận, hãy tạo lại bản nháp từ luồng chuyển tiền.</p>
         </Card>
-        <button type="button" onClick={() => router.push("/transfer")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
+        <button type="button" onClick={() => router.replace("/transfer")} className="rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white">
           Tạo lại bản nháp
         </button>
       </div>
@@ -286,21 +346,14 @@ export function TransferConfirm() {
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
-      <ConfirmHeader />
-
-      <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-muted">
-        <ArrowLeft size={16} /> Huỷ &amp; quay lại
-      </button>
-
-      <Card className="bg-primary-soft/40">
-        <p className="flex items-start gap-2 text-xs text-text">
-          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
-          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận, trợ lý không làm bước này.
-        </p>
-      </Card>
-
-      <Card className="flex flex-col gap-3">
+    <div className="flex min-h-full flex-col">
+      <TransferHeader title="Chuyển tiền" onBack={() => backWithTransition(() => router.back())} rightIcon={<Home size={22} />} rightLabel="Về trang chủ" onRightClick={() => pushWithTransition((href) => router.push(href), "/")} />
+      <div className="flex flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
+      <Card className="transfer-card flex flex-col gap-5">
+        <div className="border-b border-[#dfe5ee] pb-5">
+          <p className="text-lg font-semibold text-muted">Xác nhận giao dịch</p>
+          <p className="mt-1 text-[28px] font-bold tabular-nums text-text">{formatVnd(amount)}</p>
+        </div>
         <Labeled label="Người nhận">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
         </Labeled>
@@ -318,9 +371,17 @@ export function TransferConfirm() {
         <Labeled label="Nội dung">
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} placeholder="Tuỳ chọn" />
         </Labeled>
+        <p className="text-base font-semibold text-text">Người chuyển: {senderName}</p>
         <Labeled label="Từ tài khoản">
           <input value={sourceLabel} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
         </Labeled>
+      </Card>
+
+      <Card className="bg-primary-soft/40">
+        <p className="flex items-start gap-2 text-xs text-text">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
+          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận, trợ lý không làm bước này.
+        </p>
       </Card>
 
       {/* RT-fix (H6): review the anticipated auto-fund BEFORE confirming (H11: never an empty donor list). */}
@@ -333,16 +394,21 @@ export function TransferConfirm() {
         />
       )}
 
+      {alert.level === "yellow" && <TransferAlertBanner reasons={alert.reasons} />}
+      {shieldNotice && <p role="status" className="text-sm text-text">{shieldNotice}</p>}
       {error && <p className="text-sm text-negative">{error}</p>}
 
       <button
         type="button"
-        onClick={() => runConfirm()}
+        aria-label="Xác nhận chuyển tiền"
+        onClick={confirmWithShield}
         disabled={submitting}
-        className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+        className="login-submit mt-auto disabled:opacity-60"
       >
-        {submitting ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
+        {submitting ? "Đang xử lý…" : "Xác nhận"}
       </button>
+      <TransferAlertSheet open={redOpen} reasons={alert.reasons} onClose={() => setRedOpen(false)} onProceed={() => void runConfirm()} onNotice={setShieldNotice} />
+      </div>
     </div>
   );
 }
@@ -357,12 +423,12 @@ function ConfirmHeader() {
 }
 
 const inputCls =
-  "w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary";
+  "min-h-12 w-full rounded-[10px] border border-[#dfe5ee] bg-white px-3 py-2 text-base text-text outline-none focus:border-primary";
 
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</span>
+      <span className="text-[15px] font-medium text-muted">{label}</span>
       {children}
     </label>
   );

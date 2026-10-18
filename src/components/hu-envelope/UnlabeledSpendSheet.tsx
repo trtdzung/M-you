@@ -29,9 +29,11 @@ import { cn } from "@/lib/cn";
 export function UnlabeledSpendSheet({
   items,
   onClose,
+  open = true,
 }: {
   items: Transaction[];
   onClose: () => void;
+  open?: boolean;
 }) {
   const confirmCategory = useConfirmCategory();
   const { update: updateManualTxn } = useManualTxns();
@@ -104,6 +106,7 @@ export function UnlabeledSpendSheet({
 
   return (
     <Sheet
+      open={open}
       title="Gắn nhãn chi tiêu"
       description="Các khoản chi & chuyển khoản từ TK chính chưa vào hũ. Chọn danh mục để đưa vào hũ tương ứng."
       onClose={onClose}

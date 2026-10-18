@@ -153,10 +153,10 @@ describe("BudgetTab", () => {
     mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [covered]), false, [leg]) };
     render(<BudgetTab />);
     // Trục hạn mức: hạn mức GỐC 2.500.000 (không bị nâng lên 2.704.000) + verdict vượt.
-    expect(screen.getByText(/2\.500\.000/)).toBeInTheDocument();
-    expect(screen.queryByText(/2\.704\.000 \//)).not.toBeInTheDocument();
+    expect(screen.getByText(/2,500,000/)).toBeInTheDocument();
+    expect(screen.queryByText(/2,704,000 \//)).not.toBeInTheDocument();
     expect(screen.getByText("Vượt hạn mức")).toBeInTheDocument();
-    expect(screen.getByText(/Đã vượt 204\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/Đã vượt 204,000/)).toBeInTheDocument();
     // Trục số dư: đã về 0 nhờ nhận từ hũ khác → không còn "cần bù thủ công".
     expect(screen.getByText("Số dư")).toBeInTheDocument();
     // Khoản chuyển giữa hũ chỉ hiện ở tab Giao dịch ("Điều chỉnh hũ"), không lặp lại trên thẻ.
@@ -177,15 +177,15 @@ describe("BudgetTab", () => {
 
     // Plan 260923: số dư là tiền thật trong hũ — hết tiền thì hiện âm, không chặn sàn 0
     // (giống JarEnvelopeCard ở Tổng quan).
-    const balance = screen.getByText(/-300\.000/);
+    const balance = screen.getByText(/-300,000/);
     expect(balance).toHaveClass("text-negative");
-    expect(screen.getByText(/^Số dư/).textContent).toMatch(/-300\.000/);
+    expect(screen.getByText(/^Số dư/).textContent).toMatch(/-300,000/);
     // Phần chưa bù vẫn còn nguyên, đúng số, đúng nhãn trục SỐ DƯ.
     expect(screen.getByText("Cần bù thủ công")).toBeInTheDocument();
-    expect(screen.getByText(/đã tiêu quá số dư 300\.000/)).toBeInTheDocument();
-    expect(screen.queryByText(/vượt hạn mức 300\.000/)).not.toBeInTheDocument();
+    expect(screen.getByText(/đã tiêu quá số dư 300,000/)).toBeInTheDocument();
+    expect(screen.queryByText(/vượt hạn mức 300,000/)).not.toBeInTheDocument();
     // Trục kế hoạch vẫn kể đúng câu chuyện của nó, bằng con số KHÁC.
-    expect(screen.getByText(/Đã vượt 500\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/Đã vượt 500,000/)).toBeInTheDocument();
   });
 
   it("U15: the 'Cần bù thủ công' notice carries an action that opens the allocation sheet", () => {
@@ -205,9 +205,9 @@ describe("BudgetTab", () => {
     );
     mockResult = { loading: false, error: false, financials: withBudget(jb) };
     render(<BudgetTab />);
-    expect(screen.getByTestId("budget-rebalance-adjustment").textContent).toContain("Điều chỉnh hũ −304.000");
+    expect(screen.getByTestId("budget-rebalance-adjustment").textContent).toContain("Điều chỉnh hũ −304,000");
     expect(screen.getByText("Tổng số dư")).toBeInTheDocument();
-    const total = screen.getByText(/-11\.744\.000/);
+    const total = screen.getByText(/-11,744,000/);
     expect(total).toHaveClass("text-negative");
   });
 
@@ -215,8 +215,8 @@ describe("BudgetTab", () => {
     const a = line({ spent: 3_000_000, limit: 7_000_000, balance: 4_000_000, pct: 3 / 7 });
     mockResult = { loading: false, error: false, financials: withBudget(jarBudget({}, [a])) };
     render(<BudgetTab />);
-    expect(screen.getByText(gauge(/^Đã chi 3\.000\.000\s₫ \/ 7\.000\.000\s₫ hạn mức$/))).toBeInTheDocument();
-    expect(screen.getByText(/^Số dư/).textContent).toMatch(/4\.000\.000/);
+    expect(screen.getByText(gauge(/^Đã chi 3,000,000\sVND \/ 7,000,000\sVND hạn mức$/))).toBeInTheDocument();
+    expect(screen.getByText(/^Số dư/).textContent).toMatch(/4,000,000/);
   });
 
   it("a jar without a balance offers 'Chia ngay' in the current month", () => {
@@ -235,7 +235,7 @@ describe("BudgetTab", () => {
     render(<BudgetTab />);
     // Pre-anchor month: "Chưa có số dư", but Đã chi / hạn mức stay visible.
     expect(screen.getByText("Chưa có số dư")).toBeInTheDocument();
-    expect(screen.getByText(gauge(/^Đã chi 800\.000\s₫ \/ 4\.000\.000\s₫ hạn mức$/))).toBeInTheDocument();
+    expect(screen.getByText(gauge(/^Đã chi 800,000\sVND \/ 4,000,000\sVND hạn mức$/))).toBeInTheDocument();
     expect(screen.getByText("Cần bù thủ công")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Nạp thêm vào hũ" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Chia ngay" })).not.toBeInTheDocument();

@@ -24,7 +24,7 @@ export function TransferHeader({
   onRightClick?: () => void;
 }) {
   return (
-    <header className="flex items-center gap-2 px-4 pb-2 pt-[calc(var(--safe-area-top)+0.25rem)]">
+    <header className="transfer-header flex items-center gap-2 px-4 pb-5 pt-[calc(var(--safe-area-top)+0.25rem)]">
       <button
         type="button"
         onClick={onBack}
@@ -33,7 +33,7 @@ export function TransferHeader({
       >
         <ArrowLeft size={22} strokeWidth={2} />
       </button>
-      <h1 className="text-xl font-bold tracking-tight text-text">{title}</h1>
+      <h1 className="text-[22px] font-bold tracking-tight text-text">{title}</h1>
       <div className="ml-auto" aria-hidden={!rightIcon}>
         {rightIcon && (
           <button

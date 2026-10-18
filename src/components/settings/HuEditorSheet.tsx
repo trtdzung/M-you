@@ -29,11 +29,13 @@ export function HuEditorSheet({
   jarId,
   funds,
   onClose,
+  open = true,
 }: {
   jarId: string;
   /** Current-month balances + "Chờ phân bổ" (`useCurrentJarFunds`), owned by the tab. */
   funds: CurrentJarFunds;
   onClose: () => void;
+  open?: boolean;
 }) {
   const { config, updateJar } = useJarConfig();
   // Mẫu số của nhãn "(n/total)" là số danh mục chi ĐANG DÙNG của persona — người
@@ -69,7 +71,7 @@ export function HuEditorSheet({
   const dup = isDuplicateLabel(jar.label, config.jars, jarId);
 
   return (
-    <Sheet title="Sửa hũ" description={jar.label} onClose={() => void close()}>
+    <Sheet open={open} title="Sửa hũ" description={jar.label} onClose={() => void close()}>
       <div className="flex flex-col gap-5">
         <JarMutationErrorNotice />
         <label className="flex flex-col gap-1">

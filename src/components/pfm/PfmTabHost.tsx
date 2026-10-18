@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PanelActiveProvider } from "@/components/shell/PanelActive";
 import { isPfmTab, resolveLegacyTab, type PfmTabId } from "./PfmTabs";
 import { OverviewTab } from "./OverviewTab";
 import { BudgetTab } from "@/components/budget/BudgetTab";
 import { PfmTxnList } from "@/components/transactions/PfmTxnList";
 import { HuCategoryTab } from "@/components/settings/HuCategoryTab";
+import { GoalsListScreen } from "@/features/goals";
 
 /**
  * Single-route PFM host: client-side tab switching with no navigation, no data
@@ -30,7 +32,11 @@ export function PfmTabHost() {
     [isLegacyHuDock],
   );
 
-  const [active, setActive] = useState<PfmTabId>(() => resolve(tabParam));
+  const initial = resolve(tabParam);
+  const [active, setActive] = useState<PfmTabId>(initial);
+  const [visited, setVisited] = useState<PfmTabId[]>([initial]);
+  const scrollTops = useRef<Partial<Record<PfmTabId, number>>>({});
+  const panelEls = useRef<Partial<Record<PfmTabId, HTMLDivElement | null>>>({});
 
   // Re-sync on same-route jumps (bottom nav, copilot deep link): `useState` seeds
   // only at mount, so a `?tab=` change while already on `/pfm` must update here.
@@ -42,24 +48,46 @@ export function PfmTabHost() {
       router.replace(`/pfm?tab=${next}`, { scroll: false });
     }
     setActive((current) => (current === next ? current : next));
+    setVisited((current) => (current.includes(next) ? current : [...current, next]));
   }, [tabParam, isLegacyHuDock, resolve, router]);
+
+  useLayoutEffect(() => {
+    const el = panelEls.current[active];
+    if (!el) return;
+    const saved = scrollTops.current[active];
+    if (saved != null) el.scrollTop = saved;
+    const onScroll = () => {
+      scrollTops.current[active] = el.scrollTop;
+    };
+    el.addEventListener("scroll", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      // `hidden` can zero scrollTop. Keep the last position captured while the panel was visible.
+      if (!el.hidden) scrollTops.current[active] = el.scrollTop;
+    };
+  }, [active]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1">
         {PFM_PANELS.map(({ id, node }) => {
           const shown = id === active;
+          if (!visited.includes(id)) return null;
           return (
-            <div
-              key={id}
-              role="tabpanel"
-              id={`pfm-panel-${id}`}
-              aria-labelledby={`pfm-tab-${id}`}
-              hidden={!shown}
-              className="h-full min-h-0 overflow-y-auto scroll-pb-6 pb-6"
-            >
-              {shown && node()}
-            </div>
+            <PanelActiveProvider key={id} active={shown}>
+              <div
+                role="tabpanel"
+                id={`pfm-panel-${id}`}
+                aria-labelledby={`pfm-tab-${id}`}
+                hidden={!shown}
+                ref={(el) => {
+                  panelEls.current[id] = el;
+                }}
+                className="no-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto scroll-pb-6 pb-6"
+              >
+                {node()}
+              </div>
+            </PanelActiveProvider>
           );
         })}
       </div>
@@ -71,5 +99,6 @@ const PFM_PANELS: { id: PfmTabId; node: () => React.ReactNode }[] = [
   { id: "overview", node: () => <OverviewTab /> },
   { id: "transactions", node: () => <PfmTxnList /> },
   { id: "budget", node: () => <BudgetTab /> },
+  { id: "goals", node: () => <GoalsListScreen /> },
   { id: "settings", node: () => <HuCategoryTab /> },
 ];

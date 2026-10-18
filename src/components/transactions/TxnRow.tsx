@@ -37,14 +37,14 @@ export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: 
     <button
       type="button"
       onClick={() => onEdit(txn)}
-      className="flex min-h-16 w-full items-center gap-3 rounded-row px-1 py-2.5 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      className="txn-row flex min-h-16 w-full items-center gap-3 rounded-row px-1 py-2.5 text-left transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-text">{txn.merchantName}</span>
+          <span className="txn-row-title truncate text-sm font-medium text-text">{txn.merchantName}</span>
           {txn.userEdited && <Pencil size={11} className="shrink-0 text-primary" aria-label="Đã sửa danh mục" />}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+        <div className="txn-row-meta mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
           <span>{category}</span>
           {correction?.status !== "pending" && <CategoryProvenanceBadge correction={correction} />}
           <span aria-hidden>·</span>
@@ -56,7 +56,7 @@ export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: 
       <Money
         amount={txn.amount}
         sign={isCredit ? "credit" : "debit"}
-        className={cn("shrink-0 text-sm font-semibold", txn.status === "reversed" && "line-through opacity-60")}
+        className={cn("txn-row-amount shrink-0 text-sm font-semibold", txn.status === "reversed" && "line-through opacity-60")}
       />
     </button>
   );

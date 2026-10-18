@@ -53,11 +53,11 @@ describe("TransferAmountStep", () => {
     expect(onChangeRecipient).toHaveBeenCalledTimes(1);
   });
 
-  it("displays the amount grouped as 1.000.000 but reports raw digits upward", () => {
+  it("displays the amount grouped as 1,000,000 but reports raw digits upward", () => {
     const { onAmountChange } = renderStep({ amount: "11111111111111" });
     const input = screen.getByLabelText(/Số tiền/);
-    expect(input).toHaveValue("11.111.111.111.111");
-    fireEvent.change(input, { target: { value: "1.000.0005" } });
+    expect(input).toHaveValue("11,111,111,111,111");
+    fireEvent.change(input, { target: { value: "1,000,0005" } });
     expect(onAmountChange).toHaveBeenCalledWith("10000005");
   });
 
@@ -83,7 +83,7 @@ describe("TransferAmountStep", () => {
 
   it("shows the selected source account with its balance", () => {
     renderStep();
-    expect(screen.getByText("123.456.789 ₫")).toBeInTheDocument();
+    expect(screen.getByText("123,456,789 VND")).toBeInTheDocument();
   });
 
   it("shows the full (unmasked) account number for the source account, in the field and the sheet — no logo added there (only the recipient has one)", () => {
@@ -122,7 +122,7 @@ describe("TransferAmountStep", () => {
     expect(screen.getByText("Giải trí")).toBeInTheDocument();
     // The no-limit jar shows "Chưa có số dư"; the funded one shows its còn lại.
     expect(screen.getAllByText("Chưa có số dư")).toHaveLength(1);
-    expect(screen.getByText("1.210.000 ₫")).toBeInTheDocument();
+    expect(screen.getByText("1,210,000 VND")).toBeInTheDocument();
 
     // The no-limit jar is not a button; tapping its label does nothing.
     fireEvent.click(screen.getByText("Giải trí"));
@@ -140,7 +140,7 @@ describe("TransferAmountStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản nguồn" }));
 
     // The còn lại is shown; the "đã set"/limit wording is gone.
-    expect(screen.getByText("8.000.000 ₫")).toBeInTheDocument();
+    expect(screen.getByText("8,000,000 VND")).toBeInTheDocument();
     expect(screen.queryByText(/Đã set/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Thiết yếu"));

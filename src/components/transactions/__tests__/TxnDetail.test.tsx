@@ -89,7 +89,7 @@ describe("TxnDetail", () => {
 
     expect(screen.getByRole("dialog", { name: "Chi tiết giao dịch" })).toBeInTheDocument();
     expect(screen.getByText("Chi tiêu")).toBeInTheDocument(); // TYPE_LABEL.expense
-    expect(screen.getByText("-150.000 ₫")).toBeInTheDocument(); // debit sign
+    expect(screen.getByText("-150,000 VND")).toBeInTheDocument(); // debit sign
     expect(screen.getByText("Ngày")).toBeInTheDocument();
     expect(screen.getByText("05/09/2026")).toBeInTheDocument();
     expect(screen.getByText("Trạng thái")).toBeInTheDocument();

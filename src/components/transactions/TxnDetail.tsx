@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, EyeOff, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import type { Transaction, TransactionType } from "@/domain/models";
 import { categoryLabel } from "@/domain/models";
-import { Money, Sheet, SourceBadge } from "@/components/primitives";
+import { Money, Sheet, SheetSlot, SourceBadge } from "@/components/primitives";
 import { useCategories } from "@/state/categories";
 import { useCorrections, useConfirmCategory } from "@/state/corrections";
 import { useCategoryMemory } from "@/state/category-memory";
@@ -34,7 +34,7 @@ function formatDate(iso: string): string {
  * one), và toggle "ẩn khỏi báo cáo". Ẩn/đổi danh mục đi qua corrections seam —
  * KHÔNG mutate provider Transaction (invariant #4). Chỉ trình bày + ghi override.
  */
-export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
+export function TxnDetail({ txn, onClose, open = true }: { txn: Transaction; onClose: () => void; open?: boolean }) {
   const { corrections, clearCategory, setHidden, unsaved } = useCorrections();
   // Nhãn lấy từ taxonomy đã lưu của người dùng (kể cả danh mục đã ẩn — giao dịch cũ
   // vẫn phải gọi đúng tên, invariant #5), không lấy từ hằng số đóng gói.
@@ -54,7 +54,7 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
   }
 
   return (
-    <Sheet title="Chi tiết giao dịch" description={txn.merchantName} onClose={onClose}>
+    <Sheet className="pfm-transaction-sheet" open={open} title="Chi tiết giao dịch" description={txn.merchantName} onClose={onClose}>
       <div className="flex flex-col gap-4">
         {unsaved && (
           <p className="rounded-row bg-negative-soft px-3 py-2 text-xs text-negative">
@@ -171,7 +171,9 @@ export function TxnDetail({ txn, onClose }: { txn: Transaction; onClose: () => v
       {/* Tạo từ một giao dịch: KHÔNG kèm `jarId` — người dùng chưa chọn hũ nào,
           nên danh mục mới ở "Chưa xếp hũ" và sheet nói rõ nó rơi vào đâu.
           Danh mục vừa tạo được gán luôn cho giao dịch này. */}
-      {adding && <CategoryCreateSheet onCreated={choose} onClose={() => setAdding(false)} />}
+      <SheetSlot open={adding}>
+        <CategoryCreateSheet open={adding} onCreated={choose} onClose={() => setAdding(false)} />
+      </SheetSlot>
     </Sheet>
   );
 }

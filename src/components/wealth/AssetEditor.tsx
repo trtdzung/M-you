@@ -33,10 +33,12 @@ export function AssetEditor({
   asset,
   onSubmit,
   onClose,
+  open = true,
 }: {
   asset?: Asset;
   onSubmit: (fields: AssetFields) => void;
   onClose: () => void;
+  open?: boolean;
 }) {
   const [draft, setDraft] = useState<AssetDraft>(() => draftFrom(asset));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -53,7 +55,7 @@ export function AssetEditor({
   }
 
   return (
-    <Sheet title={editing ? "Sửa tài sản" : "Thêm tài sản"} onClose={onClose}>
+    <Sheet open={open} title={editing ? "Sửa tài sản" : "Thêm tài sản"} onClose={onClose}>
         <form
           className="flex flex-col gap-3"
           onSubmit={(e) => {

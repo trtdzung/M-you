@@ -65,6 +65,7 @@ const h = vi.hoisted(() => {
     ),
     applyAccountDebit: vi.fn(async (_accountId: string, _amount: number, _record?: unknown) => {}),
     push: vi.fn(),
+    replace: vi.fn(),
     add: vi.fn((input: { categoryId: string; type: string; amount: number; merchantName: string }) => {
       const id = `manual-test-${state.store.length + 1}`;
       state.store = [{ id, categoryId: input.categoryId, type: input.type, amount: input.amount, merchantName: input.merchantName, source: "self_reported" }, ...state.store];
@@ -84,7 +85,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: h.push, back: () => {} }),
+  useRouter: () => ({ push: h.push, replace: h.replace, back: () => {} }),
   useSearchParams: () => new URLSearchParams(h.query),
 }));
 
@@ -189,6 +190,7 @@ async function completeTransfer() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  h.replace.mockClear();
   h.store = [];
   h.draft = null;
   h.used = {};
@@ -272,6 +274,15 @@ describe("TransferConfirm — always create + categorize", () => {
     await completeTransfer();
     expect(h.store).toHaveLength(1);
     expect(h.store[0]).toMatchObject({ categoryId: "transfer", type: "transfer" });
+  });
+
+  it("starts another transfer by replacing the completed receipt history entry", async () => {
+    h.draft = jarDraft();
+    render(<TransferConfirm />);
+    await completeTransfer();
+    fireEvent.click(screen.getByRole("button", { name: "Giao dịch khác" }));
+    expect(h.replace).toHaveBeenCalledWith("/transfer");
+    expect(h.adopt).toHaveBeenCalledTimes(1);
   });
 
   it("double-submit creates only one txn (F#3)", async () => {
@@ -408,7 +419,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
     h.draft = jarDraft();
     render(<TransferConfirm />);
     await completeTransfer();
-    expect(screen.getByRole("alert")).toHaveTextContent(/Chưa bù được 200\.000.*hũ Ăn uống.*cần bù thủ công/);
+    expect(screen.getByRole("alert")).toHaveTextContent(/Chưa bù được 200,000.*hũ Ăn uống.*cần bù thủ công/);
     expect(screen.queryByText(/Đã bù/)).not.toBeInTheDocument();
   });
 
@@ -436,7 +447,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
     render(<TransferConfirm />);
     fireEvent.change(screen.getByDisplayValue(String(AMOUNT)), { target: { value: "1500000" } });
 
-    expect(await screen.findByRole("alert", { name: "Số dư không đủ" })).toHaveTextContent(/680\.000/);
+    expect(await screen.findByRole("alert", { name: "Số dư không đủ" })).toHaveTextContent(/680,000/);
     expect(screen.queryByRole("region", { name: "Dự kiến bù hũ" })).not.toBeInTheDocument();
     expect(screen.queryByText(/rót từ/)).not.toBeInTheDocument();
   });

@@ -69,7 +69,7 @@ describe("HuCreateSheet — validation", () => {
     open(ready(5_000_000));
     fill({ balance: "6.000.000" });
     create();
-    expect(screen.getByRole("alert")).toHaveTextContent("Số dư ban đầu vượt số tiền chờ phân bổ (còn 5.000.000");
+    expect(screen.getByRole("alert")).toHaveTextContent("Số dư ban đầu vượt số tiền chờ phân bổ (còn 5,000,000");
     expect(addJar).not.toHaveBeenCalled();
   });
 

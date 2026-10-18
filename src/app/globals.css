@@ -113,6 +113,10 @@ body {
   padding: 0;
 }
 
+.shell-main--goals {
+  padding-bottom: var(--safe-area-bottom);
+}
+
 /* Login: no bottom nav to clear, so drop only the reserved nav-clearance
    bottom padding — the horizontal `px-shell-main-inset` utility on `main`
    must stay in effect (PromoCarousel's `-mx-4` bleed depends on it), so this
@@ -238,6 +242,79 @@ body {
   animation: fade-in 0.24s ease-out;
 }
 
+@keyframes sheet-panel-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes sheet-panel-out {
+  from { transform: none; }
+  to { transform: translateY(100%); }
+}
+@keyframes sheet-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes vt-forward-old {
+  to { transform: translateX(-30%); }
+}
+@keyframes vt-forward-new {
+  from { transform: translateX(100%); }
+}
+@keyframes vt-back-old {
+  to { transform: translateX(100%); }
+}
+@keyframes vt-back-new {
+  from { transform: translateX(-30%); }
+}
+
+.sheet-panel-in { animation: sheet-panel-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.sheet-panel-out { animation: sheet-panel-out 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.sheet-dragging { animation: none; touch-action: none; }
+.sheet-snap { animation: none; transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-rest { animation: none; }
+.sheet-backdrop-in { animation: sheet-backdrop-in 200ms ease-out both; }
+.sheet-backdrop-out { animation: sheet-backdrop-out 200ms ease-out both; }
+
+.shell-screen {
+  background: var(--color-background, #fff);
+  border-radius: inherit;
+  overflow: clip;
+}
+/* Transition snapshots must clip themselves, not rely on their parent frame. */
+.shell-body {
+  border-radius: inherit;
+  overflow: clip;
+}
+html[data-vt-dir="forward"] .shell-screen,
+html[data-vt-dir="back"] .shell-screen { view-transition-name: shell-main; }
+html[data-vt-dir="fade"] .shell-body { view-transition-name: shell-body; }
+html[data-vt-dir="fade"] .shell-bottom-nav { view-transition-name: shell-nav; }
+
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-image-pair(shell-main) { overflow: clip; }
+::view-transition-old(shell-main) { animation: vt-forward-old 300ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+::view-transition-new(shell-main) { animation: vt-forward-new 300ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+html[data-vt-dir="back"] ::view-transition-old(shell-main) { animation-name: vt-back-old; }
+html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-back-new; }
+
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+::view-transition-group(shell-body) { animation: none; z-index: 1; }
+::view-transition-image-pair(shell-body) { overflow: clip; }
+::view-transition-old(shell-body) { animation: vt-fade-out 220ms ease-out both; }
+::view-transition-new(shell-body) { animation: vt-fade-in 220ms ease-out both; }
+::view-transition-group(shell-nav) { animation: none; z-index: 10; }
+::view-transition-old(shell-nav) { animation: none; opacity: 0; }
+::view-transition-new(shell-nav) { animation: none; }
+
 /* Ẩn thanh cuộn (carousel ngang) — vẫn cuộn được, chỉ ẩn scrollbar */
 @utility no-scrollbar {
   scrollbar-width: none;
@@ -257,4 +334,474 @@ body {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
+
+/* MSB settings reference: pale peach/blush canvas, solid white groups. */
+.settings-main-detail {
+  padding-bottom: calc(28px + var(--safe-area-bottom));
+}
+.settings-demo {
+  color: #10284b;
+}
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  margin-bottom: 20px;
+}
+.settings-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 24px;
+  background: white;
+  padding: 18px 16px;
+}
+.settings-panel {
+  overflow: hidden;
+  border-radius: 24px;
+  background: white;
+}
+.settings-panel-title {
+  border-bottom: 1px solid #dfe5ee;
+  padding: 19px 16px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.settings-row {
+  display: flex;
+  width: 100%;
+  min-height: 72px;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 2px;
+  text-align: left;
+  font-size: 15px;
+}
+.settings-panel .settings-row + .settings-row {
+  border-top: 1px solid #edf0f4;
+}
+.settings-row:focus-visible, .settings-profile:focus-visible, .settings-action:focus-visible {
+  outline: 2px solid #f26522;
+  outline-offset: -3px;
+}
+.settings-input {
+  min-height: 48px;
+  border: 1px solid #dfe5ee;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 15px;
+}
+.settings-input:focus, .settings-input:focus-within {
+  outline: 2px solid #ff9b60;
+  outline-offset: 1px;
+}
+.settings-action {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffa24e, #ef6332);
+  padding: 12px 16px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+.settings-action:disabled {
+  background: #c4c9d1;
+  cursor: not-allowed;
+}
+.settings-shell:has(.settings-simple) {
+  background: #f7f8fa;
+}
+.settings-shell:has(.settings-simple) > [aria-hidden="true"] {
+  background: #f7f8fa;
+}
+
+/* Pre-login MSB landing: anniversary artwork is decorative, all controls stay live. */
+.login-shell {
+  --shell-ink: #151515;
+}
+.login-background {
+  background: radial-gradient(ellipse at 60% 0%, #ff8b20 0%, #ff5620 28%, #ed1321 64%);
+}
+.login-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 54px;
+  gap: 16px;
+}
+.login-icon-button {
+  display: flex;
+  height: 42px;
+  width: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff3eb;
+  color: #10284b;
+}
+.login-anniversary {
+  position: relative;
+  display: flex;
+  height: clamp(240px, 31dvh, 330px);
+  align-items: center;
+  justify-content: center;
+  margin: 0 -16px;
+  overflow: hidden;
+  color: #fff6b5;
+}
+.login-years {
+  position: relative;
+  margin-left: 42px;
+  font-size: clamp(155px, 43vw, 205px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -20px;
+  font-family: Georgia, serif;
+  text-shadow: 0 0 16px #ffb848;
+}
+.login-heritage {
+  position: absolute;
+  left: 8%;
+  top: 45%;
+  z-index: 1;
+  font-size: clamp(14px, 4vw, 19px);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+.login-heritage small { font-size: 10px; }
+.login-year-label {
+  position: absolute;
+  right: 6%;
+  top: 48%;
+  font-size: 19px;
+  font-weight: 700;
+}
+.login-welcome {
+  border: 1px solid white;
+  border-radius: 24px;
+  background: #ffecef;
+  padding: 18px 16px 16px;
+}
+.login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffa54f, #ee6335);
+  color: white;
+  font-size: 17px;
+  font-weight: 600;
+}
+.login-shortcuts {
+  display: flex;
+  align-items: stretch;
+  margin: 16px 0;
+  border: 1px solid white;
+  border-radius: 24px;
+  background: #ffecef;
+  padding: 15px 6px;
+}
+.login-shortcuts button {
+  display: flex;
+  flex: 1;
+  min-height: 60px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  color: #10284b;
+  font-size: 13px;
+  font-weight: 500;
+}
+.login-shortcuts svg { stroke-width: 1.7; }
+.login-shell button:focus-visible {
+  outline: 2px solid #10284b;
+  outline-offset: 3px;
+}
+
+/* Home simulation follows the same anniversary surface as login. */
+.home-quick-grid { background: #ffecef; border-color: white; padding: 18px 8px 12px; }
+.home-quick-grid > div:first-child { row-gap: 24px; }
+.home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 76px; gap: 12px; }
+.home-quick-grid svg { width: 29px; height: 29px; }
+.home-quick-grid span { font-size: 13px; line-height: 1.35; }
+.home-quick-grid > div:last-child > * { flex: 1; }
+.home-shell .shell-bottom-nav { padding-inline: 30px; }
+.home-shell .login-anniversary { height: clamp(195px, 23dvh, 230px); }
+.home-shell .login-years { font-size: 175px; }
+.home-quick-grid > div:first-child { row-gap: 14px; }
+.home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 64px; }
+.home-shell .login-anniversary { height: 190px; }
+.home-shell .home-account { padding: 12px 16px; }
+.home-quick-grid { padding-top: 12px; }
+.home-quick-grid > div:first-child { row-gap: 8px; }
+.home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 54px; gap: 8px; }
+
+.home-insight-card {
+  border: 1px solid white;
+  border-radius: 24px;
+  background: #ffecef;
+  overflow: hidden;
+}
+.home-insight-card button:focus-visible { outline-offset: -3px; }
+.home-insight-sheet { padding: 20px 20px calc(24px + var(--safe-area-bottom)); }
+.home-insight-sheet h2 { font-size: 18px; line-height: 1.4; }
+.home-insight-sheet p { line-height: 1.6; }
+.home-insight-sheet .login-submit { font-size: 15px; }
+.home-insight-secondary {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: 9px;
+  background: white;
+  color: var(--color-primary-strong);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Transfer chrome follows the simulated settings screens; controls retain their handlers. */
+.transfer-shell { color: #10284b; }
+.transfer-header { min-height: 64px; margin-bottom: 12px; }
+.transfer-shell .transfer-card {
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: none;
+}
+.transfer-shell input:focus-visible,
+.transfer-shell .transfer-input-frame:focus-within {
+  outline: 2px solid #ff9b60;
+  outline-offset: 1px;
+}
+.transfer-shell input::placeholder { color: #a5adbc; }
+.transfer-shell .login-submit:disabled {
+  background: #c3c8d1;
+  color: #fff;
+  opacity: 1;
+}
+.transfer-sheet {
+  border-radius: 24px 24px 0 0;
+  padding-left: 16px;
+  padding-right: 16px;
+  box-shadow: none;
+}
+.transfer-sheet > div:first-child {
+  align-items: center;
+  margin-left: -16px;
+  margin-right: -16px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid #dfe5ee;
+}
+.transfer-sheet h2 { font-size: 20px; font-weight: 700; color: #10284b; }
+.transfer-sheet > div:first-child > button { color: #10284b; }
+.transfer-sheet input:focus-visible { outline: 2px solid #ff9b60; outline-offset: 1px; }
+
+.transfer-bank-sheet { max-height: 82%; background: #fff; }
+.transfer-bank-sheet > div:first-child { position: sticky; top: -16px; z-index: 1; background: #fff; }
+
+.transfer-shell .transfer-input-frame > input:focus-visible { outline: none; }
+
+/* Transfer receipt category picker: scoped to preserve other team surfaces. */
+.transfer-category-sheet {
+  background: #fff;
+  color: #10284b;
+}
+.transfer-category-sheet > div:first-child p {
+  color: #596983;
+  font-size: 14px;
+}
+.transfer-category-sheet > div.grid {
+  max-height: 55vh;
+  gap: 10px;
+  padding-top: 16px;
+}
+.transfer-category-sheet > div.grid > button {
+  min-height: 48px;
+  border-radius: 12px;
+  border-color: #dfe5ee;
+  background: #fff;
+  color: #10284b;
+  font-size: 15px;
+}
+.transfer-category-sheet > div.grid > button[aria-pressed="true"] {
+  border-color: #ff650b;
+  background: #fff1e8;
+  font-weight: 600;
+}
+.transfer-category-sheet > div.grid > button[aria-pressed="true"] svg {
+  color: #ff650b;
+}
+
+/* Assets reference: navy type and muted currency inside peach chrome. */
+.accounts-shell {
+  --color-text: #10284b;
+  --color-muted: #596983;
+}
+.accounts-overview > header { margin-bottom: 28px; }
+.accounts-overview > header h1 { font-size: 24px; font-weight: 700; }
+
+/* Team PFM module uses the same visual language as the simulated MSB screens. */
+.pfm-app-shell {
+  --color-text: #10284b;
+  --color-muted: #596983;
+  --color-border: #dfe5ee;
+  --color-primary: #ff650b;
+}
+.pfm-app-shell .rounded-card {
+  border-radius: 18px;
+  box-shadow: none;
+}
+.pfm-app-shell #main-content h2 {
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+}
+.pfm-app-shell [role="dialog"] {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+}
+.pfm-app-shell [role="dialog"] h2 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.pfm-app-shell [role="dialog"] input,
+.pfm-app-shell [role="dialog"] select,
+.pfm-app-shell [role="dialog"] textarea {
+  border-color: #dfe5ee;
+  border-radius: 9px;
+}
+
+.pfm-transactions .txn-row {
+  min-height: 88px;
+  padding: 16px 0;
+  border-radius: 0;
+}
+.pfm-transactions .txn-row:hover { background: transparent; }
+.pfm-transactions .txn-row:active { opacity: 0.7; }
+.pfm-transactions .txn-row-title { font-size: 16px; font-weight: 600; line-height: 24px; }
+.pfm-transactions .txn-row-meta { margin-top: 4px; font-size: 13px; line-height: 20px; }
+.pfm-transactions .txn-row-amount { font-size: 15px; line-height: 22px; }
+.pfm-transaction-sheet > div:first-child {
+  border-bottom: 1px solid #dfe5ee;
+  padding-bottom: 16px;
+}
+.pfm-transaction-sheet [aria-pressed="true"] {
+  border-color: #ff650b;
+  background: #fff0e7;
+}
+
+.pfm-budget .budget-jar-card { padding: 20px; }
+.pfm-budget .budget-jar-card > div:first-child > div > div:first-child {
+  font-size: 16px;
+  line-height: 24px;
+  align-items: flex-start;
+}
+.pfm-budget .budget-jar-card > div:first-child > div > div:first-child > span:first-child {
+  font-weight: 600;
+}
+.pfm-budget .budget-jar-card > div:first-child > div > div:last-child {
+  font-size: 13px;
+  line-height: 20px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pfm-budget .budget-jar-card > div:nth-child(2) {
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.goals-app-shell {
+  --color-text: #10284b;
+  --color-muted: #596983;
+  --color-border: #dfe5ee;
+  --color-primary: #ff650b;
+}
+.goals-app-shell .goal-create-fields input,
+.goals-app-shell .goal-create-fields .goal-field-input {
+  border-radius: 9px;
+  min-height: 48px;
+  background: #fff;
+  border: 1px solid #dfe5ee;
+}
+.goals-app-shell .goal-create-fields label {
+  font-size: 15px;
+  line-height: 22px;
+}
+.goals-app-shell .goal-create-fields > section {
+  border: 0;
+  border-top: 1px solid #dfe5ee;
+  border-radius: 0;
+  padding: 20px 0 0;
+}
+.goals-app-shell [role="dialog"] {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+}
+.goals-app-shell [role="dialog"] h2 { font-size: 20px; font-weight: 700; }
+
+.goals-app-shell .rounded-card {
+  border-radius: 18px;
+  box-shadow: none;
+}
+.goals-app-shell .goal-detail-screen h2 { font-size: 18px; line-height: 26px; font-weight: 600; }
+.goals-app-shell .goal-primary-button {
+  min-height: 48px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffa54f 0%, #ee6335 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.goals-app-shell .goal-secondary-button {
+  min-height: 48px;
+  border-radius: 9px;
+  background: #fff;
+  border-color: #ff650b;
+  color: #ff650b;
+  font-size: 15px;
+}
+.goals-app-shell .goal-secondary-button:disabled,
+.goals-app-shell .goal-primary-button:disabled {
+  background: #c3c8d1;
+  border-color: #c3c8d1;
+  color: #fff;
+  opacity: 1;
+}
+.goals-app-shell [role="dialog"] .goal-field-input {
+  min-height: 48px;
+  border: 1px solid #dfe5ee;
+  border-radius: 9px;
+  background: #fff;
+}
+.goals-app-shell [role="dialog"] > div:first-child {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dfe5ee;
+}
+
+.pfm-app-shell .myou-chat { border-radius: inherit; }
+.pfm-app-shell .myou-chat > header { box-shadow: none; }
+
+.pfm-app-shell .myou-chat .login-submit { width: 48px; min-width: 48px; padding: 0; }
+.pfm-app-shell .myou-chat .shadow-card { box-shadow: none; background: #fff; border: 1px solid #dfe5ee; }

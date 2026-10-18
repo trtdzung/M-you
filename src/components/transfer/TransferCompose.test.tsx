@@ -75,6 +75,19 @@ beforeEach(() => {
 });
 
 describe("TransferCompose", () => {
+  it("opens a recipient sheet without leaving bank entry", async () => {
+    render(<TransferCompose />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chọn người nhận đã lưu hoặc gần đây" }));
+    expect(screen.getByRole("tab", { name: "Đã lưu" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Gần đây" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent("Người thụ hưởng");
+    fireEvent.click(screen.getByRole("button", { name: /Lan Anh MSB/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Số tài khoản/Số thẻ")).toHaveValue("0281000556677");
+    expect(screen.getByLabelText("Tên người nhận")).toHaveValue("Lan Anh");
+  });
+
   it("hands a validated saved recipient to mock confirmation without an account number", async () => {
     render(<TransferCompose />);
     fireEvent.click(await screen.findByRole("button", { name: /Lan Anh/ }));
@@ -105,7 +118,7 @@ describe("TransferCompose", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" }));
     expect(screen.getByRole("button", { name: "Ngân hàng nhận" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "‹ Quay lại" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quay lại" }));
     expect(await screen.findByRole("button", { name: "Tài khoản/Số thẻ" })).toBeInTheDocument();
   });
 
@@ -168,7 +181,7 @@ describe("TransferCompose — jar funding verdicts", () => {
     expect(screen.queryByText("Không đủ số dư để chuyển số tiền này.")).not.toBeInTheDocument();
     fireEvent.click(continueButton);
     const sheet = await screen.findByRole("dialog");
-    expect(within(sheet).getByText(/còn thiếu 2\.000\.000/)).toBeInTheDocument();
+    expect(within(sheet).getByText(/còn thiếu 2,000,000/)).toBeInTheDocument();
     expect(within(sheet).getByText("Hũ Du lịch")).toBeInTheDocument();
   });
 
@@ -191,7 +204,7 @@ describe("TransferCompose — jar funding verdicts", () => {
     await waitFor(() => expect(continueButton).toBeEnabled());
     fireEvent.click(continueButton);
     // September's drained jar → short by the full 500k (an October view would be `ok`).
-    expect(within(await screen.findByRole("dialog")).getByText(/còn thiếu 500\.000/)).toBeInTheDocument();
+    expect(within(await screen.findByRole("dialog")).getByText(/còn thiếu 500,000/)).toBeInTheDocument();
   });
 
   it("shows the pool as 'Chưa rõ' (never a fabricated 0) when there is no CASA account", async () => {

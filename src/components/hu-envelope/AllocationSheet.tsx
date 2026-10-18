@@ -44,11 +44,13 @@ export function AllocationSheet({
   envelope,
   jars,
   onClose,
+  open = true,
 }: {
   envelope: JarEnvelopeResult;
   /** Jar config, for label/accent/current limit per row. */
   jars: Jar[];
   onClose: () => void;
+  open?: boolean;
 }) {
   const { postLedger, mutationError } = useJarConfig();
   const [saving, setSaving] = useState(false);
@@ -121,7 +123,7 @@ export function AllocationSheet({
   }
 
   return (
-    <Sheet title="Chia tiền vào hũ" description="Nhập số tiền cộng thêm vào mỗi hũ để chia hết phần đang chờ. Chỉ tăng SỐ DƯ của hũ, không đổi hạn mức. Không chuyển tiền, không cần OTP." onClose={onClose}>
+    <Sheet open={open} title="Chia tiền vào hũ" description="Nhập số tiền cộng thêm vào mỗi hũ để chia hết phần đang chờ. Chỉ tăng SỐ DƯ của hũ, không đổi hạn mức. Không chuyển tiền, không cần OTP." onClose={onClose}>
       {!poolKnown ? (
         <InsufficientData description="Chưa có số dư tài khoản để phân bổ." />
       ) : (

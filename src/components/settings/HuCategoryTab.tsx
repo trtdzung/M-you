@@ -6,7 +6,7 @@ import { Plus, ChevronRight, Tag } from "lucide-react";
 import { duplicateLabelIds } from "@/domain/engine";
 import { useJarConfig } from "@/state/jars";
 import { useCurrentJarFunds } from "@/state/use-current-jar-funds";
-import { SectionHeader } from "@/components/primitives";
+import { SectionHeader, SheetSlot, useRetained } from "@/components/primitives";
 import { jarAccent } from "@/lib/category-colors";
 import { cn } from "@/lib/cn";
 import { jarIcon } from "./jar-visuals";
@@ -38,12 +38,17 @@ export function HuCategoryTab() {
 
   const dupes = useMemo(() => duplicateLabelIds(config.jars), [config.jars]);
   const openJar = huParam && config.jars.some((j) => j.id === huParam) ? huParam : editing;
+  const heldJar = useRetained(openJar);
 
   function closeEditor() {
     setEditing(null);
     if (huParam) {
       const next = new URLSearchParams(params?.toString());
       next.delete("hu");
+      if (next.get("from") === "budget") {
+        next.set("tab", "budget");
+        next.delete("from");
+      }
       router.replace(`/pfm?${next.toString()}`, { scroll: false });
     }
   }
@@ -140,9 +145,15 @@ export function HuCategoryTab() {
         <ChevronRight size={18} className="shrink-0 text-muted" aria-hidden />
       </button>
 
-      {openJar && <HuEditorSheet jarId={openJar} funds={funds} onClose={closeEditor} />}
-      {creating && <HuCreateSheet funds={funds} onCreated={created} onClose={() => setCreating(false)} />}
-      {managing && <CategoryManager onClose={() => setManaging(false)} />}
+      <SheetSlot open={!!openJar}>
+        {heldJar && <HuEditorSheet open={!!openJar} jarId={heldJar} funds={funds} onClose={closeEditor} />}
+      </SheetSlot>
+      <SheetSlot open={creating}>
+        <HuCreateSheet open={creating} funds={funds} onCreated={created} onClose={() => setCreating(false)} />
+      </SheetSlot>
+      <SheetSlot open={managing}>
+        <CategoryManager open={managing} onClose={() => setManaging(false)} />
+      </SheetSlot>
     </div>
   );
 }

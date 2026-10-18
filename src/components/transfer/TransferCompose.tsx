@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Home, QrCode } from "lucide-react";
+import { Home, Lock, QrCode } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
@@ -10,7 +12,11 @@ import { useAutoFundWith } from "@/state/use-auto-fund";
 import { transferNow } from "@/lib/demo-clock";
 import { maskAccount } from "@/lib/mask-account";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
+import { isNavigationTransitionPending, navigateWithTransition, backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { assessTransferRisk } from "@/lib/transfer-risk";
+import { useSecurityStore } from "@/state/security/store";
+import { isTransferBlocked } from "@/state/security/selectors";
+import { formatPendingAt } from "@/components/settings/security/pending";
 import { formatVnd } from "@/lib/format";
 import { casaBalance, casaBalanceOrUnknown, computeUnallocatedPool, evaluateFunding, jarSpendable, type JarSpendable } from "@/domain/engine";
 import type { Account, Beneficiary, Transaction } from "@/domain/models";
@@ -20,6 +26,7 @@ import { TransferAccountPicker } from "./TransferAccountPicker";
 import { TransferBankEntry } from "./TransferBankEntry";
 import { TransferSaveRecipient } from "./TransferSaveRecipient";
 import { TransferAmountStep, POOL_SOURCE_LABEL, type TransferSource } from "./TransferAmountStep";
+import { SheetSlot, useRetained } from "@/components/primitives";
 import { AgentTopupSheet } from "./AgentTopupSheet";
 
 type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
@@ -28,6 +35,10 @@ export function TransferCompose() {
   const providers = useProviders();
   const router = useRouter();
   const params = useSearchParams();
+
+  useEffect(() => {
+    router.prefetch?.("/transfer-confirm");
+  }, [router]);
   const { config: jarConfig, loaded: jarsLoaded } = useJarConfig();
   const fin = useFinancials();
   const { financials } = fin;
@@ -77,6 +88,10 @@ export function TransferCompose() {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setBeneficiaries([]);
+    setTransactions([]);
+    setAccounts([]);
+    setSource(null);
     setError(false);
     Promise.all([
       providers.listBeneficiaries(),
@@ -178,17 +193,21 @@ export function TransferCompose() {
   // Continue is allowed when: an account source has the balance, OR a jar/pool
   // source is `ok`, `topup` (popup), or goal-coverable (confirmed on Confirm).
   const canContinue = Boolean(
-    recipient &&
+    !loading && !error && recipient &&
       Number.isFinite(numericAmount) &&
       numericAmount > 0 &&
       (source?.kind === "account" ? accountSourceValid : assessment !== null && !insufficient),
   );
   const [topupOpen, setTopupOpen] = useState(false);
+  const heldTopup = useRetained(topupOpen && assessment?.tier === "topup" ? assessment : null);
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
+  // Scam Shield: a lock the customer set blocks the flow before confirm.
+  const lockState = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, transferLockUntil: state.transferLockUntil })));
+  const block = isTransferBlocked(lockState, transferNow().getTime());
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
   function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation"> = {}) {
-    if (!recipient) return;
+    if (!recipient || block.blocked || isNavigationTransitionPending()) return;
     const id = `form_${Date.now()}`;
     putTransferDraft({
       id,
@@ -217,7 +236,10 @@ export function TransferCompose() {
       source: "mock",
       ...extras,
     });
-    router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`);
+    navigateWithTransition(
+      () => router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`),
+      "forward",
+    );
   }
 
   function continueToConfirm() {
@@ -232,13 +254,11 @@ export function TransferCompose() {
   }
 
   let content: React.ReactNode;
-  if (loading) {
-    content = <p role="status" className="py-6 text-sm text-muted">Đang tải thông tin chuyển tiền…</p>;
-  } else if (error) {
-    content = <p role="alert" className="rounded-xl bg-negative-soft p-3 text-sm text-negative">Không thể tải thông tin lúc này. Vui lòng thử lại.</p>;
-  } else if (step === "pick") {
+  if (step === "pick") {
     content = (
       <TransferAccountPicker
+        loading={loading}
+        loadError={error}
         beneficiaries={beneficiaries}
         transactions={transactions}
         onSelectRecipient={selectRecipient}
@@ -247,13 +267,14 @@ export function TransferCompose() {
       />
     );
   } else if (step === "bank-entry") {
-    content = <TransferBankEntry onContinue={selectRecipient} onBack={() => setStep("pick")} />;
+    content = <TransferBankEntry onContinue={selectRecipient} beneficiaries={beneficiaries} transactions={transactions} loading={loading} loadError={error} />;
   } else if (step === "save-recipient") {
-    content = <TransferSaveRecipient onContinue={saveAndSelectRecipient} onBack={() => setStep("pick")} />;
+    content = <TransferSaveRecipient onContinue={saveAndSelectRecipient} />;
   } else if (recipient) {
     content = (
       <>
-        {accounts.length === 0 && <p role="alert" className="mx-4 mb-2 text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
+        {loading && <p role="status" className="mx-4 mb-2 text-sm text-muted">Đang tải tài khoản nguồn…</p>}
+        {!loading && accounts.length === 0 && <p role="alert" className="mx-4 mb-2 text-sm text-negative">Không có tài khoản nguồn phù hợp để tạo bản nháp.</p>}
         {insufficient && (
           <p role="alert" className="mx-4 mb-2 text-sm text-negative">
             Không đủ số dư để chuyển số tiền này.
@@ -267,16 +288,18 @@ export function TransferCompose() {
           source={source}
           amount={amount}
           memo={memo}
-          canContinue={canContinue}
+          canContinue={!loading && !error && canContinue && !block.blocked}
           onChangeRecipient={backToPick}
           onSourceChange={setSource}
           onAmountChange={setAmount}
           onMemoChange={setMemo}
           onContinue={continueToConfirm}
         />
-        {topupOpen && assessment?.tier === "topup" && (
+        <SheetSlot open={topupOpen && assessment?.tier === "topup"}>
+          {heldTopup && heldTopup.tier === "topup" && (
           <AgentTopupSheet
-            assessment={assessment}
+            open={topupOpen && assessment?.tier === "topup"}
+            assessment={heldTopup}
             jarId={selectedJar?.id ?? null}
             targetLabel={selectedJar ? `Hũ ${selectedJar.label}` : POOL_SOURCE_LABEL}
             jars={jarSpendables ?? []}
@@ -288,7 +311,8 @@ export function TransferCompose() {
             }}
             onChooseAnother={() => setTopupOpen(false)}
           />
-        )}
+          )}
+        </SheetSlot>
       </>
     );
   }
@@ -296,15 +320,26 @@ export function TransferCompose() {
   return (
     <div className="flex h-full flex-col">
       {step === "pick" ? (
-        <TransferHeader onBack={() => router.back()} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
+        <TransferHeader onBack={() => backWithTransition(() => router.back())} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
       ) : (
         <TransferHeader
-          onBack={() => router.back()}
+          onBack={backToPick}
           title={step === "save-recipient" ? "Lưu người nhận" : "Chuyển tiền"}
           rightIcon={<Home size={20} strokeWidth={2} />}
           rightLabel="Về trang chủ"
-          onRightClick={() => router.push("/")}
+          onRightClick={() => pushWithTransition((href) => router.push(href), "/")}
         />
+      )}
+      {block.blocked && (
+        <div role="status" className="mx-4 mb-2 flex gap-3 rounded-[20px] bg-negative-soft p-4 text-sm leading-relaxed">
+          <Lock size={20} className="shrink-0 text-negative" aria-hidden />
+          <p className="min-w-0 flex-1">
+            {block.reason === "transfer-locked" && block.until !== undefined
+              ? `Bạn đang khóa chuyển tiền ra ngoài đến ${formatPendingAt(block.until)}.`
+              : "Tài khoản đang khóa tạm theo yêu cầu của bạn."}{" "}
+            <Link href={block.reason === "transfer-locked" ? "/settings/transfer-lock" : "/settings/sos"} className="font-semibold text-primary underline underline-offset-4">Quản lý</Link>
+          </p>
+        </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col">{content}</div>
     </div>

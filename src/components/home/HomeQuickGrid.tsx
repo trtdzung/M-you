@@ -36,5 +36,5 @@ const FOOTER: QuickAction[] = [
 ];
 
 export function HomeQuickGrid() {
-  return <QuickActions actions={ACTIONS} footer={FOOTER} />;
+  return <QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" />;
 }

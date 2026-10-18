@@ -13,6 +13,7 @@
  */
 
 import { PersonaProvider } from "@/providers/context";
+import { SecurityPersonaSync } from "@/state/security/SecurityPersonaSync";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
 import { CategoryTaxonomyProvider } from "@/state/categories";
@@ -24,10 +25,12 @@ import { PeriodProvider } from "@/state/period";
 import { AutoCategorizeProvider } from "@/state/auto-categorize";
 import { ConsentGate } from "@/components/consent/ConsentGate";
 import { LoginGate } from "@/components/login/LoginGate";
+import { AppChrome } from "@/components/shell/AppChrome";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <PersonaProvider>
+      <SecurityPersonaSync />
       <LoginGate>
         <CorrectionsProvider>
           <ManualTxnsProvider>
@@ -38,7 +41,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
                     <GoalProvider>
                       <PeriodProvider>
                         <ConsentGate>
-                          <AutoCategorizeProvider>{children}</AutoCategorizeProvider>
+                          <AutoCategorizeProvider>
+                          <AppChrome>{children}</AppChrome>
+                        </AutoCategorizeProvider>
                         </ConsentGate>
                       </PeriodProvider>
                     </GoalProvider>

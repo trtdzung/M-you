@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { SpendingSection, type DonutSide } from "@/components/report/SpendingSection";
 import { SpendingReport } from "@/components/report/SpendingReport";
+import { SheetSlot } from "@/components/primitives";
 import { CashflowOverviewCard } from "@/components/cashflow/CashflowOverviewCard";
 import { CashflowTrendCard } from "@/components/cashflow/CashflowTrendCard";
 import { HuOverviewRow } from "@/components/hu-envelope/HuOverviewRow";
@@ -89,7 +90,9 @@ export function OverviewTab() {
 
       <CashflowTrendCard trend={trend} />
 
-      {reportOpen && <SpendingReport monthKey={reportMonthKey ?? monthKey} onClose={() => setReportOpen(false)} />}
+      <SheetSlot open={reportOpen}>
+        <SpendingReport open={reportOpen} monthKey={reportMonthKey ?? monthKey} onClose={() => setReportOpen(false)} />
+      </SheetSlot>
     </div>
   );
 }

@@ -201,7 +201,7 @@ describe("JarConfigProvider — mutation errors (U20/S14/K02)", () => {
     await act(async () => {
       await hook.result.current.jars.updateJar("food", { budgetLimit: 50_000_000 });
     });
-    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 30\.886\.000/);
+    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 30,886,000/);
     expect(jarById(hook, "food")?.budgetLimit).toBe(4_000_000);
   });
 
@@ -283,7 +283,7 @@ describe("JarConfigProvider — balances (plan 260923)", () => {
     await act(async () => {
       await hook.result.current.jars.postLedger([{ jarId: "food", kind: "deposit", amount: 5_000_000 }]);
     });
-    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 1\.250\.000/);
+    expect(hook.result.current.jars.mutationError).toMatch(/Vượt số dư 1,250,000/);
   });
 });
 

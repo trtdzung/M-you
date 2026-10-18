@@ -5,7 +5,7 @@ const key = (cif: string) => `pfm.insight-draft:${cif}`;
 export function saveInsightDraft(cif: string, insight: HomeInsight): boolean {
   const c = insight.candidate;
   const visibleText = c.question;
-  const hiddenSeed = `\n\nBối cảnh từ Home ngày ${insight.asOf}: ${c.metric.label}: ${c.metric.value.toLocaleString("vi-VN")} VND (${c.confidence === "estimated" ? "ước tính" : "theo dữ liệu đã ghi nhận"}). Các dữ kiện: ${JSON.stringify(c.facts)}. Hãy kiểm tra dữ liệu hiện tại trước khi tư vấn; đây chưa phải yêu cầu thực hiện giao dịch.`;
+  const hiddenSeed = `\n\nBối cảnh từ Home ngày ${insight.asOf}: ${c.metric.label}: ${c.metric.value.toLocaleString("en-US")} VND (${c.confidence === "estimated" ? "ước tính" : "theo dữ liệu đã ghi nhận"}). Các dữ kiện: ${JSON.stringify(c.facts)}. Hãy kiểm tra dữ liệu hiện tại trước khi tư vấn; đây chưa phải yêu cầu thực hiện giao dịch.`;
   const draft = visibleText + hiddenSeed;
   try {
     sessionStorage.setItem(key(cif), JSON.stringify({ draft, visibleText, expires: Date.now() + 15 * 60_000 }));

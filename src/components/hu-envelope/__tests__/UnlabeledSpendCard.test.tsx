@@ -22,7 +22,7 @@ describe("UnlabeledSpendCard", () => {
     render(<UnlabeledSpendCard count={0} amount={0} onOpen={onOpen} />);
     expect(screen.getByText("Chưa gắn nhãn")).toBeInTheDocument();
     expect(screen.getByText("Đã gắn nhãn hết")).toBeInTheDocument();
-    expect(screen.getByText("0 ₫")).toBeInTheDocument();
+    expect(screen.getByText("0 VND")).toBeInTheDocument();
     const cta = screen.getByRole("button", { name: /Gắn nhãn/ });
     expect(cta).toBeDisabled();
     fireEvent.click(cta);

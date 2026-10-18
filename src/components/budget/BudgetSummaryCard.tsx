@@ -28,7 +28,7 @@ export function BudgetSummaryCard({
   return (
     <Card className="flex flex-col items-center gap-3" role="region" aria-label="Tổng ngân sách">
       <div className="flex w-full items-center justify-between">
-        <span className="text-sm font-semibold text-text">Tổng đã tiêu</span>
+        <span className="text-[18px] font-semibold text-text">Tổng đã tiêu</span>
         <div className="flex items-center gap-2">
           {overAllocated && (
             <span className="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning">
@@ -43,7 +43,7 @@ export function BudgetSummaryCard({
         centerLabel={pctLabel}
         sublabel={summary.daysLeft > 0 ? `Còn ${summary.daysLeft} ngày trong kỳ` : "Đã hết kỳ"}
       />
-      <div className="grid w-full grid-cols-3 gap-2 border-t border-border pt-3 text-center">
+      <div className="flex w-full flex-col gap-3 border-t border-border pt-4">
         <GaugeStat label="Đã tiêu" node={<Money amount={summary.totalSpentSet} className="font-semibold text-text" />} />
         <GaugeStat
           label="Hạn mức"
@@ -61,7 +61,7 @@ export function BudgetSummaryCard({
         />
       </div>
       {adjustment !== 0 && (
-        <p className="w-full text-center text-[11px] text-muted" data-testid="budget-rebalance-adjustment">
+        <p className="w-full text-center text-sm text-muted" data-testid="budget-rebalance-adjustment">
           Điều chỉnh hũ {adjustment > 0 ? "+" : "−"}
           {formatVnd(Math.abs(adjustment))} (bù/chuyển với Chưa phân bổ hoặc hũ khác)
         </p>
@@ -72,9 +72,9 @@ export function BudgetSummaryCard({
 
 function GaugeStat({ label, node }: { label: string; node: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] text-muted">{label}</span>
-      <span className="text-sm">{node}</span>
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-sm text-muted">{label}</span>
+      <span className="text-base tabular-nums">{node}</span>
     </div>
   );
 }

@@ -128,7 +128,7 @@ describe("JarTransferSheet — endpoint selection", () => {
 
     expect(screen.getByRole("button", { name: "Hũ chuyển: Nhà cửa — đổi" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Hũ nhận: Ăn uống — đổi" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Số tiền")).toHaveValue("300.000");
+    expect(screen.getByLabelText("Số tiền")).toHaveValue("300,000");
   });
 
   it("shows an unfunded jar disabled in the picker with 'Chưa có số dư'", () => {
@@ -163,13 +163,13 @@ describe("JarTransferSheet — amount validation", () => {
 
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "200000" } });
     fireEvent.blur(screen.getByLabelText("Số tiền"));
-    expect(screen.getByText("Tối đa 123.457 ₫.")).toBeInTheDocument();
+    expect(screen.getByText("Tối đa 123,457 VND.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Chuyển/ })).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Tối đa" }));
-    expect(screen.getByLabelText("Số tiền")).toHaveValue("123.457");
-    expect(screen.queryByText("Tối đa 123.457 ₫.")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Chuyển 123.457 ₫" })).toBeEnabled();
+    expect(screen.getByLabelText("Số tiền")).toHaveValue("123,457");
+    expect(screen.queryByText("Tối đa 123,457 VND.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Chuyển 123,457 VND" })).toBeEnabled();
   });
 });
 
@@ -179,7 +179,7 @@ describe("JarTransferSheet — confirm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Chọn hũ nhận" }));
     fireEvent.click(screen.getByRole("button", { name: /Nhà cửa/ }));
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "300000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Chuyển 300.000 ₫" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chuyển 300,000 VND" }));
 
     await waitFor(() => expect(h.commitPersisted).toHaveBeenCalledTimes(1));
     const call = h.commitPersisted.mock.calls[0][0];
@@ -204,7 +204,7 @@ describe("JarTransferSheet — confirm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Chọn hũ nhận" }));
     fireEvent.click(screen.getByRole("button", { name: /Chưa phân bổ/ }));
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "500000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Chuyển 500.000 ₫" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chuyển 500,000 VND" }));
 
     await waitFor(() => expect(h.commitPersisted).toHaveBeenCalledTimes(1));
     expect(h.commitPersisted.mock.calls[0][0].targetJarId).toBeNull();
@@ -218,7 +218,7 @@ describe("JarTransferSheet — confirm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Chọn hũ nhận" }));
     fireEvent.click(screen.getByRole("button", { name: /Nhà cửa/ }));
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "300000" } });
-    const confirmBtn = screen.getByRole("button", { name: "Chuyển 300.000 ₫" });
+    const confirmBtn = screen.getByRole("button", { name: "Chuyển 300,000 VND" });
 
     // Both clicks dispatched inside one `act` so React can't flush the
     // `saving`-disabled re-render between them — this exercises the
@@ -238,13 +238,13 @@ describe("JarTransferSheet — confirm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Chọn hũ nhận" }));
     fireEvent.click(screen.getByRole("button", { name: /Nhà cửa/ }));
     fireEvent.change(screen.getByLabelText("Số tiền"), { target: { value: "300000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Chuyển 300.000 ₫" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chuyển 300,000 VND" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent("Không ghi được thay đổi. Vui lòng thử lại."),
     );
     expect(onDone).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Số tiền")).toHaveValue("300.000");
-    expect(screen.getByRole("button", { name: "Chuyển 300.000 ₫" })).toBeEnabled();
+    expect(screen.getByLabelText("Số tiền")).toHaveValue("300,000");
+    expect(screen.getByRole("button", { name: "Chuyển 300,000 VND" })).toBeEnabled();
   });
 });

@@ -70,7 +70,7 @@ describe("VoiceFab refined transcript hand-off", () => {
     expect(speech.options.entities).toContainEqual(expect.objectContaining({ id: "food", label: "Ăn uống" }));
     expect(speech.options.endpointing).toBe("manual");
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
-    const input = await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
+    const input = await screen.findByPlaceholderText("Nhập nội dung cần hỗ trợ");
 
     act(() => speech.callback?.("chuyển năm trăm", false));
     expect(input).toHaveValue("");
@@ -124,7 +124,7 @@ describe("VoiceFab refined transcript hand-off", () => {
     speech.partial = "chi tiêu tháng này";
     rerender(<VoiceFab />);
     expect(screen.getByLabelText("Nội dung nghe được tạm thời")).toHaveTextContent("chi tiêu tháng này");
-    expect(screen.getByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Nhập nội dung cần hỗ trợ")).toHaveValue("");
     expect(agentApi.sendChatMessage).not.toHaveBeenCalled();
   });
 
@@ -147,7 +147,7 @@ describe("VoiceFab refined transcript hand-off", () => {
   it("still forwards to the agent even when the STT flags the utterance as incomplete", async () => {
     render(<VoiceFab />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
-    await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
+    await screen.findByPlaceholderText("Nhập nội dung cần hỗ trợ");
     act(() => speech.callback?.("Chuyển 500.000 VND sang hũ Ăn uống", true, {
       rawText: "Chuyển năm trăm nghìn sang hũ ăn uống",
       refinementStatus: "fallback",
@@ -166,7 +166,7 @@ describe("VoiceFab refined transcript hand-off", () => {
   it("still forwards a negated command — the real agent recognizes the negation itself", async () => {
     render(<VoiceFab />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Giữ để hỏi M-You bằng giọng nói" }));
-    await screen.findByPlaceholderText("Nhấn giữ biểu tượng M-You để nói, hoặc gõ tại đây");
+    await screen.findByPlaceholderText("Nhập nội dung cần hỗ trợ");
     act(() => speech.callback?.("Đừng chuyển 500.000 VND từ hũ Ăn uống sang hũ Khác", true, {
       rawText: "Đừng chuyển năm trăm nghìn từ hũ ăn uống sang hũ khác",
       refinementStatus: "unchanged",

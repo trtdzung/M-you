@@ -40,6 +40,14 @@ const recentTransferTxn: Transaction = {
 };
 
 describe("TransferAccountPicker", () => {
+  it("keeps entry actions available while recipients load without showing an empty list", () => {
+    const { onEnterBankDetails } = renderPicker({ loading: true });
+    expect(screen.getByRole("status")).toHaveTextContent("Đang tải người nhận");
+    expect(screen.queryByText("Danh sách người nhận trống")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tài khoản/Số thẻ" }));
+    expect(onEnterBankDetails).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the external-bank step when 'Tài khoản/Số thẻ' is tapped", () => {
     const { onEnterBankDetails } = renderPicker();
     fireEvent.click(screen.getByRole("button", { name: "Tài khoản/Số thẻ" }));

@@ -23,7 +23,9 @@ describe("maskAccountNumber", () => {
 
 describe("formatVnd", () => {
   it("formats a number as VND", () => {
-    expect(formatVnd(1_250_000)).toBe("1.250.000 ₫");
+    expect(formatVnd(1_250_000)).toBe("1,250,000 VND");
+    expect(formatVnd(0)).toBe("0 VND");
+    expect(formatVnd(-1234)).toBe("-1,234 VND");
   });
   it("renders unknown values as em dash", () => {
     expect(formatVnd(UNKNOWN)).toBe("—");

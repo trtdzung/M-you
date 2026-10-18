@@ -1,50 +1,49 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
+import { AnniversaryHero } from "@/components/home/AnniversaryHero";
 import { HomeHeader } from "@/components/shell/HomeHeader";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
 import { HomeInsightWidget } from "@/components/home/HomeInsightWidget";
-import { Empty, ErrorState, SkeletonCard } from "@/components/states";
-import { useFinancials } from "@/state/useFinancials";
+import { Empty } from "@/components/states";
+import { usePersona, useProviders } from "@/providers/context";
+import type { Providers } from "@/providers";
 
 export default function HomePage() {
-  const { loading, error, raw } = useFinancials();
-
-  const primary = useMemo(
-    () => raw?.accounts.find((a) => a.type === "current") ?? null,
-    [raw],
-  );
+  const providers = useProviders();
+  const { persona } = usePersona();
+  const [result, setResult] = useState<{ provider: Providers; accounts: Awaited<ReturnType<Providers["listAccounts"]>>; error: boolean } | null>(null);
+  useEffect(() => {
+    let active = true;
+    providers.listAccounts().then(accounts => {
+      if (active) setResult({ provider: providers, accounts, error: false });
+    }).catch(() => {
+      if (active) setResult({ provider: providers, accounts: [], error: true });
+    });
+    return () => { active = false; };
+  }, [providers]);
+  // Never show the previous customer's balance while the provider switches.
+  const current = result?.provider === providers ? result : null;
+  const primary = current?.accounts.find(a => a.type === "current") ?? null;
 
   return (
     <div>
-      {/* Header ngồi thẳng trên nền toàn màn "2/9" (không còn khối hero riêng).
-          Spacer để lộ chữ số "2/9" của ảnh nền trước khi tới các thẻ. */}
       <HomeHeader notifications={9} />
-      <div aria-hidden className="h-72" />
+      <AnniversaryHero />
 
-      {loading && (
-        <div className="flex flex-col gap-4">
-          <SkeletonCard className="h-32" />
-          <SkeletonCard className="h-56" />
-          <SkeletonCard className="h-28" />
-        </div>
-      )}
-
-      {error && <ErrorState />}
-
-      {!loading && !error && (
-        <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
           <HomeInsightWidget />
 
-          {primary ? (
+          {!current || current.error || primary ? (
             <AccountSummaryCard
-              tier={primary.tier ?? "MSB"}
-              maskedNumber={primary.maskedNumber}
-              balance={primary.balance}
-              freshness={primary.lastSyncedAt}
+              key={persona.cif}
+              tier={primary?.tier ?? persona.tier}
+              maskedNumber={primary?.maskedNumber ?? "Tài khoản chính"}
+              balance={primary?.balance ?? null}
+              freshness={primary?.lastSyncedAt ?? null}
             />
           ) : (
             <div className="shadow-card rounded-[24px] bg-surface p-5">
@@ -52,11 +51,10 @@ export default function HomePage() {
             </div>
           )}
 
-
-
           <HomeQuickGrid />
 
           <PromoCarousel
+            inset
             items={[
               <PromoCard
                 key="savings"
@@ -79,7 +77,6 @@ export default function HomePage() {
             ]}
           />
         </div>
-      )}
     </div>
   );
 }

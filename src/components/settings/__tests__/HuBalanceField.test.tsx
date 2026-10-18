@@ -58,8 +58,8 @@ describe("HuBalanceField — states", () => {
 
   it("shows a negative balance in text-negative, and the pool hint", () => {
     render(<HuBalanceField jar={jar} funds={funds({ balance: -200_000 })} />);
-    expect(screen.getByText(/-200\.000/)).toHaveClass("text-negative");
-    expect(screen.getByText(/Chờ phân bổ: 3\.000\.000.*Không chuyển tiền, không cần OTP\./)).toBeInTheDocument();
+    expect(screen.getByText(/-200,000/)).toHaveClass("text-negative");
+    expect(screen.getByText(/Chờ phân bổ: 3,000,000.*Không chuyển tiền, không cần OTP\./)).toBeInTheDocument();
   });
 });
 
@@ -105,7 +105,7 @@ describe("HuBalanceField — deposit / withdraw", () => {
     render(<HuBalanceField jar={jar} funds={funds()} />);
     type("2000000");
     fireEvent.click(screen.getByRole("button", { name: "Rút về Chờ phân bổ" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Chỉ rút tối đa 1.500.000");
+    expect(screen.getByRole("alert")).toHaveTextContent("Chỉ rút tối đa 1,500,000");
     expect(postLedger).not.toHaveBeenCalled();
   });
 
@@ -121,7 +121,7 @@ describe("HuBalanceField — deposit / withdraw", () => {
     render(<HuBalanceField jar={jar} funds={funds({ pool: 3_000_000 })} />);
     type("3000001");
     fireEvent.click(screen.getByRole("button", { name: "Nạp vào hũ" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Chỉ còn 3.000.000");
+    expect(screen.getByRole("alert")).toHaveTextContent("Chỉ còn 3,000,000");
     expect(postLedger).not.toHaveBeenCalled();
   });
 

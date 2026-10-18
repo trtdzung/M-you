@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useRouter } from "next/navigation";
+import { pushWithTransition } from "@/lib/view-transition";
 import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBankByName } from "@/lib/transfer-banks";
 import { BankLogo } from "@/components/transfer/BankLogo";
@@ -88,7 +89,7 @@ export function AgentTransferFormCard({ form, fullWidth = false }: { form: Trans
       note,
       category,
     });
-    router.push(`/transfer?${query.toString()}`);
+    pushWithTransition((href) => router.push(href), `/transfer?${query.toString()}`);
   }
 
   if (status === "loading") {
