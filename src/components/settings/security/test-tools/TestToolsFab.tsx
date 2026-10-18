@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FlaskConical } from "lucide-react";
-import { useTestToolsStore } from "@/state/security/test-tools";
+import { useTestToolsFabStore } from "@/state/security/test-tools";
 
 const TEST_TOOLS_HREF = "/settings/test-tools";
 
 /** Small floating shortcut to the tester panel. Shown only when switched on in Công cụ test. */
 export function TestToolsFab() {
-  const showFab = useTestToolsStore(state => state.showFab);
-  // The flag lives in sessionStorage, so wait for the client to avoid a hydration mismatch.
+  const showFab = useTestToolsFabStore(state => state.showFab);
+  // The flag lives in localStorage, so wait for the client to avoid a hydration mismatch.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted && showFab ? <TestToolsFabLink /> : null;

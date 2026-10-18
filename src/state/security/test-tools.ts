@@ -12,9 +12,6 @@ type TestToolsStore = {
   /** Hour (0–23, Vietnam time) the alert is judged at; null = the real clock. */
   alertHour: number | null;
   setAlertHour: (hour: number | null) => void;
-  /** Floating shortcut to the test-tools screen on every screen; off by default. */
-  showFab: boolean;
-  setShowFab: (on: boolean) => void;
 };
 
 export const useTestToolsStore = create<TestToolsStore>()(
@@ -22,13 +19,32 @@ export const useTestToolsStore = create<TestToolsStore>()(
     (set) => ({
       alertHour: null,
       setAlertHour: (hour) => set({ alertHour: hour }),
-      showFab: false,
-      setShowFab: (on) => set({ showFab: on }),
     }),
     {
       name: "msb-pfm.test-tools",
       storage: createJSONStorage(() => sessionStorage),
-      partialize: (state) => ({ alertHour: state.alertHour, showFab: state.showFab }),
+      partialize: (state) => ({ alertHour: state.alertHour }),
+    },
+  ),
+);
+
+type TestToolsFabStore = {
+  /** Floating shortcut to the test-tools screen on every screen; off by default. */
+  showFab: boolean;
+  setShowFab: (on: boolean) => void;
+};
+
+// Kept in localStorage (not per tab like the alert hour) so a tester switches it on once per browser.
+export const useTestToolsFabStore = create<TestToolsFabStore>()(
+  persist(
+    (set) => ({
+      showFab: false,
+      setShowFab: (on) => set({ showFab: on }),
+    }),
+    {
+      name: "msb-pfm.test-tools-fab",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ showFab: state.showFab }),
     },
   ),
 );
