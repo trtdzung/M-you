@@ -16,6 +16,7 @@ import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { isTransferBlocked } from "@/state/security/selectors";
+import { alertClock } from "@/state/security/test-tools";
 import { useShallow } from "zustand/react/shallow";
 import { accountLastFour, isTrustedRecipient, transferAlertLevel } from "@/lib/transfer-alert";
 import { typeForCategory } from "@/lib/category-txn-type";
@@ -101,7 +102,7 @@ export function TransferConfirm() {
         recipientName: name,
         recipientAccount: draft?.accountNumber ?? acct,
         memo: memo.trim() || null,
-        postedAt: transferNow(),
+        postedAt: alertClock(),
         aiProtect: shield.aiProtect,
         trusted: shield.trusted,
       })
