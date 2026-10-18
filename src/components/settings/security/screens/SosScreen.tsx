@@ -5,7 +5,9 @@ import { useState, type ReactNode } from "react";
 import { CircleCheck, Phone } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { transferNow } from "@/lib/demo-clock";
-import { useSettingsDemo } from "../../SettingsDemoContext";
+import { useShallow } from "zustand/react/shallow";
+import { useSecurityStore } from "@/state/security/store";
+import { effectiveContacts } from "@/state/security/selectors";
 import { Notice } from "../../settings-ui";
 import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
 
@@ -21,11 +23,12 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 /** Settings › Khẩn cấp (SC1): lock, flag transactions, call the priority hotline. */
 export function SosScreen() {
-  const demo = useSettingsDemo();
+  const security = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, accountLockedAt: state.accountLockedAt, emergencyContacts: state.emergencyContacts })));
+  const { lockAccount, unlockAccount } = useSecurityStore.getState();
   const [locking, setLocking] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   // A contact being removed stays in effect until the 24h wait ends.
-  const contacts = demo.emergencyContacts.filter(contact => contact.status !== "pending");
+  const contacts = effectiveContacts(security);
 
   return <>
     <div>
@@ -35,8 +38,8 @@ export function SosScreen() {
       <p className="mt-1 text-xs text-muted">M-You là trợ lý AI của MSB · Bản giả lập</p>
     </div>
     <Step n={1} title="Khóa tạm tài khoản và thẻ">
-      {demo.accountLocked ? <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="flex items-center gap-2 font-semibold text-positive"><CircleCheck size={20} aria-hidden />Đã khóa tạm{demo.accountLockedAt !== null && ` lúc ${timeLabel(demo.accountLockedAt)}`}</span>
+      {security.accountLocked ? <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 font-semibold text-positive"><CircleCheck size={20} aria-hidden />Đã khóa tạm{security.accountLockedAt !== null && ` lúc ${timeLabel(security.accountLockedAt)}`}</span>
         <button type="button" className="text-sm font-semibold text-primary" onClick={() => setUnlocking(true)}>Mở khóa</button>
       </div> : <button type="button" className={redButton} onClick={() => setLocking(true)}>Khóa ngay</button>}
     </Step>
@@ -49,13 +52,13 @@ export function SosScreen() {
       <a href="tel:1900545426" className={`${redButton} mt-3`}><Phone size={18} aria-hidden />Gọi tổng đài ưu tiên</a>
     </Step>
     {contacts.length > 0
-      ? demo.accountLocked && <p className="text-sm leading-relaxed" role="status">Người thân khẩn cấp ({contacts.map(contact => contact.name).join(", ")}) đã được báo.</p>
+      ? security.accountLocked && <p className="text-sm leading-relaxed" role="status">Người thân khẩn cấp ({contacts.map(contact => contact.name).join(", ")}) đã được báo.</p>
       : <Link href="/settings/emergency-contacts" className="text-sm text-primary underline underline-offset-4">Thêm người thân khẩn cấp</Link>}
     <Notice>Bất kỳ ai đề nghị &apos;hỗ trợ lấy lại tiền&apos; có thu phí đều là lừa đảo. MSB chỉ cập nhật hồ sơ trong app.</Notice>
     <Sheet open={locking} title="Khóa tạm tài khoản" onClose={() => setLocking(false)}>
       <p className="mb-5 text-sm leading-relaxed">Khóa tạm mọi giao dịch và thẻ? Bạn mở lại bằng xác thực khuôn mặt.</p>
-      <button type="button" className={redButton} onClick={() => { demo.update({ accountLocked: true, accountLockedAt: transferNow().getTime() }); setLocking(false); }}>Khóa ngay</button>
+      <button type="button" className={redButton} onClick={() => { lockAccount(transferNow().getTime()); setLocking(false); }}>Khóa ngay</button>
     </Sheet>
-    <ConfirmFaceSheet open={unlocking} title="Mở khóa tài khoản?" message="Mở lại giao dịch và thẻ cần xác thực khuôn mặt." confirmLabel="Mở khóa" onConfirm={() => { demo.update({ accountLocked: false, accountLockedAt: null }); setUnlocking(false); }} onClose={() => setUnlocking(false)} />
+    <ConfirmFaceSheet open={unlocking} title="Mở khóa tài khoản?" message="Mở lại giao dịch và thẻ cần xác thực khuôn mặt." confirmLabel="Mở khóa" onConfirm={() => { unlockAccount(); setUnlocking(false); }} onClose={() => setUnlocking(false)} />
   </>;
 }

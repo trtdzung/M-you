@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { ScrollText } from "lucide-react";
 import { transferNow } from "@/lib/demo-clock";
-import { useSettingsDemo } from "../../SettingsDemoContext";
+import { useShallow } from "zustand/react/shallow";
+import { useSecurityStore } from "@/state/security/store";
+import { effectiveContacts } from "@/state/security/selectors";
 import { Badge, Panel, Row, Toggle } from "../../settings-ui";
 import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
 import { PendingOffNotice } from "../PendingOffNotice";
-import { DAY_MS, isPending, withoutPending } from "../pending";
+import { isPending } from "../pending";
 
 const DUTIES = [
   ["Nhắc gia cố bảo mật đúng lúc", "Khi lương về, khi có thiết bị lạ đăng nhập, khi nhận tiền từ tài khoản lạ."],
@@ -23,26 +25,27 @@ const LEVELS = [
 
 /** Settings › M-You bảo vệ bạn. Turning off waits 24h; turning on is immediate. */
 export function ProtectScreen() {
-  const demo = useSettingsDemo();
+  const security = useSecurityStore(useShallow(state => ({ aiProtect: state.aiProtect, familyAlerts: state.familyAlerts, securityTips: state.securityTips, emergencyContacts: state.emergencyContacts, pendingOff: state.pendingOff })));
+  const { setAiProtect, cancelOff, applyOff, setFamilyAlerts, setSecurityTips } = useSecurityStore.getState();
   const [confirming, setConfirming] = useState(false);
-  const offAt = demo.pendingOff.aiProtect;
+  const offAt = security.pendingOff.aiProtect;
   const pending = isPending(offAt, transferNow().getTime());
   // A contact being removed stays in effect until the 24h wait ends.
-  const hasActiveContact = demo.emergencyContacts.some(contact => contact.status !== "pending");
-  const on = demo.aiProtect;
+  const hasActiveContact = effectiveContacts(security).length > 0;
+  const on = security.aiProtect;
 
   const toggle = () => {
     if (on) setConfirming(true);
-    else demo.update({ aiProtect: true, pendingOff: withoutPending(demo.pendingOff, "aiProtect") });
+    else setAiProtect(true);
   };
   const requestOff = () => {
-    demo.update({ pendingOff: { ...demo.pendingOff, aiProtect: transferNow().getTime() + DAY_MS } });
+    setAiProtect(false, transferNow().getTime());
     setConfirming(false);
   };
 
   return <>
     <Panel><div className="settings-row"><span className="flex-1"><strong>Bật bảo vệ bằng AI</strong><span className="mt-1 block text-sm text-muted">M-You là trợ lý AI của MSB. Bật lại có hiệu lực ngay.</span></span><Toggle label="Bật bảo vệ bằng AI" checked={on} onChange={toggle} disabled={pending} /></div></Panel>
-    {pending && <PendingOffNotice action="Tắt bảo vệ bằng AI" at={offAt} onCancel={() => demo.update({ pendingOff: withoutPending(demo.pendingOff, "aiProtect") })} onApply={() => demo.update({ aiProtect: false, pendingOff: withoutPending(demo.pendingOff, "aiProtect") })} />}
+    {pending && <PendingOffNotice action="Tắt bảo vệ bằng AI" at={offAt} onCancel={() => cancelOff("aiProtect")} onApply={() => applyOff("aiProtect")} />}
     <Panel title="M-You làm gì cho bạn">
       <ol className="space-y-4 py-4">{DUTIES.map(([title, detail], i) => <li key={title} className="flex gap-3"><span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-strong">{i + 1}</span><span><strong className="block">{title}</strong><span className="mt-1 block text-sm leading-relaxed text-muted">{detail}</span></span></li>)}</ol>
     </Panel>
@@ -51,8 +54,8 @@ export function ProtectScreen() {
     </Panel>
     <div className={on ? undefined : "opacity-50"}>
       <Panel title="Tùy chỉnh">
-        <div className="settings-row"><span className="flex-1"><strong>Báo người thân khi có cảnh báo Đỏ</strong>{!hasActiveContact && <Link href="/settings/emergency-contacts" className="mt-1 block text-sm text-primary underline underline-offset-4">Cần thêm người thân khẩn cấp trước</Link>}</span><Toggle label="Báo người thân khi có cảnh báo Đỏ" checked={demo.familyAlerts && hasActiveContact} disabled={!on || !hasActiveContact} onChange={() => demo.update({ familyAlerts: !demo.familyAlerts })} /></div>
-        <div className="settings-row"><span className="flex-1"><strong>Gợi ý bảo mật đúng lúc</strong><span className="mt-1 block text-sm text-muted">Tối đa 1 lần/ngày, 3 lần/tuần</span></span><Toggle label="Gợi ý bảo mật đúng lúc" checked={demo.securityTips} disabled={!on} onChange={() => demo.update({ securityTips: !demo.securityTips })} /></div>
+        <div className="settings-row"><span className="flex-1"><strong>Báo người thân khi có cảnh báo Đỏ</strong>{!hasActiveContact && <Link href="/settings/emergency-contacts" className="mt-1 block text-sm text-primary underline underline-offset-4">Cần thêm người thân khẩn cấp trước</Link>}</span><Toggle label="Báo người thân khi có cảnh báo Đỏ" checked={security.familyAlerts && hasActiveContact} disabled={!on || !hasActiveContact} onChange={() => setFamilyAlerts(!security.familyAlerts)} /></div>
+        <div className="settings-row"><span className="flex-1"><strong>Gợi ý bảo mật đúng lúc</strong><span className="mt-1 block text-sm text-muted">Tối đa 1 lần/ngày, 3 lần/tuần</span></span><Toggle label="Gợi ý bảo mật đúng lúc" checked={security.securityTips} disabled={!on} onChange={() => setSecurityTips(!security.securityTips)} /></div>
         <div className="settings-row"><span className="flex-1 font-semibold">Kiểm tra lệnh chuyển tiền</span><Badge good>Luôn bật</Badge></div>
       </Panel>
     </div>

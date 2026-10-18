@@ -13,6 +13,7 @@
  */
 
 import { PersonaProvider } from "@/providers/context";
+import { SecurityPersonaSync } from "@/state/security/SecurityPersonaSync";
 import { AssetLiabilityProvider } from "@/state/assets";
 import { CorrectionsProvider } from "@/state/corrections";
 import { CategoryTaxonomyProvider } from "@/state/categories";
@@ -29,6 +30,7 @@ import { AppChrome } from "@/components/shell/AppChrome";
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <PersonaProvider>
+      <SecurityPersonaSync />
       <LoginGate>
         <CorrectionsProvider>
           <ManualTxnsProvider>

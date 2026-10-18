@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { MessageSquareLock } from "lucide-react";
 import { transferNow } from "@/lib/demo-clock";
-import { useSettingsDemo } from "../../SettingsDemoContext";
+import { useSecurityStore } from "@/state/security/store";
 import { Action, Badge, Notice, Panel } from "../../settings-ui";
 import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
 import { PendingOffNotice } from "../PendingOffNotice";
-import { DAY_MS, isPending, withoutPending } from "../pending";
+import { isPending } from "../pending";
 
 const VALID_CODE = /^[A-Z0-9]{4,12}$/;
 
@@ -20,22 +20,22 @@ function SmsPreview({ code }: { code: string }) {
 
 /** Settings › Mã chống giả mạo. Setting or changing the code needs a face check; turning off waits 24h. */
 export function AntiPhishingScreen() {
-  const demo = useSettingsDemo();
-  const code = demo.antiPhishingCode;
+  const code = useSecurityStore(state => state.antiPhishingCode);
+  const offAt = useSecurityStore(state => state.pendingOff.antiPhishing);
+  const { saveAntiPhishingCode, requestOff: requestStoreOff, cancelOff, applyOff } = useSecurityStore.getState();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [confirm, setConfirm] = useState<"save" | "off" | null>(null);
-  const offAt = demo.pendingOff.antiPhishing;
   const pending = isPending(offAt, transferNow().getTime());
 
   const save = () => {
-    demo.update({ antiPhishingCode: draft, pendingOff: withoutPending(demo.pendingOff, "antiPhishing") });
+    saveAntiPhishingCode(draft);
     setEditing(false);
     setDraft("");
     setConfirm(null);
   };
   const requestOff = () => {
-    demo.update({ pendingOff: { ...demo.pendingOff, antiPhishing: transferNow().getTime() + DAY_MS } });
+    requestStoreOff("antiPhishing", transferNow().getTime());
     setConfirm(null);
   };
 
@@ -57,7 +57,7 @@ export function AntiPhishingScreen() {
         <p className="mb-5 rounded-[16px] border-2 border-dashed border-primary py-4 text-3xl font-bold tracking-[0.2em] text-primary-strong">{code}</p>
         <div className="text-left"><SmsPreview code={code} /></div>
       </div></Panel>
-      {pending && <PendingOffNotice action="Tắt mã chống giả mạo" at={offAt} onCancel={() => demo.update({ pendingOff: withoutPending(demo.pendingOff, "antiPhishing") })} onApply={() => demo.update({ antiPhishingCode: null, pendingOff: withoutPending(demo.pendingOff, "antiPhishing") })} />}
+      {pending && <PendingOffNotice action="Tắt mã chống giả mạo" at={offAt} onCancel={() => cancelOff("antiPhishing")} onApply={() => applyOff("antiPhishing")} />}
       <Action onClick={() => { setDraft(code); setEditing(true); }}>Đổi mã</Action>
       {!pending && <button type="button" className="text-sm font-semibold text-negative" onClick={() => setConfirm("off")}>Tắt mã</button>}
     </>}

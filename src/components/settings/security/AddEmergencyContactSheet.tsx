@@ -2,22 +2,25 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
+import { useSecurityStore } from "@/state/security/store";
 import { Action } from "../settings-ui";
 
 const RELATIONS = ["Bố/Mẹ", "Vợ/Chồng", "Con", "Anh/Chị/Em", "Khác"] as const;
 const VALID_PHONE = /^0\d{9}$/;
 
 /** Form to invite an emergency contact. Adding raises security, so no face check. */
-export function AddEmergencyContactSheet({ open, onAdd, onClose }: { open: boolean; onAdd: (contact: { name: string; relation: string; phone: string }) => void; onClose: () => void }) {
+export function AddEmergencyContactSheet({ open, onAdded, onClose }: { open: boolean; onAdded: () => void; onClose: () => void }) {
+  const addEmergencyContact = useSecurityStore(state => state.addEmergencyContact);
   const [name, setName] = useState("");
   const [relation, setRelation] = useState<string>(RELATIONS[0]);
   const [phone, setPhone] = useState("");
   const valid = name.trim().length > 0 && VALID_PHONE.test(phone);
   const submit = () => {
-    onAdd({ name: name.trim(), relation, phone });
+    addEmergencyContact({ name: name.trim(), relation, phone });
     setName("");
     setRelation(RELATIONS[0]);
     setPhone("");
+    onAdded();
   };
 
   return <Sheet open={open} title="Thêm người thân" onClose={onClose}>

@@ -7,6 +7,7 @@ import { Sheet } from "@/components/primitives";
 import { usePersona } from "@/providers/context";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
+import { clearSecurityStorage } from "@/state/security/storage";
 import { useSettingsDemo } from "./SettingsDemoContext";
 import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 
@@ -99,7 +100,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
     <Sheet open={!!feedback} title="Thông báo" onClose={() => setFeedback(null)}>{feedback && <><p className="mb-5 text-sm leading-relaxed" role="status">{feedback}</p><Action onClick={() => setFeedback(null)}>Đã hiểu</Action></>}</Sheet>
     <Sheet open={!!sheet} title={sheet === "logout" ? "Đăng xuất" : sheet === "revoke" ? "Thu hồi đồng ý" : "Thông tin"} onClose={() => setSheet(null)}>
       <p className="mb-5 text-sm leading-relaxed">{sheet === "logout" ? "Bạn có muốn đăng xuất khỏi phiên giả lập hiện tại? Dữ liệu tài chính được giữ lại." : sheet === "revoke" ? "Thu hồi quyền sử dụng dữ liệu và quay về màn hình giới thiệu?" : sheet === "forgot" ? "Luồng quên PIN đang được mô phỏng. Hãy quay lại và nhập một mã mẫu gồm 6 chữ số để tiếp tục thử đổi PIN." : sheet === "signature-history" ? "Chưa có tài liệu ký số trong phiên giả lập." : sheet?.startsWith("signature") ? "Chức năng ký số đang được mô phỏng. Không có chứng thư được phát hành hoặc tài liệu được ký thật." : sheet === "limits" ? "Hạn mức hiển thị là số liệu minh họa. Không thay đổi hạn mức ngân hàng thật." : sheet === "device" ? "Đây là thiết bị minh họa trong lịch sử truy cập. Không có phiên đăng nhập thật được thu hồi." : "Chỉ nhập thông tin mẫu khi thử nghiệm. Ngân hàng không yêu cầu bạn chia sẻ mã OTP, PIN hoặc mật khẩu qua tin nhắn."}</p>
-      <Action onClick={() => { if (sheet === "logout") { window.localStorage.removeItem("msb-pfm.authenticated"); window.location.assign("/"); } else if (sheet === "revoke") { revokeConsent(); window.location.assign("/onboarding"); } else setSheet(null); }}>{sheet === "logout" ? "Đăng xuất" : sheet === "revoke" ? "Xác nhận thu hồi" : "Đã hiểu"}</Action>
+      <Action onClick={() => { if (sheet === "logout") { clearSecurityStorage(); window.localStorage.removeItem("msb-pfm.authenticated"); window.location.assign("/"); } else if (sheet === "revoke") { revokeConsent(); window.location.assign("/onboarding"); } else setSheet(null); }}>{sheet === "logout" ? "Đăng xuất" : sheet === "revoke" ? "Xác nhận thu hồi" : "Đã hiểu"}</Action>
     </Sheet>
   </div>;
 }

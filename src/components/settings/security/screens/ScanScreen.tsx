@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { useSettingsDemo } from "../../SettingsDemoContext";
+import { useSecurityStore } from "@/state/security/store";
 import { Action } from "../../settings-ui";
 import { scanMessage, type ScanResult } from "../scan-message";
 import { ScanResultBubble } from "../ScanResultBubble";
@@ -17,7 +17,7 @@ const chip = "rounded-full border border-primary px-3 py-1.5 text-xs font-semibo
 
 /** Settings › Kiểm tra tin nhắn lạ: chat-style rule check by the MSB AI assistant (simulated). */
 export function ScanScreen() {
-  const demo = useSettingsDemo();
+  const antiPhishingCode = useSecurityStore(state => state.antiPhishingCode);
   const [text, setText] = useState("");
   const [checked, setChecked] = useState<{ text: string; result: ScanResult } | null>(null);
   const [reported, setReported] = useState(false);
@@ -28,8 +28,8 @@ export function ScanScreen() {
     {checked && <div className="flex flex-col gap-3">
       <p className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[20px] rounded-tr-md bg-primary-soft p-4 text-sm leading-relaxed">{checked.text}</p>
       <ScanResultBubble result={checked.result} />
-      {demo.antiPhishingCode !== null
-        ? <p className="text-sm leading-relaxed text-muted">Tin nhắn thật từ MSB luôn có mã <strong className="text-text">{demo.antiPhishingCode}</strong>.</p>
+      {antiPhishingCode !== null
+        ? <p className="text-sm leading-relaxed text-muted">Tin nhắn thật từ MSB luôn có mã <strong className="text-text">{antiPhishingCode}</strong>.</p>
         : <div className="flex flex-wrap items-center gap-2 text-sm leading-relaxed text-muted"><span>Bật mã chống giả mạo để nhận ra tin nhắn giả ngay.</span><Link href="/settings/anti-phishing" className={chip}>Bật mã chống giả mạo</Link></div>}
       {flagged && <div className="flex flex-wrap gap-2">
         <button type="button" className={chip} onClick={() => setReported(true)}>Báo cáo tin nhắn này</button>
