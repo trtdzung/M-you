@@ -408,7 +408,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
     h.draft = jarDraft();
     render(<TransferConfirm />);
     await completeTransfer();
-    expect(screen.getByRole("alert")).toHaveTextContent(/Chưa bù được 200\.000.*hũ Ăn uống.*cần bù thủ công/);
+    expect(screen.getByRole("alert")).toHaveTextContent(/Chưa bù được 200,000.*hũ Ăn uống.*cần bù thủ công/);
     expect(screen.queryByText(/Đã bù/)).not.toBeInTheDocument();
   });
 
@@ -436,7 +436,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
     render(<TransferConfirm />);
     fireEvent.change(screen.getByDisplayValue(String(AMOUNT)), { target: { value: "1500000" } });
 
-    expect(await screen.findByRole("alert", { name: "Số dư không đủ" })).toHaveTextContent(/680\.000/);
+    expect(await screen.findByRole("alert", { name: "Số dư không đủ" })).toHaveTextContent(/680,000/);
     expect(screen.queryByRole("region", { name: "Dự kiến bù hũ" })).not.toBeInTheDocument();
     expect(screen.queryByText(/rót từ/)).not.toBeInTheDocument();
   });

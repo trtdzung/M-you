@@ -2,7 +2,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { TransferHeader } from "@/components/transfer/TransferHeader";
+import { Home } from "lucide-react";
 import { Card } from "@/components/primitives";
 import { usePersona, useProviders } from "@/providers/context";
 import { useCategories } from "@/state/categories";
@@ -286,21 +288,14 @@ export function TransferConfirm() {
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
-      <ConfirmHeader />
-
-      <button type="button" onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-muted">
-        <ArrowLeft size={16} /> Huỷ &amp; quay lại
-      </button>
-
-      <Card className="bg-primary-soft/40">
-        <p className="flex items-start gap-2 text-xs text-text">
-          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
-          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận, trợ lý không làm bước này.
-        </p>
-      </Card>
-
-      <Card className="flex flex-col gap-3">
+    <div className="flex min-h-full flex-col">
+      <TransferHeader title="Chuyển tiền" onBack={() => router.back()} rightIcon={<Home size={22} />} rightLabel="Về trang chủ" onRightClick={() => router.push("/")} />
+      <div className="flex flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
+      <Card className="transfer-card flex flex-col gap-5">
+        <div className="border-b border-[#dfe5ee] pb-5">
+          <p className="text-lg font-semibold text-muted">Xác nhận giao dịch</p>
+          <p className="mt-1 text-[28px] font-bold tabular-nums text-text">{formatVnd(amount)}</p>
+        </div>
         <Labeled label="Người nhận">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
         </Labeled>
@@ -318,9 +313,17 @@ export function TransferConfirm() {
         <Labeled label="Nội dung">
           <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} placeholder="Tuỳ chọn" />
         </Labeled>
+        <p className="text-base font-semibold text-text">Người chuyển: {senderName}</p>
         <Labeled label="Từ tài khoản">
           <input value={sourceLabel} readOnly className={`${inputCls} bg-surface-muted text-muted`} />
         </Labeled>
+      </Card>
+
+      <Card className="bg-primary-soft/40">
+        <p className="flex items-start gap-2 text-xs text-text">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
+          Kiểm tra kỹ từng thông tin. Bạn là người xác nhận, trợ lý không làm bước này.
+        </p>
       </Card>
 
       {/* RT-fix (H6): review the anticipated auto-fund BEFORE confirming (H11: never an empty donor list). */}
@@ -337,12 +340,14 @@ export function TransferConfirm() {
 
       <button
         type="button"
+        aria-label="Xác nhận chuyển tiền"
         onClick={() => runConfirm()}
         disabled={submitting}
-        className="rounded-full bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+        className="login-submit mt-auto disabled:opacity-60"
       >
-        {submitting ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
+        {submitting ? "Đang xử lý…" : "Xác nhận"}
       </button>
+      </div>
     </div>
   );
 }
@@ -357,12 +362,12 @@ function ConfirmHeader() {
 }
 
 const inputCls =
-  "w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text outline-none focus:border-primary";
+  "min-h-12 w-full rounded-[10px] border border-[#dfe5ee] bg-white px-3 py-2 text-base text-text outline-none focus:border-primary";
 
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</span>
+      <span className="text-[15px] font-medium text-muted">{label}</span>
       {children}
     </label>
   );
