@@ -475,3 +475,29 @@ body {
 .home-quick-grid { padding-top: 12px; }
 .home-quick-grid > div:first-child { row-gap: 8px; }
 .home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 54px; gap: 8px; }
+
+.home-insight-card {
+  border: 1px solid white;
+  border-radius: 24px;
+  background: #ffecef;
+  overflow: hidden;
+}
+.home-insight-card button:focus-visible { outline-offset: -3px; }
+.home-insight-sheet { padding: 20px 20px calc(24px + var(--safe-area-bottom)); }
+.home-insight-sheet h2 { font-size: 18px; line-height: 1.4; }
+.home-insight-sheet p { line-height: 1.6; }
+.home-insight-sheet .login-submit { font-size: 15px; }
+.home-insight-secondary {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: 9px;
+  background: white;
+  color: var(--color-primary-strong);
+  font-size: 15px;
+  font-weight: 600;
+}
