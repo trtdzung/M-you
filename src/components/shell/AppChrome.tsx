@@ -79,6 +79,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
     }
 
     function onPointerDown(event: PointerEvent) {
+      if (pathname.startsWith("/goals-preview") || (pathname === "/pfm" && new URLSearchParams(window.location.search).get("tab") === "goals")) return;
       if (!prefersMotion() || event.button !== 0 || !edgeBackHref(pathname)) return;
       const target = event.target;
       if (!(target instanceof Element)) return;
@@ -117,8 +118,13 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
       if (!tracked) return;
       suppressClick = true;
       if (localPoint(event).x - originX < 72) return;
+      if (pathname === "/pfm" && new URLSearchParams(window.location.search).get("tab") === "goals") {
+        if (!window.dispatchEvent(new Event("goals-preview:back", { cancelable: true }))) return;
+      }
       const target = edgeBackHref(pathname);
       if (target === "history") backWithTransition(() => router.back());
+      // Goals prototype keeps its own screen stack: edge-swipe pops it instead of leaving the page.
+      else if (pathname.startsWith("/goals-preview")) window.dispatchEvent(new Event("goals-preview:back"));
       else if (pathname.startsWith("/goals")) backWithTransition(() => router.replace(goalReturnHref(new URLSearchParams(window.location.search).get("from"))));
       else if (target) pushWithTransition((href) => router.push(href), target);
     }

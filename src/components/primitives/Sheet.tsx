@@ -17,6 +17,8 @@ export function Sheet({
   onClose,
   children,
   className,
+  bodyClassName,
+  headerAction,
   closeLabel = "Đóng",
 }: {
   title: string;
@@ -25,6 +27,8 @@ export function Sheet({
   onClose: () => void;
   children: ReactNode;
   className?: string;
+  bodyClassName?: string;
+  headerAction?: ReactNode;
   closeLabel?: string;
 }) {
   const titleId = useId();
@@ -56,9 +60,9 @@ export function Sheet({
     setDragY(0);
   }
 
-  const frameRef = useRef({ title, description, children, className });
-  if (live) frameRef.current = { title, description, children, className };
-  const frame = live ? { title, description, children, className } : frameRef.current;
+  const frameRef = useRef({ title, description, children, className, bodyClassName, headerAction });
+  if (live) frameRef.current = { title, description, children, className, bodyClassName, headerAction };
+  const frame = live ? { title, description, children, className, bodyClassName, headerAction } : frameRef.current;
 
   // Anchor the sheet inside the device frame, not the browser viewport. The
   // desktop preview applies `zoom` to `.device-canvas`, which breaks
@@ -204,7 +208,7 @@ export function Sheet({
         }}
         style={dragMode === "drag" || dragMode === "snap" ? { transform: `translateY(${dragY}px)` } : undefined}
         className={cn(
-          "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
+          "relative flex max-h-[88dvh] w-full max-w-device-width flex-col overflow-hidden rounded-t-card bg-surface shadow-nav",
           exiting
             ? "sheet-panel-out"
             : dragMode === "drag"
@@ -223,9 +227,9 @@ export function Sheet({
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
-          className="mb-4 flex cursor-grab touch-none items-start justify-between gap-3"
+          className="flex shrink-0 cursor-grab touch-none items-start justify-between gap-3 border-b border-border px-4 pb-3 pt-4"
         >
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 id={titleId} className="text-base font-semibold text-text">
               {frame.title}
             </h2>
@@ -235,6 +239,7 @@ export function Sheet({
               </p>
             )}
           </div>
+          {frame.headerAction}
           <button
             ref={closeRef}
             type="button"
@@ -245,7 +250,7 @@ export function Sheet({
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        {frame.children}
+        <div className={cn("no-scrollbar min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pt-4 pb-[calc(24px+var(--safe-area-bottom))]", frame.bodyClassName)}>{frame.children}</div>
       </div>
     </div>,
     container,

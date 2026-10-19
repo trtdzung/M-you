@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { backWithTransition } from "@/lib/view-transition";
 import { ArrowLeft } from "lucide-react";
 
@@ -11,8 +11,12 @@ import { ArrowLeft } from "lucide-react";
  */
 export function PfmHeader() {
   const router = useRouter();
+  const params = useSearchParams();
+  if (params?.get("tab") === "goals") return null;
   function back() {
-    if (new URLSearchParams(window.location.search).get("tab") === "settings") {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "goals" && !window.dispatchEvent(new Event("goals-preview:back", { cancelable: true }))) return;
+    if (tab === "settings") {
       router.replace("/pfm?tab=budget", { scroll: false });
     } else {
       backWithTransition(() => router.replace("/"));
