@@ -34,4 +34,4 @@ export const progressTrack = "relative h-2.5 w-full overflow-hidden rounded-full
 
 /** Sticky bottom bar for the screen's single primary action. */
 export const bottomBar =
-  "sticky bottom-0 z-10 -mx-shell-main-inset mt-2 flex flex-col gap-2 bg-[linear-gradient(to_top,#f7d4d6_70%,rgba(247,212,214,0))] px-shell-main-inset pb-[calc(16px+var(--safe-area-bottom,0px))] pt-4";
+  "sticky bottom-0 z-10 mt-2 flex flex-col gap-2 bg-[linear-gradient(to_top,#f7d4d6_70%,rgba(247,212,214,0))] pb-[calc(16px+var(--safe-area-bottom,0px))] pt-4";

@@ -79,6 +79,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
     }
 
     function onPointerDown(event: PointerEvent) {
+      if (pathname.startsWith("/goals-preview") || (pathname === "/pfm" && new URLSearchParams(window.location.search).get("tab") === "goals")) return;
       if (!prefersMotion() || event.button !== 0 || !edgeBackHref(pathname)) return;
       const target = event.target;
       if (!(target instanceof Element)) return;

@@ -83,7 +83,7 @@ export function PfmTabHost() {
                 ref={(el) => {
                   panelEls.current[id] = el;
                 }}
-                className="no-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto scroll-pb-6 pb-6"
+                className="no-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overscroll-x-none overflow-y-auto scroll-pb-6 pb-6"
               >
                 {node()}
               </div>
