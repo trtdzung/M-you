@@ -24,6 +24,7 @@ export interface CreateGoalInput {
 export type SimEvent = "salary" | "bigExpense" | "standingOrderFail" | "overdue";
 
 export type NavAction =
+  | { type: "nav/params"; params: ScreenParams }
   | { type: "nav/push"; screen: ScreenId; params?: ScreenParams }
   | { type: "nav/pop"; count?: number }
   | { type: "nav/replace"; screen: ScreenId; params?: ScreenParams }

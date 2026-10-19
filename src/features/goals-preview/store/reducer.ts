@@ -108,6 +108,8 @@ function navReducer(state: PreviewState, action: PreviewAction): PreviewState | 
   const stack = state.nav.stack;
   const seq = state.seq + 1;
   switch (action.type) {
+    case "nav/params":
+      return { ...state, nav: { stack: stack.map((item, index) => index === stack.length - 1 ? { ...item, params: { ...item.params, ...action.params } } : item) } };
     case "nav/push":
       return { ...state, seq, nav: { stack: [...stack, entry(seq, action.screen, action.params)] } };
     case "nav/replace":

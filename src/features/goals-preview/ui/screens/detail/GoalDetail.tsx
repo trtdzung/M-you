@@ -33,7 +33,8 @@ export function GoalDetail({ params }: ScreenProps) {
   const goalId = paramString(params, "goalId");
   const { dispatch, nav, state } = usePreview();
   const ctx = useGoalContext(goalId);
-  const [tab, setTab] = useState<Tab>(() => parseTab(paramString(params, "tab")));
+  const tab = parseTab(paramString(params, "tab"));
+  const setTab = (next: Tab) => nav.updateParams({ tab: next });
   const [menu, setMenu] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   if (!ctx || !goalId) return <GoalNotFound title="Chi tiết mục tiêu" />;

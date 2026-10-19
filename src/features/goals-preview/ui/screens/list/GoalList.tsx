@@ -7,7 +7,7 @@ import { SegmentedControl } from "@/components/primitives";
 
 import { allocateSurplus, formatISODate, goalValue, progressPct, progressState } from "../../../engine";
 import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";
-import type { ScreenProps } from "../../../model/screens";
+import { paramString, type ScreenProps } from "../../../model/screens";
 import type { PreviewState } from "../../../model/state";
 import type { Goal } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
@@ -65,11 +65,11 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
 
 /** Mục tiêu của tôi. */
 export function GoalList({ params }: ScreenProps) {
-  void params;
   const { state, dispatch, nav } = usePreview();
   const router = useRouter();
   const pathname = usePathname();
-  const [tab, setTab] = useState<Tab>("active");
+  const tab: Tab = paramString(params, "listTab") === "history" ? "history" : "active";
+  const setTab = (next: Tab) => nav.updateParams({ listTab: next });
   const [sorting, setSorting] = useState(false);
 
   const active = useMemo(() => selectActiveGoals(state), [state]);
@@ -104,7 +104,7 @@ export function GoalList({ params }: ScreenProps) {
     <div className="flex flex-col gap-4 pb-6">
       <ScreenHeader
         title="Mục tiêu của tôi"
-        onBack={pathname === "/pfm" ? () => router.replace("/") : undefined}
+        onBack={pathname === "/pfm" ? () => nav.canGoBack ? nav.pop() : router.replace("/") : undefined}
         right={
           <button
             type="button"

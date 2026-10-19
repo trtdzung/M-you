@@ -32,7 +32,9 @@ const FILTERS: { value: Filter; label: string; kinds?: GoalTxnKind[] }[] = [
 export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav, toast } = usePreview();
   const { goal, account, state } = ctx;
-  const [filter, setFilter] = useState<Filter>("all");
+  const savedFilter = nav.current.params.cashFilter;
+  const filter = FILTERS.some((f) => f.value === savedFilter) ? savedFilter as Filter : "all";
+  const setFilter = (next: Filter) => nav.updateParams({ cashFilter: next });
   const [filterOpen, setFilterOpen] = useState(false);
   const [limit, setLimit] = useState(10);
   const txns = selectGoalTxns(state, goalId);
