@@ -78,13 +78,6 @@ export function HomeMock({ params }: ScreenProps) {
           <p className="text-[13px] leading-5 text-muted">Xin chào</p>
           <h1 className="truncate text-[20px] font-bold leading-6 text-text">{state.customer.name}</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => nav.reset("FlowMap")}
-          className={`rounded-full border border-border px-3 text-xs font-semibold leading-8 text-muted ${ring}`}
-        >
-          Bản đồ luồng
-        </button>
       </header>
 
       <section className={`${card} bg-primary text-primary-fg`} aria-label="Tài khoản chính">

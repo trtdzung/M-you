@@ -25,8 +25,10 @@ function entry(seq: number, screen: ScreenId, params: ScreenParams = {}): Screen
 export function stateFromScenario(scenarioId: string, jump = false): PreviewState {
   const scenario = getScenario(scenarioId);
   const world = scenario.build();
-  const stack: ScreenEntry[] = [entry(1, "FlowMap")];
-  if (jump && scenario.jumpTo) stack.push(entry(2, scenario.jumpTo.screen, scenario.jumpTo.params));
+  // Customer flow always bottoms out at the goal list, so "back" never lands on a dev screen.
+  const target = jump ? scenario.jumpTo : undefined;
+  const stack: ScreenEntry[] = [entry(1, "GoalList", target?.screen === "GoalList" ? target.params : undefined)];
+  if (target && target.screen !== "GoalList") stack.push(entry(2, target.screen, target.params));
   return { ...world, dismissedSuggestionIds: [], nav: { stack }, toasts: [] };
 }
 
@@ -120,7 +122,7 @@ function navReducer(state: PreviewState, action: PreviewAction): PreviewState | 
       return { ...state, nav: { stack: stack.slice(0, Math.max(1, stack.length - count)) } };
     }
     case "nav/reset":
-      return { ...state, seq, nav: { stack: [entry(seq, action.screen ?? "FlowMap", action.params)] } };
+      return { ...state, seq, nav: { stack: [entry(seq, action.screen ?? "GoalList", action.params)] } };
     case "nav/popTo": {
       const index = stack.map((e) => e.screen).lastIndexOf(action.screen);
       if (index === -1) return state;

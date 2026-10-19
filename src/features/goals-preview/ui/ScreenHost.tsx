@@ -21,7 +21,7 @@ export function ScreenHost() {
   }, [entry.key, hydrated]);
 
   if (!hydrated) return <SkeletonCard className="mt-4 h-40" />;
-  const def = SCREEN_REGISTRY[entry.screen] ?? SCREEN_REGISTRY.FlowMap;
+  const def = SCREEN_REGISTRY[entry.screen] ?? SCREEN_REGISTRY.GoalList;
   const Screen = def.component;
   return (
     <div key={entry.key} data-screen={entry.screen} className="goals-preview-screen">

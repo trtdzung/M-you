@@ -28,7 +28,7 @@ export type NavAction =
   | { type: "nav/push"; screen: ScreenId; params?: ScreenParams }
   | { type: "nav/pop"; count?: number }
   | { type: "nav/replace"; screen: ScreenId; params?: ScreenParams }
-  /** Stack becomes [screen] (default FlowMap). */
+  /** Stack becomes [screen] (default GoalList). */
   | { type: "nav/reset"; screen?: ScreenId; params?: ScreenParams }
   /** Pop until `screen` is on top (no-op if absent). */
   | { type: "nav/popTo"; screen: ScreenId };

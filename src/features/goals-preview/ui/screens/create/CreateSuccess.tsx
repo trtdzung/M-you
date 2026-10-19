@@ -25,8 +25,7 @@ export function CreateSuccess({ params }: ScreenProps) {
   const account = goal?.accountId ? state.accounts.find((a) => a.id === goal.accountId) : undefined;
 
   const toList = () => {
-    nav.reset("HomeMock");
-    nav.push("GoalList");
+    nav.reset("GoalList");
   };
 
   if (!goal || !account) {
@@ -54,8 +53,7 @@ export function CreateSuccess({ params }: ScreenProps) {
   };
 
   const viewGoal = () => {
-    nav.reset("HomeMock");
-    nav.push("GoalList");
+    nav.reset("GoalList");
     nav.push("GoalDetail", { goalId: goal.id });
   };
 
