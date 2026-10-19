@@ -46,6 +46,7 @@ export interface PreviewNav {
   push: (screen: ScreenId, params?: ScreenParams) => void;
   replace: (screen: ScreenId, params?: ScreenParams) => void;
   pop: (count?: number) => void;
+  popWith: (params: ScreenParams) => void;
   popTo: (screen: ScreenId) => void;
   reset: (screen?: ScreenId, params?: ScreenParams) => void;
 }
@@ -256,13 +257,14 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   const push = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/push", screen, params }), [dispatch]);
   const replace = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/replace", screen, params }), [dispatch]);
   const pop = useCallback((count?: number) => dispatch({ type: "nav/pop", count }), [dispatch]);
+  const popWith = useCallback((params: ScreenParams) => dispatch({ type: "nav/popWith", params }), [dispatch]);
   const popTo = useCallback((screen: ScreenId) => dispatch({ type: "nav/popTo", screen }), [dispatch]);
   const reset = useCallback((screen?: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/reset", screen, params }), [dispatch]);
   const toast = useCallback((message: string, tone?: ToastTone) => dispatch({ type: "toast/push", message, tone }), [dispatch]);
 
   const nav = useMemo<PreviewNav>(
-    () => ({ stack, current: stack[stack.length - 1], canGoBack: stack.length > 1, updateParams, push, replace, pop, popTo, reset }),
-    [stack, updateParams, push, replace, pop, popTo, reset],
+    () => ({ stack, current: stack[stack.length - 1], canGoBack: stack.length > 1, updateParams, push, replace, pop, popWith, popTo, reset }),
+    [stack, updateParams, push, replace, pop, popWith, popTo, reset],
   );
 
   const value = useMemo(

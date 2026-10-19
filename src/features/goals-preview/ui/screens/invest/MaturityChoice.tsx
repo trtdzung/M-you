@@ -23,7 +23,7 @@ export function MaturityChoice({ params }: ScreenProps) {
   const [term, setTerm] = useState<number | undefined>();
   const [confirm, setConfirm] = useState(false);
 
-  if (!asset || asset.type !== "liquid" || asset.category !== "term_deposit" || asset.principal === undefined || !goal) {
+  if (!asset || asset.type !== "msb" || asset.category !== "term_deposit" || asset.principal === undefined || !goal) {
     return (
       <div className={screenPadding}>
         <ScreenHeader title="Khoản đáo hạn" />
@@ -37,7 +37,7 @@ export function MaturityChoice({ params }: ScreenProps) {
   const maturity = asset.maturityDate ?? today;
   const interest = depositAccrued(asset.principal, asset.ratePa ?? 0, asset.createdAt, maturity);
   const total = asset.principal + interest;
-  const terms = product?.kind === "term_deposit" ? product.terms.filter((t) => addMonths(today, t.months) <= goal.targetDate) : [];
+  const terms = product?.kind === "term_deposit" ? product.terms : [];
   const chosen = terms.find((t) => t.months === term) ?? terms[terms.length - 1];
   const canRoll = terms.length > 0;
   const rolling = choice === "rollover" && canRoll;
@@ -125,7 +125,7 @@ export function MaturityChoice({ params }: ScreenProps) {
         onConfirm={() => {
           dispatch({ type: "handleMaturity", assetId: asset.id, choice: rolling ? "rollover" : "toCash", termMonths: rolling ? chosen?.months : undefined });
           const prev = nav.stack[nav.stack.length - 2];
-          nav.pop(!rolling && prev?.screen === "LiquidAssetDetail" ? 2 : 1);
+          nav.pop(!rolling && prev?.screen === "MsbAssetDetail" ? 2 : 1);
         }}
       />
     </div>

@@ -1,7 +1,7 @@
 import { getInstrument } from "../data/market";
 import { getInvestProduct } from "../data/products";
 import type { WorldState } from "../model/state";
-import type { Asset, FixedAsset, FundProduct, Goal, GoalAccount, ISODate, LiquidAsset, Loan, PricePoint, ProgressState, ValueSource } from "../model/types";
+import type { Asset, DeclaredAsset, FundProduct, Goal, GoalAccount, ISODate, MsbAsset, Loan, PricePoint, ProgressState, ValueSource } from "../model/types";
 import { daysBetween, isBefore } from "./dates";
 import { outstandingPrincipal } from "./loan";
 
@@ -32,11 +32,11 @@ export function depositAccrued(principal: number, ratePa: number, from: ISODate,
 /** Current market value of one asset (before countPercent). */
 export function assetValue(asset: Asset, world: Pick<WorldState, "clock" | "market">): number {
   if (asset.status === "sold") return 0;
-  if (asset.type === "fixed") return outsideValue(asset, world.clock.today, world.market.fundPriceShiftPct) ?? asset.value;
-  return liquidValue(asset, world.clock.today, world.market.fundPriceShiftPct);
+  if (asset.type === "declared") return outsideValue(asset, world.clock.today, world.market.fundPriceShiftPct) ?? asset.value;
+  return msbValue(asset, world.clock.today, world.market.fundPriceShiftPct);
 }
 
-export function liquidValue(asset: LiquidAsset, today: ISODate, shiftPct: number): number {
+export function msbValue(asset: MsbAsset, today: ISODate, shiftPct: number): number {
   const product = getInvestProduct(asset.productId);
   if (asset.category === "fund" && product?.kind === "fund" && asset.units !== undefined) {
     return Math.round(asset.units * fundPriceAt(product, today, shiftPct));
@@ -53,7 +53,7 @@ export function liquidValue(asset: LiquidAsset, today: ISODate, shiftPct: number
 
 /** True for outside assets the engine values itself (market price or interest formula). */
 export function isAutoValued(asset: Asset): boolean {
-  return asset.type === "fixed" && ((!!asset.instrumentId && asset.quantity !== undefined) || !!asset.accrual);
+  return asset.type === "declared" && ((!!asset.instrumentId && asset.quantity !== undefined) || !!asset.accrual);
 }
 
 /**
@@ -61,7 +61,7 @@ export function isAutoValued(asset: Asset): boolean {
  * (capped at maturity). Undefined when the asset is valued by hand (house, car…).
  */
 export function outsideValue(
-  asset: Pick<FixedAsset, "instrumentId" | "quantity" | "accrual">,
+  asset: Pick<DeclaredAsset, "instrumentId" | "quantity" | "accrual">,
   today: ISODate,
   shiftPct = 0,
 ): number | undefined {
@@ -94,39 +94,39 @@ export interface GoalValueBreakdown {
   /** Số dư tài khoản mục tiêu. */
   cash: number;
   /** Tài sản linh hoạt (theo giá hiện tại). */
-  liquid: number;
+  msb: number;
   /** Phần tài sản cố định được tính vào mục tiêu. */
-  fixedCounted: number;
+  declaredCounted: number;
   /** Toàn bộ giá trị tài sản cố định (chưa nhân %). */
-  fixedTotal: number;
-  /** Tài sản = liquid + fixedCounted. */
+  declaredTotal: number;
+  /** Tài sản = msb + declaredCounted. */
   assets: number;
   /** Giá trị mục tiêu = cash + assets. */
   total: number;
-  /** Weakest provenance among the parts (self_reported if any fixed asset counts). */
+  /** Weakest provenance among the parts (self_reported if any declared asset counts). */
   source: ValueSource;
 }
 
 export function goalValue(world: Pick<WorldState, "accounts" | "assets" | "clock" | "market">, goal: Goal): GoalValueBreakdown {
   const cash = goalAccount(world, goal)?.balance ?? 0;
-  let liquid = 0;
-  let fixedCounted = 0;
-  let fixedTotal = 0;
+  let msb = 0;
+  let declaredCounted = 0;
+  let declaredTotal = 0;
   let source: ValueSource = "msb";
   for (const asset of goalAssets(world, goal.id)) {
     const value = assetValue(asset, world);
-    if (asset.type === "liquid") {
-      liquid += Math.round((value * asset.countPercent) / 100);
+    if (asset.type === "msb") {
+      msb += Math.round((value * asset.countPercent) / 100);
     } else {
-      fixedTotal += value;
+      declaredTotal += value;
       const counted = Math.round((value * asset.countPercent) / 100);
-      fixedCounted += counted;
+      declaredCounted += counted;
       // Auto-valued outside assets are market estimates; hand-valued ones stay self-reported (the weaker label wins).
       if (counted > 0) source = isAutoValued(asset) ? (source === "msb" ? "estimated" : source) : "self_reported";
     }
   }
-  const assets = liquid + fixedCounted;
-  return { cash, liquid, fixedCounted, fixedTotal, assets, total: cash + assets, source };
+  const assets = msb + declaredCounted;
+  return { cash, msb, declaredCounted, declaredTotal, assets, total: cash + assets, source };
 }
 
 type ValueWorld = Pick<WorldState, "accounts" | "assets" | "clock" | "market" | "loans">;
@@ -134,8 +134,8 @@ type ValueWorld = Pick<WorldState, "accounts" | "assets" | "clock" | "market" | 
 /**
  * The target the goal is currently working toward.
  * Phase 1: targetAmount by targetDate, value = cash + assets.
- * Phase 2 (vay để đạt mục tiêu): the loan principal by the last instalment date,
- * value = gốc đã trả + cash + assets — enough value means the loan can be settled.
+ * Phase 2 (vay để đạt mục tiêu): tổng gốc + lãi phải trả đến kỳ cuối,
+ * value = đã trả (gốc + lãi) + cash + assets — enough value means the loan can be settled.
  */
 export interface GoalStage {
   phase: 1 | 2;
@@ -144,6 +144,8 @@ export interface GoalStage {
   targetDate: ISODate;
   /** Gốc đã trả (phase 2 only, else 0). */
   principalPaid: number;
+  /** Đã trả gồm cả lãi và phần trả trước (phase 2 only, else 0). */
+  repaid: number;
   /** Dư nợ gốc còn lại (phase 2 only, else 0). */
   outstanding: number;
   value: number;
@@ -161,18 +163,21 @@ export function goalStage(world: ValueWorld, goal: Goal): GoalStage {
     const outstanding = loan.status === "paid_off" ? 0 : outstandingPrincipal(loan.schedule);
     const principalPaid = Math.max(0, loan.principal - outstanding);
     const last = loan.schedule[loan.schedule.length - 1];
+    const repaid = loan.schedule.filter((r) => r.status === "paid").reduce((sum, r) => sum + r.payment, 0) + loan.prepaid;
+    const remaining = loan.schedule.filter((r) => r.status !== "paid").reduce((sum, r) => sum + r.payment, 0);
     return {
       phase: 2,
-      target: loan.principal,
+      target: repaid + remaining,
       startDate: loan.disbursedAt,
       targetDate: last?.dueDate ?? loan.disbursedAt,
       principalPaid,
+      repaid,
       outstanding,
-      value: principalPaid + total,
+      value: repaid + total,
       loan,
     };
   }
-  return { phase: 1, target: goal.targetAmount, startDate: goal.createdAt, targetDate: goal.targetDate, principalPaid: 0, outstanding: 0, value: total };
+  return { phase: 1, target: goal.targetAmount, startDate: goal.createdAt, targetDate: goal.targetDate, principalPaid: 0, repaid: 0, outstanding: 0, value: total };
 }
 
 /** 0–100+ of the current stage (not clamped above, so early achievement can show 103%). */
@@ -220,14 +225,18 @@ export function remainingAmount(world: ValueWorld, goal: Goal): number {
  * Phase-1 result for a goal that borrowed: what the customer saved on their own
  * (goal balance right before the disbursement) and the loan that closed the gap.
  */
+/** Đầu ghi chú của giao dịch rút tiền mặt để mua tài sản khi sang giai đoạn 2 (đọc lại phần đã tích luỹ). */
+export const PHASE_ONE_PURCHASE_NOTE = "Mua tài sản: ";
+
 export function phaseOneResult(world: Pick<WorldState, "txns" | "loans">, goal: Goal): { saved: number; borrowed: number; achievedAt: ISODate } | undefined {
   const loan = goalLoan(world, goal);
   if (!loan) return undefined;
   const txns = world.txns.filter((t) => t.goalId === goal.id);
   const idx = txns.findIndex((t) => t.kind === "loan_disbursement");
   const before = idx > 0 ? txns[idx - 1].balanceAfter : undefined;
+  const handover = txns.find((t) => t.kind === "withdraw" && t.note.startsWith(PHASE_ONE_PURCHASE_NOTE));
   return {
-    saved: before ?? Math.max(0, goal.targetAmount - loan.principal),
+    saved: handover?.amount ?? before ?? Math.max(0, goal.targetAmount - loan.principal),
     borrowed: loan.principal,
     achievedAt: goal.achievedAt ?? loan.disbursedAt,
   };
@@ -235,5 +244,5 @@ export function phaseOneResult(world: Pick<WorldState, "txns" | "loans">, goal: 
 
 /** Fixed asset valuation older than 12 months needs a refresh. */
 export function needsRevaluation(asset: Asset, today: ISODate): boolean {
-  return asset.type === "fixed" && !isAutoValued(asset) && daysBetween(asset.valuationDate, today) > 365;
+  return asset.type === "declared" && !isAutoValued(asset) && daysBetween(asset.valuationDate, today) > 365;
 }

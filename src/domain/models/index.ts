@@ -19,6 +19,9 @@ export {
   REBALANCE_CATEGORY,
   REBALANCE_CATEGORY_LABEL,
   isRebalanceCategory,
+  GOAL_CATEGORY,
+  GOAL_CATEGORY_LABEL,
+  isGoalCategory,
   categoryLabel,
 } from "./categories";
 export type { CategoryDef, CategoryKind, StoredCategory } from "./categories";

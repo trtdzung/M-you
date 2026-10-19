@@ -27,10 +27,9 @@ describe("R2 advanceTime rollback; R3 số TK; migration accounts", () => {
   afterAll(() => fx.close());
 
   it("R2: xử lý bù lỗi → rollback đồng hồ và không ghi action_log; retry sau vẫn ok", () => {
-    const created = applyAction(CIF, "r2-create", { type: "createGoal", input: goalInput("r2") });
+    const created = applyAction(CIF, "r2-create", { type: "createGoal", input: { ...goalInput("r2"), initialDeposit: 50_000 } });
     expect(created.ok).toBe(true);
     const gid = created.ok ? created.createdGoalId! : "";
-    expect(applyAction(CIF, "r2-open", { type: "openAccount", goalId: gid, initialDeposit: 50_000 }).ok).toBe(true);
     expect(applyAction(CIF, "r2-so", { type: "setStandingOrder", goalId: gid, amount: 100, dayOfMonth: 5 }).ok).toBe(
       true,
     );
@@ -69,24 +68,25 @@ describe("R2 advanceTime rollback; R3 số TK; migration accounts", () => {
   });
 
   it("R3: số TK D10 trùng toàn hệ thống → tăng seq tới khi trống", () => {
-    const created = applyAction(CIF, "r3-create", { type: "createGoal", input: goalInput("collision") });
-    expect(created.ok).toBe(true);
-    const gid = created.ok ? created.createdGoalId! : "";
-    const world = created.ok ? created.world : null;
+    // Đọc seq hiện tại bằng một thao tác không đổi dữ liệu mục tiêu; tạo mục tiêu bump seq 2 lần (id mục tiêu, id tài khoản).
+    const probe = applyAction(CIF, "r3-probe", { type: "setRiskProfile", profile: "balanced" });
+    expect(probe.ok).toBe(true);
+    const seq0 = probe.ok ? probe.world.seq : 0;
     const expected =
       "88" +
       CIF.replace(/\D/g, "").slice(-4).padStart(4, "0") +
-      String((world!.seq + 1) % 1_000_000).padStart(6, "0");
+      String((seq0 + 2) % 1_000_000).padStart(6, "0");
     fx.db
       .prepare(
         `INSERT INTO gv2_goal_accounts (cif, account_id, goal_id, number, name, interest_rate_pa, opened_at, closed_at)
          VALUES ('synthetic_10001', 'dummy', 'dummy', ?, 'collision', 0, '2026-01-01', '2026-01-02')`,
       )
       .run(expected);
-    const opened = applyAction(CIF, "r3-open", { type: "openAccount", goalId: gid, initialDeposit: 0 });
-    expect(opened.ok).toBe(true);
-    if (!opened.ok) return;
-    const number = opened.world.accounts.find((a) => a.goalId === gid)?.number;
+    const created = applyAction(CIF, "r3-create", { type: "createGoal", input: goalInput("collision") });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const gid = created.createdGoalId!;
+    const number = created.world.accounts.find((a) => a.goalId === gid)?.number;
     expect(number).toBeTruthy();
     expect(number).not.toBe(expected);
   });

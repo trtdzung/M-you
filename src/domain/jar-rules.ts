@@ -21,7 +21,7 @@
  */
 
 import type { Jar, JarConfig } from "@/domain/models";
-import { REBALANCE_CATEGORY, UNCLASSIFIED } from "@/domain/models";
+import { GOAL_CATEGORY, REBALANCE_CATEGORY, UNCLASSIFIED } from "@/domain/models";
 import { KHAC_JAR_ID } from "@/domain/engine/category-jars";
 import { POOL_DONOR_ID } from "@/domain/engine/jar-funding";
 
@@ -31,7 +31,7 @@ import { POOL_DONOR_ID } from "@/domain/engine/jar-funding";
  * "khac" (the id of the report's "Chưa xếp hũ" group) is reserved on CREATE only;
  * a legacy stored jar with that id must still round-trip a full-set replace (PUT).
  */
-const ALWAYS_RESERVED_JAR_IDS: ReadonlySet<string> = new Set([POOL_DONOR_ID, UNCLASSIFIED, REBALANCE_CATEGORY]);
+const ALWAYS_RESERVED_JAR_IDS: ReadonlySet<string> = new Set([POOL_DONOR_ID, UNCLASSIFIED, REBALANCE_CATEGORY, ...Object.values(GOAL_CATEGORY)]);
 
 /**
  * Ceiling for any single jar money figure (limit, opening balance, ledger entry)

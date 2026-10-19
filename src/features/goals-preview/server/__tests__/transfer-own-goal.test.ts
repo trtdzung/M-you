@@ -27,11 +27,8 @@ describe("Chuyển nội bộ tới TK mục tiêu (D22–D24, D29, D30, F4)", (
   beforeAll(async () => {
     fx = await openGoalFixtureDb();
     holder.db = fx.db;
-    const created = applyAction(CIF, "xfer-create", { type: "createGoal", input: goalInput("xfer") });
+    const created = applyAction(CIF, "xfer-create", { type: "createGoal", input: { ...goalInput("xfer"), initialDeposit: 100_000 } });
     expect(created.ok).toBe(true);
-    const gid = created.ok ? created.createdGoalId! : "";
-    const opened = applyAction(CIF, "xfer-open", { type: "openAccount", goalId: gid, initialDeposit: 100_000 });
-    expect(opened.ok).toBe(true);
     const accounts = readAccounts(CIF);
     mainId = accounts.find((a) => a.type === "current")!.id;
     const ga = accounts.find((a) => a.type === "goal")!;

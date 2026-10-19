@@ -2,7 +2,7 @@ import type { PreviewNav } from "../../../store/PreviewStore";
 import { getInvestProduct } from "../../../data/products";
 import { depositAccrued, assetValue, formatISODate, goalStage, goalValue, monthsBetween } from "../../../engine";
 import type { PreviewState } from "../../../model/state";
-import type { Goal, LiquidAsset } from "../../../model/types";
+import type { Goal, MsbAsset } from "../../../model/types";
 
 /** Local helpers for the assets + invest screens (T4). */
 
@@ -21,7 +21,7 @@ export interface SaleQuote {
 }
 
 /** Mirrors the reducer's sale rules (full sale value; multiply by fraction for partial). */
-export function quoteSale(state: PreviewState, asset: LiquidAsset): SaleQuote {
+export function quoteSale(state: PreviewState, asset: MsbAsset): SaleQuote {
   const today = state.clock.today;
   const product = getInvestProduct(asset.productId);
   if (asset.category === "term_deposit" && asset.principal !== undefined && product?.kind === "term_deposit") {

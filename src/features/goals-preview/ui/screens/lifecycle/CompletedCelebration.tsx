@@ -2,7 +2,7 @@
 
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate, formatMonths, monthsBetween } from "../../../engine";
-import { TEMPLATE_EMOJI } from "../../../model/labels";
+import { goalEmoji } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";
 import { BottomActions, ScreenHeader, SummaryRows } from "../../shared";
 import { primaryButton, screenPadding, secondaryButton, warningBox, emphasisTitle } from "../../shared/styles";
@@ -63,7 +63,7 @@ export function CompletedCelebration({ params }: ScreenProps) {
           ))}
         </div>
         <div className="text-[56px] leading-none" aria-hidden>
-          {TEMPLATE_EMOJI[goal.template]}
+          {goalEmoji(goal)}
         </div>
         <h2 className={`mt-3 ${emphasisTitle}`}>Chúc mừng bạn!</h2>
         <p className="mt-1 text-sm leading-5 text-muted">

@@ -2,7 +2,7 @@ import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenId, ScreenParams } from "../model/screens";
 import type {
   CustomerProfile,
-  FixedAssetCategory,
+  DeclaredAssetCategory,
   GoalFlexibility,
   GoalTemplate,
   ISODate,
@@ -11,15 +11,37 @@ import type {
   ValueSource,
 } from "../model/types";
 
+/** Tài sản tự khai thêm vào mục tiêu (dùng cho `addAsset` và `CreateGoalInput.assets`). */
+export interface DeclaredAssetInput {
+  name: string;
+  category: DeclaredAssetCategory;
+  value: number;
+  countPercent: number;
+  valuationDate?: ISODate;
+  source?: ValueSource;
+  instrumentId?: string;
+  quantity?: number;
+  accrual?: { principal: number; ratePa: number; startDate: ISODate; maturityDate?: ISODate };
+  institution?: string;
+}
+
 export interface CreateGoalInput {
   name: string;
   template: GoalTemplate;
   targetAmount: number;
   targetDate: ISODate;
   flexibility: GoalFlexibility;
+  /** Logo cho mục tiêu tuỳ chỉnh; mặc định theo `template`. */
+  icon?: GoalTemplate;
   /** Default: after every existing saving goal. */
   priority?: number;
   note?: string;
+  /** Nạp ban đầu từ tài khoản chính khi tạo (tài khoản mục tiêu được mở cùng lúc). */
+  initialDeposit?: number;
+  /** Trích tự động hằng tháng bật sẵn khi tạo. */
+  standingOrder?: { amount: number; dayOfMonth: number };
+  /** Tài sản có sẵn gắn vào mục tiêu ngay khi tạo. */
+  assets?: DeclaredAssetInput[];
 }
 
 export type SimEvent = "salary" | "bigExpense" | "standingOrderFail" | "overdue";
@@ -28,11 +50,16 @@ export type NavAction =
   | { type: "nav/params"; params: ScreenParams }
   | { type: "nav/push"; screen: ScreenId; params?: ScreenParams }
   | { type: "nav/pop"; count?: number }
+  /** Quay lại một màn và gộp `params` vào màn đó (trả kết quả cho màn trước). */
+  | { type: "nav/popWith"; params: ScreenParams }
   | { type: "nav/replace"; screen: ScreenId; params?: ScreenParams }
   /** Stack becomes [screen] (default GoalList). */
   | { type: "nav/reset"; screen?: ScreenId; params?: ScreenParams }
   /** Pop until `screen` is on top (no-op if absent). */
   | { type: "nav/popTo"; screen: ScreenId };
+
+/** Tài sản mà tiền mặt của mục tiêu dùng để mua khi sang giai đoạn vay: tài sản cố định đang có, hoặc tài sản mới. */
+export type LoanPurchase = { assetId: string } | { name: string; category: DeclaredAssetCategory; value: number };
 
 export type PreviewAction =
   // --- scenario / sim
@@ -52,9 +79,6 @@ export type PreviewAction =
   | { type: "triggerEvent"; event: SimEvent; goalId?: string }
   // --- create
   | { type: "createGoal"; input: CreateGoalInput }
-  | { type: "updateDraftGoal"; goalId: string; patch: Partial<CreateGoalInput> }
-  | { type: "discardDraftGoal"; goalId: string }
-  | { type: "openAccount"; goalId: string; initialDeposit: number }
   // --- cash
   | { type: "deposit"; goalId: string; amount: number; note?: string }
   | { type: "withdraw"; goalId: string; amount: number; note?: string; emergency?: boolean }
@@ -64,20 +88,7 @@ export type PreviewAction =
   | { type: "reserveLoan"; goalId: string; productId: string; principal: number; termMonths: number }
   | { type: "cancelReservedLoan"; goalId: string }
   // --- assets / invest
-  | {
-      type: "addFixedAsset";
-      goalId: string;
-      name: string;
-      category: FixedAssetCategory;
-      value: number;
-      countPercent: number;
-      valuationDate?: ISODate;
-      source?: ValueSource;
-      instrumentId?: string;
-      quantity?: number;
-      accrual?: { principal: number; ratePa: number; startDate: ISODate; maturityDate?: ISODate };
-      institution?: string;
-    }
+  | ({ type: "addAsset"; goalId: string } & DeclaredAssetInput)
   | { type: "revalueAsset"; assetId: string; value: number; countPercent?: number; valuationDate?: ISODate }
   | { type: "removeAsset"; assetId: string }
   /** Outside market asset (gold, stock, fund): the customer bought or sold, value follows the price. */
@@ -87,7 +98,7 @@ export type PreviewAction =
   | { type: "sellAsset"; assetId: string; fraction?: number; proceeds?: number }
   | { type: "handleMaturity"; assetId: string; choice: "rollover" | "toCash"; termMonths?: number }
   // --- loan / lifecycle
-  | { type: "takeLoan"; goalId: string; productId: string; principal: number; termMonths: number; payForGoal?: boolean }
+  | { type: "takeLoan"; goalId: string; productId: string; principal: number; termMonths: number; purchase?: LoanPurchase; settlement?: "now" | "next" }
   | { type: "startRepayment"; goalId: string }
   | { type: "repay"; loanId: string }
   | { type: "prepay"; loanId: string; amount: number }

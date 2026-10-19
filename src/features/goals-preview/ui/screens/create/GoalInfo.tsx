@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Lock, MoveHorizontal, Pencil } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarDays, Pencil, Plus, X } from "lucide-react";
 import { formatVnd } from "@/features/goals-preview/format-money";
+import { Sheet } from "@/components/primitives";
 import { cn } from "@/lib/cn";
 import { addMonths, dayOfMonth, formatISODate, formatMonths, monthsBetween, monthsLeft } from "../../../engine/dates";
 import { allocateSurplus } from "../../../engine/feasibility";
 import type { ScreenProps } from "../../../model/screens";
 import { paramNumber, paramString } from "../../../model/screens";
-import type { GoalFlexibility, GoalTemplate } from "../../../model/types";
+import type { GoalTemplate } from "../../../model/types";
+import type { DeclaredAssetInput } from "../../../store/actions";
 import { usePreview } from "../../../store/PreviewStore";
 import { AmountCard, formatShort, SuggestChip } from "../../shared/AmountCard";
 import { BottomActions } from "../../shared/BottomActions";
@@ -16,8 +18,8 @@ import { InfoTooltip } from "../../shared/InfoTooltip";
 import { MonthYearSheet } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle, figure } from "../../shared/styles";
-import { FLEX_INFO, WIZARD_STEPS, isFlexible, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
+import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, secondaryButton, sectionTitle, figure } from "../../shared/styles";
+import { TEMPLATES, WIZARD_STEPS, countedValue, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig, wizardAssets } from "./wizard";
 
 
 const QUICK_MONTHS = [
@@ -30,36 +32,27 @@ const MIN_AMOUNT = 1_000_000;
 
 /** Bước 2 · Lập kế hoạch: tên, số tiền, ngày, mức linh hoạt, nạp ban đầu. Tạo (hoặc cập nhật) bản nháp rồi sang mở tài khoản. */
 export function GoalInfo({ params }: ScreenProps) {
-  const { state, dispatch, nav } = usePreview();
+  const { state, nav } = usePreview();
   const today = state.clock.today;
-  const goalId = paramString(params, "goalId");
-  const existing = goalId ? state.goals.find((g) => g.id === goalId && g.status === "draft") : undefined;
-  const templateId = (existing?.template ?? paramString(params, "template") ?? "other") as GoalTemplate;
+  // Quay lại từ bước sau thì giữ nguyên những gì khách đã nhập (kế hoạch nằm trong tham số màn hình).
+  const saved = { name: paramString(params, "name"), amount: paramNumber(params, "targetAmount"), date: paramString(params, "targetDate") };
+  const templateId = (paramString(params, "template") ?? "other") as GoalTemplate;
   const config = templateConfig(templateId);
 
   const suggestedAmount =
     suggestedTarget(config, state.customer).amount;
 
-  const [name, setName] = useState(existing?.name ?? config.defaultName);
-  const [amount, setAmount] = useState<number | null>(existing?.targetAmount ?? suggestedAmount);
-  const [date, setDate] = useState<string>(existing?.targetDate ?? targetDateFromNow(today, config.months));
-  const [flex, setFlex] = useState<GoalFlexibility>(existing?.flexibility ?? config.flexibility);
+  const [name, setName] = useState(saved.name ?? config.defaultName);
+  const [amount, setAmount] = useState<number | null>(saved.amount ?? suggestedAmount);
+  const [date, setDate] = useState<string>(saved.date ?? targetDateFromNow(today, config.months));
   const [deposit, setDeposit] = useState<number | null>(paramNumber(params, "deposit") ?? null);
-  const depositRef = useRef(0);
+  // Mục tiêu tuỳ chỉnh được chọn logo trong các logo có sẵn; các loại khác dùng logo của loại đó.
+  const customLogo = templateId === "other";
+  const [logo, setLogo] = useState<GoalTemplate>((paramString(params, "icon") as GoalTemplate | undefined) ?? templateId);
+  const [logoOpen, setLogoOpen] = useState(false);
+  const [assets, setAssets] = useState<DeclaredAssetInput[]>(() => wizardAssets(params));
   const [touched, setTouched] = useState(false);
-  const [pending, setPending] = useState(false);
-  const lastCreated = useRef(state.lastCreatedGoalId);
-
-  // After createGoal the new id appears in state; swap this entry to carry it, then move on.
-  useEffect(() => {
-    if (!pending || !state.lastCreatedGoalId || state.lastCreatedGoalId === lastCreated.current) return;
-    const id = state.lastCreatedGoalId;
-    setPending(false);
-    nav.replace("GoalInfo", { template: templateId, goalId: id, deposit: depositRef.current });
-    nav.push("OpenAccountConfirm", { goalId: id, deposit: depositRef.current });
-  }, [pending, state.lastCreatedGoalId, nav, templateId]);
-
-  const [year, month] = date.split("-").map(Number);
+    const [year, month] = date.split("-").map(Number);
   const minDate = addMonths(today, 1);
   const years = useMemo(() => {
     const y0 = Number(today.slice(0, 4));
@@ -82,18 +75,30 @@ export function GoalInfo({ params }: ScreenProps) {
   const onContinue = () => {
     setTouched(true);
     if (!valid || amount === null) return;
-    const payload = { name: name.trim(), template: templateId, targetAmount: amount, targetDate: date, flexibility: flex };
-    const start = deposit ?? 0;
-    depositRef.current = start;
-    if (existing) {
-      dispatch({ type: "updateDraftGoal", goalId: existing.id, patch: payload });
-      nav.updateParams({ deposit: start });
-      nav.push("OpenAccountConfirm", { goalId: existing.id, deposit: start });
-    } else {
-      lastCreated.current = state.lastCreatedGoalId;
-      dispatch({ type: "createGoal", input: payload });
-      setPending(true);
-    }
+    // Chưa tạo gì: kế hoạch đi tiếp qua tham số, chỉ tạo mục tiêu khi khách xác nhận mở tài khoản.
+    const next = { ...snapshot(), targetAmount: amount };
+    nav.updateParams(next);
+    nav.push("OpenAccountConfirm", next);
+  };
+
+  // Giữ những gì đã nhập trong tham số màn hình, để quay lại từ màn thêm tài sản không mất dữ liệu.
+  const snapshot = () => ({
+    template: templateId,
+    name: name.trim(),
+    ...(amount !== null ? { targetAmount: amount } : {}),
+    targetDate: date,
+    deposit: deposit ?? 0,
+    assets: JSON.stringify(assets),
+    ...(customLogo ? { icon: logo } : {}),
+  });
+  const addAsset = () => {
+    nav.updateParams(snapshot());
+    nav.push("AddAsset", { ...snapshot(), wizard: "1" });
+  };
+  const removeAsset = (index: number) => {
+    const next = assets.filter((_, i) => i !== index);
+    setAssets(next);
+    nav.updateParams({ assets: JSON.stringify(next) });
   };
 
   const months = monthsBetween(today, date);
@@ -101,7 +106,7 @@ export function GoalInfo({ params }: ScreenProps) {
   const customDate = !quickDates.some((q) => q.date === date);
   const [pickDate, setPickDate] = useState(customDate);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const Icon = config.icon;
+  const Icon = templateConfig(customLogo ? logo : templateId).icon;
   const quickAmounts = quickAmountsFor(config, state.customer);
 
   // Live preview: what this plan asks for each month vs the surplus still free.
@@ -113,12 +118,12 @@ export function GoalInfo({ params }: ScreenProps) {
     return Math.max(0, surplus - loans - used);
   }, [state, surplus]);
   const left = monthsLeft(today, date);
-  const start = deposit ?? 0;
+  const assetsCounted = assets.reduce((sum, a) => sum + countedValue(a), 0);
+  const start = (deposit ?? 0) + assetsCounted;
   const toSave = Math.max(0, (amount ?? 0) - start);
   const monthly = toSave > 0 && left > 0 ? Math.ceil(toSave / left / 1000) * 1000 : 0;
   const share = free === "unknown" || free <= 0 ? null : monthly / free;
   const tone = share === null ? "muted" : share <= 0.5 ? "positive" : share <= 1 ? "warning" : "negative";
-  const flexKey = isFlexible(flex) ? "flexible" : "fixed";
 
   // One-tap fixes when the plan does not fit the free surplus.
   const fixes: { label: string; apply: () => void }[] = [];
@@ -132,7 +137,7 @@ export function GoalInfo({ params }: ScreenProps) {
     if (reduced >= MIN_AMOUNT && reduced < amount) fixes.push({ label: `Giảm còn ${formatShort(reduced)}`, apply: () => setAmount(reduced) });
     const neededDeposit = Math.ceil((amount - free * left) / 1_000_000) * 1_000_000;
     if (neededDeposit > start && neededDeposit <= state.customer.mainCasaBalance) {
-      fixes.push({ label: `Nạp ngay ${formatShort(neededDeposit)}`, apply: () => setDeposit(neededDeposit) });
+      fixes.push({ label: `Nạp ngay ${formatShort(neededDeposit)}`, apply: () => setDeposit(Math.max(0, neededDeposit - assetsCounted)) });
     }
   }
   const stuck = tone === "negative" && fixes.length === 0;
@@ -143,9 +148,23 @@ export function GoalInfo({ params }: ScreenProps) {
       <StepProgress steps={WIZARD_STEPS} current={1} />
 
       <section className={`${card} flex items-center gap-3`} aria-label="Tên mục tiêu">
-        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
-          <Icon size={30} strokeWidth={1.8} />
-        </span>
+        {customLogo ? (
+          <button
+            type="button"
+            aria-label="Đổi logo mục tiêu"
+            onClick={() => setLogoOpen(true)}
+            className={cn("relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong", ring)}
+          >
+            <Icon size={30} strokeWidth={1.8} aria-hidden />
+            <span aria-hidden className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-surface text-muted shadow-card">
+              <Pencil size={11} />
+            </span>
+          </button>
+        ) : (
+          <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
+            <Icon size={30} strokeWidth={1.8} />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <label className="flex items-center gap-2">
             <span className="sr-only">Tên mục tiêu</span>
@@ -171,6 +190,33 @@ export function GoalInfo({ params }: ScreenProps) {
         chips={quickAmounts.map((a) => ({ label: formatShort(a), amount: a }))}
       />
 
+      <section className={`${card} flex flex-col gap-3`} aria-label="Tài sản có sẵn">
+        <div className="flex items-center gap-1">
+          <h2 className={sectionTitle}>Tài sản có sẵn</h2>
+          <InfoTooltip label="tài sản có sẵn" text="Nhà, xe, vàng, cổ phiếu, tiền gửi ở nơi khác… bạn đã có và muốn tính vào mục tiêu này. Phần được tính sẽ giảm số tiền bạn cần tiết kiệm thêm." />
+        </div>
+        {assets.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {assets.map((a, i) => (
+              <li key={`${a.name}-${i}`} className="flex items-center justify-between gap-2 rounded-2xl bg-surface-muted px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-semibold text-text">{a.name}</p>
+                  <p className="text-[12px] text-muted">
+                    Tính vào mục tiêu {formatVnd(countedValue(a))} ({a.countPercent}% của {formatVnd(a.value)})
+                  </p>
+                </div>
+                <button type="button" aria-label={`Bỏ ${a.name}`} onClick={() => removeAsset(i)} className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted", ring)}>
+                  <X size={16} aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button type="button" className={secondaryButton} onClick={addAsset}>
+          <Plus size={18} aria-hidden /> Thêm tài sản
+        </button>
+      </section>
+
       <section className={`${card} flex flex-col gap-3`} aria-label="Thời hạn">
         <div className="flex items-center gap-1">
           <h2 className={sectionTitle}>Muốn đạt vào lúc nào?</h2>
@@ -186,6 +232,34 @@ export function GoalInfo({ params }: ScreenProps) {
             <CalendarDays size={16} aria-hidden className="mr-1.5" /> {pickDate ? `T${month}/${year}` : "Chọn ngày khác"}
           </button>
         </div>
+      {customLogo && (
+        <Sheet open={logoOpen} title="Chọn logo" onClose={() => setLogoOpen(false)}>
+          <div role="radiogroup" aria-label="Logo mục tiêu" className="grid grid-cols-4 gap-3">
+            {TEMPLATES.map((t) => {
+              const LogoIcon = t.icon;
+              const selected = logo === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={t.title}
+                  onClick={() => { setLogo(t.id); setLogoOpen(false); }}
+                  className={cn(
+                    "flex h-16 items-center justify-center rounded-2xl border-2 transition-colors",
+                    ring,
+                    selected ? "border-primary bg-primary-soft text-primary-strong" : "border-transparent bg-surface-muted text-muted",
+                  )}
+                >
+                  <LogoIcon size={26} strokeWidth={1.8} aria-hidden />
+                </button>
+              );
+            })}
+          </div>
+        </Sheet>
+      )}
+
         <MonthYearSheet
           key={`${year}-${month}-${pickerOpen}`}
           open={pickerOpen}
@@ -199,36 +273,6 @@ export function GoalInfo({ params }: ScreenProps) {
           }}
         />
         {errors.date && <p className={fieldError}>{errors.date}</p>}
-      </section>
-
-      <section className={`${card} flex flex-col gap-3`} aria-label="Mức linh hoạt">
-        <div className="flex items-center gap-1">
-          <h2 className={sectionTitle}>Kế hoạch có linh hoạt không?</h2>
-          <InfoTooltip label="mức linh hoạt" text={`${FLEX_INFO.fixed.title}: ${FLEX_INFO.fixed.text} ${FLEX_INFO.flexible.title}: ${FLEX_INFO.flexible.text}`} />
-        </div>
-        <div role="radiogroup" aria-label="Mức linh hoạt" className="grid grid-cols-2 gap-1 rounded-full bg-surface-muted p-1">
-          {(["fixed", "flexible"] as const).map((key) => {
-            const opt = FLEX_INFO[key];
-            const selected = flexKey === key;
-            const OptIcon = key === "fixed" ? Lock : MoveHorizontal;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setFlex(opt.value)}
-                className={cn(
-                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold transition-colors",
-                  selected ? "bg-surface text-primary-strong shadow-card" : "text-muted",
-                  ring,
-                )}
-              >
-                <OptIcon size={16} aria-hidden /> {opt.title}
-              </button>
-            );
-          })}
-        </div>
       </section>
 
       <AmountCard
@@ -291,7 +335,7 @@ export function GoalInfo({ params }: ScreenProps) {
       </section>
 
       <BottomActions inline>
-        <button type="button" className={primaryButton} onClick={onContinue} disabled={pending || (touched && !valid)}>
+        <button type="button" className={primaryButton} onClick={onContinue} disabled={touched && !valid}>
           Tiếp tục
         </button>
       </BottomActions>

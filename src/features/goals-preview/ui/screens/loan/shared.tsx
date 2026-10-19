@@ -37,8 +37,6 @@ export function NotFoundScreen({ title, onCta }: { title: string; onCta: () => v
 
 /** Amount still missing: at the target date when planning ahead, today once due. */
 export function loanGap(state: PreviewState, goal: Goal, deposit = 0): number {
-  // Draft goal: no account yet, the opening deposit comes from the wizard.
-  if (goal.status === "draft") return Math.max(0, goal.targetAmount - deposit);
   const remaining = Math.max(0, goal.targetAmount - goalValue(state, goal).total);
   if (goal.status === "missed" || state.clock.today >= goal.targetDate) return remaining;
   const f = feasibility(state, goal);

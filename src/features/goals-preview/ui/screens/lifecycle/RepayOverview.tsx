@@ -6,7 +6,7 @@ import { daysBetween, formatISODate, outstandingPrincipal } from "../../../engin
 import { LOAN_ROW_LABEL } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";
 import { Amount, BottomActions, ConfirmSheet, GoalStatusBadge, ScreenHeader, SummaryRows } from "../../shared";
-import { card, divider, errorBox, listRow, primaryButton, progressTrack, screenPadding, successBox, warningBox, calloutTitle, heroNumber } from "../../shared/styles";
+import { card, divider, errorBox, listRow, primaryButton, progressTrack, screenPadding, secondaryButton, successBox, warningBox, calloutTitle, heroNumber } from "../../shared/styles";
 import { NotFoundScreen, Section, pct, useLoanScreen } from "../loan/shared";
 
 /** Tích luỹ & trả nợ: dư nợ, kỳ tới, quá hạn, và các lối đi (lịch trả, trả trước). */
@@ -52,17 +52,22 @@ export function RepayOverview({ params }: ScreenProps) {
   const payoff = loan.schedule[loan.schedule.length - 1]?.dueDate;
   const daysToNext = next ? daysBetween(today, next.dueDate) : 0;
 
-  const primary = overdue && enough ? (
-    <button type="button" className={primaryButton} onClick={() => setConfirming(true)}>
-      Trả ngay {next ? formatVnd(next.payment) : ""}
+  const primary = !next ? (
+    <button type="button" className={primaryButton} onClick={() => nav.push("Prepay", { goalId: goal.id, loanId: loan.id })}>
+      Trả trước để giảm lãi
     </button>
-  ) : !enough ? (
+  ) : enough ? (
+    <button type="button" className={primaryButton} onClick={() => setConfirming(true)}>
+      {overdue ? "Trả ngay" : "Trả kỳ tháng này"} {formatVnd(next.payment)}
+    </button>
+  ) : overdue ? (
     <button type="button" className={primaryButton} onClick={() => nav.push("DepositFlow", { goalId: goal.id, amount: shortfall })}>
       Nạp thêm {formatVnd(shortfall)}
     </button>
   ) : (
-    <button type="button" className={primaryButton} onClick={() => nav.push("Prepay", { goalId: goal.id, loanId: loan.id })}>
-      Trả trước để giảm lãi
+    // Chưa đến hạn và chưa đủ tiền: không ép nạp hay trả, chỉ xem lịch.
+    <button type="button" className={primaryButton} onClick={() => nav.push("RepaySchedule", { goalId: goal.id, loanId: loan.id })}>
+      Xem lịch trả nợ
     </button>
   );
 
@@ -112,11 +117,16 @@ export function RepayOverview({ params }: ScreenProps) {
             ]}
           />
           {enough ? (
-            <div className={successBox}>Tài khoản mục tiêu đủ tiền, MSB sẽ tự trừ vào ngày đến hạn.</div>
+            <div className={successBox}>Tài khoản mục tiêu đủ tiền. Bạn có thể trả ngay kỳ này, hoặc để MSB tự trừ vào ngày đến hạn.</div>
           ) : (
             <div className={warningBox}>
-              Tài khoản mục tiêu còn thiếu {formatVnd(shortfall)} cho kỳ này. Nạp thêm để không bị quá hạn.
+              Tài khoản mục tiêu còn thiếu {formatVnd(shortfall)} cho kỳ này. Bạn có thể nạp thêm bất cứ lúc nào để không bị quá hạn.
             </div>
+          )}
+          {!enough && !overdue && (
+            <button type="button" className={secondaryButton} onClick={() => nav.push("DepositFlow", { goalId: goal.id, amount: shortfall })}>
+              Nạp tiền vào tài khoản mục tiêu
+            </button>
           )}
         </Section>
       )}
@@ -135,13 +145,12 @@ export function RepayOverview({ params }: ScreenProps) {
         <button
           type="button"
           className={`${listRow} disabled:opacity-50`}
-          disabled={overdue}
           onClick={() => nav.push("Prepay", { goalId: goal.id, loanId: loan.id })}
         >
           <span className="flex-1">
             <span className="block text-[15px] font-semibold text-text">Trả trước một phần nợ gốc</span>
             <span className="block text-[13px] leading-5 text-muted">
-              {overdue ? "Hãy trả kỳ quá hạn trước khi trả trước." : "Giảm lãi và số tiền phải trả mỗi tháng."}
+              Giảm lãi và số tiền phải trả mỗi tháng.
             </span>
           </span>
         </button>

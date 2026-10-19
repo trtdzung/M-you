@@ -5,7 +5,7 @@ import { PiggyBank, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
-import { cashBuffer, daysBetween, fundPriceAt, goalAccount, idleCash, investSuggestions, monthsLeft, addMonths, type InvestSuggestion } from "../../../engine";
+import { daysBetween, fundPriceAt, goalAccount, investableCash, investSuggestions, monthsLeft, addMonths, type InvestSuggestion } from "../../../engine";
 import { RISK_LEVEL_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
@@ -56,9 +56,8 @@ export function InvestSuggest({ params }: ScreenProps) {
   }
 
   const today = state.clock.today;
-  const idle = idleCash(state, goal);
+  const idle = investableCash(state, goal);
   const account = goalAccount(state, goal);
-  const buffer = cashBuffer(state, goal);
   const months = monthsLeft(today, goal.targetDate);
   const suggestions = investSuggestions(state, goal, idle).slice(0, 3);
 
@@ -68,10 +67,10 @@ export function InvestSuggest({ params }: ScreenProps) {
         <ScreenHeader title="Gợi ý đầu tư" subtitle={goal.name} />
         <EmptyState
           icon={<PiggyBank size={40} strokeWidth={1.5} />}
-          title="Chưa có tiền nhàn rỗi"
-          description={`Tiền trong tài khoản mục tiêu đang được giữ để trích các kỳ tới (khoảng ${formatVnd(buffer)}). Khi số dư cao hơn, MSB sẽ gợi ý cách sinh lời.`}
-          ctaLabel="Quay lại"
-          onCta={() => nav.pop()}
+          title="Tài khoản mục tiêu chưa có tiền"
+          description="Hãy nạp tiền vào tài khoản mục tiêu để đầu tư vào sản phẩm MSB."
+          ctaLabel="Nạp tiền"
+          onCta={() => nav.push("DepositFlow", { goalId: goal.id })}
         />
       </div>
     );
@@ -100,10 +99,10 @@ export function InvestSuggest({ params }: ScreenProps) {
 
       <section className={cn(card, "flex flex-col gap-1")}>
         <div className="flex items-center gap-1">
-          <p className="text-[13px] text-muted">Tiền nhàn rỗi có thể đầu tư</p>
+          <p className="text-[13px] text-muted">Số tiền có thể đầu tư</p>
           <InfoTooltip
-            label="cách tính tiền nhàn rỗi"
-            text={`Số dư tài khoản mục tiêu ${formatVnd(account?.balance ?? 0)}, giữ lại ${formatVnd(buffer)} cho các kỳ tích luỹ sắp tới. Còn ${months} tháng đến ngày mục tiêu (${dateVi(goal.targetDate)}).`}
+            label="cách tính số tiền có thể đầu tư"
+            text={`Toàn bộ số dư tài khoản mục tiêu: ${formatVnd(account?.balance ?? 0)}. Còn ${months} tháng đến ngày mục tiêu (${dateVi(goal.targetDate)}).`}
           />
         </div>
         <p className={heroNumber}>{formatVndCompact(idle)}</p>

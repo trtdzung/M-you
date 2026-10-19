@@ -24,24 +24,6 @@ export function Prepay({ params }: ScreenProps) {
     );
   }
 
-  const overdue = loan.schedule.some((r) => r.status === "overdue");
-  if (overdue) {
-    return (
-      <div className={screenPadding}>
-        {header}
-        <div className={errorBox}>
-          <p className="font-semibold text-negative">Chưa thể trả trước</p>
-          <p className="mt-1 text-muted">Bạn đang có kỳ nợ quá hạn. Hãy trả kỳ quá hạn trước, sau đó mới trả trước nợ gốc.</p>
-        </div>
-        <BottomActions>
-          <button type="button" className={primaryButton} onClick={() => nav.pop()}>
-            Quay lại để trả kỳ quá hạn
-          </button>
-        </BottomActions>
-      </div>
-    );
-  }
-
   const cash = account?.balance ?? 0;
   const outstanding = outstandingPrincipal(loan.schedule);
   const max = Math.min(cash, outstanding);

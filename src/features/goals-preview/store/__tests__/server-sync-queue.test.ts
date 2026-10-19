@@ -104,18 +104,10 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
     });
     q.enqueue(create("first"), "goal-local-900");
     q.enqueue(create("goal-local-900"), "goal-local-901");
-    const draft = payload().world.goals.find((g) => g.status === "draft");
-    if (draft) {
-      q.enqueue({ type: "updateDraftGoal", goalId: draft.id, patch: { name: "goal-local-900" } });
-    } else {
-      q.enqueue({ type: "setRiskProfile", profile: "balanced" });
-    }
+    q.enqueue({ type: "setRiskProfile", profile: "balanced" });
     await done;
     expect(sent).toHaveLength(3);
     expect((sent[1] as { input: { name: string } }).input.name).toBe("goal-local-900");
-    if (draft) {
-      expect((sent[2] as { patch: { name: string } }).patch.name).toBe("goal-local-900");
-    }
     expect(resolution?.goalIdMap["goal-local-900"]).toBe("goal-server-900");
   });
 
@@ -144,15 +136,15 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
     });
     q.enqueue(create("fail-first"), "goal-local-fail");
     q.enqueue(create("goal-local-fail"), "goal-local-fail-2");
-    q.enqueue({ type: "openAccount", goalId: "goal-local-fail", initialDeposit: 0 });
-    q.enqueue({ type: "updateDraftGoal", goalId: "some-real", patch: { name: "goal-local-fail" } });
+    q.enqueue({ type: "setStandingOrder", goalId: "goal-local-fail", amount: 1_000_000, dayOfMonth: 5 });
+    q.enqueue({ type: "pauseGoal", goalId: "some-real" });
     await done;
     expect(sent.length).toBeGreaterThanOrEqual(2);
-    expect(sent.some((a) => (a as { type: string }).type === "openAccount")).toBe(false);
+    expect(sent.some((a) => (a as { type: string }).type === "setStandingOrder")).toBe(false);
     expect(sent.filter((a) => (a as { type: string }).type === "createGoal")).toHaveLength(2);
   });
 
-  it("N2 REAL_MAP: openAccount xếp sau dùng id server; không nhảy draft khác", async () => {
+  it("N2 REAL_MAP: thao tác xếp sau dùng id server; không nhảy sang mục tiêu khác", async () => {
     let state: PreviewState = {
       ...getWorld(CIF).world,
       nav: { stack: [{ key: "list", screen: "GoalList", params: {} }] },
@@ -187,7 +179,7 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
       screen: "OpenAccountConfirm",
       params: { goalId: lid },
     });
-    q.enqueue({ type: "openAccount", goalId: lid, initialDeposit: 0 });
+    q.enqueue({ type: "setStandingOrder", goalId: lid, amount: 1_000_000, dayOfMonth: 5 });
     await done;
 
     const own = state.goals.find((g) => g.name === "r3-own");
@@ -195,13 +187,13 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
     expect(own!.id).not.toBe(lid);
     expect(state.lastCreatedGoalId).toBe(own!.id);
     expect(state.nav.stack.at(-1)?.params.goalId).toBe(own!.id);
-    const open = sent.find((a) => (a as { type: string }).type === "openAccount") as { goalId: string };
+    const open = sent.find((a) => (a as { type: string }).type === "setStandingOrder") as { goalId: string };
     expect(open.goalId).toBe(own!.id);
     expect(open.goalId).not.toBe(lid);
     expect(own!.status).toBe("accumulating");
   });
 
-  it("N2 NEW_RECONCILE: tạo offline hết 3 lần → cắt nav, không chọn draft cũ", async () => {
+  it("N2 NEW_RECONCILE: tạo offline hết 3 lần → cắt nav, không chọn mục tiêu cũ", async () => {
     vi.useFakeTimers();
     try {
       let state: PreviewState = {
@@ -210,7 +202,7 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
         toasts: [],
         dismissedSuggestionIds: [],
       };
-      const existing = state.goals.filter((g) => g.status === "draft").at(-1);
+      const existing = state.goals.at(-1);
       const a = create("NEW NEVER SAVED");
       state = previewReducer(state, a);
       const newId = state.lastCreatedGoalId!;

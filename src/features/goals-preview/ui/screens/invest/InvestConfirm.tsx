@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
-import { addMonths, daysBetween, depositAccrued, idleCash, monthsLeft } from "../../../engine";
+import { addMonths, daysBetween, depositAccrued, investableCash, monthsLeft } from "../../../engine";
 import { RISK_LEVEL_LABEL } from "../../../model/labels";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
@@ -17,7 +17,7 @@ export function InvestConfirm({ params }: ScreenProps) {
   const { state, dispatch, nav } = usePreview();
   const goal = findGoal(state, paramString(params, "goalId"));
   const product = getInvestProduct(paramString(params, "productId"));
-  const idle = goal ? idleCash(state, goal) : 0;
+  const idle = goal ? investableCash(state, goal) : 0;
   const [amount, setAmount] = useState<number | null>(paramNumber(params, "amount") ?? null);
   const [term, setTerm] = useState<number | undefined>(paramNumber(params, "termMonths"));
   const [confirm, setConfirm] = useState(false);
@@ -33,7 +33,7 @@ export function InvestConfirm({ params }: ScreenProps) {
 
   const today = state.clock.today;
   const left = monthsLeft(today, goal.targetDate);
-  const terms = product.kind === "term_deposit" ? product.terms.filter((t) => addMonths(today, t.months) <= goal.targetDate) : [];
+  const terms = product.kind === "term_deposit" ? product.terms : [];
   const chosenTerm = product.kind === "term_deposit" ? terms.find((t) => t.months === term) ?? terms[terms.length - 1] : undefined;
   const maturityDate = chosenTerm ? addMonths(today, chosenTerm.months) : product.kind === "bond" ? product.maturityDate : undefined;
   const rate = chosenTerm?.ratePa ?? (product.kind === "savings" ? product.ratePa : product.kind === "bond" ? product.couponPa : undefined);
@@ -41,9 +41,8 @@ export function InvestConfirm({ params }: ScreenProps) {
   const max = Math.max(idle, 0);
 
   let error: string | undefined;
-  if (amount !== null && amount < product.minAmount) error = `Số tiền tối thiểu là ${formatVnd(product.minAmount)}.`;
   if (product.kind === "term_deposit" && !chosenTerm) error = "Không có kỳ hạn nào đáo hạn trước ngày mục tiêu.";
-  const valid = amount !== null && amount >= product.minAmount && amount <= max && !error;
+  const valid = amount !== null && amount > 0 && amount <= max && !error;
   const pastTarget = !!maturityDate && maturityDate > goal.targetDate;
 
   const rows = [

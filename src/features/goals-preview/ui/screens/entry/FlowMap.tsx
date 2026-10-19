@@ -43,9 +43,6 @@ const FLOW_GROUPS: { title: string; items: FlowItem[] }[] = [
     items: [
       { screen: "TemplatePick", label: "Chọn loại mục tiêu", hint: "Bước 1: xe, nhà, du lịch…" },
       { screen: "GoalInfo", label: "Thông tin mục tiêu", hint: "Tên, số tiền, ngày, mức linh hoạt" },
-      { screen: "OpeningFunds", label: "Tiền & tài sản ban đầu", hint: "Số tiền có sẵn và tài sản gắn vào" },
-      { screen: "FeasibilityResult", label: "Kết quả khả thi", hint: "Khả thi, sát, không kịp hoặc chưa đủ dữ liệu" },
-      { screen: "OptionsCompare", label: "So sánh phương án", hint: "Tiết kiệm thêm, lùi ngày, giảm, vay" },
       { screen: "OpenAccountConfirm", label: "Mở tài khoản mục tiêu", hint: "Xác nhận trước khi mở" },
       { screen: "StandingOrderSetup", label: "Trích tiền tự động", hint: "Thiết lập số tiền và ngày trích" },
       { screen: "CreateSuccess", label: "Tạo thành công", hint: "Màn kết thúc luồng tạo" },
@@ -65,9 +62,9 @@ const FLOW_GROUPS: { title: string; items: FlowItem[] }[] = [
   {
     title: "Tài sản & đầu tư",
     items: [
-      { screen: "AddFixedAsset", label: "Thêm tài sản cố định", hint: "Nhà, xe, vàng… tự khai giá trị" },
+      { screen: "AddAsset", label: "Thêm tài sản", hint: "Nhà, xe, vàng… tự khai giá trị" },
       { screen: "RevalueAsset", label: "Định giá lại tài sản", hint: "Cập nhật giá trị đã cũ" },
-      { screen: "LiquidAssetDetail", label: "Chi tiết tài sản linh hoạt", hint: "Quỹ, tiền gửi, lãi lỗ" },
+      { screen: "MsbAssetDetail", label: "Chi tiết tài sản (quỹ, tiền gửi)", hint: "Quỹ, tiền gửi, lãi lỗ" },
       { screen: "SellAsset", label: "Bán tài sản", hint: "Phí và số tiền nhận về" },
       { screen: "InvestSuggest", label: "Gợi ý đầu tư", hint: "Cho tiền nhàn rỗi trong mục tiêu" },
       { screen: "InvestConfirm", label: "Xác nhận đầu tư", hint: "Tóm tắt trước khi gửi / mua" },

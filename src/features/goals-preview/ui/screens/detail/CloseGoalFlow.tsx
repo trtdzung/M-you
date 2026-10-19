@@ -25,11 +25,11 @@ export function CloseGoalFlow({ params }: ScreenProps) {
   const loan = state.loans.find((l) => l.id === goal.loanId);
   const loanActive = loan?.status === "active";
   const done = goal.status === "closed" || goal.status === "completed";
-  const liquid = goalAssets(state, goalId).filter((a) => a.type === "liquid");
-  const fixed = goalAssets(state, goalId).filter((a) => a.type === "fixed");
-  const liquidTotal = liquid.reduce((s, a) => s + assetValue(a, state), 0);
-  const earlyDeposits = liquid.filter((a) => a.maturityDate && a.maturityDate > state.clock.today);
-  const toMain = value.cash + liquidTotal;
+  const msb = goalAssets(state, goalId).filter((a) => a.type === "msb");
+  const declared = goalAssets(state, goalId).filter((a) => a.type === "declared");
+  const msbTotal = msb.reduce((s, a) => s + assetValue(a, state), 0);
+  const earlyDeposits = msb.filter((a) => a.maturityDate && a.maturityDate > state.clock.today);
+  const toMain = value.cash + msbTotal;
 
   function goToList() {
     if (nav.stack.some((e) => e.screen === "GoalList")) nav.popTo("GoalList");
@@ -61,8 +61,8 @@ export function CloseGoalFlow({ params }: ScreenProps) {
             <h2 className={sectionTitle}>Khi đóng mục tiêu</h2>
             <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-text">
               <li>Tiền trong tài khoản mục tiêu ({formatVnd(value.cash)}) được chuyển về tài khoản chính.</li>
-              <li>Tài sản linh hoạt ({liquid.length}) được bán hoặc tất toán, tiền về tài khoản chính.</li>
-              <li>Tài sản cố định ({fixed.length}) chỉ được gỡ khỏi mục tiêu, bạn vẫn giữ chúng.</li>
+              <li>Khoản đầu tư MSB ({msb.length}) được tất toán, tiền về tài khoản chính.</li>
+              <li>Tài sản bạn tự khai ({declared.length}) chỉ được gỡ khỏi mục tiêu, bạn vẫn giữ chúng.</li>
               <li>Tài khoản mục tiêu bị đóng, không thể mở lại. Lịch sử vẫn xem được.</li>
             </ul>
           </section>
@@ -77,14 +77,14 @@ export function CloseGoalFlow({ params }: ScreenProps) {
               ))}
             </section>
           )}
-          {liquid.some((a) => a.category === "fund") && (
+          {msb.some((a) => a.category === "fund") && (
             <p className={warningBox}>Quỹ bán dưới thời hạn miễn phí có thể bị tính phí bán, và giá bán theo giá thị trường hôm nay.</p>
           )}
 
           <SummaryRows
             rows={[
               { label: "Tiền mặt về tài khoản chính", value: value.cash, source: "msb" },
-              { label: "Tài sản linh hoạt (ước tính)", value: liquidTotal, source: "estimated" },
+              { label: "Khoản đầu tư MSB (ước tính)", value: msbTotal, source: "estimated" },
               { label: "Dự kiến nhận về", value: toMain, source: "estimated", emphasis: true },
             ]}
           />

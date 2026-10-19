@@ -30,9 +30,9 @@ export function selectGoalTxns(state: PreviewState, goalId: string): GoalTxn[] {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-/** Non-draft goals not in history, by priority. */
+/** Goals not in history, by priority. */
 export function selectActiveGoals(state: PreviewState): Goal[] {
-  return state.goals.filter((g) => g.status !== "draft" && !isHistory(g.status)).sort((a, b) => a.priority - b.priority);
+  return state.goals.filter((g) => !isHistory(g.status)).sort((a, b) => a.priority - b.priority);
 }
 
 export function selectHistoryGoals(state: PreviewState): Goal[] {

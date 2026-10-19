@@ -73,7 +73,7 @@ describe("F1 parseGoalAction / applyAction", () => {
       { type: "createGoal", input: goalInput("UI create") },
       { type: "setStandingOrder", goalId: "goal-1", amount: 0, dayOfMonth: 1, active: false },
       {
-        type: "addFixedAsset",
+        type: "addAsset",
         goalId: "goal-1",
         name: "gold",
         category: "gold",

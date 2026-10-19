@@ -5,13 +5,14 @@ import { advanceTime, applySalary, describeAdvance, payDueInstalments, runStandi
 import { addMonths, daysBetween, formatISODate, monthsBetween, nextDayOfMonth } from "../engine/dates";
 import { findGoal, goalBalance, makeAccountNumber, nextId, postTxn } from "../engine/ledger";
 import { applyLifecycle, refreshLoanStatuses } from "../engine/lifecycle";
-import { affordability, annuityPayment, buildSchedule, outstandingPrincipal } from "../engine/loan";
-import { assetValue, depositAccrued, fundPriceAt, goalValue } from "../engine/value";
+import { nextSettleDate, settleToMain } from "../engine/settle";
+import { annuityPayment, buildSchedule, outstandingPrincipal } from "../engine/loan";
+import { assetValue, depositAccrued, fundPriceAt, goalValue, PHASE_ONE_PURCHASE_NOTE } from "../engine/value";
 import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
-import type { Goal, LiquidAsset, ToastTone } from "../model/types";
+import type { DeclaredAssetCategory, Goal, MsbAsset, ToastTone } from "../model/types";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import type { PreviewAction, SimEvent } from "./actions";
+import type { DeclaredAssetInput, PreviewAction, SimEvent } from "./actions";
 
 export const STORAGE_KEY = "goals-preview:v1";
 const EMPTY_SCENARIO_ID = "empty";
@@ -62,7 +63,7 @@ function nextPriority(draft: PreviewState): number {
   return draft.goals.reduce((max, g) => Math.max(max, g.priority), 0) + 1;
 }
 
-function liquidSaleValue(draft: PreviewState, asset: LiquidAsset): { gross: number; fee: number; note: string } {
+function msbSaleValue(draft: PreviewState, asset: MsbAsset): { gross: number; fee: number; note: string } {
   const today = draft.clock.today;
   const product = getInvestProduct(asset.productId);
   if (asset.category === "term_deposit" && asset.principal !== undefined && product?.kind === "term_deposit") {
@@ -81,8 +82,8 @@ function liquidSaleValue(draft: PreviewState, asset: LiquidAsset): { gross: numb
 }
 
 /** Sells a liquid asset fully into the goal account (mutates). Returns proceeds. */
-function liquidate(draft: PreviewState, goal: Goal, asset: LiquidAsset, fraction = 1): number {
-  const { gross, fee, note } = liquidSaleValue(draft, asset);
+function liquidate(draft: PreviewState, goal: Goal, asset: MsbAsset, fraction = 1): number {
+  const { gross, fee, note } = msbSaleValue(draft, asset);
   const proceeds = Math.round((gross - fee) * fraction);
   postTxn(draft, goal, "divest", proceeds, draft.clock.today, `Bán ${asset.name}${note ? ` · ${note}` : ""}`);
   if (fraction >= 1) {
@@ -97,9 +98,30 @@ function liquidate(draft: PreviewState, goal: Goal, asset: LiquidAsset, fraction
   return proceeds;
 }
 
+function declaredAsset(draft: PreviewState, goalId: string, input: DeclaredAssetInput, today: string) {
+  return makeAsset(
+    draft,
+    goalId,
+    {
+      type: "declared",
+      name: input.name,
+      category: input.category,
+      value: input.value,
+      valuationDate: input.valuationDate ?? today,
+      countPercent: input.countPercent,
+      source: input.source,
+      instrumentId: input.instrumentId,
+      quantity: input.quantity,
+      accrual: input.accrual,
+      institution: input.institution,
+    },
+    today,
+  );
+}
+
 function refreshFundSnapshots(draft: PreviewState): void {
   for (const asset of draft.assets) {
-    if (asset.type !== "liquid" || asset.category !== "fund" || asset.status !== "held" || asset.units === undefined) continue;
+    if (asset.type !== "msb" || asset.category !== "fund" || asset.status !== "held" || asset.units === undefined) continue;
     const product = getInvestProduct(asset.productId);
     if (product?.kind !== "fund") continue;
     asset.price = fundPriceAt(product, draft.clock.today, draft.market.fundPriceShiftPct);
@@ -123,6 +145,11 @@ function navReducer(state: PreviewState, action: PreviewAction): PreviewState | 
       const count = Math.max(1, action.count ?? 1);
       if (stack.length <= 1) return state;
       return { ...state, nav: { stack: stack.slice(0, Math.max(1, stack.length - count)) } };
+    }
+    case "nav/popWith": {
+      if (stack.length <= 1) return state;
+      const rest = stack.slice(0, -1);
+      return { ...state, nav: { stack: rest.map((item, index) => (index === rest.length - 1 ? { ...item, params: { ...item.params, ...action.params } } : item)) } };
     }
     case "nav/reset":
       return { ...state, navSeq: seq, nav: { stack: [entry(seq, action.screen ?? "GoalList", action.params)] } };
@@ -249,44 +276,27 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       return triggerEvent(state, draft, action.event, action.goalId);
 
     case "createGoal": {
+      const deposit = Math.max(0, Math.round(action.input.initialDeposit ?? 0));
+      if (deposit > draft.customer.mainCasaBalance) return fail(state, "Tài khoản chính không đủ số dư để nạp ban đầu.");
       const id = nextId(draft, "goal");
-      draft.goals.push({
+      const goal: Goal = {
         id,
         name: action.input.name.trim() || "Mục tiêu mới",
         template: action.input.template,
         targetAmount: action.input.targetAmount,
         targetDate: action.input.targetDate,
-        flexibility: action.input.flexibility,
+        flexibility: "date_flexible",
+        ...(action.input.icon ? { icon: action.input.icon } : {}),
         priority: action.input.priority ?? nextPriority(draft),
-        status: "draft",
+        status: "accumulating",
         createdAt: today,
         note: action.input.note,
-      });
-      draft.lastCreatedGoalId = id;
-      return draft;
-    }
-
-    case "updateDraftGoal": {
-      const goal = findGoal(draft, action.goalId);
-      if (!goal || goal.status !== "draft") return state;
-      Object.assign(goal, action.patch);
-      return draft;
-    }
-
-    case "discardDraftGoal": {
-      draft.goals = draft.goals.filter((g) => !(g.id === action.goalId && g.status === "draft"));
-      draft.assets = draft.assets.filter((a) => a.goalId !== action.goalId || draft.goals.some((g) => g.id === a.goalId));
-      return draft;
-    }
-
-    case "openAccount": {
-      const goal = findGoal(draft, action.goalId);
-      if (!goal || goal.status !== "draft") return fail(state, "Không tìm thấy mục tiêu nháp.");
-      if (action.initialDeposit > draft.customer.mainCasaBalance) return fail(state, "Tài khoản chính không đủ số dư để nạp ban đầu.");
+      };
+      draft.goals.push(goal);
       const accountId = nextId(draft, "acc");
       draft.accounts.push({
         id: accountId,
-        goalId: goal.id,
+        goalId: id,
         number: makeAccountNumber(draft.seq),
         name: `TK mục tiêu – ${goal.name}`,
         balance: 0,
@@ -295,14 +305,19 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
         status: "open",
       });
       goal.accountId = accountId;
-      goal.status = "accumulating";
-      goal.createdAt = today;
-      if (action.initialDeposit > 0) {
-        draft.customer.mainCasaBalance -= action.initialDeposit;
-        postTxn(draft, goal, "deposit", action.initialDeposit, today, "Nạp tiền ban đầu");
+      if (deposit > 0) {
+        draft.customer.mainCasaBalance -= deposit;
+        postTxn(draft, goal, "deposit", deposit, today, "Nạp tiền ban đầu");
       }
+      for (const asset of action.input.assets ?? []) draft.assets.push(declaredAsset(draft, id, asset, today));
+      const so = action.input.standingOrder;
+      if (so && so.amount > 0) {
+        const day = Math.min(28, Math.max(1, Math.round(so.dayOfMonth)));
+        goal.standingOrder = { amount: so.amount, dayOfMonth: day, active: true, nextRunDate: nextDayOfMonth(today, day), failedCount: 0 };
+      }
+      draft.lastCreatedGoalId = id;
       lifecycle(draft);
-      toast(draft, `Đã mở Tài khoản mục tiêu cho “${goal.name}”.`);
+      toast(draft, `Đã tạo mục tiêu “${goal.name}” và mở tài khoản mục tiêu.`);
       return draft;
     }
 
@@ -360,29 +375,10 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       return draft;
     }
 
-    case "addFixedAsset": {
+    case "addAsset": {
       const goal = findGoal(draft, action.goalId);
       if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
-      draft.assets.push(
-        makeAsset(
-          draft,
-          goal.id,
-          {
-            type: "fixed",
-            name: action.name,
-            category: action.category,
-            value: action.value,
-            valuationDate: action.valuationDate ?? today,
-            countPercent: action.countPercent,
-            source: action.source,
-            instrumentId: action.instrumentId,
-            quantity: action.quantity,
-            accrual: action.accrual,
-            institution: action.institution,
-          },
-          today,
-        ),
-      );
+      draft.assets.push(declaredAsset(draft, goal.id, action, today));
       lifecycle(draft);
       toast(draft, `Đã thêm tài sản “${action.name}”.`);
       return draft;
@@ -390,7 +386,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "revalueAsset": {
       const asset = draft.assets.find((a) => a.id === action.assetId);
-      if (!asset || asset.type !== "fixed") return fail(state, "Chỉ định giá lại được tài sản cố định.");
+      if (!asset || asset.type !== "declared") return fail(state, "Chỉ định giá lại được tài sản tự khai.");
       asset.value = action.value;
       asset.valuationDate = action.valuationDate ?? today;
       if (action.countPercent !== undefined) asset.countPercent = action.countPercent;
@@ -402,7 +398,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "setAssetQuantity": {
       const asset = draft.assets.find((a) => a.id === action.assetId);
-      if (!asset || asset.type !== "fixed" || !asset.instrumentId) return fail(state, "Tài sản này không tính theo số lượng.");
+      if (!asset || asset.type !== "declared" || !asset.instrumentId) return fail(state, "Tài sản này không tính theo số lượng.");
       if (!(action.quantity > 0)) return fail(state, "Số lượng phải lớn hơn 0.");
       asset.quantity = action.quantity;
       asset.valuationDate = today;
@@ -414,7 +410,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
     case "removeAsset": {
       const asset = draft.assets.find((a) => a.id === action.assetId);
       if (!asset) return state;
-      if (asset.type === "liquid" && asset.status !== "sold") return fail(state, "Hãy bán tài sản linh hoạt để đưa tiền về tài khoản mục tiêu.");
+      if (asset.type === "msb" && asset.status !== "sold") return fail(state, "Hãy bán khoản đầu tư MSB để đưa tiền về tài khoản mục tiêu.");
       draft.assets = draft.assets.filter((a) => a.id !== action.assetId);
       toast(draft, `Đã bỏ “${asset.name}” khỏi mục tiêu.`, "info");
       return draft;
@@ -424,12 +420,11 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       const goal = findGoal(draft, action.goalId);
       const product = getInvestProduct(action.productId);
       if (!goal?.accountId || !product) return fail(state, "Không tìm thấy mục tiêu hoặc sản phẩm.");
-      if (action.amount < product.minAmount) return fail(state, `Số tiền tối thiểu là ${formatVnd(product.minAmount)}.`);
       if (action.amount > goalBalance(draft, goal)) return fail(state, "Số dư tài khoản mục tiêu không đủ.");
       const asset = makeAsset(
         draft,
         goal.id,
-        { type: "liquid", category: product.kind, productId: product.id, amount: action.amount, createdAt: today, termMonths: action.termMonths },
+        { type: "msb", category: product.kind, productId: product.id, amount: action.amount, createdAt: today, termMonths: action.termMonths },
         today,
       );
       draft.assets.push(asset);
@@ -442,7 +437,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       const asset = draft.assets.find((a) => a.id === action.assetId);
       const goal = asset ? findGoal(draft, asset.goalId) : undefined;
       if (!asset || !goal || asset.status === "sold") return fail(state, "Không tìm thấy tài sản.");
-      if (asset.type === "liquid") {
+      if (asset.type === "msb") {
         const fraction = Math.min(1, Math.max(0.01, action.fraction ?? 1));
         const proceeds = liquidate(draft, goal, asset, fraction);
         toast(draft, `Đã bán, ${formatVnd(proceeds)} về tài khoản mục tiêu.`);
@@ -459,10 +454,9 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
     case "handleMaturity": {
       const asset = draft.assets.find((a) => a.id === action.assetId);
       const goal = asset ? findGoal(draft, asset.goalId) : undefined;
-      if (!asset || !goal || asset.type !== "liquid" || asset.category !== "term_deposit" || asset.principal === undefined) {
+      if (!asset || !goal || asset.type !== "msb" || asset.category !== "term_deposit" || asset.principal === undefined) {
         return fail(state, "Không tìm thấy khoản tiền gửi.");
       }
-      if (asset.status === "held" && (!asset.maturityDate || asset.maturityDate > today)) return fail(state, "Khoản tiền gửi chưa đến hạn.");
       const value = asset.principal + depositAccrued(asset.principal, asset.ratePa ?? 0, asset.createdAt, asset.maturityDate ?? today);
       if (action.choice === "toCash") {
         postTxn(draft, goal, "maturity", value, today, `${asset.name} đáo hạn`);
@@ -496,14 +490,6 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       if (goal.loanId && draft.loans.some((l) => l.id === goal.loanId && l.status === "active")) return fail(state, "Mục tiêu đã có khoản vay.");
       const termMonths = Math.min(product.maxTermMonths, action.termMonths);
       const payment = annuityPayment(action.principal, product.ratePa, termMonths);
-      const check = affordability({
-        monthlyPayment: payment,
-        monthlyIncome: draft.customer.monthlyIncome,
-        existingDebtPayment: draft.customer.existingDebtPayment,
-        ratePa: product.ratePa,
-        termMonths,
-      });
-      if (!check.allowed) return fail(state, "Khoản trả hằng tháng vượt 40% thu nhập — không thể vay.");
       const loanId = nextId(draft, "loan");
       const loan = {
         id: loanId,
@@ -522,22 +508,49 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       draft.loans.push(loan);
       goal.loanId = loanId;
       goal.plannedLoan = undefined;
-      for (const asset of draft.assets) {
-        if (asset.goalId === goal.id && asset.type === "liquid" && asset.status !== "sold") liquidate(draft, goal, asset);
+      // Sang giai đoạn 2: tiền mặt trong tài khoản mục tiêu rút ra để mua tài sản (tài sản cố định đang có, hoặc mới;
+      // mặc định là chính tài sản mục tiêu). Các tài sản khác đã dùng để mua mục tiêu nên biến mất, không quy ra tiền.
+      // Tiền vay không đi qua tài khoản mục tiêu. Tài sản mua không tính vào tiến độ trả nợ (countPercent = 0).
+      const chosen = action.purchase && "assetId" in action.purchase ? action.purchase.assetId : undefined;
+      const kept = draft.assets.find((a) => a.id === chosen && a.goalId === goal.id && a.type === "declared");
+      const bought = kept
+        ? undefined
+        : action.purchase && !("assetId" in action.purchase)
+          ? action.purchase
+          : { name: goal.name, category: (goal.template === "house" ? "house" : goal.template === "car" ? "car" : "other") as DeclaredAssetCategory, value: goal.targetAmount };
+      const cash = goalBalance(draft, goal);
+      // Đầu tư MSB: tất toán ngay (rút toàn bộ giá trị hiện tại về tài khoản chính) hoặc hẹn tất toán vào kỳ tới.
+      const investments = draft.assets.filter((a): a is MsbAsset => a.goalId === goal.id && a.type === "msb" && a.status !== "sold");
+      const pending: MsbAsset[] = [];
+      for (const inv of investments) {
+        if ((action.settlement ?? "now") === "now") {
+          settleToMain(draft, goal, inv, today);
+        } else {
+          inv.settleOn = nextSettleDate(inv, today);
+          inv.countPercent = 0;
+          pending.push(inv);
+        }
       }
-      postTxn(draft, goal, "loan_disbursement", action.principal, today, `Giải ngân ${product.name}`);
-      if (action.payForGoal ?? true) {
-        postTxn(draft, goal, "withdraw", goalBalance(draft, goal), today, `Thanh toán “${goal.name}”`);
+      draft.assets = draft.assets.filter((a) => a.goalId !== goal.id || a === kept || pending.includes(a as MsbAsset));
+      if (kept && kept.type === "declared") kept.countPercent = 0;
+      if (bought) {
+        draft.assets.push(
+          makeAsset(draft, goal.id, { type: "declared", name: bought.name, category: bought.category, value: bought.value, valuationDate: today, countPercent: 0 }, today),
+        );
       }
-      goal.status = "achieved";
+      if (cash > 0) {
+        postTxn(draft, goal, "withdraw", cash, today, `${PHASE_ONE_PURCHASE_NOTE}${kept?.name ?? bought?.name ?? goal.name}`);
+      }
+      // Vay xong là sang giai đoạn trả nợ ngay; mọi thao tác tiếp theo làm trên màn mục tiêu.
+      goal.status = "repaying";
       goal.achievedAt = today;
-      toast(draft, `Đã giải ngân ${formatVnd(action.principal)}. “${goal.name}” đã Đạt mục tiêu!`);
+      toast(draft, `Đã giải ngân ${formatVnd(action.principal)}. “${goal.name}” đã sang giai đoạn trả nợ.`);
       return draft;
     }
 
     case "startRepayment": {
       const goal = findGoal(draft, action.goalId);
-      if (!goal || goal.status !== "achieved") return fail(state, "Mục tiêu chưa ở trạng thái Đạt mục tiêu.");
+      if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
       goal.status = "repaying";
       toast(draft, "Bắt đầu giai đoạn Tích luỹ & trả nợ.", "info");
       return draft;
@@ -563,7 +576,6 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       const loan = draft.loans.find((l) => l.id === action.loanId);
       const goal = loan ? findGoal(draft, loan.goalId) : undefined;
       if (!loan || !goal || loan.status !== "active") return fail(state, "Không tìm thấy khoản vay đang hoạt động.");
-      if (loan.schedule.some((r) => r.status === "overdue")) return fail(state, "Hãy trả kỳ quá hạn trước khi trả trước.");
       const outstanding = outstandingPrincipal(loan.schedule);
       const amount = Math.min(action.amount, outstanding);
       if (amount <= 0) return fail(state, "Số tiền trả trước không hợp lệ.");
@@ -596,7 +608,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "reserveLoan": {
       const goal = findGoal(draft, action.goalId);
-      if (!goal || (goal.status !== "accumulating" && goal.status !== "paused")) return fail(state, "Chỉ đặt trước khoản vay cho mục tiêu đang tích luỹ.");
+      if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
       goal.plannedLoan = { productId: action.productId, principal: action.principal, termMonths: action.termMonths, reservedAt: today };
       toast(draft, `Đã đặt trước khoản vay ${formatVnd(action.principal)}. MSB giải ngân vào ngày ${formatISODate(goal.targetDate)}.`);
       return draft;
@@ -612,9 +624,8 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "completeEarly": {
       const goal = findGoal(draft, action.goalId);
-      if (!goal || goal.status !== "accumulating") return fail(state, "Mục tiêu không ở trạng thái đang tích luỹ.");
+      if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
       const value = goalValue(draft, goal).total;
-      if (value < goal.targetAmount) return fail(state, "Mục tiêu chưa đủ tiền.");
       goal.status = "completed";
       goal.completedAt = today;
       goal.completedEarly = today < goal.targetDate;
@@ -627,7 +638,6 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
     case "extend": {
       const goal = findGoal(draft, action.goalId);
       if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
-      if (action.newTargetDate <= today) return fail(state, "Ngày mới phải sau hôm nay.");
       goal.originalTargetDate ??= goal.targetDate;
       goal.targetDate = action.newTargetDate;
       if (goal.status === "missed") goal.status = "accumulating";
@@ -659,8 +669,8 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "pauseGoal": {
       const goal = findGoal(draft, action.goalId);
-      if (!goal || (goal.status !== "accumulating" && goal.status !== "repaying")) return fail(state, "Không thể tạm dừng mục tiêu này.");
-      goal.pausedFrom = goal.status;
+      if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
+      if (goal.status !== "paused") goal.pausedFrom = goal.status;
       goal.status = "paused";
       if (goal.standingOrder) goal.standingOrder.active = false;
       toast(draft, `Đã tạm dừng “${goal.name}”.`, "info");
@@ -669,7 +679,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "resumeGoal": {
       const goal = findGoal(draft, action.goalId);
-      if (!goal || goal.status !== "paused") return fail(state, "Mục tiêu không ở trạng thái tạm dừng.");
+      if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
       goal.status = goal.pausedFrom ?? "accumulating";
       goal.pausedFrom = undefined;
       if (goal.standingOrder) {
@@ -684,12 +694,9 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
     case "closeGoal": {
       const goal = findGoal(draft, action.goalId);
       if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
-      if (goal.loanId && draft.loans.some((l) => l.id === goal.loanId && l.status === "active")) {
-        return fail(state, "Còn khoản vay chưa trả hết — chưa thể đóng mục tiêu.");
-      }
       goal.finalValue = goalValue(draft, goal).total;
       for (const asset of draft.assets) {
-        if (asset.goalId === goal.id && asset.type === "liquid" && asset.status !== "sold") liquidate(draft, goal, asset);
+        if (asset.goalId === goal.id && asset.type === "msb" && asset.status !== "sold") liquidate(draft, goal, asset);
       }
       const cash = goalBalance(draft, goal);
       if (cash > 0) {

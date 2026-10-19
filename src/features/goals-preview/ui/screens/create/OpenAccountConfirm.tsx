@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Landmark } from "lucide-react";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { formatISODate, monthsLeft, nextDayOfMonth } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
-import type { Goal } from "../../../model/types";
+import { EmptyState } from "../../shared/EmptyState";
 import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
@@ -15,7 +15,7 @@ import { DayOfMonthPicker, Switch } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { card, errorBox, primaryButton, screenPadding, sectionTitle } from "../../shared/styles";
-import { DraftGuard, WIZARD_STEPS, formatAccountNumber, previewAccountNumber, wizardDeposit } from "./wizard";
+import { WIZARD_STEPS, countedValue, formatAccountNumber, previewAccountNumber, wizardDeposit, wizardPlan, type WizardPlan } from "./wizard";
 
 const INTEREST_RATE_PA = 0.5;
 const WITHDRAW_RULES =
@@ -23,14 +23,20 @@ const WITHDRAW_RULES =
 
 /** Bước 3 · Mở tài khoản: tóm tắt kế hoạch, trích tự động (bật sẵn) và xác nhận mở. */
 export function OpenAccountConfirm({ params }: ScreenProps) {
-  return (
-    <DraftGuard params={params} title="Mở tài khoản mục tiêu">
-      {(goal) => <Body goal={goal} deposit={wizardDeposit(params)} />}
-    </DraftGuard>
-  );
+  const { nav } = usePreview();
+  const plan = wizardPlan(params);
+  if (!plan) {
+    return (
+      <div className={screenPadding}>
+        <ScreenHeader title="Mở tài khoản mục tiêu" />
+        <EmptyState title="Chưa có kế hoạch" description="Hãy bắt đầu lại từ bước chọn mục tiêu." ctaLabel="Tạo mục tiêu mới" onCta={() => nav.replace("TemplatePick")} />
+      </div>
+    );
+  }
+  return <Body goal={plan} deposit={wizardDeposit(params)} />;
 }
 
-function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
+function Body({ goal, deposit }: { goal: WizardPlan; deposit: number }) {
   const { state, dispatch, nav } = usePreview();
   const [open, setOpen] = useState(false);
   const balance = state.customer.mainCasaBalance;
@@ -39,17 +45,40 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
   const accountName = `TK mục tiêu – ${goal.name}`;
 
   const left = monthsLeft(state.clock.today, goal.targetDate);
-  const toSave = Math.max(0, goal.targetAmount - deposit);
+  const assetsCounted = goal.assets.reduce((sum, a) => sum + countedValue(a), 0);
+  const toSave = Math.max(0, goal.targetAmount - deposit - assetsCounted);
   const monthly = toSave > 0 && left > 0 ? Math.ceil(toSave / left / 1000) * 1000 : 0;
   const [autoOn, setAutoOn] = useState(monthly > 0);
   const [autoAmount, setAutoAmount] = useState<number | null>(monthly > 0 ? monthly : null);
   const [day, setDay] = useState(Math.min(28, state.customer.salaryDay + 1));
   const autoValid = !autoOn || (autoAmount ?? 0) > 0;
 
+  // Tạo mục tiêu, mở tài khoản và nạp ban đầu trong một bước; id mới xuất hiện ở lastCreatedGoalId.
+  const lastCreated = useRef(state.lastCreatedGoalId);
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (!pending || !state.lastCreatedGoalId || state.lastCreatedGoalId === lastCreated.current) return;
+    setPending(false);
+    nav.replace("CreateSuccess", { goalId: state.lastCreatedGoalId });
+  }, [pending, state.lastCreatedGoalId, nav]);
+
   const confirm = () => {
-    dispatch({ type: "openAccount", goalId: goal.id, initialDeposit: deposit });
-    if (autoOn && autoAmount) dispatch({ type: "setStandingOrder", goalId: goal.id, amount: autoAmount, dayOfMonth: day });
-    nav.replace("CreateSuccess", { goalId: goal.id });
+    lastCreated.current = state.lastCreatedGoalId;
+    dispatch({
+      type: "createGoal",
+      input: {
+        name: goal.name,
+        template: goal.template,
+        targetAmount: goal.targetAmount,
+        targetDate: goal.targetDate,
+        flexibility: "date_flexible",
+        initialDeposit: deposit,
+        ...(goal.icon ? { icon: goal.icon } : {}),
+        ...(goal.assets.length > 0 ? { assets: goal.assets } : {}),
+        ...(autoOn && autoAmount ? { standingOrder: { amount: autoAmount, dayOfMonth: day } } : {}),
+      },
+    });
+    setPending(true);
   };
 
   return (
@@ -64,6 +93,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
             { label: "Mục tiêu", value: formatVndCompact(goal.targetAmount) },
             { label: "Đạt vào", value: formatISODate(goal.targetDate) },
             { label: "Nạp ban đầu", value: formatVndCompact(deposit) },
+            ...(goal.assets.length > 0 ? [{ label: `Tài sản có sẵn (${goal.assets.length})`, value: formatVndCompact(assetsCounted) }] : []),
             { label: "Góp mỗi tháng", value: formatVndCompact(monthly) },
           ].map((row) => (
             <div key={row.label}>
@@ -112,7 +142,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
               <InfoTooltip label="quy tắc rút tiền" text={WITHDRAW_RULES} />
             </div>
             <p className="text-[13px] text-muted">
-              <span className="tabular-nums">{formatAccountNumber(accountNumber)}</span> · lãi {INTEREST_RATE_PA.toString().replace(".", ",")}%/năm
+              Số dự kiến <span className="tabular-nums">{formatAccountNumber(accountNumber)}</span> · lãi {INTEREST_RATE_PA.toString().replace(".", ",")}%/năm
             </p>
           </div>
         </div>
@@ -125,7 +155,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
       )}
 
       <BottomActions inline>
-        <button type="button" className={primaryButton} disabled={insufficient || !autoValid} onClick={() => setOpen(true)}>
+        <button type="button" className={primaryButton} disabled={insufficient || !autoValid || pending} onClick={() => setOpen(true)}>
           Mở tài khoản
         </button>
       </BottomActions>

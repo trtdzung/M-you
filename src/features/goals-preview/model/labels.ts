@@ -1,10 +1,10 @@
 import type {
-  FixedAssetCategory,
+  DeclaredAssetCategory,
   GoalFlexibility,
   GoalStatus,
   GoalTemplate,
   GoalTxnKind,
-  LiquidAssetCategory,
+  MsbAssetCategory,
   LoanPurpose,
   LoanRowStatus,
   ProgressState,
@@ -16,7 +16,6 @@ import type {
 /** Plain-Vietnamese labels shared by every screen. */
 
 export const STATUS_LABEL: Record<GoalStatus, string> = {
-  draft: "Bản nháp",
   accumulating: "Đang tích luỹ",
   paused: "Tạm dừng",
   achieved: "Đạt mục tiêu",
@@ -55,8 +54,12 @@ export const TEMPLATE_EMOJI: Record<GoalTemplate, string> = {
   other: "🎯",
 };
 
+/** Emoji của mục tiêu: logo khách chọn (mục tiêu tuỳ chỉnh) hoặc logo theo loại. */
+export function goalEmoji(goal: { template: GoalTemplate; icon?: GoalTemplate }): string {
+  return TEMPLATE_EMOJI[goal.icon ?? goal.template];
+}
+
 export const FLEXIBILITY_LABEL: Record<GoalFlexibility, string> = {
-  date_fixed: "Ngày cố định",
   date_flexible: "Có thể lùi ngày",
   amount_flexible: "Có thể giảm số tiền",
 };
@@ -74,7 +77,7 @@ export const TXN_LABEL: Record<GoalTxnKind, string> = {
   standing_order_failed: "Trích tự động không thành công",
 };
 
-export const FIXED_CATEGORY_LABEL: Record<FixedAssetCategory, string> = {
+export const DECLARED_CATEGORY_LABEL: Record<DeclaredAssetCategory, string> = {
   house: "Nhà, đất",
   car: "Ô tô",
   motorbike: "Xe máy",
@@ -86,7 +89,7 @@ export const FIXED_CATEGORY_LABEL: Record<FixedAssetCategory, string> = {
   bond: "Trái phiếu",
 };
 
-export const LIQUID_CATEGORY_LABEL: Record<LiquidAssetCategory, string> = {
+export const MSB_CATEGORY_LABEL: Record<MsbAssetCategory, string> = {
   savings: "Tiết kiệm linh hoạt",
   term_deposit: "Tiền gửi có kỳ hạn",
   fund: "Chứng chỉ quỹ",

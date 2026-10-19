@@ -27,6 +27,11 @@ export function idleCash(world: World, goal: Goal): number {
   return idle >= IDLE_CASH_MIN ? idle : 0;
 }
 
+/** Số tiền có thể đầu tư: toàn bộ số dư tài khoản mục tiêu (không giữ lại khoản đệm). */
+export function investableCash(world: World, goal: Goal): number {
+  return Math.max(0, Math.floor(goalAccount(world, goal)?.balance ?? 0));
+}
+
 export type HorizonBand = "short" | "medium" | "long";
 
 /** < 12 tháng: ngắn · 12–36: trung · > 36: dài. */
@@ -93,6 +98,17 @@ export function investSuggestions(world: World, goal: Goal, amount = idleCash(wo
       suggestedAmount: amount,
       estimatedAtMaturity: amount + depositAccrued(amount, term.ratePa, today, maturityDate),
       maturityDate,
+    });
+  }
+  // Luôn có ít nhất một lựa chọn, kể cả khi không có kỳ hạn nào đáo hạn trước ngày mục tiêu.
+  if (out.length === 0) {
+    out.push({
+      productId: SAVINGS_FLEX.id,
+      ratePa: SAVINGS_FLEX.ratePa,
+      riskLevel: "low",
+      title: SAVINGS_FLEX.name,
+      reason: "Rút được bất cứ lúc nào, phù hợp khi bạn chưa chắc ngày cần tiền.",
+      suggestedAmount: amount,
     });
   }
   return out;

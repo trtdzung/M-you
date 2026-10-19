@@ -96,7 +96,7 @@ export function WithdrawFlow({ params }: ScreenProps) {
               </span>
             </div>
             <SplitProgressBar
-              cash={Math.max(0, stage.principalPaid + value.cash - (showImpact ? amount! : 0))}
+              cash={Math.max(0, stage.repaid + value.cash - (showImpact ? amount! : 0))}
               assets={value.assets}
               target={stage.target}
               showLegend={false}

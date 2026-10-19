@@ -11,7 +11,16 @@ export function nextId(draft: Pick<WorldState, "seq">, prefix: string): string {
   return `${prefix}-${draft.seq}`;
 }
 
-/** Deterministic 12-digit goal account number, MSB-like prefix. */
+/**
+ * Số tài khoản mục tiêu duy nhất toàn hệ thống (D10): "88" + 4 số cuối phần số của cif (đệm 0) +
+ * seq lúc mở đệm 6 số = 12 số. Server cấp số này; màn tạo dùng cùng công thức để hiện số dự kiến.
+ */
+export function goalAccountNumber(cif: string, seq: number): string {
+  const cifDigits = cif.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  return `88${cifDigits}${String(seq % 1_000_000).padStart(6, "0")}`;
+}
+
+/** Deterministic 12-digit goal account number, MSB-like prefix (số giả lập của reducer, server sẽ thay). */
 export function makeAccountNumber(seed: number): string {
   const body = String((seed * 7919 + 104_729) % 100_000_000).padStart(8, "0");
   return `9668${body}`;

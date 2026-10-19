@@ -4,9 +4,6 @@ import { FlowMap } from "./screens/entry/FlowMap";
 import { HomeMock } from "./screens/entry/HomeMock";
 import { TemplatePick } from "./screens/create/TemplatePick";
 import { GoalInfo } from "./screens/create/GoalInfo";
-import { OpeningFunds } from "./screens/create/OpeningFunds";
-import { FeasibilityResult } from "./screens/create/FeasibilityResult";
-import { OptionsCompare } from "./screens/create/OptionsCompare";
 import { OpenAccountConfirm } from "./screens/create/OpenAccountConfirm";
 import { StandingOrderSetup } from "./screens/create/StandingOrderSetup";
 import { CreateSuccess } from "./screens/create/CreateSuccess";
@@ -15,10 +12,11 @@ import { GoalDetail } from "./screens/detail/GoalDetail";
 import { DepositFlow } from "./screens/detail/DepositFlow";
 import { WithdrawFlow } from "./screens/detail/WithdrawFlow";
 import { StandingOrderManage } from "./screens/detail/StandingOrderManage";
+import { EditTarget } from "./screens/detail/EditTarget";
 import { CloseGoalFlow } from "./screens/detail/CloseGoalFlow";
-import { AddFixedAsset } from "./screens/assets/AddFixedAsset";
+import { AddAsset } from "./screens/assets/AddAsset";
 import { RevalueAsset } from "./screens/assets/RevalueAsset";
-import { LiquidAssetDetail } from "./screens/assets/LiquidAssetDetail";
+import { MsbAssetDetail } from "./screens/assets/MsbAssetDetail";
 import { SellAsset } from "./screens/assets/SellAsset";
 import { InvestSuggest } from "./screens/invest/InvestSuggest";
 import { InvestConfirm } from "./screens/invest/InvestConfirm";
@@ -49,9 +47,6 @@ export const SCREEN_REGISTRY: Record<ScreenId, ScreenDef> = {
   HomeMock: { component: HomeMock, title: "Trang chủ", group: "entry" },
   TemplatePick: { component: TemplatePick, title: "Chọn loại mục tiêu", group: "create" },
   GoalInfo: { component: GoalInfo, title: "Thông tin mục tiêu", group: "create" },
-  OpeningFunds: { component: OpeningFunds, title: "Tiền & tài sản ban đầu", group: "create", needs: ["goalId"] },
-  FeasibilityResult: { component: FeasibilityResult, title: "Kết quả khả thi", group: "create", needs: ["goalId"] },
-  OptionsCompare: { component: OptionsCompare, title: "So sánh phương án", group: "create", needs: ["goalId"] },
   OpenAccountConfirm: { component: OpenAccountConfirm, title: "Mở tài khoản mục tiêu", group: "create", needs: ["goalId"] },
   StandingOrderSetup: { component: StandingOrderSetup, title: "Trích tiền tự động", group: "create", needs: ["goalId"] },
   CreateSuccess: { component: CreateSuccess, title: "Tạo mục tiêu thành công", group: "create", needs: ["goalId"] },
@@ -60,10 +55,11 @@ export const SCREEN_REGISTRY: Record<ScreenId, ScreenDef> = {
   DepositFlow: { component: DepositFlow, title: "Nạp tiền", group: "detail", needs: ["goalId"] },
   WithdrawFlow: { component: WithdrawFlow, title: "Rút tiền", group: "detail", needs: ["goalId"] },
   StandingOrderManage: { component: StandingOrderManage, title: "Trích tiền tự động", group: "detail", needs: ["goalId"] },
+  EditTarget: { component: EditTarget, title: "Chỉnh sửa mục tiêu", group: "detail", needs: ["goalId"] },
   CloseGoalFlow: { component: CloseGoalFlow, title: "Đóng mục tiêu", group: "detail", needs: ["goalId"] },
-  AddFixedAsset: { component: AddFixedAsset, title: "Thêm tài sản", group: "assets", needs: ["goalId"] },
+  AddAsset: { component: AddAsset, title: "Thêm tài sản", group: "assets", needs: ["goalId"] },
   RevalueAsset: { component: RevalueAsset, title: "Định giá lại tài sản", group: "assets", needs: ["goalId", "assetId"] },
-  LiquidAssetDetail: { component: LiquidAssetDetail, title: "Chi tiết tài sản", group: "assets", needs: ["goalId", "assetId"] },
+  MsbAssetDetail: { component: MsbAssetDetail, title: "Chi tiết tài sản", group: "assets", needs: ["goalId", "assetId"] },
   SellAsset: { component: SellAsset, title: "Bán tài sản", group: "assets", needs: ["goalId", "assetId"] },
   InvestSuggest: { component: InvestSuggest, title: "Gợi ý đầu tư", group: "invest", needs: ["goalId"] },
   InvestConfirm: { component: InvestConfirm, title: "Xác nhận đầu tư", group: "invest", needs: ["goalId"] },

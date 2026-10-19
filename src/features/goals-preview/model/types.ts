@@ -48,13 +48,13 @@ export type GoalTemplate =
 
 /**
  * Lifecycle:
- * draft → accumulating → completed
- *                     ↘ (đến hạn, thiếu, vay) achieved → repaying → completed
+
+ * accumulating → completed
+ *             ↘ (đến hạn, thiếu, vay) achieved → repaying → completed
  *                     ↘ (đến hạn, thiếu, không vay) missed → (gia hạn/giảm) accumulating | closed
  * paused / closed at any time (closed is terminal).
  */
 export type GoalStatus =
-  | "draft"
   | "accumulating"
   | "paused"
   | "achieved"
@@ -67,7 +67,7 @@ export type GoalStatus =
 export type GoalPhase = 1 | 2;
 
 /** How the customer can bend if the plan does not fit. */
-export type GoalFlexibility = "date_fixed" | "date_flexible" | "amount_flexible";
+export type GoalFlexibility = "date_flexible" | "amount_flexible";
 
 export type ProgressState = "on_track" | "ahead" | "slightly_behind" | "off_track";
 
@@ -91,11 +91,12 @@ export interface Goal {
   targetAmount: number;
   targetDate: ISODate;
   flexibility: GoalFlexibility;
+  /** Logo khách chọn cho mục tiêu tuỳ chỉnh (lấy từ logo của các loại có sẵn); mặc định theo `template`. */
+  icon?: GoalTemplate;
   /** 1 = cao nhất; số dư hằng tháng được chia theo thứ tự này. */
   priority: number;
   status: GoalStatus;
   createdAt: ISODate;
-  /** Undefined while status is "draft". */
   accountId?: string;
   standingOrder?: StandingOrder;
   loanId?: string;
@@ -174,8 +175,8 @@ export const TXN_DIRECTION: Record<GoalTxnKind, 1 | -1 | 0> = {
 // ---------------------------------------------------------------- assets
 
 /** Self-declared assets. house…other are valued by hand; gold…bond are financial assets held outside MSB. */
-export type FixedAssetCategory = "house" | "car" | "motorbike" | "other" | "gold" | "stock" | "external_fund" | "deposit" | "bond";
-export type LiquidAssetCategory = "savings" | "term_deposit" | "fund" | "bond";
+export type DeclaredAssetCategory = "house" | "car" | "motorbike" | "other" | "gold" | "stock" | "external_fund" | "deposit" | "bond";
+export type MsbAssetCategory = "savings" | "term_deposit" | "fund" | "bond";
 
 interface AssetBase {
   id: string;
@@ -197,9 +198,9 @@ interface AssetBase {
  * Tài sản tự khai (ngoài MSB). Nhà, xe… có giá tự khai. Tài sản tài chính ở nơi khác được định giá tự động:
  * vàng / cổ phiếu / chứng chỉ quỹ = số lượng × giá thị trường; tiền gửi / trái phiếu = gốc + lãi cộng dồn.
  */
-export interface FixedAsset extends AssetBase {
-  type: "fixed";
-  category: FixedAssetCategory;
+export interface DeclaredAsset extends AssetBase {
+  type: "declared";
+  category: DeclaredAssetCategory;
   productId?: undefined;
   /** Market instrument (data/market.ts) priced daily; value = quantity × price. */
   instrumentId?: string;
@@ -211,9 +212,9 @@ export interface FixedAsset extends AssetBase {
 }
 
 /** Tài sản linh hoạt: sản phẩm MSB có giá biết trước. */
-export interface LiquidAsset extends AssetBase {
-  type: "liquid";
-  category: LiquidAssetCategory;
+export interface MsbAsset extends AssetBase {
+  type: "msb";
+  category: MsbAssetCategory;
   productId: string;
   /** Fund / bond units. */
   units?: number;
@@ -224,9 +225,11 @@ export interface LiquidAsset extends AssetBase {
   ratePa?: number;
   termMonths?: number;
   maturityDate?: ISODate;
+  /** Hẹn tất toán (sang giai đoạn vay): đến ngày này tự bán và rút toàn bộ về tài khoản chính. */
+  settleOn?: ISODate;
 }
 
-export type Asset = FixedAsset | LiquidAsset;
+export type Asset = DeclaredAsset | MsbAsset;
 
 // ---------------------------------------------------------------- loan
 

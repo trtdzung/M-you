@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Check, Plus } from "lucide-react";
 import { SegmentedControl } from "@/components/primitives";
 
 import { allocateSurplus, formatISODate, goalStage, goalValue, progressPct, progressState } from "../../../engine";
-import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";
+import { goalEmoji, TEMPLATE_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import type { PreviewState } from "../../../model/state";
 import type { Goal } from "../../../model/types";
@@ -30,14 +30,14 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
   const target = history ? goal.targetAmount : stage.target;
   const pct = Math.round(progressPct(state, goal));
   const finished = history && goal.finalValue !== undefined;
-  const cash = finished ? goal.finalValue! : stage.principalPaid + v.cash;
+  const cash = finished ? goal.finalValue! : stage.repaid + v.cash;
   const assets = finished ? 0 : v.assets;
   const showProgress = goal.status === "accumulating" || goal.status === "repaying";
   return (
     <button type="button" onClick={onOpen} className={`${card} flex w-full flex-col gap-3 text-left ${ring}`}>
       <div className="flex items-start gap-3">
         <span aria-hidden className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-[22px]">
-          {TEMPLATE_EMOJI[goal.template]}
+          {goalEmoji(goal)}
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[16px] font-semibold text-text">{goal.name}</p>

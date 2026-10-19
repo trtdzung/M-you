@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { FixedAssetDetailSheet, priceDateOf } from "../assets/FixedAssetDetailSheet";
-import { LiquidAssetDetail } from "../assets/LiquidAssetDetail";
+import { DeclaredAssetDetailSheet, priceDateOf } from "../assets/DeclaredAssetDetailSheet";
+import { MsbAssetDetail } from "../assets/MsbAssetDetail";
 import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink, Gem, CircleDollarSign, PieChart, FileText, Home } from "lucide-react";
 import { getInstrument } from "../../../data/market";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { assetGain, assetValue, formatISODate, goalAssets, isAutoValued } from "../../../engine";
-import { FIXED_CATEGORY_LABEL, LIQUID_CATEGORY_LABEL } from "../../../model/labels";
+import { DECLARED_CATEGORY_LABEL, MSB_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { SourceTag } from "../../shared/SourceTag";
 import { InfoTooltip } from "../../shared/InfoTooltip";
@@ -19,15 +19,15 @@ import { canTransact, isStaleValuation, type GoalContext } from "./common";
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav, dispatch, toast } = usePreview();
   const [removeId, setRemoveId] = useState<string | null>(null);
-  const fixedDetailId = typeof nav.current.params.fixedAssetId === "string" ? nav.current.params.fixedAssetId : null;
-  const setFixedDetailId = (id: string | null) => nav.updateParams({ fixedAssetId: id ?? undefined });
+  const declaredDetailId = typeof nav.current.params.declaredAssetId === "string" ? nav.current.params.declaredAssetId : null;
+  const setDeclaredDetailId = (id: string | null) => nav.updateParams({ declaredAssetId: id ?? undefined });
   const [detailId, setDetailId] = useState<string | null>(null);
   const { state, goal } = ctx;
   const assets = goalAssets(state, goalId);
-  const liquid = assets.flatMap((a) => (a.type === "liquid" ? [a] : []));
-  const fixed = assets.flatMap((a) => (a.type === "fixed" ? [a] : []));
+  const msb = assets.flatMap((a) => (a.type === "msb" ? [a] : []));
+  const declared = assets.flatMap((a) => (a.type === "declared" ? [a] : []));
 
-  const removing = fixed.find((asset) => asset.id === removeId);
+  const removing = declared.find((asset) => asset.id === removeId);
   const removedValue = removing ? Math.round(assetValue(removing, state) * removing.countPercent / 100) : 0;
   const impact = removing ? progressAfter(state, goal, -removedValue) : null;
 
@@ -44,34 +44,33 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
           <div className="grid grid-cols-2 gap-3"><button type="button" className={secondaryButton} onClick={() => setRemoveId(null)}>Huỷ</button><button type="button" className={`${primaryButton} !bg-negative`} onClick={() => { dispatch({ type: "removeAsset", assetId: removing.id }); setRemoveId(null); toast("Đã gỡ tài sản khỏi mục tiêu.", "success"); }}>Xác nhận gỡ</button></div>
         </div>}
       </Sheet>
-      {fixedDetailId && <FixedAssetDetailSheet assetId={fixedDetailId} onClose={() => setFixedDetailId(null)} />}
-      <Sheet bodyClassName="flex flex-col !overflow-hidden !pb-0" open={detailId !== null} title={liquid.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
-        {detailId && <LiquidAssetDetail params={{ goalId, assetId: detailId }} embedded onNavigate={() => setDetailId(null)} />}
+      {declaredDetailId && <DeclaredAssetDetailSheet assetId={declaredDetailId} onClose={() => setDeclaredDetailId(null)} />}
+      <Sheet bodyClassName="flex flex-col !overflow-hidden !pb-0" open={detailId !== null} title={msb.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
+        {detailId && <MsbAssetDetail params={{ goalId, assetId: detailId }} embedded onNavigate={() => setDetailId(null)} />}
       </Sheet>
       <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center"><h2 className={sectionTitle}>Linh hoạt</h2><InfoTooltip label="tài sản linh hoạt" text="Sản phẩm MSB như tiền gửi, quỹ hoặc trái phiếu. Khả năng bán, rút tiền và giá trị nhận lại phụ thuộc từng sản phẩm." /></div>
-          <SourceTag source="msb" />
+        <div className="flex items-center">
+          <h2 className={sectionTitle}>Tài sản</h2>
+          <InfoTooltip label="tài sản" text="Gồm sản phẩm MSB (tiền gửi, quỹ, trái phiếu) và tài sản bạn tự khai hoặc ở nơi khác (nhà, xe, vàng, cổ phiếu…). Chỉ phần theo tỷ lệ tính vào mục tiêu được cộng vào tiến độ." />
         </div>
-        {liquid.length === 0 ? (
+        {assets.length === 0 && (
           <div className={`${card} flex flex-col gap-2 text-center`}>
-            <p className="text-sm text-muted">Chưa có tài sản linh hoạt. Đưa tiền nhàn rỗi vào tiết kiệm, quỹ hoặc trái phiếu để sinh lời.</p>
-            {goal.status === "accumulating" && (
-              <button type="button" className={secondaryButton} onClick={() => nav.push("InvestSuggest", { goalId })}>
-                Xem gợi ý đầu tư
-              </button>
-            )}
+            <p className="text-sm text-muted">Chưa có tài sản nào. Đưa tiền nhàn rỗi vào tiết kiệm, quỹ hoặc trái phiếu, hoặc thêm tài sản bạn đang có.</p>
+            <button type="button" className={secondaryButton} onClick={() => nav.push("InvestSuggest", { goalId })}>
+              Xem gợi ý đầu tư
+            </button>
           </div>
-        ) : (
+        )}
+        {msb.length > 0 && (
           <ul className="flex flex-col gap-3">
-            {liquid.map((a) => {
+            {msb.map((a) => {
               const gain = assetGain(a, state);
               return (
                 <li key={a.id}>
                   <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => setDetailId(a.id)}>
                     <div className="flex items-start gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong"><Landmark size={20} aria-hidden /></span>
-                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{LIQUID_CATEGORY_LABEL[a.category]}</p></div>
+                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">{MSB_CATEGORY_LABEL[a.category]} <SourceTag source={a.source} /></p></div>
                     </div>
                     <div>
                       <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
@@ -89,17 +88,9 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
             })}
           </ul>
         )}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center"><h2 className={sectionTitle}>Tài sản ngoài MSB</h2><InfoTooltip label="tài sản ngoài MSB" text="Nhà, xe có giá do bạn tự khai. Vàng, cổ phiếu, chứng chỉ quỹ, tiền gửi và trái phiếu ở nơi khác được app tự ước tính theo giá thị trường hoặc lãi suất. Chỉ phần theo tỷ lệ bạn chọn được tính vào mục tiêu." /></div>
-        </div>
-        {fixed.length === 0 ? (
-          <p className={`${card} text-center text-sm text-muted`}>Chưa khai báo tài sản nào ngoài MSB.</p>
-        ) : (
+        {declared.length > 0 && (
           <ul className="flex flex-col gap-3">
-            {fixed.map((a) => {
+            {declared.map((a) => {
               const auto = isAutoValued(a);
               const stale = !auto && isStaleValuation(a.valuationDate, state.clock.today);
               const now = assetValue(a, state);
@@ -107,10 +98,10 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
               const Icon = { house: Home, car: Car, gold: Gem, stock: CircleDollarSign, external_fund: PieChart, deposit: Landmark, bond: FileText }[a.category as string] ?? Package;
               return (
                 <li key={a.id} className="relative rounded-card bg-surface shadow-card">
-                  <button type="button" className={`${card} !shadow-none flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => setFixedDetailId(a.id)}>
+                  <button type="button" className={`${card} !shadow-none flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => setDeclaredDetailId(a.id)}>
                     <div className={`flex items-start gap-3 ${stale ? "pr-9" : ""}`}>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-source-self-soft text-source-self"><Icon size={20} aria-hidden /></span>
-                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]} <SourceTag source={auto ? "estimated" : "self_reported"} /></p></div>
+                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">{DECLARED_CATEGORY_LABEL[a.category]} <SourceTag source={auto ? "estimated" : "self_reported"} /></p></div>
                     </div>
                     <div>
                       <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
@@ -137,8 +128,8 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
         )}
 
         {canTransact(goal) && (
-          <button type="button" className={secondaryButton} onClick={() => nav.push("AddFixedAsset", { goalId })}>
-            <Plus size={18} aria-hidden /> Thêm tài sản ngoài MSB
+          <button type="button" className={secondaryButton} onClick={() => nav.push("AddAsset", { goalId })}>
+            <Plus size={18} aria-hidden /> Thêm tài sản
           </button>
         )}
       </section>
