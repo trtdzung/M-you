@@ -89,7 +89,7 @@ export function InvestConfirm({ params }: ScreenProps) {
             ) : (
               <p className={warningBox}>Còn {left} tháng đến ngày mục tiêu, chưa có kỳ hạn nào đáo hạn kịp.</p>
             )}
-            <p className={hint}>Chỉ hiện kỳ hạn đáo hạn trước ngày mục tiêu ({dateVi(goal.targetDate)}).</p>
+            <p className={hint}>Bạn có thể chọn kỳ hạn đáo hạn sau ngày mục tiêu ({dateVi(goal.targetDate)}); các kỳ hạn này sẽ được cảnh báo.</p>
           </div>
         )}
         {product.kind === "fund" && (
