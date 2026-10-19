@@ -90,6 +90,16 @@ CREATE TABLE IF NOT EXISTS gv2_instruments (
   active INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS gv2_stock_directory (
+  code TEXT PRIMARY KEY,
+  company_name TEXT NOT NULL,
+  short_name TEXT,
+  floor TEXT,
+  listed INTEGER NOT NULL DEFAULT 1,
+  source TEXT NOT NULL,
+  synced_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS gv2_price_sync (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   sync_date TEXT NOT NULL,

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ensureStockDirectory, readStockDirectoryEntry, resolveFromSsi } from "./directory";
 import { goalsV2Db } from "../db";
 import {
   FETCH_FROM_FIRST,
@@ -7,7 +8,6 @@ import {
   fetchGold,
   fetchStocks,
   lookupStock,
-  resolveStockFullName,
   vnDate,
   type SinceFn,
   type SourcePoint,
@@ -65,11 +65,13 @@ function trigger(force: boolean): { refreshing: boolean; asOf: string | null } {
 
 /** Gọi khi đọc thị trường: trả ngay, đồng bộ (nếu cần) chạy ở nền. */
 export function ensurePricesFresh(): { refreshing: boolean; asOf: string | null } {
+  ensureStockDirectory();
   return trigger(false);
 }
 
 /** Nút "Cập nhật lại": như trên nhưng bỏ điều kiện "đã có hôm nay" (vẫn giữ khoá 2 phút). */
 export function refreshPricesNow(): { refreshing: boolean; asOf: string | null } {
+  ensureStockDirectory({ force: true });
   return trigger(true);
 }
 
@@ -110,7 +112,7 @@ async function runSync(runId: number): Promise<void> {
     const upsertInstrument = db.prepare(
       `INSERT INTO gv2_instruments (id, kind, name, full_name, unit, fractional, source, external_ref, active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-       ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name, full_name = excluded.full_name,
+       ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name, full_name = COALESCE(excluded.full_name, gv2_instruments.full_name),
          unit = excluded.unit, fractional = excluded.fractional, source = excluded.source,
          external_ref = excluded.external_ref, active = 1`,
     );
@@ -194,16 +196,16 @@ export async function registerStockSymbol(symbol: string): Promise<RegisterStock
     console.error("[goals-v2] stock lookup failed", found.message);
     return { ok: false, reason: "unavailable" };
   }
-  const fullName = await resolveStockFullName(found.symbol);
+  if (!readStockDirectoryEntry(found.symbol)) await resolveFromSsi(found.symbol);
   const db = goalsV2Db();
   const id = `stock-${found.symbol.toLowerCase()}`;
   const fetchedAt = now.toISOString();
   db.transaction(() => {
     db.prepare(
-      `INSERT INTO gv2_instruments (id, kind, name, full_name, unit, fractional, source, external_ref, active)
-       VALUES (?, 'stock', ?, ?, 'cổ phiếu', 0, 'vndirect', ?, 1)
-       ON CONFLICT(id) DO UPDATE SET active = 1, full_name = COALESCE(excluded.full_name, gv2_instruments.full_name)`,
-    ).run(id, found.symbol, fullName ?? null, found.symbol);
+      `INSERT INTO gv2_instruments (id, kind, name, unit, fractional, source, external_ref, active)
+       VALUES (?, 'stock', ?, 'cổ phiếu', 0, 'vndirect', ?, 1)
+       ON CONFLICT(id) DO UPDATE SET active = 1`,
+    ).run(id, found.symbol, found.symbol);
     const upsert = db.prepare(
       `INSERT INTO gv2_prices (instrument_id, price_date, price, raw_price, source, fetched_at)
        VALUES (?, ?, ?, ?, ?, ?)

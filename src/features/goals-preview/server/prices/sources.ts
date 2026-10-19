@@ -3,7 +3,6 @@ import "server-only";
 import type { MarketKind } from "../../data/market";
 
 const TIMEOUT_MS = 8000;
-const NAME_TIMEOUT_MS = 2500;
 
 export const FETCH_FROM_FIRST = "2025-09-01";
 
@@ -45,44 +44,6 @@ export const VN30 = [
   "LPB", "MBB", "MSN", "MWG", "PLX", "SAB", "SHB", "SSB", "SSI", "STB",
   "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
 ] as const;
-
-/** Fallback company names when VNDirect finfo is unreachable (verified offline 2026-10). */
-export const VN30_COMPANY_NAMES: Record<(typeof VN30)[number], string> = {
-  ACB: "Ngân hàng TMCP Á Châu",
-  BCM: "Becamex IDC",
-  BID: "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam",
-  BVH: "Tập đoàn Bảo Việt",
-  CTG: "Ngân hàng TMCP Công Thương Việt Nam",
-  FPT: "FPT Corporation",
-  GAS: "Tổng Công ty Khí Việt Nam",
-  GVR: "Tập đoàn Công nghiệp Cao su Việt Nam",
-  HDB: "Ngân hàng TMCP Phát triển TP.HCM",
-  HPG: "Tập đoàn Hòa Phát",
-  LPB: "Ngân hàng TMCP Lộc Phát Việt Nam",
-  MBB: "Ngân hàng TMCP Quân Đội",
-  MSN: "Tập đoàn Masan",
-  MWG: "Thế Giới Di Động",
-  PLX: "Tập đoàn Xăng dầu Việt Nam",
-  SAB: "Sabeco",
-  SHB: "Ngân hàng TMCP Sài Gòn – Hà Nội",
-  SSB: "Ngân hàng TMCP Đông Nam Á",
-  SSI: "Chứng khoán SSI",
-  STB: "Ngân hàng TMCP Sài Gòn Thương Tín",
-  TCB: "Ngân hàng TMCP Kỹ Thương Việt Nam",
-  TPB: "Ngân hàng TMCP Tiên Phong",
-  VCB: "Ngân hàng TMCP Ngoại Thương Việt Nam",
-  VHM: "Vinhomes",
-  VIB: "Ngân hàng TMCP Quốc tế Việt Nam",
-  VIC: "Tập đoàn Vingroup",
-  VJC: "Vietjet Aviation",
-  VNM: "Vinamilk",
-  VPB: "Ngân hàng TMCP Việt Nam Thịnh Vượng",
-  VRE: "Vincom Retail",
-};
-
-export function stockCompanyNameFallback(symbol: string): string | undefined {
-  return VN30_COMPANY_NAMES[symbol as (typeof VN30)[number]];
-}
 
 const VN_OFFSET_MS = 7 * 3600_000;
 
@@ -210,32 +171,6 @@ async function stockHistory(symbol: string, since: string, now: Date): Promise<S
   return stockPoints(symbol, json);
 }
 
-/**
- * Tên công ty từ api-finfo VNDirect (`/v4/stocks?q=code:XXX` → companyName / shortName).
- * Lỗi mạng hoặc thiếu field → undefined (caller dùng fallback tĩnh).
- */
-export async function fetchStockCompanyName(symbol: string): Promise<string | undefined> {
-  try {
-    // Tên chỉ để hiển thị: chờ ngắn, hết giờ thì dùng fallback (không làm chậm việc thêm mã).
-    const json = await fetchJson(`https://api-finfo.vndirect.com.vn/v4/stocks?q=code:${encodeURIComponent(symbol)}`, undefined, NAME_TIMEOUT_MS);
-    const rows = isRecord(json) && Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
-    const row = rows.find((r) => isRecord(r) && String(r.code ?? "").toUpperCase() === symbol);
-    if (!isRecord(row)) return undefined;
-    const companyName = typeof row.companyName === "string" ? row.companyName.trim() : "";
-    if (companyName) return companyName;
-    const shortName = typeof row.shortName === "string" ? row.shortName.trim() : "";
-    if (shortName && shortName.toUpperCase() !== symbol) return shortName;
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Prefer live VNDirect name; fall back to the VN30 static map. */
-export async function resolveStockFullName(symbol: string): Promise<string | undefined> {
-  return (await fetchStockCompanyName(symbol)) ?? stockCompanyNameFallback(symbol);
-}
-
 export type StockLookup =
   | { status: "ok"; symbol: string; points: SourcePoint[] }
   | { status: "not_found" }
@@ -275,13 +210,10 @@ export async function fetchStocks(now: Date, since: SinceFn, extraSymbols: reado
   const symbols = [...new Set<string>([...VN30, ...extraSymbols])];
   const results = await mapLimit(symbols, 6, async (symbol) => {
     try {
-      // VN30: dùng map tĩnh (tránh N request finfo). Mã ngoài danh sách: hỏi VNDirect rồi mới fallback.
       const points = await stockHistory(symbol, since(`stock-${symbol.toLowerCase()}`), now);
-      const known = stockCompanyNameFallback(symbol);
-      const fullName = known ?? (await fetchStockCompanyName(symbol));
-      return { symbol, points, fullName, error: null as string | null };
+      return { symbol, points, error: null as string | null };
     } catch (e) {
-      return { symbol, points: [] as SourcePoint[], fullName: stockCompanyNameFallback(symbol), error: `${symbol}: ${errMsg(e)}` };
+      return { symbol, points: [] as SourcePoint[], error: `${symbol}: ${errMsg(e)}` };
     }
   });
   const instruments: SourceInstrument[] = [];
@@ -291,7 +223,7 @@ export async function fetchStocks(now: Date, since: SinceFn, extraSymbols: reado
     if (r.error) errors.push(r.error);
     if (r.points.length === 0) continue;
     instruments.push({
-      id: `stock-${r.symbol.toLowerCase()}`, kind: "stock", name: r.symbol, fullName: r.fullName,
+      id: `stock-${r.symbol.toLowerCase()}`, kind: "stock", name: r.symbol,
       unit: "cổ phiếu", fractional: false, source: "vndirect", externalRef: r.symbol,
     });
     points.push(...r.points);

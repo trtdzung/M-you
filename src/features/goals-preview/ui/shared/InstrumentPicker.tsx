@@ -16,6 +16,23 @@ import { seriesPriceAt } from "../../engine";
 import type { ISODate } from "../../model/types";
 import { input, label, listRow, ring, secondaryButton } from "./styles";
 
+interface DirectoryItem {
+  code: string;
+  companyName: string;
+  shortName: string | null;
+  floor: string | null;
+}
+let directoryRequest: Promise<DirectoryItem[]> | undefined;
+function loadDirectory(): Promise<DirectoryItem[]> {
+  return directoryRequest ??= fetch("/api/goals-v2/market/stock-directory")
+    .then(async response => {
+      if (!response.ok) throw new Error("Directory unavailable");
+      const body = await response.json();
+      if (!Array.isArray(body.items)) throw new Error("Invalid directory");
+      return body.items as DirectoryItem[];
+    }).catch(() => []);
+}
+
 function fold(text: string): string {
   return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "d").toLowerCase();
 }
@@ -46,6 +63,7 @@ export function InstrumentPicker({
   /** Quỹ không có trong danh sách → chuyển sang tự khai giá trị. */
   onManualFund?: () => void;
 }) {
+  const [directory, setDirectory] = useState<DirectoryItem[]>([]);
   const [open, setOpen] = useState(false);
   // Sheet chạy lại hiệu ứng focus khi onClose đổi; giữ hàm ổn định để ô tìm kiếm không mất focus khi gõ.
   const close = useCallback(() => setOpen(false), []);
@@ -72,7 +90,27 @@ export function InstrumentPicker({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || kind !== "stock") return;
+    let cancelled = false;
+    void loadDirectory().then(items => { if (!cancelled) setDirectory(items); });
+    return () => { cancelled = true; };
+  }, [open, kind]);
+
   const all = sortedInstruments(kind);
+  // Chưa gõ: chỉ các mã đã có giá ("Phổ biến"); gõ rồi mới tìm trong cả danh mục mã niêm yết.
+  if (kind === "stock" && query.trim()) {
+    for (const entry of directory) {
+      const priced = all.find(m => m.name === entry.code);
+      if (priced) {
+        all[all.indexOf(priced)] = { ...priced, fullName: entry.companyName };
+      } else {
+        all.push({ id: `stock-${entry.code.toLowerCase()}`, kind: "stock", name: entry.code,
+          fullName: entry.companyName, unit: "cổ phiếu", fractional: false, priceSeries: [] });
+      }
+    }
+    all.sort((a, b) => a.name.localeCompare(b.name, "en"));
+  }
   const q = fold(query.trim());
   // Mỗi từ khách gõ phải là đầu của một từ trong mã hoặc tên; mã bắt đầu bằng từ khoá xếp trước.
   const tokens = q.split(/\s+/).filter(Boolean);
@@ -96,19 +134,23 @@ export function InstrumentPicker({
   const sheetTitle = kind === "stock" ? "Chọn mã cổ phiếu" : "Chọn chứng chỉ quỹ";
 
   const pick = (m: MarketInstrument) => {
+    if (kind === "stock" && m.priceSeries.length === 0) {
+      void addSymbol(m.name);
+      return;
+    }
     onChange(m.id);
     setOpen(false);
   };
 
-  const addSymbol = async () => {
-    if (!showAddStock || checking) return;
+  const addSymbol = async (symbol = symbolQuery) => {
+    if (checking) return;
     setChecking(true);
     setAddError(undefined);
     try {
       const res = await fetch("/api/goals-v2/market/instruments", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ symbol: symbolQuery }),
+        body: JSON.stringify({ symbol }),
       });
       const body = (await res.json().catch(() => null)) as { instrument?: MarketInstrument; error?: string } | null;
       if (res.ok && body?.instrument) {
@@ -165,7 +207,7 @@ export function InstrumentPicker({
             setAddError(undefined);
           }}
           onPick={pick}
-          onAddSymbol={addSymbol}
+          onAddSymbol={() => { void addSymbol(); }}
           onManualFund={onManualFund}
           unitPrice={unitPrice}
           priceLabel={priceLabel}
@@ -205,7 +247,7 @@ export function InstrumentPicker({
           setAddError(undefined);
         }}
         onPick={pick}
-        onAddSymbol={addSymbol}
+        onAddSymbol={() => { void addSymbol(); }}
         onManualFund={onManualFund}
         unitPrice={unitPrice}
         priceLabel={priceLabel}
@@ -292,7 +334,8 @@ function InstrumentSheet({
             <ul className="flex flex-col">
               {filtered.map((m) => {
                 const price = unitPrice(m);
-                const aria = `${m.name}${m.fullName ? `, ${m.fullName}` : ""}, giá ${priceLabel(price)}`;
+                const displayPrice = kind === "stock" && m.priceSeries.length === 0 ? "Chưa có giá" : priceLabel(price);
+                const aria = `${m.name}${m.fullName ? `, ${m.fullName}` : ""}, giá ${displayPrice}`;
                 return (
                   <li key={m.id}>
                     <button
@@ -305,7 +348,7 @@ function InstrumentSheet({
                         <p className="text-[15px] font-bold text-text">{m.name}</p>
                         {m.fullName && <p className="truncate text-[13px] text-muted">{m.fullName}</p>}
                       </div>
-                      <span className="shrink-0 text-[13px] font-semibold tabular-nums text-text">{priceLabel(price)}</span>
+                      <span className="shrink-0 text-[13px] font-semibold tabular-nums text-text">{displayPrice}</span>
                     </button>
                   </li>
                 );

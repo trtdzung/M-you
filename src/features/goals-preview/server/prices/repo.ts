@@ -2,7 +2,7 @@ import "server-only";
 
 import type { MarketInstrument, MarketKind } from "../../data/market";
 import { goalsV2Db } from "../db";
-import { stockCompanyNameFallback } from "./sources";
+import { seedStockDirectory } from "./directory";
 
 /** Một lượt đồng bộ `running` bắt đầu trong khoảng này được coi là còn chạy. */
 export const SYNC_LOCK_MS = 2 * 60_000;
@@ -36,17 +36,18 @@ function normalizeLabels(row: InstrumentRow): { name: string; fullName?: string 
       name = code;
     }
   }
-  if (row.kind === "stock" && !fullName) {
-    fullName = stockCompanyNameFallback(name);
-  }
   return { name, fullName };
 }
 
 /** Công cụ đang hoạt động kèm chuỗi giá tăng dần theo ngày (chỉ công cụ có ít nhất 1 giá). */
 export function readMarketInstruments(): MarketInstrument[] {
+  seedStockDirectory();
   const db = goalsV2Db();
   const instruments = db
-    .prepare("SELECT id, kind, name, full_name, unit, fractional FROM gv2_instruments WHERE active = 1 ORDER BY id")
+    .prepare(`SELECT i.id, i.kind, i.name, CASE WHEN i.kind = 'stock' THEN d.company_name ELSE i.full_name END AS full_name,
+      i.unit, i.fractional FROM gv2_instruments i LEFT JOIN gv2_stock_directory d
+      ON d.code = COALESCE(NULLIF(i.external_ref, ''), i.name)
+      WHERE i.active = 1 ORDER BY i.id`)
     .all() as InstrumentRow[];
   const prices = db
     .prepare(
