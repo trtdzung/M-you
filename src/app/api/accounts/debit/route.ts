@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Transaction } from "@/domain/models";
 import { AccountNotFoundError, debitAccount } from "@/lib/accounts-store";
 import { ManualTxnIdConflictError } from "@/lib/manual-txns-store";
+import { creditOwnGoalAccountIfMatch } from "@/features/goals-preview/server/incoming";
 
 /**
  * POST /api/accounts/debit — record a confirmed transfer's debit against an
@@ -47,7 +48,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "txn is invalid or does not match amount" }, { status: 422 });
   }
   try {
-    return NextResponse.json(debitAccount(cif, accountId, amount, txn as Transaction | undefined));
+    const accounts = debitAccount(cif, accountId, amount, txn as Transaction | undefined);
+    if (txn) creditOwnGoalAccountIfMatch(cif, txn as Transaction);
+    return NextResponse.json(accounts);
   } catch (err) {
     if (err instanceof AccountNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 });
     if (err instanceof ManualTxnIdConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
