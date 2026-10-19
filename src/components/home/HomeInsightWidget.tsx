@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { useRouter } from "next/navigation";
 import { pushWithTransition } from "@/lib/view-transition";
 import { Sheet } from "@/components/primitives/Sheet";
-import { ChevronRight, HeartPulse, Sparkles, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, HeartPulse, Sparkles } from "lucide-react";
 import { formatVnd } from "@/lib/format";
 import { usePersona } from "@/providers/context";
 import { useAssetLiabilities } from "@/state/assets";
@@ -23,25 +23,21 @@ const TOTAL_SLIDES = 3;
 
 export function HomeInsightWidget() {
   const { persona } = usePersona();
-  const profile = useAssetLiabilities();
-  const goals = useGoals();
+  const router = useRouter();
   const jars = useJarConfig();
   const corrections = useCorrections();
-  const { manualTxns } = useManualTxns();
-  const router = useRouter();
+  const manualTxns = useManualTxns().manualTxns;
+  const profile = useAssetLiabilities();
+  const goals = useGoals();
 
   const [data, setData] = useState<{ key: string; result: HomeInsightCarouselResult } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
 
   // Carousel state
   const [activeSlide, setActiveSlide] = useState(0);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const startXRef = useRef<number | null>(null);
-  const isDraggingRef = useRef(false);
-  const hasMovedRef = useRef(false);
+  const touchStartX = useRef<number | null>(null);
 
   // Sheets state
   const [sheetMode, setSheetMode] = useState<"none" | "health" | "insight_0" | "insight_1">("none");
@@ -151,88 +147,19 @@ export function HomeInsightWidget() {
     }
   };
 
-  const onDragStart = (clientX: number) => {
-    startXRef.current = clientX;
-    isDraggingRef.current = true;
-    hasMovedRef.current = false;
-    setDragOffset(0);
-  };
-
-  const onDragMove = (clientX: number) => {
-    if (!isDraggingRef.current || startXRef.current === null) return;
-    const diff = clientX - startXRef.current;
-    if (Math.abs(diff) > 5) {
-      hasMovedRef.current = true;
-      setIsSwiping(true);
-      if ((activeSlide === 0 && diff > 0) || (activeSlide === TOTAL_SLIDES - 1 && diff < 0)) {
-        setDragOffset(diff * 0.25);
-      } else {
-        setDragOffset(diff);
-      }
-    }
-  };
-
-  const onDragEnd = () => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    setIsSwiping(false);
-
-    if (dragOffset < -40 && activeSlide < TOTAL_SLIDES - 1) {
-      setActiveSlide((prev) => prev + 1);
-    } else if (dragOffset > 40 && activeSlide > 0) {
-      setActiveSlide((prev) => prev - 1);
-    }
-    setDragOffset(0);
-    setTimeout(() => {
-      hasMovedRef.current = false;
-    }, 120);
-  };
-
   const handleTouchStart = (e: React.TouchEvent) => {
-    onDragStart(e.touches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    onDragMove(e.touches[0].clientX);
+    touchStartX.current = e.touches[0].clientX;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (isDraggingRef.current && startXRef.current !== null && !hasMovedRef.current) {
-      const endX = e.changedTouches?.[0]?.clientX;
-      if (endX !== undefined) {
-        const diff = endX - startXRef.current;
-        if (diff < -40 && activeSlide < TOTAL_SLIDES - 1) {
-          setActiveSlide((prev) => prev + 1);
-        } else if (diff > 40 && activeSlide > 0) {
-          setActiveSlide((prev) => prev - 1);
-        }
-      }
+    if (touchStartX.current === null) return;
+    const diff = e.changedTouches[0].clientX - touchStartX.current;
+    if (diff > 40) {
+      prevSlide();
+    } else if (diff < -40) {
+      nextSlide();
     }
-    onDragEnd();
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    onDragStart(e.clientX);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    onDragMove(e.clientX);
-  };
-
-  const handleMouseUp = () => {
-    onDragEnd();
-  };
-
-  const handleMouseLeave = () => {
-    if (isDraggingRef.current) {
-      onDragEnd();
-    }
-  };
-
-  const handleCardClick = (action: () => void) => {
-    if (hasMovedRef.current) return;
-    action();
+    touchStartX.current = null;
   };
 
   function chat(insight: HomeInsight) {
@@ -282,18 +209,17 @@ export function HomeInsightWidget() {
     );
   }
 
-  const activeInsight =
-    activeSlide === 1 ? insights[0] : activeSlide === 2 ? insights[1] : null;
-
   return (
     <>
       <section
         aria-label="Gợi ý tài chính và Sức khỏe tài chính"
-        className="home-insight-card relative flex flex-col justify-between overflow-hidden"
+        className="home-insight-card relative flex flex-col justify-between touch-pan-y"
         onKeyDown={handleKeyDown}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         tabIndex={0}
       >
-        {/* Top bar: Carousel Pagination Dots & Slide Counter (No arrow buttons) */}
+        {/* Top bar: Carousel Controls & Pagination */}
         <div className="flex items-center justify-between border-b border-orange-100/70 px-4 py-1.5 text-xs">
           {/* Dots Indicator */}
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Danh sách slide gợi ý">
@@ -315,140 +241,139 @@ export function HomeInsightWidget() {
             })}
           </div>
 
-          {/* Slide counter */}
+          {/* Slide counter & Prev/Next arrows */}
           <div className="flex items-center gap-1">
             <span className="text-[11px] font-semibold text-muted" aria-live="polite">
               {activeSlide + 1} / {TOTAL_SLIDES}
             </span>
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={prevSlide}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-white hover:text-text focus-visible:outline-primary"
+                aria-label="Slide trước"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={nextSlide}
+                className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-white hover:text-text focus-visible:outline-primary"
+                aria-label="Slide sau"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Continuous Horizontal Swipe Track */}
-        <div
-          className="relative w-full cursor-grab active:cursor-grabbing overflow-hidden select-none touch-pan-y"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-        >
-          <div
-            className={`flex w-full ${isSwiping ? "" : "transition-transform duration-300 ease-out"}`}
-            style={{
-              transform: `translateX(calc(-${activeSlide * 100}% + ${dragOffset}px))`,
-            }}
+        {/* Slide 1: Financial Health Score */}
+        {activeSlide === 0 && (
+          <button
+            type="button"
+            onClick={() => setSheetMode("health")}
+            className="flex min-h-[72px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-primary"
+            aria-label={`Xem chi tiết Sức khỏe tài chính: ${
+              healthScore?.overallScore !== null ? `${healthScore?.overallScore} điểm` : "Chưa đủ dữ liệu"
+            }`}
           >
-            {/* Slide 1: Financial Health Score */}
-            <div className="w-full min-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => handleCardClick(() => setSheetMode("health"))}
-                className="flex min-h-[72px] w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-primary"
-                aria-label={`Xem chi tiết Sức khỏe tài chính: ${
-                  healthScore?.overallScore !== null ? `${healthScore?.overallScore} điểm` : "Chưa đủ dữ liệu"
-                }`}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <HeartPulse size={22} aria-hidden />
-                </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <HeartPulse size={22} aria-hidden />
+            </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-text">Sức khỏe tài chính</span>
-                    {healthScore?.overallScore !== null ? (
-                      <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-bold text-primary shadow-xs">
-                        {healthScore?.overallScore} / 100
-                      </span>
-                    ) : (
-                      <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
-                        Chưa đủ dữ liệu
-                      </span>
-                    )}
-                  </div>
-                  <span className="block truncate text-xs text-muted">
-                    {healthScore?.overallScore !== null
-                      ? `Độ phủ dữ liệu ${Math.round((healthScore?.scoreCoverage ?? 0) * 100)}% · Vuốt để xem gợi ý`
-                      : `Độ phủ dữ liệu ${Math.round((healthScore?.scoreCoverage ?? 0) * 100)}% · Xem chi tiết`}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-sm font-semibold text-text">Sức khỏe tài chính</span>
+                {healthScore?.overallScore !== null ? (
+                  <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-bold text-primary shadow-xs">
+                    {healthScore?.overallScore} / 100
                   </span>
-                </div>
-
-                <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
-              </button>
+                ) : (
+                  <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">
+                    Chưa đủ dữ liệu
+                  </span>
+                )}
+              </div>
+              <span className="block truncate text-xs text-muted">
+                {healthScore?.overallScore !== null
+                  ? `Độ phủ dữ liệu ${Math.round((healthScore?.scoreCoverage ?? 0) * 100)}% · Chạm để xem nhận xét`
+                  : `Độ phủ dữ liệu ${Math.round((healthScore?.scoreCoverage ?? 0) * 100)}% · Xem chi tiết`}
+              </span>
             </div>
 
-            {/* Slide 2: Top 1 Candidate Insight */}
-            <div className="w-full min-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => handleCardClick(() => insights[0] && setSheetMode("insight_0"))}
-                className="flex min-h-[72px] w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-primary"
-                aria-label={insights[0] ? `Xem insight: ${insights[0].title}` : "Chưa có gợi ý mới"}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Sparkles size={22} aria-hidden />
-                </div>
+            <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
+          </button>
+        )}
 
-                <div className="min-w-0 flex-1">
-                  {insights[0] ? (
-                    <>
-                      <span className="block truncate text-sm font-semibold text-text">{insights[0].title}</span>
-                      <span className="block truncate text-xs text-muted">
-                        {insights[0].candidate.metric.label}:{" "}
-                        <span className="font-semibold text-text">
-                          {formatVnd(insights[0].candidate.metric.value)}
-                        </span>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
-                      <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
-                    </>
-                  )}
-                </div>
-
-                <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
-              </button>
+        {/* Slide 2: Top 1 Candidate Insight */}
+        {activeSlide === 1 && (
+          <button
+            type="button"
+            onClick={() => insights[0] && setSheetMode("insight_0")}
+            className="flex min-h-[72px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-primary"
+            aria-label={insights[0] ? `Xem insight: ${insights[0].title}` : "Chưa có gợi ý mới"}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Sparkles size={22} aria-hidden />
             </div>
 
-            {/* Slide 3: Top 2 Candidate Insight */}
-            <div className="w-full min-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => handleCardClick(() => insights[1] && setSheetMode("insight_1"))}
-                className="flex min-h-[72px] w-full min-w-0 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-primary"
-                aria-label={insights[1] ? `Xem insight: ${insights[1].title}` : "Chưa có gợi ý mới"}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  {insights[1] ? <Sparkles size={22} aria-hidden /> : <CheckCircle2 size={22} aria-hidden />}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  {insights[1] ? (
-                    <>
-                      <span className="block truncate text-sm font-semibold text-text">{insights[1].title}</span>
-                      <span className="block truncate text-xs text-muted">
-                        {insights[1].candidate.metric.label}:{" "}
-                        <span className="font-semibold text-text">
-                          {formatVnd(insights[1].candidate.metric.value)}
-                        </span>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
-                      <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
-                    </>
-                  )}
-                </div>
-
-                <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
-              </button>
+            <div className="min-w-0 flex-1">
+              {insights[0] ? (
+                <>
+                  <span className="block truncate text-sm font-semibold text-text">{insights[0].title}</span>
+                  <span className="block truncate text-xs text-muted">
+                    {insights[0].candidate.metric.label}:{" "}
+                    <span className="font-semibold text-text">
+                      {formatVnd(insights[0].candidate.metric.value)}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
+                  <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
+                </>
+              )}
             </div>
-          </div>
-        </div>
+
+            <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
+          </button>
+        )}
+
+        {/* Slide 3: Top 2 Candidate Insight */}
+        {activeSlide === 2 && (
+          <button
+            type="button"
+            onClick={() => insights[1] && setSheetMode("insight_1")}
+            className="flex min-h-[72px] min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left focus-visible:outline-primary"
+            aria-label={insights[1] ? `Xem insight: ${insights[1].title}` : "Chưa có gợi ý mới"}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              {insights[1] ? <Sparkles size={22} aria-hidden /> : <CheckCircle2 size={22} aria-hidden />}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {insights[1] ? (
+                <>
+                  <span className="block truncate text-sm font-semibold text-text">{insights[1].title}</span>
+                  <span className="block truncate text-xs text-muted">
+                    {insights[1].candidate.metric.label}:{" "}
+                    <span className="font-semibold text-text">
+                      {formatVnd(insights[1].candidate.metric.value)}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
+                  <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
+                </>
+              )}
+            </div>
+
+            <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
+          </button>
+        )}
       </section>
 
       {error && (

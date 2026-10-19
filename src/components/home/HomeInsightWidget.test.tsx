@@ -152,17 +152,15 @@ describe("HomeInsightWidget Carousel & Health Score", () => {
     const carouselSection = screen.getByRole("region", {
       name: "Gợi ý tài chính và Sức khỏe tài chính",
     });
-    const swipeTrack = carouselSection.querySelector(".touch-pan-y") as HTMLElement;
-    fireEvent.touchStart(swipeTrack, { touches: [{ clientX: 200 }] });
-    fireEvent.touchEnd(swipeTrack, { changedTouches: [{ clientX: 100 }] });
+    fireEvent.touchStart(carouselSection, { touches: [{ clientX: 200 }] });
+    fireEvent.touchEnd(carouselSection, { changedTouches: [{ clientX: 100 }] });
 
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
     expect(screen.getByText(card1.title)).toBeInTheDocument();
     expect(screen.getByText(/Còn lại · Ăn uống:/)).toBeInTheDocument();
 
-    // Navigate to Slide 3 using touch swipe
-    fireEvent.touchStart(swipeTrack, { touches: [{ clientX: 200 }] });
-    fireEvent.touchEnd(swipeTrack, { changedTouches: [{ clientX: 100 }] });
+    // Navigate to Slide 3 using next button arrow
+    fireEvent.click(screen.getByRole("button", { name: "Slide sau" }));
 
     expect(screen.getByText("3 / 3")).toBeInTheDocument();
     expect(screen.getByText(card2.title)).toBeInTheDocument();
@@ -171,6 +169,10 @@ describe("HomeInsightWidget Carousel & Health Score", () => {
     // Navigate with Keyboard ArrowLeft
     fireEvent.keyDown(carouselSection, { key: "ArrowLeft" });
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
+
+    // Navigate with previous button arrow
+    fireEvent.click(screen.getByRole("button", { name: "Slide trước" }));
+    expect(screen.getByText("1 / 3")).toBeInTheDocument();
   });
 
   it("opens Health Score sheet with metric breakdown, coverage explanation, and agent assessment", async () => {
