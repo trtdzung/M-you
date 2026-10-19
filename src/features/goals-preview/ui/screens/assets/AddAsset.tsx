@@ -71,6 +71,53 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
   );
 }
 
+/** Bỏ dấu, viết thường để tìm không phân biệt dấu. */
+function normalize(text: string): string {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+}
+
+/** Ô tìm kiếm mã / tên công cụ (cổ phiếu, quỹ); chỉ hiện kết quả khi khách gõ. */
+function InstrumentSearch({ kind, selectedId, onPick }: { kind: MarketKind; selectedId: string | undefined; onPick: (id: string) => void }) {
+  const [query, setQuery] = useState("");
+  const q = normalize(query.trim());
+  const results = q ? instrumentsOf(kind).filter((m) => normalize(m.name).includes(q)).slice(0, 8) : [];
+  const selected = selectedId ? getInstrument(selectedId) : undefined;
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        aria-label={kind === "stock" ? "Tìm mã cổ phiếu" : "Tìm quỹ"}
+        className={input}
+        value={query}
+        placeholder={kind === "stock" ? "Tìm mã cổ phiếu, VD: FPT" : "Tìm quỹ theo tên hoặc mã"}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {q && (
+        <ul className="flex flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+          {results.length === 0 ? (
+            <li className="px-3 py-2.5 text-sm text-muted">Không tìm thấy kết quả.</li>
+          ) : (
+            results.map((m) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onPick(m.id);
+                    setQuery("");
+                  }}
+                  className={cn("flex min-h-11 w-full items-center px-3 text-left text-sm text-text hover:bg-surface-muted", ring)}
+                >
+                  {m.name}
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+      {selected && <SuggestChip label={selected.name} selected onClick={() => undefined} />}
+    </div>
+  );
+}
+
 /** Thêm tài sản ngoài MSB: tài sản vật chất (tự khai giá) hoặc tài sản tài chính ở nơi khác (tự định giá). */
 export function AddAsset({ params }: ScreenProps) {
   const { state, dispatch, nav } = usePreview();
@@ -191,7 +238,7 @@ export function AddAsset({ params }: ScreenProps) {
       <section className={cn(card, "flex flex-col gap-4")} aria-label="Loại tài sản">
         <h2 className={sectionTitle}>Loại tài sản</h2>
         <TypeGrid title="Tài sản vật chất" types={PHYSICAL} value={type.category} onPick={pick} />
-        <TypeGrid title="Tài sản tài chính ở nơi khác" types={FINANCIAL} value={type.category} onPick={pick} />
+        <TypeGrid title="Tài sản tài chính" types={FINANCIAL} value={type.category} onPick={pick} />
       </section>
 
       {type.valuation === "manual" && (
@@ -228,11 +275,15 @@ export function AddAsset({ params }: ScreenProps) {
             </div>
             <SourceTag source="estimated" />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {instrumentsOf(type.category as MarketKind).map((m) => (
-              <SuggestChip key={m.id} label={m.name} selected={m.id === instrumentId} onClick={() => setInstrumentId(m.id)} />
-            ))}
-          </div>
+          {type.category === "gold" ? (
+            <div className="flex flex-wrap gap-2">
+              {instrumentsOf("gold").map((m) => (
+                <SuggestChip key={m.id} label={m.name} selected={m.id === instrumentId} onClick={() => setInstrumentId(m.id)} />
+              ))}
+            </div>
+          ) : (
+            <InstrumentSearch kind={type.category as MarketKind} selectedId={instrumentId} onPick={setInstrumentId} />
+          )}
           {type.category === "stock" && (
             <div className="flex flex-col gap-1.5">
               <label htmlFor="asset-symbol" className={label}>Mã cổ phiếu khác</label>
