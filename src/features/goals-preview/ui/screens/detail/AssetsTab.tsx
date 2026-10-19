@@ -1,14 +1,13 @@
 "use client";
 
-import { ChevronRight, Plus } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { ChevronRight, Plus, Landmark, Car, Package } from "lucide-react";
+import { formatVnd, formatVndCompact } from "@/lib/format";
 import { assetGain, assetValue, formatISODate, goalAssets } from "../../../engine";
 import { FIXED_CATEGORY_LABEL, LIQUID_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
-import { Amount } from "../../shared/Amount";
 import { SourceTag } from "../../shared/SourceTag";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { card, listRow, secondaryButton, sectionTitle } from "../../shared/styles";
+import { card, ring, secondaryButton, sectionTitle } from "../../shared/styles";
 import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
@@ -35,27 +34,26 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
             )}
           </div>
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-card bg-surface shadow-card">
+          <ul className="flex flex-col gap-3">
             {liquid.map((a) => {
               const gain = assetGain(a, state);
               return (
                 <li key={a.id}>
-                  <button type="button" className={listRow} onClick={() => nav.push("LiquidAssetDetail", { goalId, assetId: a.id })}>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-text">{a.name}</p>
-                      <p className="text-[12px] text-muted">
-                        {LIQUID_CATEGORY_LABEL[a.category]}
-                        {a.maturityDate ? ` · đáo hạn ${formatISODate(a.maturityDate)}` : ""}
-                      </p>
-                      <p className={`text-[12px] ${gain >= 0 ? "text-positive" : "text-negative"}`}>
-                        {gain >= 0 ? "Lãi" : "Lỗ"} {formatVnd(Math.abs(gain))} so với vốn
-                      </p>
+                  <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => nav.push("LiquidAssetDetail", { goalId, assetId: a.id })}>
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong"><Landmark size={20} aria-hidden /></span>
+                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{LIQUID_CATEGORY_LABEL[a.category]}</p></div>
                     </div>
-                    <div className="text-right">
-                      <Amount amount={assetValue(a, state)} source="msb" className="text-sm font-semibold text-text" />
-                      <p className="text-[12px] text-muted">tính {a.countPercent}%</p>
+                    <div>
+                      <p className="text-[12px] text-muted">Đóng góp vào mục tiêu</p>
+                      <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{formatVndCompact(Math.round(assetValue(a, state) * a.countPercent / 100))}</p>
+                      {a.countPercent < 100 && <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị hiện tại {formatVndCompact(assetValue(a, state))}</p>}
+                      {gain !== 0 && <p className={`mt-1 text-[12px] ${gain > 0 ? "text-positive" : "text-negative"}`}>{gain > 0 ? "Lãi" : "Lỗ"} {formatVnd(Math.abs(gain))} so với vốn</p>}
                     </div>
-                    <ChevronRight size={18} className="text-muted" aria-hidden />
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                      <p className="text-[12px] text-muted">{a.maturityDate ? `Đáo hạn ${formatISODate(a.maturityDate)}` : "Giá trị có thể thay đổi theo thị trường"}</p>
+                      <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary-strong">Chi tiết <ChevronRight size={16} aria-hidden /></span>
+                    </div>
                   </button>
                 </li>
               );
@@ -72,22 +70,27 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
         {fixed.length === 0 ? (
           <p className={`${card} text-center text-sm text-muted`}>Chưa có tài sản cố định nào được khai báo.</p>
         ) : (
-          <ul className="divide-y divide-border rounded-card bg-surface shadow-card">
+          <ul className="flex flex-col gap-3">
             {fixed.map((a) => {
               const stale = isStaleValuation(a.valuationDate, state.clock.today);
               return (
                 <li key={a.id} className="relative">
-                  <button type="button" className={`${listRow} flex-col !items-stretch rounded-card`} onClick={() => nav.push("RevalueAsset", { goalId, assetId: a.id })}>
-                    <p className={`truncate text-sm font-semibold text-text ${stale ? "pr-10" : ""}`}>{a.name}</p>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]} · {formatISODate(a.valuationDate)}</p>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right"><Amount amount={a.value} source={a.source} className="whitespace-nowrap text-sm font-semibold text-text" /><p className="text-[12px] text-muted">Tính {a.countPercent}% vào mục tiêu</p></div>
-                        <ChevronRight size={18} className="text-muted" aria-hidden />
-                      </div>
+                  <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => nav.push("RevalueAsset", { goalId, assetId: a.id })}>
+                    <div className={`flex items-start gap-3 ${stale ? "pr-9" : ""}`}>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-source-self-soft text-source-self">{a.category === "car" ? <Car size={20} aria-hidden /> : <Package size={20} aria-hidden />}</span>
+                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]}</p></div>
+                    </div>
+                    <div>
+                      <p className="text-[12px] text-muted">Đóng góp vào mục tiêu</p>
+                      <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{formatVndCompact(Math.round(a.value * a.countPercent / 100))}</p>
+                      <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị tự khai {formatVndCompact(a.value)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                      <p className="text-[12px] text-muted">Định giá {formatISODate(a.valuationDate)}</p>
+                      <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary-strong">Cập nhật giá <ChevronRight size={16} aria-hidden /></span>
                     </div>
                   </button>
-                  {stale && <div className="absolute right-1 top-1"><InfoTooltip warning label={`giá trị đã cũ của ${a.name}`} text={`Tài sản này được định giá ngày ${formatISODate(a.valuationDate)}, đã hơn 6 tháng. Hãy cập nhật giá trị để tiến độ mục tiêu sát thực tế.`} /></div>}
+                  {stale && <div className="absolute right-2 top-2"><InfoTooltip warning label={`giá trị đã cũ của ${a.name}`} text={`Tài sản này được định giá ngày ${formatISODate(a.valuationDate)}, đã hơn 6 tháng. Hãy cập nhật giá trị để tiến độ mục tiêu sát thực tế.`} /></div>}
                 </li>
               );
             })}
