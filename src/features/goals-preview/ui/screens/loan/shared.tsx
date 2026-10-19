@@ -42,8 +42,8 @@ export function loanGap(state: PreviewState, goal: Goal, deposit = 0): number {
   const remaining = Math.max(0, goal.targetAmount - goalValue(state, goal).total);
   if (goal.status === "missed" || state.clock.today >= goal.targetDate) return remaining;
   const f = feasibility(state, goal);
-  const projected = typeof f.gapAtTarget === "number" ? f.gapAtTarget : remaining;
-  return projected > 0 ? projected : remaining;
+  // On track → nothing is missing at the target date; unknown surplus → fall back to what is missing today.
+  return typeof f.gapAtTarget === "number" ? f.gapAtTarget : remaining;
 }
 
 export function roundUp(value: number, step: number): number {

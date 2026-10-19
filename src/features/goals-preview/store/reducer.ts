@@ -2,7 +2,7 @@ import { getInvestProduct, getLoanProduct } from "../data/products";
 import { DEFAULT_SCENARIO_ID, getScenario } from "../data/scenarios";
 import { makeAsset } from "../engine/assets";
 import { advanceTime, applySalary, describeAdvance, payDueInstalments, runStandingOrder } from "../engine/advance";
-import { addMonths, daysBetween, monthsBetween, nextDayOfMonth } from "../engine/dates";
+import { addMonths, daysBetween, formatISODate, monthsBetween, nextDayOfMonth } from "../engine/dates";
 import { findGoal, goalBalance, makeAccountNumber, nextId, postTxn } from "../engine/ledger";
 import { applyLifecycle, refreshLoanStatuses } from "../engine/lifecycle";
 import { affordability, annuityPayment, buildSchedule, outstandingPrincipal } from "../engine/loan";
@@ -455,6 +455,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       refreshLoanStatuses(loan, today);
       draft.loans.push(loan);
       goal.loanId = loanId;
+      goal.plannedLoan = undefined;
       for (const asset of draft.assets) {
         if (asset.goalId === goal.id && asset.type === "liquid" && asset.status !== "sold") liquidate(draft, goal, asset);
       }
@@ -524,6 +525,22 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       }
       lifecycle(draft);
       toast(draft, `Đã trả trước ${formatVnd(amount)}. ${loan.status === "paid_off" ? "Khoản vay đã tất toán." : `Kỳ trả mới: ${formatVnd(loan.monthlyPayment)}/tháng.`}`);
+      return draft;
+    }
+
+    case "reserveLoan": {
+      const goal = findGoal(draft, action.goalId);
+      if (!goal || (goal.status !== "accumulating" && goal.status !== "paused")) return fail(state, "Chỉ đặt trước khoản vay cho mục tiêu đang tích luỹ.");
+      goal.plannedLoan = { productId: action.productId, principal: action.principal, termMonths: action.termMonths, reservedAt: today };
+      toast(draft, `Đã đặt trước khoản vay ${formatVnd(action.principal)}. MSB giải ngân vào ngày ${formatISODate(goal.targetDate)}.`);
+      return draft;
+    }
+
+    case "cancelReservedLoan": {
+      const goal = findGoal(draft, action.goalId);
+      if (!goal?.plannedLoan) return state;
+      goal.plannedLoan = undefined;
+      toast(draft, "Đã huỷ khoản vay đặt trước.", "info");
       return draft;
     }
 

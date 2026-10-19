@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { CalendarCheck, CalendarClock } from "lucide-react";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
-import { buildSchedule, formatMonths, quoteLoan, totalInterest } from "../../../engine";
+import { addMonths, buildSchedule, feasibility, formatISODate, formatMonths, goalValue, quoteLoan, totalInterest } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import { AmountCard, SuggestChip } from "../../shared/AmountCard";
 import { BottomActions, ScreenHeader } from "../../shared";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { card, figure, ghostButton, heroNumber, primaryButton, screenPadding, sectionTitle, warningBox } from "../../shared/styles";
+import { card, ghostButton, heroNumber, primaryButton, screenPadding, sectionTitle, warningBox } from "../../shared/styles";
 import { DtiGauge, INDICATIVE_NOTE, NotFoundScreen, loanGap, productForGoal, roundUp, useLoanScreen } from "./shared";
 
 const TERM_CHOICES: Record<"house" | "car" | "consumer", number[]> = {
@@ -19,13 +20,14 @@ const TERM_CHOICES: Record<"house" | "car" | "consumer", number[]> = {
 const rateText = (ratePa: number) => `${String(ratePa).replace(".", ",")}%/năm`;
 
 /**
- * Mô phỏng khoản vay: phần còn thiếu → số tiền, kỳ hạn → khoản trả & DTI.
- * The loan product always matches the goal's purpose (nhà → vay mua nhà, xe → vay mua xe, còn lại → tiêu dùng).
+ * Vay để đạt mục tiêu: shows what the loan buys (reaching the goal on its date vs later), a prefilled
+ * MSB loan for the goal's purpose (nhà → vay mua nhà, xe → vay mua xe, còn lại → tiêu dùng), and a real
+ * action — reserve now (disbursed on the target date), add to a draft plan, or apply when due.
  */
 export function LoanSimulator({ params }: ScreenProps) {
-  const { state, goal, nav, today } = useLoanScreen(params);
-  const [amount, setAmount] = useState<number | null>(paramNumber(params, "amount") ?? null);
-  const [term, setTerm] = useState<number | undefined>(paramNumber(params, "termMonths"));
+  const { state, goal, nav, today, dispatch } = useLoanScreen(params);
+  const [amount, setAmount] = useState<number | null>(paramNumber(params, "amount") ?? goal?.plannedLoan?.principal ?? null);
+  const [term, setTerm] = useState<number | undefined>(paramNumber(params, "termMonths") ?? goal?.plannedLoan?.termMonths);
 
   if (!goal) return <NotFoundScreen title="Mô phỏng khoản vay" onCta={() => nav.push("GoalList")} />;
 
@@ -52,6 +54,15 @@ export function LoanSimulator({ params }: ScreenProps) {
   const totalInt = totalInterest(buildSchedule(principal, product.ratePa, termMonths, startDate));
   const blocked = !quote.affordability.allowed;
   const lenderParams = { goalId: goal.id, productId: product.id, amount: principal, termMonths, deposit: isDraft ? deposit : undefined };
+  const short = gap > 0;
+  const reserved = goal.plannedLoan;
+  const canReserve = !isDraft && !isDue && (goal.status === "accumulating" || goal.status === "paused");
+
+  // Without the loan: when would saving alone reach the target?
+  const fe = isDraft ? undefined : feasibility(state, goal);
+  const have = isDraft ? deposit : goalValue(state, goal).total;
+  const pace = fe && typeof fe.allocatedMonthly === "number" ? fe.allocatedMonthly : 0;
+  const soloDate = pace > 0 ? addMonths(today, Math.ceil(Math.max(0, goal.targetAmount - have) / pace)) : undefined;
 
   // Only draft and due goals act on the loan; before the due date the simulation is information only.
   const primary = amountError ? (
@@ -70,6 +81,17 @@ export function LoanSimulator({ params }: ScreenProps) {
     <button type="button" className={primaryButton} onClick={() => nav.push("LoanApply", lenderParams)}>
       Đăng ký vay
     </button>
+  ) : short && canReserve ? (
+    <button
+      type="button"
+      className={primaryButton}
+      onClick={() => {
+        dispatch({ type: "reserveLoan", goalId: goal.id, productId: product.id, principal, termMonths });
+        nav.pop();
+      }}
+    >
+      {reserved ? "Cập nhật khoản vay đặt trước" : "Đặt trước khoản vay"}
+    </button>
   ) : (
     <button type="button" className={primaryButton} onClick={() => nav.pop()}>
       Quay lại mục tiêu
@@ -78,26 +100,44 @@ export function LoanSimulator({ params }: ScreenProps) {
 
   return (
     <div className={screenPadding}>
-      <ScreenHeader title="Mô phỏng khoản vay" subtitle={goal.name} />
+      <ScreenHeader title="Vay để đạt mục tiêu" subtitle={goal.name} />
 
-      <section className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1" aria-label="Lưu ý về vay">
-        <span className="text-[13px] text-muted">Vay là phương án cuối cùng.</span>
-        <button type="button" className={`${ghostButton} -ml-2 !min-h-9`} onClick={() => nav.push("OptionsCompare", { goalId: goal.id })}>
-          Xem phương án khác
-        </button>
-      </section>
+      {short ? (
+        <section className={`${card} flex flex-col gap-3`} aria-label="Lợi ích của khoản vay">
+          <div className="flex items-center gap-1">
+            <h2 className={sectionTitle}>
+              {isDue ? "Còn thiếu" : "Dự kiến thiếu"} {formatVndCompact(gap)} để đạt mục tiêu
+            </h2>
+            <InfoTooltip
+              label="cách tính và lưu ý"
+              text={`Mục tiêu ${formatVnd(goal.targetAmount)} trừ phần bạn đã có và sẽ tích luỹ thêm. Nên cân nhắc tiết kiệm thêm hoặc lùi ngày trước; khoản vay chỉ bù đúng phần còn thiếu.`}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1 rounded-2xl bg-positive-soft p-3">
+              <span className="flex items-center gap-1 text-[12px] font-semibold text-positive">
+                <CalendarCheck size={14} aria-hidden /> Có khoản vay
+              </span>
+              <span className="text-[16px] font-bold tabular-nums text-text">{isDue ? "Ngay bây giờ" : formatISODate(goal.targetDate)}</span>
+              <span className="text-[12px] text-muted">đúng hạn</span>
+            </div>
+            <div className="flex flex-col gap-1 rounded-2xl bg-surface-muted/70 p-3">
+              <span className="flex items-center gap-1 text-[12px] font-semibold text-muted">
+                <CalendarClock size={14} aria-hidden /> Chỉ tự tích luỹ
+              </span>
+              <span className="text-[16px] font-bold tabular-nums text-text">{soloDate ? formatISODate(soloDate) : "Chưa xác định"}</span>
+              <span className="text-[12px] text-muted">{soloDate ? `chậm ${formatMonths(Math.max(0, Math.round((Date.parse(soloDate) - Date.parse(goal.targetDate)) / 2_629_746_000)))}` : "chưa đủ dữ liệu thu chi"}</span>
+            </div>
+          </div>
+          <button type="button" className={`${ghostButton} self-start -ml-3 !min-h-9`} onClick={() => nav.push("OptionsCompare", { goalId: goal.id })}>
+            Xem cách khác không cần vay
+          </button>
+        </section>
+      ) : (
+        <p className={`${card} text-sm text-text`}>Kế hoạch hiện tại đủ để đạt mục tiêu đúng hạn, bạn chưa cần vay.</p>
+      )}
 
-      <section className={`${card} flex flex-col gap-1`} aria-label="Phần còn thiếu">
-        <div className="flex items-center gap-1">
-          <p className="text-[13px] text-muted">{isDue ? "Còn thiếu hôm nay" : "Dự kiến còn thiếu khi đến hạn"}</p>
-          <InfoTooltip
-            label="cách tính phần còn thiếu"
-            text={`Mục tiêu ${formatVnd(goal.targetAmount)} trừ phần bạn đã có và sẽ tích luỹ thêm: còn thiếu ${formatVnd(gap)}.`}
-          />
-        </div>
-        <p className={figure}>{formatVndCompact(gap)}</p>
-      </section>
-
+      {short && (
       <section className={`${card} flex flex-col gap-4`} aria-label="Khoản vay">
         <div className="flex items-center justify-between gap-2">
           <h2 className={sectionTitle}>{product.name.replace(" MSB", "")}</h2>
@@ -123,8 +163,20 @@ export function LoanSimulator({ params }: ScreenProps) {
           </div>
         </div>
       </section>
+      )}
 
-      {!amountError && (
+      {short && reserved && canReserve && (
+        <section className={`${card} flex flex-wrap items-center justify-between gap-2`} aria-label="Khoản vay đã đặt trước">
+          <span className="text-[13px] text-text">
+            Đã đặt trước {formatVndCompact(reserved.principal)} · {formatMonths(reserved.termMonths)}
+          </span>
+          <button type="button" className={`${ghostButton} !min-h-9 !text-negative`} onClick={() => dispatch({ type: "cancelReservedLoan", goalId: goal.id })}>
+            Huỷ đặt trước
+          </button>
+        </section>
+      )}
+
+      {short && !amountError && (
         <section className={`${card} flex flex-col gap-3`} aria-label="Kết quả mô phỏng">
           <div className="flex items-center gap-1">
             <p className="text-[13px] text-muted">Trả mỗi tháng khoảng</p>

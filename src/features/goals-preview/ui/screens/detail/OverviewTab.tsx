@@ -91,7 +91,8 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
     { label: "Nạp tiền", icon: ArrowDownToLine, show: active, go: () => nav.push("DepositFlow", { goalId }) },
     { label: "Rút tiền", icon: ArrowUpFromLine, show: canTransact(goal), go: () => nav.push("WithdrawFlow", { goalId }) },
     { label: "Đầu tư", icon: LineChart, show: goal.status === "accumulating" || goal.status === "repaying", go: () => nav.push("InvestSuggest", { goalId }) },
-    { label: "Vay", icon: Banknote, show: goal.status === "accumulating" || goal.status === "missed", go: () => nav.push("LoanSimulator", { goalId }) },
+    // The loan is offered only when the plan falls short (or the goal is already due and short).
+    { label: "Vay", icon: Banknote, show: goal.status === "missed" || (goal.status === "accumulating" && (fe.status === "infeasible" || !!goal.plannedLoan)), go: () => nav.push("LoanSimulator", { goalId }) },
   ].filter((q) => q.show);
 
   let next: { label: string; screen: "DueResult" | "RepayOverview" | "AchievedIntro" | "MissedOptions" | "CompletedCelebration" | "Prepay" } | undefined;
@@ -171,11 +172,18 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
             </div>
           </details>
         </> : <p className="text-sm text-muted">Mục tiêu không còn cần góp thêm theo kế hoạch ở trạng thái này.</p>}
-        {fe.status === "infeasible" && goal.status === "accumulating" && (
-          <button type="button" className={secondaryButton} onClick={() => nav.push("LoanSimulator", { goalId })}>
-            Xem các cách bù phần thiếu
+        {goal.plannedLoan && goal.status === "accumulating" ? (
+          <button type="button" className={`${infoBox} flex w-full items-center justify-between gap-2 text-left`} onClick={() => nav.push("LoanSimulator", { goalId })}>
+            <span>
+              Đã đặt trước khoản vay <b>{formatVnd(goal.plannedLoan.principal)}</b>, giải ngân {formatISODate(goal.targetDate)}
+            </span>
+            <span className="shrink-0 text-[13px] font-semibold text-primary-strong">Xem</span>
           </button>
-        )}
+        ) : fe.status === "infeasible" && goal.status === "accumulating" ? (
+          <button type="button" className={secondaryButton} onClick={() => nav.push("LoanSimulator", { goalId })}>
+            Vay để đạt mục tiêu đúng hạn
+          </button>
+        ) : null}
       </section>
 
       {suggestions}

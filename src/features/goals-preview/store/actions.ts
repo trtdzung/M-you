@@ -52,6 +52,9 @@ export type PreviewAction =
   | { type: "withdraw"; goalId: string; amount: number; note?: string; emergency?: boolean }
   | { type: "setStandingOrder"; goalId: string; amount: number; dayOfMonth: number; active?: boolean }
   | { type: "runStandingOrderNow"; goalId: string }
+  // --- loan reservation (before the due date)
+  | { type: "reserveLoan"; goalId: string; productId: string; principal: number; termMonths: number }
+  | { type: "cancelReservedLoan"; goalId: string }
   // --- assets / invest
   | {
       type: "addFixedAsset";

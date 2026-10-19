@@ -98,6 +98,8 @@ export interface Goal {
   accountId?: string;
   standingOrder?: StandingOrder;
   loanId?: string;
+  /** Loan the customer reserved ahead of the target date; disbursed when the goal falls due. */
+  plannedLoan?: { productId: string; principal: number; termMonths: number; reservedAt: ISODate };
   /** Date the goal value first reached the target before targetDate. */
   reachedEarlyAt?: ISODate;
   achievedAt?: ISODate;
