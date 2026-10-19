@@ -10,7 +10,7 @@ import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SummaryRows } from "../../shared/SummaryRows";
-import { card, errorBox, primaryButton, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
+import { card, errorBox, ghostButton, primaryButton, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
 import { GoalNotFound, useGoalContext } from "./common";
 
 /** Đóng mục tiêu: giải thích hậu quả rồi xác nhận. */
@@ -92,14 +92,14 @@ export function CloseGoalFlow({ params }: ScreenProps) {
       )}
 
       <BottomActions>
+        <button type="button" className={primaryButton} onClick={() => nav.pop()}>
+          Giữ lại mục tiêu
+        </button>
         {!loanActive && !done ? (
-          <button type="button" className={`${primaryButton} bg-negative`} onClick={() => setConfirm(true)}>
+          <button type="button" className={`${ghostButton} self-center !text-negative`} onClick={() => setConfirm(true)}>
             Đóng mục tiêu
           </button>
         ) : null}
-        <button type="button" className={secondaryButton} onClick={() => nav.pop()}>
-          Giữ lại mục tiêu
-        </button>
       </BottomActions>
 
       <ConfirmSheet

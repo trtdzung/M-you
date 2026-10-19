@@ -124,17 +124,9 @@ export function DueResult({ params }: ScreenProps) {
           Nếu vay {formatVnd(probe.principal)} trong {probe.termMonths} tháng, bạn trả khoảng {formatVnd(probe.quote.monthlyPayment)}/tháng (số tham khảo).
         </p>
         <BottomActions>
-          <button type="button" className={primaryButton} onClick={() => nav.push("LoanSimulator", { goalId: goal.id })}>
-            Vay phần còn thiếu
+          <button type="button" className={primaryButton} onClick={() => nav.push("MissedOptions", { goalId: goal.id })}>
+            Xem cách bù phần thiếu
           </button>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className={secondaryButton} onClick={() => nav.push("MissedOptions", { goalId: goal.id, focus: "extend" })}>
-              Gia hạn
-            </button>
-            <button type="button" className={secondaryButton} onClick={() => nav.push("MissedOptions", { goalId: goal.id, focus: "reduce" })}>
-              Giảm mục tiêu
-            </button>
-          </div>
         </BottomActions>
       </div>
     );

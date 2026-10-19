@@ -94,13 +94,15 @@ export function CompletedCelebration({ params }: ScreenProps) {
             </button>
           </>
         ) : (
-          <button type="button" className={primaryButton} onClick={() => nav.push("TemplatePick")}>
-            Tạo mục tiêu mới
-          </button>
+          <>
+            <button type="button" className={primaryButton} onClick={() => nav.push("TemplatePick")}>
+              Tạo mục tiêu mới
+            </button>
+            <button type="button" className={secondaryButton} onClick={() => nav.push("GoalList")}>
+              Về danh sách
+            </button>
+          </>
         )}
-        <button type="button" className={secondaryButton} onClick={() => nav.push("GoalList")}>
-          Về danh sách
-        </button>
       </BottomActions>
     </div>
   );
