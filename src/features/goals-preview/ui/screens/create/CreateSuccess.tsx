@@ -97,7 +97,7 @@ export function CreateSuccess({ params }: ScreenProps) {
         />
       </section>
 
-      <BottomActions>
+      <BottomActions inline>
         <button type="button" className={primaryButton} onClick={viewGoal}>
           Xem mục tiêu
         </button>

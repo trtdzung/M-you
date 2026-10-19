@@ -97,7 +97,7 @@ export function StandingOrderSetup({ params }: ScreenProps) {
         <p className="text-[13px] text-muted">Lần trích đầu tiên: {formatISODate(nextRun)}</p>
       </section>
 
-      <BottomActions>
+      <BottomActions inline>
         <button
           type="button"
           className={primaryButton}

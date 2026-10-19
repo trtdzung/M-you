@@ -80,7 +80,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
         </p>
       )}
 
-      <BottomActions>
+      <BottomActions inline>
         <button type="button" className={primaryButton} disabled={insufficient} onClick={() => setOpen(true)}>
           Mở tài khoản
         </button>

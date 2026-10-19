@@ -273,7 +273,7 @@ export function GoalInfo({ params }: ScreenProps) {
         )}
       </section>
 
-      <BottomActions>
+      <BottomActions inline>
         <button type="button" className={primaryButton} onClick={onContinue} disabled={pending || (touched && !valid)}>
           Tiếp tục
         </button>

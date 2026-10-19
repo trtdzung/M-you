@@ -174,7 +174,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
 
       {!ok && !unknown && <p className={infoBox}>Đừng lo, có vài cách để điều chỉnh. Bạn sẽ thấy so sánh ở bước tiếp theo.</p>}
 
-      <BottomActions>
+      <BottomActions inline>
         {ok || unknown ? (
           <button type="button" className={primaryButton} onClick={goOpen}>
             {unknown ? "Tiếp tục mở tài khoản" : "Mở tài khoản mục tiêu"}

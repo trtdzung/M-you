@@ -196,7 +196,7 @@ function OpeningFundsBody({ goalId, initialDeposit }: { goalId: string; initialD
 
       {overBalance && <p className={errorBox}>Số tiền vượt số dư tài khoản chính ({formatVnd(balance)}). Hãy giảm bớt.</p>}
 
-      <BottomActions>
+      <BottomActions inline>
         <button type="button" className={primaryButton} disabled={overBalance} onClick={() => go(depositValue)}>
           Tiếp tục
         </button>
