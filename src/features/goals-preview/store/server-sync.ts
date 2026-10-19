@@ -83,25 +83,20 @@ export interface GoalIdResolution {
 
 type IdCheck = (value: string) => boolean;
 
-/** True when a string value at level 1 of the action (or level 2 inside an object/array field) matches. */
+/** True when a goal reference matches. Other action fields are not goal ids. */
 function referencesId(action: PreviewAction, match: IdCheck): boolean {
-  for (const value of Object.values(action)) {
-    if (typeof value === "string" && match(value)) return true;
-    if (value && typeof value === "object" && Object.values(value).some((inner) => typeof inner === "string" && match(inner))) return true;
-  }
-  return false;
+  return (
+    ("goalId" in action && typeof action.goalId === "string" && match(action.goalId)) ||
+    ("goalIds" in action && action.goalIds.some((id) => match(id)))
+  );
 }
 
-/** Replaces temporary goal ids (level 1, and level 2 inside an object/array field) with the server ids. */
+/** Replaces only goal reference fields with the server ids. */
 function mapGoalIds(action: PreviewAction, map: Record<string, string>): PreviewAction {
-  const swap = (value: unknown) => (typeof value === "string" && Object.hasOwn(map, value) ? map[value] : value);
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(action)) {
-    if (Array.isArray(value)) out[key] = value.map(swap);
-    else if (value && typeof value === "object") out[key] = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, swap(v)]));
-    else out[key] = swap(value);
-  }
-  return out as unknown as PreviewAction;
+  const swap = (id: string) => (Object.hasOwn(map, id) ? map[id] : id);
+  if ("goalId" in action && typeof action.goalId === "string") return { ...action, goalId: swap(action.goalId) };
+  if ("goalIds" in action) return { ...action, goalIds: action.goalIds.map(swap) };
+  return action;
 }
 
 export interface SyncHandlers {

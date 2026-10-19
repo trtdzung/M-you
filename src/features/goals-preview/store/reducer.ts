@@ -147,7 +147,7 @@ function syncWorld(state: PreviewState, world: WorldState, goalIdMap: Record<str
   const lastLost = last !== undefined && (unsavedGoalIds.includes(last) || (!Object.hasOwn(goalIdMap, last) && !world.goals.some((g) => g.id === last)));
   const lost = (value: unknown) => typeof value === "string" && (unsavedGoalIds.includes(value) || (lastLost && value === last));
 
-  const cut = state.nav.stack.findIndex((item) => Object.values(item.params).some(lost));
+  const cut = state.nav.stack.findIndex((item) => lost(item.params.goalId));
   const mapped = (value: unknown) => typeof value === "string" && Object.hasOwn(goalIdMap, value);
   let navSeq = state.navSeq;
   let nav = state.nav;
@@ -155,13 +155,12 @@ function syncWorld(state: PreviewState, world: WorldState, goalIdMap: Record<str
     // Nothing left below the dropped screen: back to the goal list.
     navSeq = (navSeq ?? 0) + 1;
     nav = { stack: [entry(navSeq, "GoalList")] };
-  } else if (cut > 0 || state.nav.stack.some((item) => Object.values(item.params).some(mapped))) {
+  } else if (cut > 0 || state.nav.stack.some((item) => mapped(item.params.goalId))) {
     const kept = cut > 0 ? state.nav.stack.slice(0, cut) : state.nav.stack;
     nav = {
       stack: kept.map((item) => {
-        if (!Object.values(item.params).some(mapped)) return item;
-        const params: ScreenParams = {};
-        for (const [key, value] of Object.entries(item.params)) params[key] = typeof value === "string" ? mapId(value) : value;
+        if (!mapped(item.params.goalId)) return item;
+        const params: ScreenParams = { ...item.params, goalId: mapId(item.params.goalId as string) };
         return { ...item, params };
       }),
     };
