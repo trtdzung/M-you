@@ -61,7 +61,7 @@ export const SCREEN_REGISTRY: Record<ScreenId, ScreenDef> = {
   WithdrawFlow: { component: WithdrawFlow, title: "Rút tiền", group: "detail", needs: ["goalId"] },
   StandingOrderManage: { component: StandingOrderManage, title: "Trích tiền tự động", group: "detail", needs: ["goalId"] },
   CloseGoalFlow: { component: CloseGoalFlow, title: "Đóng mục tiêu", group: "detail", needs: ["goalId"] },
-  AddFixedAsset: { component: AddFixedAsset, title: "Thêm tài sản cố định", group: "assets", needs: ["goalId"] },
+  AddFixedAsset: { component: AddFixedAsset, title: "Thêm tài sản", group: "assets", needs: ["goalId"] },
   RevalueAsset: { component: RevalueAsset, title: "Định giá lại tài sản", group: "assets", needs: ["goalId", "assetId"] },
   LiquidAssetDetail: { component: LiquidAssetDetail, title: "Chi tiết tài sản", group: "assets", needs: ["goalId", "assetId"] },
   SellAsset: { component: SellAsset, title: "Bán tài sản", group: "assets", needs: ["goalId", "assetId"] },

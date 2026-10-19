@@ -18,7 +18,7 @@ export function SellAsset({ params }: ScreenProps) {
   const asset = selectAsset(state, paramString(params, "assetId"));
   const goal = findGoal(state, asset?.goalId);
   const [percent, setPercent] = useState(100);
-  const [proceedsInput, setProceedsInput] = useState<number | null>(asset?.type === "fixed" ? asset.value : null);
+  const [proceedsInput, setProceedsInput] = useState<number | null>(asset?.type === "fixed" ? assetValue(asset, state) : null);
   const [confirm, setConfirm] = useState(false);
 
   if (!asset || !goal || asset.status === "sold") {
@@ -39,7 +39,7 @@ export function SellAsset({ params }: ScreenProps) {
   const proceeds = isLiquid ? Math.round((quote?.net ?? 0) * fraction) : proceedsInput ?? 0;
   const fee = isLiquid ? Math.round((quote?.fee ?? 0) * fraction) : 0;
   // Cash in goal account goes up by proceeds; the asset's counted value goes away.
-  const removedCounted = Math.round(((isLiquid ? assetValue(asset, state) * fraction : asset.value) * asset.countPercent) / 100);
+  const removedCounted = Math.round(((isLiquid ? assetValue(asset, state) * fraction : assetValue(asset, state)) * asset.countPercent) / 100);
   const delta = proceeds - removedCounted;
   const progress = progressAfter(state, goal, delta);
   const valid = proceeds > 0;
@@ -54,7 +54,7 @@ export function SellAsset({ params }: ScreenProps) {
           <p className="text-[13px] text-muted">Giá trị hiện tại</p>
           {quote?.early && <InfoTooltip warning label="tất toán trước hạn" text={`${quote.note}. ${quote.lostInterest > 0 ? `Phần lãi bị giảm theo báo giá hiện tại: ${formatVnd(quote.lostInterest)}.` : "Kiểm tra mức lãi áp dụng khi tất toán trước hạn trước khi xác nhận."}`} />}
         </div>
-        <Amount amount={isLiquid ? quote?.gross : asset.value} source={asset.source} className="text-2xl font-bold" />
+        <Amount amount={isLiquid ? quote?.gross : assetValue(asset, state)} source={asset.source} className="text-2xl font-bold" />
       </section>
 
       {partial && (

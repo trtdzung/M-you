@@ -65,9 +65,15 @@ export type PreviewAction =
       countPercent: number;
       valuationDate?: ISODate;
       source?: ValueSource;
+      instrumentId?: string;
+      quantity?: number;
+      accrual?: { principal: number; ratePa: number; startDate: ISODate; maturityDate?: ISODate };
+      institution?: string;
     }
   | { type: "revalueAsset"; assetId: string; value: number; countPercent?: number; valuationDate?: ISODate }
   | { type: "removeAsset"; assetId: string }
+  /** Outside market asset (gold, stock, fund): the customer bought or sold, value follows the price. */
+  | { type: "setAssetQuantity"; assetId: string; quantity: number }
   | { type: "invest"; goalId: string; productId: string; amount: number; termMonths?: number }
   /** Liquid: sells `fraction` (default 1) at current value. Fixed: records `proceeds` (default declared value). */
   | { type: "sellAsset"; assetId: string; fraction?: number; proceeds?: number }

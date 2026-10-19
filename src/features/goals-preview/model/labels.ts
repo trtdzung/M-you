@@ -78,8 +78,12 @@ export const FIXED_CATEGORY_LABEL: Record<FixedAssetCategory, string> = {
   house: "Nhà, đất",
   car: "Ô tô",
   motorbike: "Xe máy",
-  gold: "Vàng cất giữ",
+  gold: "Vàng",
   other: "Tài sản khác",
+  stock: "Cổ phiếu",
+  external_fund: "Chứng chỉ quỹ",
+  deposit: "Tiền gửi ngân hàng khác",
+  bond: "Trái phiếu",
 };
 
 export const LIQUID_CATEGORY_LABEL: Record<LiquidAssetCategory, string> = {

@@ -1,6 +1,7 @@
+import { getInstrument } from "../data/market";
 import { getInvestProduct } from "../data/products";
 import type { WorldState } from "../model/state";
-import type { Asset, FundProduct, Goal, GoalAccount, ISODate, LiquidAsset, Loan, ProgressState, ValueSource } from "../model/types";
+import type { Asset, FixedAsset, FundProduct, Goal, GoalAccount, ISODate, LiquidAsset, Loan, PricePoint, ProgressState, ValueSource } from "../model/types";
 import { daysBetween, isBefore } from "./dates";
 import { outstandingPrincipal } from "./loan";
 
@@ -8,7 +9,11 @@ import { outstandingPrincipal } from "./loan";
 
 /** Daily fund price: linear interpolation of monthly anchors, then the manual shift. */
 export function fundPriceAt(fund: FundProduct, date: ISODate, shiftPct = 0): number {
-  const series = fund.priceSeries;
+  return seriesPriceAt(fund.priceSeries, date, shiftPct);
+}
+
+/** Price on `date` from monthly anchors (linear interpolation), then the manual market shift. */
+export function seriesPriceAt(series: PricePoint[], date: ISODate, shiftPct = 0): number {
   if (series.length === 0) return 0;
   let price = series[series.length - 1].price;
   if (date <= series[0].date) price = series[0].price;
@@ -36,7 +41,7 @@ export function depositAccrued(principal: number, ratePa: number, from: ISODate,
 /** Current market value of one asset (before countPercent). */
 export function assetValue(asset: Asset, world: Pick<WorldState, "clock" | "market">): number {
   if (asset.status === "sold") return 0;
-  if (asset.type === "fixed") return asset.value;
+  if (asset.type === "fixed") return outsideValue(asset, world.clock.today, world.market.fundPriceShiftPct) ?? asset.value;
   return liquidValue(asset, world.clock.today, world.market.fundPriceShiftPct);
 }
 
@@ -53,6 +58,30 @@ export function liquidValue(asset: LiquidAsset, today: ISODate, shiftPct: number
     return Math.round(asset.units * asset.price) + depositAccrued(asset.costBasis, asset.ratePa ?? 0, asset.createdAt, today);
   }
   return asset.value;
+}
+
+/** True for outside assets the engine values itself (market price or interest formula). */
+export function isAutoValued(asset: Asset): boolean {
+  return asset.type === "fixed" && ((!!asset.instrumentId && asset.quantity !== undefined) || !!asset.accrual);
+}
+
+/**
+ * Value of an outside financial asset today: quantity × market price, or principal + simple interest
+ * (capped at maturity). Undefined when the asset is valued by hand (house, car…).
+ */
+export function outsideValue(
+  asset: Pick<FixedAsset, "instrumentId" | "quantity" | "accrual">,
+  today: ISODate,
+  shiftPct = 0,
+): number | undefined {
+  const instrument = getInstrument(asset.instrumentId);
+  if (instrument && asset.quantity !== undefined) return Math.round(asset.quantity * seriesPriceAt(instrument.priceSeries, today, shiftPct));
+  if (asset.accrual) {
+    const { principal, ratePa, startDate, maturityDate } = asset.accrual;
+    const end = maturityDate && isBefore(maturityDate, today) ? maturityDate : today;
+    return principal + depositAccrued(principal, ratePa, startDate, end);
+  }
+  return undefined;
 }
 
 /** Unrealised gain/loss vs cost basis (VND). */
@@ -101,7 +130,8 @@ export function goalValue(world: Pick<WorldState, "accounts" | "assets" | "clock
       fixedTotal += value;
       const counted = Math.round((value * asset.countPercent) / 100);
       fixedCounted += counted;
-      if (counted > 0) source = asset.source === "estimated" && source === "msb" ? "estimated" : "self_reported";
+      // Auto-valued outside assets are market estimates; hand-valued ones stay self-reported (the weaker label wins).
+      if (counted > 0) source = isAutoValued(asset) ? (source === "msb" ? "estimated" : source) : "self_reported";
     }
   }
   const assets = liquid + fixedCounted;
@@ -214,5 +244,5 @@ export function phaseOneResult(world: Pick<WorldState, "txns" | "loans">, goal: 
 
 /** Fixed asset valuation older than 12 months needs a refresh. */
 export function needsRevaluation(asset: Asset, today: ISODate): boolean {
-  return asset.type === "fixed" && daysBetween(asset.valuationDate, today) > 365;
+  return asset.type === "fixed" && !isAutoValued(asset) && daysBetween(asset.valuationDate, today) > 365;
 }

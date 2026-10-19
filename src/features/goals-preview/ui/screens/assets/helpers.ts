@@ -1,6 +1,6 @@
 import type { PreviewNav } from "../../../store/PreviewStore";
 import { getInvestProduct } from "../../../data/products";
-import { depositAccrued, assetValue, formatISODate, goalValue, monthsBetween } from "../../../engine";
+import { depositAccrued, assetValue, formatISODate, goalStage, goalValue, monthsBetween } from "../../../engine";
 import type { PreviewState } from "../../../model/state";
 import type { Goal, LiquidAsset } from "../../../model/types";
 
@@ -49,9 +49,10 @@ export function quoteSale(state: PreviewState, asset: LiquidAsset): SaleQuote {
 
 /** Progress % of goal if its total value changes by `delta`. */
 export function progressAfter(state: PreviewState, goal: Goal, delta: number): { before: number; after: number } {
-  const total = goalValue(state, goal).total;
-  const t = goal.targetAmount || 1;
-  return { before: (total / t) * 100, after: (Math.max(0, total + delta) / t) * 100 };
+  // Progress of the current phase (phase 2 = loan principal), matching the goal detail header.
+  const stage = goalStage(state, goal);
+  const t = stage.target || 1;
+  return { before: (stage.value / t) * 100, after: (Math.max(0, stage.value + delta) / t) * 100 };
 }
 
 export function pct(value: number): string {

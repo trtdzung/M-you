@@ -1,6 +1,6 @@
 import { getInvestProduct } from "../data/products";
 import type { WorldState } from "../model/state";
-import type { Asset, FixedAssetCategory, ISODate, LiquidAssetCategory, ValueSource } from "../model/types";
+import type { Asset, FixedAsset, FixedAssetCategory, ISODate, LiquidAssetCategory, ValueSource } from "../model/types";
 import { addMonths } from "./dates";
 import { nextId } from "./ledger";
 import { depositAccrued, fundPriceAt } from "./value";
@@ -16,6 +16,10 @@ export interface FixedAssetSpec {
   valuationDate: ISODate;
   countPercent: number;
   source?: ValueSource;
+  instrumentId?: string;
+  quantity?: number;
+  accrual?: FixedAsset["accrual"];
+  institution?: string;
 }
 
 export interface LiquidAssetSpec {
@@ -42,9 +46,12 @@ export function makeAsset(world: WorldState, goalId: string, spec: FixedAssetSpe
       value: spec.value,
       valuationDate: spec.valuationDate,
       countPercent: spec.countPercent,
-      source: spec.source ?? "self_reported",
+      source: spec.source ?? (spec.instrumentId || spec.accrual ? "estimated" : "self_reported"),
       status: "held",
       createdAt,
+      ...(spec.instrumentId ? { instrumentId: spec.instrumentId, quantity: spec.quantity } : {}),
+      ...(spec.accrual ? { accrual: spec.accrual } : {}),
+      ...(spec.institution ? { institution: spec.institution } : {}),
     };
   }
   const product = getInvestProduct(spec.productId);

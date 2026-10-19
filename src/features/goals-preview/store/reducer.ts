@@ -324,6 +324,10 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
             valuationDate: action.valuationDate ?? today,
             countPercent: action.countPercent,
             source: action.source,
+            instrumentId: action.instrumentId,
+            quantity: action.quantity,
+            accrual: action.accrual,
+            institution: action.institution,
           },
           today,
         ),
@@ -342,6 +346,17 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       asset.source = "self_reported";
       lifecycle(draft);
       toast(draft, `Đã cập nhật giá trị “${asset.name}”.`);
+      return draft;
+    }
+
+    case "setAssetQuantity": {
+      const asset = draft.assets.find((a) => a.id === action.assetId);
+      if (!asset || asset.type !== "fixed" || !asset.instrumentId) return fail(state, "Tài sản này không tính theo số lượng.");
+      if (!(action.quantity > 0)) return fail(state, "Số lượng phải lớn hơn 0.");
+      asset.quantity = action.quantity;
+      asset.valuationDate = today;
+      lifecycle(draft);
+      toast(draft, `Đã cập nhật số lượng “${asset.name}”.`);
       return draft;
     }
 

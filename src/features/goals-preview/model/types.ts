@@ -172,7 +172,8 @@ export const TXN_DIRECTION: Record<GoalTxnKind, 1 | -1 | 0> = {
 
 // ---------------------------------------------------------------- assets
 
-export type FixedAssetCategory = "house" | "car" | "motorbike" | "gold" | "other";
+/** Self-declared assets. house…other are valued by hand; gold…bond are financial assets held outside MSB. */
+export type FixedAssetCategory = "house" | "car" | "motorbike" | "other" | "gold" | "stock" | "external_fund" | "deposit" | "bond";
 export type LiquidAssetCategory = "savings" | "term_deposit" | "fund" | "bond";
 
 interface AssetBase {
@@ -191,11 +192,21 @@ interface AssetBase {
   createdAt: ISODate;
 }
 
-/** Tài sản cố định: nhà, xe, vàng cất nhà… giá tự khai, không có nguồn giá. */
+/**
+ * Tài sản tự khai (ngoài MSB). Nhà, xe… có giá tự khai. Tài sản tài chính ở nơi khác được định giá tự động:
+ * vàng / cổ phiếu / chứng chỉ quỹ = số lượng × giá thị trường; tiền gửi / trái phiếu = gốc + lãi cộng dồn.
+ */
 export interface FixedAsset extends AssetBase {
   type: "fixed";
   category: FixedAssetCategory;
   productId?: undefined;
+  /** Market instrument (data/market.ts) priced daily; value = quantity × price. */
+  instrumentId?: string;
+  quantity?: number;
+  /** Outside deposit / bond: principal + simple interest from startDate (capped at maturityDate). */
+  accrual?: { principal: number; ratePa: number; startDate: ISODate; maturityDate?: ISODate };
+  /** Where it is held (other bank, broker, fund manager). */
+  institution?: string;
 }
 
 /** Tài sản linh hoạt: sản phẩm MSB có giá biết trước. */

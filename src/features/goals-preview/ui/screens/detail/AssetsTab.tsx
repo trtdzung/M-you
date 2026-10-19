@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { FixedAssetDetailSheet } from "../assets/FixedAssetDetailSheet";
 import { LiquidAssetDetail } from "../assets/LiquidAssetDetail";
-import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink } from "lucide-react";
+import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink, Gem, CircleDollarSign, PieChart, FileText, Home } from "lucide-react";
+import { getInstrument } from "../../../data/market";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
-import { assetGain, assetValue, formatISODate, goalAssets } from "../../../engine";
+import { assetGain, assetValue, formatISODate, goalAssets, isAutoValued } from "../../../engine";
 import { FIXED_CATEGORY_LABEL, LIQUID_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { SourceTag } from "../../shared/SourceTag";
@@ -27,7 +28,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
   const fixed = assets.flatMap((a) => (a.type === "fixed" ? [a] : []));
 
   const removing = fixed.find((asset) => asset.id === removeId);
-  const removedValue = removing ? Math.round(removing.value * removing.countPercent / 100) : 0;
+  const removedValue = removing ? Math.round(assetValue(removing, state) * removing.countPercent / 100) : 0;
   const impact = removing ? progressAfter(state, goal, -removedValue) : null;
 
   return (
@@ -92,29 +93,35 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center"><h2 className={sectionTitle}>Cố định</h2><InfoTooltip label="tài sản cố định" text="Nhà, xe, vàng… có giá trị do bạn tự khai. Chỉ phần giá trị theo tỷ lệ bạn chọn được tính vào mục tiêu." /></div>
-          <SourceTag source="self_reported" />
+          <div className="flex items-center"><h2 className={sectionTitle}>Tài sản ngoài MSB</h2><InfoTooltip label="tài sản ngoài MSB" text="Nhà, xe có giá do bạn tự khai. Vàng, cổ phiếu, chứng chỉ quỹ, tiền gửi và trái phiếu ở nơi khác được app tự ước tính theo giá thị trường hoặc lãi suất. Chỉ phần theo tỷ lệ bạn chọn được tính vào mục tiêu." /></div>
         </div>
         {fixed.length === 0 ? (
-          <p className={`${card} text-center text-sm text-muted`}>Chưa có tài sản cố định nào được khai báo.</p>
+          <p className={`${card} text-center text-sm text-muted`}>Chưa khai báo tài sản nào ngoài MSB.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {fixed.map((a) => {
-              const stale = isStaleValuation(a.valuationDate, state.clock.today);
+              const auto = isAutoValued(a);
+              const stale = !auto && isStaleValuation(a.valuationDate, state.clock.today);
+              const now = assetValue(a, state);
+              const instrument = getInstrument(a.instrumentId);
+              const Icon = { house: Home, car: Car, gold: Gem, stock: CircleDollarSign, external_fund: PieChart, deposit: Landmark, bond: FileText }[a.category as string] ?? Package;
               return (
                 <li key={a.id} className="relative rounded-card bg-surface shadow-card">
                   <button type="button" className={`${card} !shadow-none flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => setFixedDetailId(a.id)}>
                     <div className={`flex items-start gap-3 ${stale ? "pr-9" : ""}`}>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-source-self-soft text-source-self">{a.category === "car" ? <Car size={20} aria-hidden /> : <Package size={20} aria-hidden />}</span>
-                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]}</p></div>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-source-self-soft text-source-self"><Icon size={20} aria-hidden /></span>
+                      <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]} <SourceTag source={auto ? "estimated" : "self_reported"} /></p></div>
                     </div>
                     <div>
                       <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
-                      <p className={`mt-1 ${figure}`}>{formatVndCompact(Math.round(a.value * a.countPercent / 100))}</p>
-                      <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị tự khai {formatVndCompact(a.value)}</p>
+                      <p className={`mt-1 ${figure}`}>{formatVndCompact(Math.round(now * a.countPercent / 100))}</p>
+                      <p className="mt-1 text-[12px] text-muted">
+                        {a.countPercent}% của {formatVndCompact(now)}
+                        {instrument && a.quantity !== undefined ? ` · ${a.quantity.toLocaleString("vi-VN")} ${instrument.unit} theo giá hôm nay` : a.accrual ? " · gốc + lãi tới hôm nay" : " tự khai"}
+                      </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-                      <p className="text-[12px] text-muted">Định giá {formatISODate(a.valuationDate)}</p>
+                      <p className="text-[12px] text-muted">{auto ? "Tự cập nhật hằng ngày" : `Định giá ${formatISODate(a.valuationDate)}`}</p>
                       <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary-strong">Chi tiết <ChevronRight size={16} aria-hidden /></span>
                     </div>
                   </button>
@@ -128,7 +135,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
 
         {canTransact(goal) && (
           <button type="button" className={secondaryButton} onClick={() => nav.push("AddFixedAsset", { goalId })}>
-            <Plus size={18} aria-hidden /> Thêm tài sản cố định
+            <Plus size={18} aria-hidden /> Thêm tài sản ngoài MSB
           </button>
         )}
       </section>
