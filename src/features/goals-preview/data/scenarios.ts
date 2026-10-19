@@ -1,7 +1,7 @@
 import type { Scenario, WorldState } from "../model/state";
 import { buildWorld } from "./builder";
 import { outsideValue } from "../engine/value";
-import { BOND_MSB, FUND_BOND, FUND_EQUITY, LOAN_CAR, ONLINE_DEPOSIT, SAVINGS_FLEX } from "./products";
+import { LOAN_CAR, ONLINE_DEPOSIT, SAVINGS_FLEX } from "./products";
 
 /**
  * 14 scripted scenarios + demo (mixed) + empty. Each `build()` returns a fresh
@@ -48,7 +48,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 120 * TR,
             monthly: 5 * TR,
             dayOfMonth: 12,
-            assets: [{ type: "liquid", category: "fund", productId: FUND_BOND.id, amount: 20 * TR, createdAt: "2026-05-15" }],
+            assets: [{ type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 20 * TR, termMonths: 12, createdAt: "2026-05-15" }],
           },
           {
             name: "Quỹ dự phòng 6 tháng",
@@ -140,7 +140,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 120 * TR,
             monthly: 5 * TR,
             dayOfMonth: 12,
-            assets: [{ type: "liquid", category: "fund", productId: FUND_EQUITY.id, amount: 40 * TR, createdAt: "2026-06-15" }],
+            assets: [{ type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 40 * TR, termMonths: 12, createdAt: "2026-06-15" }],
           },
         ],
       }),
@@ -474,9 +474,9 @@ export const SCENARIOS: Scenario[] = [
               // Sản phẩm MSB (tài sản linh hoạt)
               { type: "liquid", category: "savings", productId: SAVINGS_FLEX.id, amount: 60 * TR, createdAt: "2026-03-01" },
               { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 300 * TR, termMonths: 12, createdAt: "2025-12-01" },
-              { type: "liquid", category: "fund", productId: FUND_BOND.id, amount: 150 * TR, createdAt: "2025-06-15" },
-              { type: "liquid", category: "fund", productId: FUND_EQUITY.id, amount: 100 * TR, createdAt: "2026-01-10" },
-              { type: "liquid", category: "bond", productId: BOND_MSB.id, amount: 200 * TR, createdAt: "2025-09-01" },
+              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 150 * TR, termMonths: 12, createdAt: "2025-06-15" },
+              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 100 * TR, termMonths: 12, createdAt: "2026-01-10" },
+              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 200 * TR, termMonths: 12, createdAt: "2025-09-01" },
               // Tài sản ngoài MSB: vật chất (tự khai)
               { type: "fixed", name: "Căn hộ cũ Bình Thạnh (định bán)", category: "house", value: 2_600 * TR, costBasis: 1_900 * TR, valuationDate: "2026-08-01", countPercent: 60 },
               { type: "fixed", name: "Xe Honda CR-V 2021", category: "car", value: 750 * TR, costBasis: 1_050 * TR, valuationDate: "2026-02-01", countPercent: 50 },

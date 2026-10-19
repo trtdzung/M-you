@@ -239,7 +239,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
         number: makeAccountNumber(draft.seq),
         name: `TK mục tiêu – ${goal.name}`,
         balance: 0,
-        interestRatePa: 0.5,
+        interestRatePa: 0,
         openedAt: today,
         status: "open",
       });
