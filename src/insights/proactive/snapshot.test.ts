@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildCustomerSnapshot, selectDiverseTopCandidates, selectTop3DiverseCandidates, type SnapshotOverlay } from "./snapshot";
+import {
+  buildCustomerSnapshot,
+  selectDiverseTopCandidates,
+  selectTop3DiverseCandidates,
+  selectOrderedHomeCandidates,
+  type SnapshotOverlay,
+} from "./snapshot";
 import type { RawData } from "@/domain/engine/finance-compose";
 import { generateDataset } from "@/providers/mock/fixtures/generate";
 import { PERSONA_LIST } from "@/providers/mock/personas";
@@ -185,7 +191,7 @@ describe("financial snapshot", () => {
     expect(c2?.impactLine).toContain("Số dư hiện thiếu khoảng 1,5 triệu để tất toán.");
   });
 
-  it("generates PERIODIC_PULSE and DISCOVERY_GUIDE with Security Hub", () => {
+  it("generates PERIODIC_PULSE and security signals with SC3 and BT1", () => {
     const s = buildCustomerSnapshot(
       raw(),
       noJars,
@@ -197,24 +203,21 @@ describe("financial snapshot", () => {
     );
 
     // Periodic pulse
-    const pulse = s.candidates.find((c) => c.id === "pulse:weekly_brief");
+    const pulse = s.candidates.find((c) => c.category === "PERIODIC_PULSE");
     expect(pulse).toBeDefined();
-    expect(pulse?.category).toBe("PERIODIC_PULSE");
     expect(pulse?.categoryLabel).toBe("Nhịp tiền định kỳ");
     expect(pulse?.slotGroup).toBe("GROW_AND_GUIDE");
-    expect(pulse?.primaryAction?.href).toBe("/pfm");
 
-    // Security hold alert (High priority)
-    const hold = s.candidates.find((c) => c.id === "security:hold_alert");
+    // Security hold alert / SC3 (High priority RED)
+    const hold = s.candidates.find((c) => c.id === "security:sc3_active_case");
     expect(hold).toBeDefined();
-    expect(hold?.category).toBe("DISCOVERY_GUIDE");
+    expect(hold?.category).toBe("SECURITY_RED");
+    expect(hold?.securityLevel).toBe("RED");
     expect(hold?.slotGroup).toBe("PROTECT");
     expect(hold?.tone).toBe("urgent");
-    expect(hold?.primaryAction?.type).toBe("navigate_security_hub");
-    expect(hold?.primaryAction?.href).toBe("/settings");
-    expect(hold?.metric.unit).toBe("count");
+    expect(hold?.actionType).toBe("view_fraud_case");
 
-    // Security guide with score
+    // Security onboarding with score < 80 (BT1 GREEN)
     const sGuide = buildCustomerSnapshot(
       raw(),
       noJars,
@@ -222,14 +225,15 @@ describe("financial snapshot", () => {
       profile,
       [],
       now,
-      { score: 45, hasEmergencyContact: false, hasActiveHold: false }
+      { score: 45, hasEmergencyContact: true, hasActiveHold: false }
     );
-    const guide = sGuide.candidates.find((c) => c.id === "security:guide");
+    const guide = sGuide.candidates.find((c) => c.id === "security:bt1_onboarding");
     expect(guide).toBeDefined();
-    expect(guide?.category).toBe("DISCOVERY_GUIDE");
+    expect(guide?.category).toBe("SECURITY_GREEN");
+    expect(guide?.securityLevel).toBe("GREEN");
     expect(guide?.metric.unit).toBe("points");
     expect(guide?.metric.value).toBe(45);
-    expect(guide?.badgeText).toBe("Điểm 45/100");
+    expect(guide?.badgeText).toBe("Bảo mật · Xanh");
   });
 
   it("slot diversity algorithm selects distinct categories for Slide 2 and Slide 3", () => {
@@ -300,5 +304,52 @@ describe("financial snapshot", () => {
     expect(filled[1].category).not.toBe("CASHFLOW_RISK");
     expect(filled[2].category).not.toBe("CASHFLOW_RISK");
     expect(filled[1].category).not.toBe(filled[2].category);
+  });
+
+  it("selectOrderedHomeCandidates orders [Security RED/AMBER] -> [PFM 1..3] -> [Security GREEN] and inserts fallback security:all_clear", () => {
+    const dummy = (id: string, domain: any, priority: number, securityLevel?: any, category?: any): any => ({
+      id,
+      domain,
+      priority,
+      securityLevel,
+      category: category ?? (domain === "SECURITY" ? `SECURITY_${securityLevel}` : "PERIODIC_PULSE"),
+      metric: { label: "Test", value: 100, unit: "VND" },
+      facts: {},
+    });
+
+    // Case 1: Candidates with RED, AMBER, GREEN and multiple PFM
+    const candidates = [
+      dummy("pfm-1", "PFM", 1, undefined, "UPCOMING_OBLIGATION"),
+      dummy("sec-green", "SECURITY", 8, "GREEN"),
+      dummy("pfm-2", "PFM", 2, undefined, "CASHFLOW_RISK"),
+      dummy("sec-red", "SECURITY", 0, "RED"),
+      dummy("sec-amber", "SECURITY", 1, "AMBER"),
+      dummy("pfm-3", "PFM", 3, undefined, "GOAL_PROGRESS"),
+    ];
+
+    const ordered = selectOrderedHomeCandidates(candidates);
+    expect(ordered.length).toBeLessThanOrEqual(5);
+    expect(ordered.length).toBeGreaterThanOrEqual(2);
+
+    // Order must be: [Security RED, AMBER] -> [PFM 1..3] -> [Security GREEN]
+    expect(ordered[0].id).toBe("sec-red");
+    expect(ordered[0].securityLevel).toBe("RED");
+    expect(ordered[1].id).toBe("sec-amber");
+    expect(ordered[1].securityLevel).toBe("AMBER");
+    expect(ordered[2].domain).toBe("PFM");
+    expect(ordered[3].domain).toBe("PFM");
+    expect(ordered[4].domain).toBe("PFM");
+
+    // Case 2: Only PFM candidates -> automatically includes fallback security:all_clear at the end
+    const pfmOnly = [
+      dummy("pfm-only-1", "PFM", 1, undefined, "UPCOMING_OBLIGATION"),
+      dummy("pfm-only-2", "PFM", 2, undefined, "PERIODIC_PULSE"),
+    ];
+    const withFallbackSec = selectOrderedHomeCandidates(pfmOnly);
+    expect(withFallbackSec.length).toBe(3);
+    expect(withFallbackSec[0].domain).toBe("PFM");
+    expect(withFallbackSec[1].domain).toBe("PFM");
+    expect(withFallbackSec[2].id).toBe("security:all_clear");
+    expect(withFallbackSec[2].securityLevel).toBe("GREEN");
   });
 });

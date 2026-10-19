@@ -7,7 +7,6 @@ import { Sheet } from "@/components/primitives/Sheet";
 import {
   ChevronRight,
   Sparkles,
-  CheckCircle2,
   CalendarClock,
   TrendingDown,
   AlertTriangle,
@@ -16,6 +15,7 @@ import {
   Activity,
   Trophy,
   ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { formatVnd } from "@/lib/format";
 import { usePersona } from "@/providers/context";
@@ -29,16 +29,47 @@ import {
   type HomeInsightCarouselResult,
   type InsightCategory,
   type InsightTone,
+  type SecurityAlertLevel,
+  type InsightActionChip,
   CATEGORY_META,
 } from "@/insights/proactive/home-contract";
 import { saveInsightDraft } from "@/insights/proactive/chat-handoff";
 import { HandbookSheet } from "@/components/security/HandbookSheet";
-
 import { useAppToday } from "@/state/app-clock";
 
-const TOTAL_SLIDES = 3;
+function getCategoryVisuals(
+  category?: InsightCategory,
+  tone?: InsightTone,
+  securityLevel?: SecurityAlertLevel
+) {
+  if (securityLevel === "RED" || category === "SECURITY_RED") {
+    return {
+      pill: "bg-red-50 text-red-700 border-red-200/80",
+      dot: "bg-red-500",
+      iconBg: "bg-red-50",
+      iconText: "text-red-600",
+      cardBorder: "border-red-200/80 bg-red-50/30",
+    };
+  }
+  if (securityLevel === "AMBER" || category === "SECURITY_AMBER") {
+    return {
+      pill: "bg-amber-50 text-amber-800 border-amber-200/80",
+      dot: "bg-amber-500",
+      iconBg: "bg-amber-50",
+      iconText: "text-amber-700",
+      cardBorder: "border-amber-200/80 bg-amber-50/30",
+    };
+  }
+  if (securityLevel === "GREEN" || category === "SECURITY_GREEN") {
+    return {
+      pill: "bg-emerald-50 text-emerald-800 border-emerald-200/80",
+      dot: "bg-emerald-500",
+      iconBg: "bg-emerald-50",
+      iconText: "text-emerald-700",
+      cardBorder: "border-emerald-200/80 bg-emerald-50/20",
+    };
+  }
 
-function getCategoryVisuals(category?: InsightCategory, tone?: InsightTone) {
   const meta = category ? CATEGORY_META[category] : undefined;
   const effectiveTone = tone ?? meta?.defaultTone ?? "info";
 
@@ -47,36 +78,42 @@ function getCategoryVisuals(category?: InsightCategory, tone?: InsightTone) {
     dot: string;
     iconBg: string;
     iconText: string;
+    cardBorder: string;
   }> = {
     urgent: {
       pill: "bg-red-50 text-red-700 border-red-200/80",
       dot: "bg-red-500",
       iconBg: "bg-red-50",
       iconText: "text-red-600",
+      cardBorder: "",
     },
     warning: {
       pill: "bg-amber-50 text-amber-800 border-amber-200/80",
       dot: "bg-amber-500",
       iconBg: "bg-amber-50",
       iconText: "text-amber-700",
+      cardBorder: "",
     },
     positive: {
       pill: "bg-emerald-50 text-emerald-800 border-emerald-200/80",
       dot: "bg-emerald-500",
       iconBg: "bg-emerald-50",
       iconText: "text-emerald-700",
+      cardBorder: "",
     },
     info: {
       pill: "bg-blue-50 text-blue-800 border-blue-200/80",
       dot: "bg-blue-500",
       iconBg: "bg-blue-50",
       iconText: "text-blue-700",
+      cardBorder: "",
     },
     security: {
       pill: "bg-teal-50 text-teal-800 border-teal-200/80",
       dot: "bg-teal-500",
       iconBg: "bg-teal-50",
       iconText: "text-teal-700",
+      cardBorder: "",
     },
   };
 
@@ -102,15 +139,23 @@ export function formatCandidateMetric(metric: { label: string; value: number; un
 function CategoryIcon({
   category,
   tone,
+  securityLevel,
   size = 16,
   className = "",
 }: {
   category?: InsightCategory;
   tone?: InsightTone;
+  securityLevel?: SecurityAlertLevel;
   size?: number;
   className?: string;
 }) {
-  if (tone === "security" || category === "DISCOVERY_GUIDE") {
+  if (securityLevel === "RED" || category === "SECURITY_RED") {
+    return <ShieldAlert size={size} className={className} aria-hidden />;
+  }
+  if (securityLevel === "AMBER" || category === "SECURITY_AMBER") {
+    return <ShieldAlert size={size} className={className} aria-hidden />;
+  }
+  if (securityLevel === "GREEN" || category === "SECURITY_GREEN" || tone === "security" || category === "DISCOVERY_GUIDE") {
     return <ShieldCheck size={size} className={className} aria-hidden />;
   }
   switch (category) {
@@ -157,9 +202,13 @@ export function HomeInsightWidget() {
   const hasMovedRef = useRef(false);
 
   // Sheets state
-  const [sheetMode, setSheetMode] = useState<"none" | "fallback" | "insight_0" | "insight_1" | "insight_2">("none");
+  const [selectedInsightIndex, setSelectedInsightIndex] = useState<number | null>(null);
+  const [showFallbackSheet, setShowFallbackSheet] = useState(false);
   const [handbookOpen, setHandbookOpen] = useState(false);
-  const closeSheet = useCallback(() => setSheetMode("none"), []);
+  const closeSheet = useCallback(() => {
+    setSelectedInsightIndex(null);
+    setShowFallbackSheet(false);
+  }, []);
 
   const ready = jars.loaded && corrections.loaded && !corrections.unsaved;
   const payload = JSON.stringify({
@@ -177,7 +226,11 @@ export function HomeInsightWidget() {
   const previousRequestIdentity = useRef<string | null>(null);
 
   const currentResult = data?.key === resultKey && ready ? data.result : null;
-  const insights: HomeInsight[] = currentResult?.insights ?? (currentResult?.insight ? [currentResult.insight] : []);
+  const insights: HomeInsight[] =
+    currentResult?.secondaryInsights ??
+    currentResult?.insights ??
+    (currentResult?.insight ? [currentResult.insight] : []);
+  const totalSlides = Math.max(insights.length, 1);
 
   useEffect(() => {
     const focus = () => setRefresh((n) => n + 1);
@@ -192,7 +245,8 @@ export function HomeInsightWidget() {
     const clockOnly = previousRequestIdentity.current === requestIdentity;
     previousRequestIdentity.current = requestIdentity;
     if (!clockOnly) {
-      setSheetMode("none");
+      setSelectedInsightIndex(null);
+      setShowFallbackSheet(false);
       setActiveSlide(0);
     }
 
@@ -252,12 +306,12 @@ export function HomeInsightWidget() {
   }, [ready, payload, resultKey, refresh, persona.cif, today, requestIdentity]);
 
   const prevSlide = useCallback(() => {
-    setActiveSlide((curr) => (curr > 0 ? curr - 1 : TOTAL_SLIDES - 1));
-  }, []);
+    setActiveSlide((curr) => (curr > 0 ? curr - 1 : totalSlides - 1));
+  }, [totalSlides]);
 
   const nextSlide = useCallback(() => {
-    setActiveSlide((curr) => (curr < TOTAL_SLIDES - 1 ? curr + 1 : 0));
-  }, []);
+    setActiveSlide((curr) => (curr < totalSlides - 1 ? curr + 1 : 0));
+  }, [totalSlides]);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "ArrowLeft") {
@@ -282,7 +336,7 @@ export function HomeInsightWidget() {
     if (Math.abs(diff) > 5) {
       hasMovedRef.current = true;
       setIsSwiping(true);
-      if ((activeSlide === 0 && diff > 0) || (activeSlide === TOTAL_SLIDES - 1 && diff < 0)) {
+      if ((activeSlide === 0 && diff > 0) || (activeSlide === totalSlides - 1 && diff < 0)) {
         setDragOffset(diff * 0.25);
       } else {
         setDragOffset(diff);
@@ -295,7 +349,7 @@ export function HomeInsightWidget() {
     isDraggingRef.current = false;
     setIsSwiping(false);
 
-    if (dragOffset < -40 && activeSlide < TOTAL_SLIDES - 1) {
+    if (dragOffset < -40 && activeSlide < totalSlides - 1) {
       setActiveSlide((prev) => prev + 1);
     } else if (dragOffset > 40 && activeSlide > 0) {
       setActiveSlide((prev) => prev - 1);
@@ -319,7 +373,7 @@ export function HomeInsightWidget() {
       const endX = e.changedTouches?.[0]?.clientX;
       if (endX !== undefined) {
         const diff = endX - startXRef.current;
-        if (diff < -40 && activeSlide < TOTAL_SLIDES - 1) {
+        if (diff < -40 && activeSlide < totalSlides - 1) {
           setActiveSlide((prev) => prev + 1);
         } else if (diff > 40 && activeSlide > 0) {
           setActiveSlide((prev) => prev - 1);
@@ -377,6 +431,51 @@ export function HomeInsightWidget() {
     } catch {}
   };
 
+  const handleChipClick = (chip: InsightActionChip, insight: HomeInsight) => {
+    if (chip.actionType === "call_hotline") {
+      window.open("tel:19006083");
+      return;
+    }
+    if (chip.actionType === "open_security_handbook") {
+      setSelectedInsightIndex(null);
+      setHandbookOpen(true);
+      return;
+    }
+    if (chip.actionType === "navigate_smart_otp") {
+      pushWithTransition((href) => router.push(href), "/pfm?tab=security&action=smart_otp");
+      return;
+    }
+    if (chip.actionType === "navigate_lock_card") {
+      pushWithTransition((href) => router.push(href), "/pfm?tab=security&action=lock_card");
+      return;
+    }
+    if (chip.actionType === "navigate_biometric_settings") {
+      pushWithTransition((href) => router.push(href), "/pfm?tab=security&action=biometrics");
+      return;
+    }
+    if (chip.actionType === "request_msb_investigation" || chip.actionType === "chat_handoff") {
+      chat(insight);
+      return;
+    }
+    if (chip.actionType === "dismiss" || chip.actionType === "mark_known_sender") {
+      handleDismiss(insight.snapshotId);
+      return;
+    }
+    if (chip.actionType === "open_jar_transfer") {
+      pushWithTransition((href) => router.push(href), "/pfm?tab=jars");
+      return;
+    }
+    if (chip.actionType === "open_auto_fund") {
+      chat(insight);
+      return;
+    }
+    if (chip.href) {
+      pushWithTransition((href) => router.push(href), chip.href);
+      return;
+    }
+    pushWithTransition((href) => router.push(href), "/pfm");
+  };
+
   // Loading or Error Fallback
   if (!currentResult) {
     return (
@@ -384,7 +483,7 @@ export function HomeInsightWidget() {
         <section aria-label="Gợi ý tài chính" className="home-insight-card flex items-center">
           <button
             type="button"
-            onClick={() => setSheetMode("fallback")}
+            onClick={() => setShowFallbackSheet(true)}
             className="flex min-h-16 min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left focus-visible:outline-primary"
           >
             <Sparkles size={24} className="shrink-0 text-primary" aria-hidden />
@@ -395,7 +494,7 @@ export function HomeInsightWidget() {
             <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
           </button>
         </section>
-        <Sheet open={sheetMode === "fallback"} title="Gợi ý tài chính" onClose={closeSheet} className="home-insight-sheet">
+        <Sheet open={showFallbackSheet} title="Gợi ý tài chính" onClose={closeSheet} className="home-insight-sheet">
           <p className="mb-4 text-sm text-muted">
             {error || (loading ? "Đang cập nhật gợi ý tài chính cho bạn." : "Hiện chưa có gợi ý mới cho bạn.")}
           </p>
@@ -416,10 +515,7 @@ export function HomeInsightWidget() {
     );
   }
 
-  const selectedInsight =
-    sheetMode === "insight_0" ? insights[0] :
-    sheetMode === "insight_1" ? insights[1] :
-    sheetMode === "insight_2" ? insights[2] : null;
+  const selectedInsight = selectedInsightIndex !== null ? insights[selectedInsightIndex] ?? null : null;
 
   return (
     <>
@@ -429,11 +525,11 @@ export function HomeInsightWidget() {
         onKeyDown={handleKeyDown}
         tabIndex={0}
       >
-        {/* Top bar: Carousel Pagination Dots & Slide Counter (No arrow buttons) */}
+        {/* Top bar: Carousel Pagination Dots & Slide Counter */}
         <div className="flex items-center justify-between border-b border-orange-100/70 px-4 py-1.5 text-xs">
           {/* Dots Indicator */}
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Danh sách slide gợi ý">
-            {[0, 1, 2].map((idx) => {
+            {Array.from({ length: totalSlides }).map((_, idx) => {
               const isActive = activeSlide === idx;
               return (
                 <button
@@ -454,7 +550,7 @@ export function HomeInsightWidget() {
           {/* Slide counter */}
           <div className="flex items-center gap-1">
             <span className="text-[11px] font-semibold text-muted" aria-live="polite">
-              {activeSlide + 1} / {TOTAL_SLIDES}
+              {activeSlide + 1} / {totalSlides}
             </span>
           </div>
         </div>
@@ -476,263 +572,130 @@ export function HomeInsightWidget() {
               transform: `translateX(calc(-${activeSlide * 100}% + ${dragOffset}px))`,
             }}
           >
-            {/* Slide 1 (1/3): Insight 1 */}
-            <div className="w-full min-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => handleCardClick(() => insights[0] && setSheetMode("insight_0"))}
-                className="flex min-h-[76px] w-full min-w-0 items-center gap-3 px-4 py-2 text-left focus-visible:outline-primary"
-                aria-label={insights[0] ? `Xem insight: ${insights[0].title}` : "Chưa có gợi ý mới"}
-              >
-                {insights[0] ? (
-                  <>
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                        getCategoryVisuals(insights[0].category ?? insights[0].candidate.category, insights[0].tone ?? insights[0].candidate.tone).iconBg
-                      } ${
-                        getCategoryVisuals(insights[0].category ?? insights[0].candidate.category, insights[0].tone ?? insights[0].candidate.tone).iconText
-                      }`}
-                    >
-                      <CategoryIcon
-                        category={insights[0].category ?? insights[0].candidate.category}
-                        tone={insights[0].tone ?? insights[0].candidate.tone}
-                        size={22}
-                      />
-                    </div>
+            {insights.length === 0 ? (
+              <div className="w-full min-w-full shrink-0">
+                <div className="flex min-h-[76px] w-full min-w-0 items-center gap-3 px-4 py-2 text-left">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Sparkles size={22} aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
+                    <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              insights.map((item, idx) => {
+                const visuals = getCategoryVisuals(
+                  item.category ?? item.candidate.category,
+                  item.tone ?? item.candidate.tone,
+                  item.securityLevel
+                );
+                const chips = item.chips ?? item.candidate.chips ?? [];
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            getCategoryVisuals(insights[0].category ?? insights[0].candidate.category, insights[0].tone ?? insights[0].candidate.tone).pill
-                          }`}
+                return (
+                  <div key={item.candidate.id ?? idx} className="w-full min-w-full shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleCardClick(() => setSelectedInsightIndex(idx))}
+                      className={`flex min-h-[76px] w-full min-w-0 flex-col justify-center px-4 py-2 text-left focus-visible:outline-primary ${visuals.cardBorder}`}
+                      aria-label={`Xem insight: ${item.title}`}
+                    >
+                      <div className="flex w-full items-center gap-3">
+                        <div
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${visuals.iconBg} ${visuals.iconText}`}
                         >
                           <CategoryIcon
-                            category={insights[0].category ?? insights[0].candidate.category}
-                            tone={insights[0].tone ?? insights[0].candidate.tone}
-                            size={10}
+                            category={item.category ?? item.candidate.category}
+                            tone={item.tone ?? item.candidate.tone}
+                            securityLevel={item.securityLevel}
+                            size={22}
                           />
-                          <span>
-                            {insights[0].categoryLabel ??
-                              insights[0].candidate.categoryLabel ??
-                              (insights[0].category ? CATEGORY_META[insights[0].category]?.label : "Gợi ý")}
-                          </span>
-                        </span>
-                        {(insights[0].badgeText || insights[0].candidate.badgeText) && (
-                          <span className="truncate text-[10px] font-medium text-muted bg-neutral-100/90 px-1.5 py-0.5 rounded">
-                            {insights[0].badgeText || insights[0].candidate.badgeText}
-                          </span>
-                        )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${visuals.pill}`}
+                            >
+                              <CategoryIcon
+                                category={item.category ?? item.candidate.category}
+                                tone={item.tone ?? item.candidate.tone}
+                                securityLevel={item.securityLevel}
+                                size={10}
+                              />
+                              <span>
+                                {item.categoryLabel ??
+                                  item.candidate.categoryLabel ??
+                                  (item.category ? CATEGORY_META[item.category]?.label : "Gợi ý")}
+                              </span>
+                            </span>
+                            {(item.badgeText || item.candidate.badgeText) && (
+                              <span className="truncate text-[10px] font-medium text-muted bg-neutral-100/90 px-1.5 py-0.5 rounded">
+                                {item.badgeText || item.candidate.badgeText}
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="block truncate text-sm font-semibold text-text">{item.title}</span>
+
+                          {(item.impactLine || item.candidate.impactLine) ? (
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-medium">
+                              <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${visuals.dot}`} />
+                              <span className="truncate">{item.impactLine || item.candidate.impactLine}</span>
+                            </div>
+                          ) : null}
+
+                          {item.candidate.metric?.label ? (
+                            <span className="block truncate text-xs text-muted">
+                              {item.candidate.metric.label}:{" "}
+                              <span className="font-semibold text-text">
+                                {formatCandidateMetric(item.candidate.metric)}
+                              </span>
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
                       </div>
 
-                      <span className="block truncate text-sm font-semibold text-text">{insights[0].title}</span>
-
-                      {(insights[0].impactLine || insights[0].candidate.impactLine) ? (
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-medium">
-                          <span
-                            className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
-                              getCategoryVisuals(insights[0].category ?? insights[0].candidate.category, insights[0].tone ?? insights[0].candidate.tone).dot
-                            }`}
-                          />
-                          <span className="truncate">{insights[0].impactLine || insights[0].candidate.impactLine}</span>
+                      {/* Action Chips */}
+                      {chips.length > 0 && (
+                        <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                          {chips.map((chip) => (
+                            <span
+                              key={chip.label}
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleChipClick(chip, item);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleChipClick(chip, item);
+                                }
+                              }}
+                              className={`shrink-0 rounded-full text-[10px] font-semibold px-2.5 py-0.5 border cursor-pointer transition-all ${
+                                chip.variant === "primary"
+                                  ? "bg-primary text-white border-primary hover:opacity-90 shadow-xs"
+                                  : chip.variant === "ghost"
+                                  ? "text-slate-500 border-slate-200/60 hover:bg-slate-100"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-2xs"
+                              }`}
+                            >
+                              {chip.label}
+                            </span>
+                          ))}
                         </div>
-                      ) : null}
-
-                      <span className="block truncate text-xs text-muted">
-                        {insights[0].candidate.metric.label}:{" "}
-                        <span className="font-semibold text-text">
-                          {formatCandidateMetric(insights[0].candidate.metric)}
-                        </span>
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Sparkles size={22} aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
-                      <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
-                    </div>
-                  </>
-                )}
-
-                <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
-              </button>
-            </div>
-
-            {/* Slide 2 (2/3): Insight 2 */}
-            <div className="w-full min-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => handleCardClick(() => insights[1] && setSheetMode("insight_1"))}
-                className="flex min-h-[76px] w-full min-w-0 items-center gap-3 px-4 py-2 text-left focus-visible:outline-primary"
-                aria-label={insights[1] ? `Xem insight: ${insights[1].title}` : "Chưa có gợi ý mới"}
-              >
-                {insights[1] ? (
-                  <>
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                        getCategoryVisuals(insights[1].category ?? insights[1].candidate.category, insights[1].tone ?? insights[1].candidate.tone).iconBg
-                      } ${
-                        getCategoryVisuals(insights[1].category ?? insights[1].candidate.category, insights[1].tone ?? insights[1].candidate.tone).iconText
-                      }`}
-                    >
-                      <CategoryIcon
-                        category={insights[1].category ?? insights[1].candidate.category}
-                        tone={insights[1].tone ?? insights[1].candidate.tone}
-                        size={22}
-                      />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            getCategoryVisuals(insights[1].category ?? insights[1].candidate.category, insights[1].tone ?? insights[1].candidate.tone).pill
-                          }`}
-                        >
-                          <CategoryIcon
-                            category={insights[1].category ?? insights[1].candidate.category}
-                            tone={insights[1].tone ?? insights[1].candidate.tone}
-                            size={10}
-                          />
-                          <span>
-                            {insights[1].categoryLabel ??
-                              insights[1].candidate.categoryLabel ??
-                              (insights[1].category ? CATEGORY_META[insights[1].category]?.label : "Gợi ý")}
-                          </span>
-                        </span>
-                        {(insights[1].badgeText || insights[1].candidate.badgeText) && (
-                          <span className="truncate text-[10px] font-medium text-muted bg-neutral-100/90 px-1.5 py-0.5 rounded">
-                            {insights[1].badgeText || insights[1].candidate.badgeText}
-                          </span>
-                        )}
-                      </div>
-
-                      <span className="block truncate text-sm font-semibold text-text">{insights[1].title}</span>
-
-                      {(insights[1].impactLine || insights[1].candidate.impactLine) ? (
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-medium">
-                          <span
-                            className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
-                              getCategoryVisuals(insights[1].category ?? insights[1].candidate.category, insights[1].tone ?? insights[1].candidate.tone).dot
-                            }`}
-                          />
-                          <span className="truncate">{insights[1].impactLine || insights[1].candidate.impactLine}</span>
-                        </div>
-                      ) : null}
-
-                      <span className="block truncate text-xs text-muted">
-                        {insights[1].candidate.metric.label}:{" "}
-                        <span className="font-semibold text-text">
-                          {formatCandidateMetric(insights[1].candidate.metric)}
-                        </span>
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Sparkles size={22} aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
-                      <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
-                    </div>
-                  </>
-                )}
-
-                <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
-              </button>
-            </div>
-
-            {/* Slide 3 (3/3): Insight 3 */}
-            <div className="w-full min-w-full shrink-0">
-              <button
-                type="button"
-                onClick={() => handleCardClick(() => insights[2] && setSheetMode("insight_2"))}
-                className="flex min-h-[76px] w-full min-w-0 items-center gap-3 px-4 py-2 text-left focus-visible:outline-primary"
-                aria-label={insights[2] ? `Xem insight: ${insights[2].title}` : "Chưa có gợi ý mới"}
-              >
-                {insights[2] ? (
-                  <>
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-                        getCategoryVisuals(insights[2].category ?? insights[2].candidate.category, insights[2].tone ?? insights[2].candidate.tone).iconBg
-                      } ${
-                        getCategoryVisuals(insights[2].category ?? insights[2].candidate.category, insights[2].tone ?? insights[2].candidate.tone).iconText
-                      }`}
-                    >
-                      <CategoryIcon
-                        category={insights[2].category ?? insights[2].candidate.category}
-                        tone={insights[2].tone ?? insights[2].candidate.tone}
-                        size={22}
-                      />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            getCategoryVisuals(insights[2].category ?? insights[2].candidate.category, insights[2].tone ?? insights[2].candidate.tone).pill
-                          }`}
-                        >
-                          <CategoryIcon
-                            category={insights[2].category ?? insights[2].candidate.category}
-                            tone={insights[2].tone ?? insights[2].candidate.tone}
-                            size={10}
-                          />
-                          <span>
-                            {insights[2].categoryLabel ??
-                              insights[2].candidate.categoryLabel ??
-                              (insights[2].category ? CATEGORY_META[insights[2].category]?.label : "Gợi ý")}
-                          </span>
-                        </span>
-                        {(insights[2].badgeText || insights[2].candidate.badgeText) && (
-                          <span className="truncate text-[10px] font-medium text-muted bg-neutral-100/90 px-1.5 py-0.5 rounded">
-                            {insights[2].badgeText || insights[2].candidate.badgeText}
-                          </span>
-                        )}
-                      </div>
-
-                      <span className="block truncate text-sm font-semibold text-text">{insights[2].title}</span>
-
-                      {(insights[2].impactLine || insights[2].candidate.impactLine) ? (
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-medium">
-                          <span
-                            className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${
-                              getCategoryVisuals(insights[2].category ?? insights[2].candidate.category, insights[2].tone ?? insights[2].candidate.tone).dot
-                            }`}
-                          />
-                          <span className="truncate">{insights[2].impactLine || insights[2].candidate.impactLine}</span>
-                        </div>
-                      ) : null}
-
-                      <span className="block truncate text-xs text-muted">
-                        {insights[2].candidate.metric.label}:{" "}
-                        <span className="font-semibold text-text">
-                          {formatCandidateMetric(insights[2].candidate.metric)}
-                        </span>
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Sparkles size={22} aria-hidden />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
-                      <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
-                    </div>
-                  </>
-                )}
-
-                <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
-              </button>
-            </div>
+                      )}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </section>
@@ -746,7 +709,7 @@ export function HomeInsightWidget() {
       {/* Insight Detail Sheet */}
       {selectedInsight && (
         <Sheet
-          open={sheetMode !== "none" && sheetMode !== "fallback"}
+          open={selectedInsightIndex !== null}
           title={selectedInsight.title}
           onClose={closeSheet}
           className="home-insight-sheet"
@@ -755,12 +718,17 @@ export function HomeInsightWidget() {
           <div className="flex items-center justify-between gap-2 mb-3">
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                getCategoryVisuals(selectedInsight.category ?? selectedInsight.candidate.category, selectedInsight.tone ?? selectedInsight.candidate.tone).pill
+                getCategoryVisuals(
+                  selectedInsight.category ?? selectedInsight.candidate.category,
+                  selectedInsight.tone ?? selectedInsight.candidate.tone,
+                  selectedInsight.securityLevel
+                ).pill
               }`}
             >
               <CategoryIcon
                 category={selectedInsight.category ?? selectedInsight.candidate.category}
                 tone={selectedInsight.tone ?? selectedInsight.candidate.tone}
+                securityLevel={selectedInsight.securityLevel}
                 size={13}
               />
               <span>
@@ -781,7 +749,11 @@ export function HomeInsightWidget() {
             <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-orange-50/70 p-3 border border-orange-100/80">
               <span
                 className={`mt-1 inline-block h-2 w-2 rounded-full shrink-0 ${
-                  getCategoryVisuals(selectedInsight.category ?? selectedInsight.candidate.category, selectedInsight.tone ?? selectedInsight.candidate.tone).dot
+                  getCategoryVisuals(
+                    selectedInsight.category ?? selectedInsight.candidate.category,
+                    selectedInsight.tone ?? selectedInsight.candidate.tone,
+                    selectedInsight.securityLevel
+                  ).dot
                 }`}
               />
               <p className="text-xs font-semibold text-slate-800 leading-snug">
@@ -792,21 +764,43 @@ export function HomeInsightWidget() {
 
           <p className="text-sm text-muted leading-relaxed">{selectedInsight.body}</p>
 
-          <div className="my-5 rounded-2xl border border-orange-100 bg-[#fff1ea] p-4">
-            <p className="text-xs text-muted">{selectedInsight.candidate.metric.label}</p>
-            <p className="mt-2 text-2xl font-bold text-text">
-              {formatCandidateMetric(selectedInsight.candidate.metric)}
-            </p>
-            {selectedInsight.candidate.confidence === "estimated" ? (
-              <p className="mt-1 text-xs text-muted">Đây là ước tính dựa trên dữ liệu hiện có.</p>
-            ) : (
-              <p className="mt-1 text-xs text-muted">Dữ liệu ghi nhận từ tài khoản thực tế.</p>
-            )}
-          </div>
+          {selectedInsight.candidate.metric?.label ? (
+            <div className="my-5 rounded-2xl border border-orange-100 bg-[#fff1ea] p-4">
+              <p className="text-xs text-muted">{selectedInsight.candidate.metric.label}</p>
+              <p className="mt-2 text-2xl font-bold text-text">
+                {formatCandidateMetric(selectedInsight.candidate.metric)}
+              </p>
+              {selectedInsight.candidate.confidence === "estimated" ? (
+                <p className="mt-1 text-xs text-muted">Đây là ước tính dựa trên dữ liệu hiện có.</p>
+              ) : (
+                <p className="mt-1 text-xs text-muted">Dữ liệu ghi nhận từ tài khoản thực tế.</p>
+              )}
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-2">
-            {/* Primary Action Button */}
+            {/* Action Chips as Buttons */}
             {(() => {
+              const chips = selectedInsight.chips ?? selectedInsight.candidate.chips ?? [];
+              if (chips.length > 0) {
+                return chips.map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => handleChipClick(chip, selectedInsight)}
+                    className={
+                      chip.variant === "primary"
+                        ? "login-submit flex items-center justify-center gap-1.5"
+                        : "home-insight-secondary flex items-center justify-center gap-1.5"
+                    }
+                  >
+                    {chip.actionType === "open_security_handbook" && <ShieldCheck size={16} />}
+                    <span>{chip.label}</span>
+                  </button>
+                ));
+              }
+
+              // Fallback to primaryAction
               const primary = selectedInsight.primaryAction ?? selectedInsight.candidate.primaryAction;
               const actionHref = primary?.href ?? selectedInsight.actionHref ?? selectedInsight.candidate.actionHref;
               const actionType = primary?.type ?? selectedInsight.actionType ?? selectedInsight.candidate.actionType;
@@ -815,6 +809,7 @@ export function HomeInsightWidget() {
               if (actionType === "open_security_handbook") {
                 return (
                   <button
+                    type="button"
                     onClick={() => {
                       closeSheet();
                       setHandbookOpen(true);
@@ -830,6 +825,7 @@ export function HomeInsightWidget() {
               if (actionHref) {
                 return (
                   <button
+                    type="button"
                     onClick={() => pushWithTransition((href) => router.push(href), actionHref)}
                     className="login-submit"
                   >
@@ -838,33 +834,19 @@ export function HomeInsightWidget() {
                 );
               }
 
-              if (selectedInsight.candidate.action === "overview") {
-                return (
-                  <button
-                    onClick={() => pushWithTransition((href) => router.push(href), "/pfm")}
-                    className="login-submit"
-                  >
-                    Xem tổng quan
-                  </button>
-                );
-              }
-
-              if (actionLabel) {
-                return (
-                  <button
-                    onClick={() => pushWithTransition((href) => router.push(href), "/pfm")}
-                    className="login-submit"
-                  >
-                    {actionLabel}
-                  </button>
-                );
-              }
-
-              return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => pushWithTransition((href) => router.push(href), "/pfm")}
+                  className="login-submit"
+                >
+                  {actionLabel ?? "Xem tổng quan"}
+                </button>
+              );
             })()}
 
             {/* Chat with Assistant Button */}
-            <button onClick={() => chat(selectedInsight)} className="home-insight-secondary">
+            <button type="button" onClick={() => chat(selectedInsight)} className="home-insight-secondary">
               {selectedInsight.candidate.topic === "allocation"
                 ? "Chia tiền cùng M-Your"
                 : selectedInsight.candidate.topic === "investment"

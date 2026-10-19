@@ -255,26 +255,19 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
   });
 
   it("handles empty candidate slot gracefully without duplicating candidates", async () => {
-    const singleInsightRes: HomeInsightCarouselResult = {
+    const emptyInsightRes: HomeInsightCarouselResult = {
       ...carouselResponse,
-      insights: [card1],
+      insights: [],
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({ ok: true, json: async () => singleInsightRes }))
+      vi.fn(async () => ({ ok: true, json: async () => emptyInsightRes }))
     );
 
     render(<HomeInsightWidget />);
-    expect(await screen.findByRole("button", { name: new RegExp(card1.title) })).toBeInTheDocument();
-
-    // Go to slide 2
-    fireEvent.click(screen.getByRole("tab", { name: "Chuyển đến slide 2" }));
-    expect(screen.getAllByText("Chưa có gợi ý mới").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("M-Your đang tiếp tục theo dõi tài chính của bạn").length).toBeGreaterThanOrEqual(1);
-
-    // Go to slide 3
-    fireEvent.click(screen.getByRole("tab", { name: "Chuyển đến slide 3" }));
-    expect(screen.getAllByText("Chưa có gợi ý mới").length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText("Chưa có gợi ý mới")).toBeInTheDocument();
+    expect(screen.getByText("M-Your đang tiếp tục theo dõi tài chính của bạn")).toBeInTheDocument();
+    expect(screen.getByText("1 / 1")).toBeInTheDocument();
   });
 
   it("never displays the previous customer's card while loading another", async () => {
@@ -363,5 +356,71 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
 
     // Verify HandbookSheet opened
     expect(await screen.findByText("Giải pháp bảo mật MSB")).toBeInTheDocument();
+  });
+
+  it("renders up to 5 dynamic slides with security alert levels and action chips", async () => {
+    const redCard: HomeInsight = {
+      snapshotId: "c".repeat(64),
+      title: "Cảnh báo OTP liên tục",
+      body: "Phát hiện nhiều yêu cầu OTP bất thường.",
+      source: "proactive_agent",
+      asOf: "2026-09-15",
+      domain: "security",
+      securityLevel: "RED",
+      category: "SECURITY_RED",
+      categoryLabel: "Bảo mật tài khoản",
+      tone: "critical",
+      impactLine: "Khóa thẻ khẩn cấp để đảm bảo an toàn.",
+      chips: [
+        { id: "hotline", label: "Gọi hotline 1900 6083", actionType: "call_hotline", variant: "primary" },
+        { id: "otp", label: "Kiểm tra Smart OTP", actionType: "navigate_smart_otp" },
+      ],
+      primaryAction: {
+        type: "call_hotline",
+        label: "Gọi hotline 1900 6083",
+      },
+      candidate: {
+        id: "security:sc3_otp_burst",
+        domain: "security",
+        securityLevel: "RED",
+        topic: "spending",
+        category: "SECURITY_RED",
+        categoryLabel: "Bảo mật tài khoản",
+        tone: "critical",
+        priority: 1,
+        severity: "warning",
+        confidence: "recorded",
+        title: "Cảnh báo OTP liên tục",
+        body: "Phát hiện nhiều yêu cầu OTP bất thường.",
+        facts: {},
+        action: "overview",
+        question: "Bảo vệ tài khoản ngay",
+        chips: [
+          { id: "hotline", label: "Gọi hotline 1900 6083", actionType: "call_hotline", variant: "primary" },
+        ],
+      },
+    };
+
+    const fiveSlideRes: HomeInsightCarouselResult = {
+      ...carouselResponse,
+      secondaryInsights: [redCard, card1, card2, card3, { ...card1, candidate: { ...card1.candidate, id: "card5" } }],
+    };
+
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => fiveSlideRes })));
+    render(<HomeInsightWidget />);
+
+    // Verify 1 / 5 pagination
+    expect(await screen.findByText("1 / 5")).toBeInTheDocument();
+    expect(screen.getByText("Cảnh báo OTP liên tục")).toBeInTheDocument();
+
+    // Verify action chips rendered on card
+    const hotlineChip = screen.getByRole("button", { name: "Gọi hotline 1900 6083" });
+    expect(hotlineChip).toBeInTheDocument();
+
+    // Clicking chip calls window.open
+    const openMock = vi.fn();
+    vi.stubGlobal("open", openMock);
+    fireEvent.click(hotlineChip);
+    expect(openMock).toHaveBeenCalledWith("tel:19006083");
   });
 });

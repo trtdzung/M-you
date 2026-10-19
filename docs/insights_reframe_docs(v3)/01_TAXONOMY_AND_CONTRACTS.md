@@ -1,18 +1,24 @@
-# 01. TAXONOMY & DATA CONTRACTS (PURE 3-INSIGHT CAROUSEL - NO HEALTH SCORE)
+# 01. TAXONOMY & DATA CONTRACTS (5-SLIDE CAROUSEL: PFM 1-3 + SECURITY 1-2)
 
-## 1. Mục tiêu Kiến trúc Mới
-1. **Loại bỏ hoàn toàn Slide Health Score** (`HealthScoreSheet`, điểm `X/100`, 4 trụ cột) khỏi `HomeInsightWidget` trên màn hình Home (do phần này đã được đưa vào tính năng **Wrapped**).
-2. **Chuyển đổi Carousel 3 Slide thành 3 Proactive Insights (Top 3 Candidates)** được tuyển chọn từ **8 Nhóm Insight chuẩn (Bảng 3)** kết hợp với **Security Hub**.
-3. Mỗi thẻ Insight trên Carousel phải hiển thị:
-   - **Category Pill** (Nhãn phân loại + Icon + Màu ngữ nghĩa).
-   - **Headline (`title`)**: Sự kiện + Con số cụ thể.
-   - **Impact Subline (`impactLine`)**: Câu nhận định hệ quả/khả năng đáp ứng ngay lập tức (VD: *"Số dư hiện đủ trả"*, *"Dưới ngưỡng an toàn 3 triệu"*).
+## 1. Kiến trúc tổng thể mới
+1. **Loại bỏ hoàn toàn Slide Health Score khỏi `HomeInsightWidget.tsx`**:
+   - Nội dung Health Score đã nằm trong `/wrapped`.
+   - Không xóa file `HealthScoreSheet.tsx` hay `health-score.ts`, chỉ ngừng render trên `HomeInsightWidget.tsx` và gán `healthAssessment: null` trong `src/lib/home-insight-service.ts`.
+2. **Cơ cấu Carousel tối đa 5 Slides**:
+   - Toàn bộ các slide trên `HomeInsightWidget` đều là Proactive Insights lấy từ `payload.secondaryInsights` (độ dài từ 2 đến 5).
+   - **Quota Tài chính (`domain: 'PFM'`)**: Luôn từ **1 đến 3** insights.
+   - **Quota Bảo mật (`domain: 'SECURITY'`)**: Luôn từ **1 đến 2** insights.
+3. **Thứ tự hiển thị bắt buộc trên Carousel**:
+   `[1. Bảo mật ĐỎ / VÀNG (0..2)]` -> `[2. Tài chính PFM theo mức độ ưu tiên (1..3)]` -> `[3. Bảo mật XANH (0..2)]`
 
-## 2. Định nghĩa 8 Nhóm Insight (`InsightCategory`)
+---
 
-Cập nhật vào `src/insights/proactive/home-contract.ts`[cite: 1]:
+## 2. Định nghĩa Types trong `src/insights/proactive/home-contract.ts`
 
-```typescript
+```ts
+export type InsightDomain = 'PFM' | 'SECURITY';
+export type SecurityAlertLevel = 'RED' | 'AMBER' | 'GREEN';
+
 export type InsightCategory =
   | 'UPCOMING_OBLIGATION' // 1. Nghĩa vụ sắp đến hạn
   | 'CASHFLOW_RISK'       // 2. Rủi ro dòng tiền
@@ -20,49 +26,68 @@ export type InsightCategory =
   | 'GOAL_PROGRESS'       // 4. Tiến độ mục tiêu
   | 'OPTIMIZATION'        // 5. Cơ hội tối ưu
   | 'PERIODIC_PULSE'      // 6. Nhịp tiền định kỳ
-  | 'RECOGNITION_RECAP'   // 7. Ghi nhận & nhìn lại (Dẫn sang Wrapped)
-  | 'DISCOVERY_GUIDE';    // 8. Khám phá & hướng dẫn (PFM + Security Hub)
-
-export type InsightSlotRole =
-  | 'SLOT_1_PROTECT'      // Nhóm 1, 2 (Nghĩa vụ đến hạn, Rủi ro dòng tiền, hoặc Security Hold khẩn)
-  | 'SLOT_2_MONITOR'      // Nhóm 3, 4, 6 (Bất thường & rò rỉ, Tiến độ mục tiêu, Nhịp tiền định kỳ)
-  | 'SLOT_3_GROW_GUIDE';  // Nhóm 5, 7, 8 (Cơ hội tối ưu, Ghi nhận & nhìn lại, Khám phá & Bảo mật)
+  | 'RECOGNITION_RECAP'   // 7. Ghi nhận & nhìn lại
+  | 'DISCOVERY_GUIDE'     // 8. Khám phá & hướng dẫn
+  | 'SECURITY_RED'        // Cảnh báo bảo mật mức Đỏ (SC3, Hold, BT5/T7b)
+  | 'SECURITY_AMBER'      // Cảnh báo bảo mật mức Vàng (BT4/T7a)
+  | 'SECURITY_GREEN';     // Bảo mật mức Xanh (BT3, BT1, All-Clear)
 
 export type InsightTone = 'urgent' | 'warning' | 'positive' | 'info' | 'security';
 
 export type InsightPrimaryActionType =
-  | 'navigate_pfm'           // Mở /pfm
-  | 'navigate_transfer'      // Mở /transfer (thanh toán hóa đơn/thẻ)
-  | 'navigate_goals'         // Mở /goals
-  | 'navigate_wrapped'       // Mở /wrapped (Xem nhìn lại & Health Score trong Wrapped)
-  | 'navigate_security_hub'  // Mở /settings (Security Hub)
-  | 'open_jar_transfer'      // Mở chuyển tiền giữa các hũ
-  | 'open_auto_fund'         // Mở cài đặt tự động chia tiền khi lương về
-  | 'open_security_handbook' // Mở HandbookSheet (Cẩm nang bảo mật)
-  | 'chat_handoff';          // Trao đổi với M-Your
-3. Cấu trúc HomeInsightCard & Payload API mớiTrong src/insights/proactive/home-contract.ts[cite: 1]:Thay vì trả về secondaryInsights (2 phần tử) kèm healthScore, nay danh sách insight trả về tới 3 phần tử (insights: HomeInsightCard[] hoặc giữ alias secondaryInsights chứa tối đa 3 phần tử để tương thích ngược với code cũ).Không cần gọi LLM sinh healthAssessment nữa, tiết kiệm 50% token và giảm latency.TypeScriptexport interface HomeInsightActionSpec {
-  type: InsightPrimaryActionType;
-  label: string;          // VD: "Thanh toán ngay", "Rà soát khoản chi", "Xem hành trình Wrapped"
-  href?: string;          // Đường dẫn đích nếu là navigate_*
-  payload?: Record<string, string | number>;
-}
+  | 'navigate_pfm'
+  | 'navigate_transfer'
+  | 'navigate_goals'
+  | 'navigate_wrapped'
+  | 'navigate_security_hub'
+  | 'open_jar_transfer'
+  | 'open_auto_fund'
+  | 'open_security_handbook'
+  | 'open_emergency_contact'
+  | 'request_msb_investigation'
+  | 'mark_known_sender'
+  | 'view_fraud_case'
+  | 'chat_handoff'
+  | 'dismiss';
 
-export interface ReframedInsightFields {
-  category: InsightCategory;
-  categoryLabel: string;  // VD: "Nghĩa vụ sắp đến hạn", "Rủi ro dòng tiền"
-  slotRole: InsightSlotRole;
-  tone: InsightTone;
-  impactLine: string;     // Câu "So what" (<= 80 ký tự), VD: "Số dư hiện đủ trả."
-  badgeText?: string;     // VD: "Còn 3 ngày", "Đạt 50%", "+3 thuê bao"
-  primaryAction: HomeInsightActionSpec;
+export interface InsightActionChip {
+  label: string;
+  actionType: InsightPrimaryActionType;
+  href?: string;
+  prompt?: string;
+  variant?: 'primary' | 'secondary' | 'ghost';
 }
-4. Bảng Mapping Ngữ nghĩa UI 
-#,InsightCategory,categoryLabel,slotRole ưu tiên,tone,Icon (lucide-react)
-1,UPCOMING_OBLIGATION,Nghĩa vụ sắp đến hạn,SLOT_1_PROTECT,urgent,CalendarClock
-2,CASHFLOW_RISK,Rủi ro dòng tiền,SLOT_1_PROTECT,warning,TrendingDown
-3,ANOMALY_LEAKAGE,Bất thường & rò rỉ,SLOT_2_MONITOR,warning,AlertTriangle
-4,GOAL_PROGRESS,Tiến độ mục tiêu,SLOT_2_MONITOR,positive,Target
-5,OPTIMIZATION,Cơ hội tối ưu,SLOT_3_GROW_GUIDE,info,TrendingUp
-6,PERIODIC_PULSE,Nhịp tiền định kỳ,SLOT_2_MONITOR,info,Activity
-7,RECOGNITION_RECAP,Ghi nhận & nhìn lại,SLOT_3_GROW_GUIDE,positive,Trophy
-8,DISCOVERY_GUIDE,Khám phá & Bảo mật,SLOT_3_GROW_GUIDE (hoặc SLOT_1 nếu có Hold),security / info,ShieldCheck / Sparkles
+```
+
+---
+
+## 3. Mở rộng `CandidateInsight` và `HomeInsightCard`
+
+Bổ sung các trường sau vào `CandidateInsight` (trong `snapshot.ts`) và `HomeInsightCard` (trong `home-contract.ts`):
+
+```ts
+export interface ReframedInsightExtensions {
+  domain?: InsightDomain;              // 'PFM' | 'SECURITY'
+  securityLevel?: SecurityAlertLevel;  // 'RED' | 'AMBER' | 'GREEN' (chỉ dành cho domain === 'SECURITY')
+  scenarioCode?: 'BT1' | 'BT3' | 'BT4' | 'BT5' | 'SC3' | 'ALL_CLEAR';
+  category?: InsightCategory;
+  categoryLabel?: string;
+  tone?: InsightTone;
+  impactLine?: string;                 // Câu nhận định hệ quả / hành động ngắn dưới tiêu đề
+  badgeText?: string;                  // VD: "Cảnh báo Đỏ", "Cảnh báo Vàng", "An toàn", "Còn 3 ngày"
+  actionType?: InsightPrimaryActionType;
+  actionHref?: string;
+  actionLabel?: string;
+  chips?: InsightActionChip[];         // Danh sách các chip hành động hiển thị trên thẻ & sheet
+}
+```
+
+---
+
+## 4. Quy tắc Validation trong `home-contract.ts`
+- Cập nhật `validAgentSelection(value, allowedIds)`:
+  - Cho phép `value.selected` có độ dài từ `1` đến `5` (`value.selected.length < 1 || value.selected.length > 5` mới trả về `false`).
+- Cập nhật `fallbackPayload(snapshot)`:
+  - Lấy tối đa 5 ứng viên từ `snapshot.candidates.slice(0, 5)` (đã được sắp xếp đúng thứ tự ở tầng snapshot).
+  - Truyền đầy đủ `domain`, `securityLevel`, `scenarioCode`, `category`, `categoryLabel`, `tone`, `impactLine`, `badgeText`, `actionType`, `actionHref`, `actionLabel`, `chips` vào `secondaryInsights`.
+  - Gán `healthAssessment: null`.

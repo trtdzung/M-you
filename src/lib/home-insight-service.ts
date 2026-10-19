@@ -4,12 +4,10 @@ import { AGENT_BASE_URL, agentAuthHeaders } from "./agent-proxy-auth";
 import { customerSnapshot } from "./financial-snapshot-service";
 import {
   validAgentSelection,
-  validHealthScoreAssessment,
   type HomeInsight,
   type HomeInsightCarouselResult,
-  type HealthScoreAssessment,
 } from "@/insights/proactive/home-contract";
-import { selectTop3DiverseCandidates, type SnapshotCandidate } from "@/insights/proactive/snapshot";
+import { selectOrderedHomeCandidates, type SnapshotCandidate } from "@/insights/proactive/snapshot";
 
 const inFlight = new Map<string, Promise<HomeInsightCarouselResult>>();
 
@@ -36,6 +34,7 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
       healthScore: snapshot.healthScore,
       healthAssessment: null,
       insights: [],
+      secondaryInsights: [],
       insight: null,
       reason: "dismissed",
       cached: true,
@@ -46,9 +45,13 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
     try {
       const parsed = JSON.parse(row.card_json);
       if (parsed && Array.isArray(parsed.insights) && parsed.healthScore) {
-        return { ...parsed, cached: true };
+        return {
+          ...parsed,
+          healthAssessment: null,
+          secondaryInsights: parsed.secondaryInsights ?? parsed.insights,
+          cached: true,
+        };
       }
-      // Rebuild legacy single-card cache
     } catch {
       /* rebuild corrupt cache */
     }
@@ -59,7 +62,7 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
   if (existing) return existing;
 
   const task = (async (): Promise<HomeInsightCarouselResult> => {
-    // Extract up to 2 diverse candidates preserving deterministic priority order & diversity
+    // Extract up to 5 candidates preserving deterministic priority order & [Security Đỏ/Vàng] -> [PFM] -> [Security Xanh]
     const distinctCandidates: SnapshotCandidate[] = [];
     const seenIds = new Set<string>();
     for (const c of snapshot.candidates) {
@@ -68,7 +71,7 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
         distinctCandidates.push(c);
       }
     }
-    const topCandidates = selectTop3DiverseCandidates(distinctCandidates);
+    const topCandidates = selectOrderedHomeCandidates(distinctCandidates).slice(0, 5);
 
     if (topCandidates.length === 0) {
       const emptyResult: HomeInsightCarouselResult = {
@@ -77,6 +80,7 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
         healthScore: snapshot.healthScore,
         healthAssessment: null,
         insights: [],
+        secondaryInsights: [],
         insight: null,
         reason: "no_candidate",
         cached: false,
@@ -94,6 +98,9 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
       body: cand.body,
       asOf: snapshot.asOf,
       source: "fallback",
+      domain: cand.domain,
+      securityLevel: cand.securityLevel,
+      scenarioCode: cand.scenarioCode,
       category: cand.category,
       categoryLabel: cand.categoryLabel,
       slotGroup: cand.slotGroup,
@@ -101,13 +108,13 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
       impactLine: cand.impactLine,
       badgeText: cand.badgeText,
       progressPct: cand.progressPct,
+      chips: cand.chips,
       primaryAction: cand.primaryAction,
       actionType: cand.actionType,
       actionHref: cand.actionHref,
       actionLabel: cand.actionLabel ?? cand.primaryAction?.label,
     }));
 
-    let assessment: HealthScoreAssessment | null = null;
     let hasAgentSuccess = false;
 
     try {
@@ -137,11 +144,7 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
         if (!response.ok) throw new Error(`upstream_status_${response.status}`);
         const data = await response.json();
         const selection = validAgentSelection(data, snapshotId, snapshot.candidates);
-        const parsedAssessment = validHealthScoreAssessment(
-          data?.health_score_assessment ?? data?.healthAssessment,
-          snapshotId
-        );
-        return { selection, assessment: parsedAssessment };
+        return { selection };
       };
 
       let onAbort: () => void = () => {};
@@ -153,12 +156,17 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
             signal.addEventListener("abort", onAbort, { once: true });
           }),
         ]);
-        if (agentResult.selection && insights.length > 0) {
-          insights[0] = { ...insights[0], ...agentResult.selection, source: "agent" };
-          hasAgentSuccess = true;
-        }
-        if (agentResult.assessment) {
-          assessment = agentResult.assessment;
+        if (agentResult.selection) {
+          if (agentResult.selection.selected && Array.isArray(agentResult.selection.selected)) {
+            for (const item of agentResult.selection.selected) {
+              const idx = insights.findIndex((i) => i.candidate.id === item.candidate.id);
+              if (idx !== -1) {
+                insights[idx] = { ...insights[idx], ...item, source: "agent" };
+              }
+            }
+          } else if (insights.length > 0) {
+            insights[0] = { ...insights[0], ...agentResult.selection, source: "agent" };
+          }
           hasAgentSuccess = true;
         }
       } finally {
@@ -172,8 +180,9 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
       snapshotId,
       asOf: snapshot.asOf,
       healthScore: snapshot.healthScore,
-      healthAssessment: assessment,
+      healthAssessment: null,
       insights,
+      secondaryInsights: insights,
       insight: insights[0] ?? null,
       cached: false,
     };

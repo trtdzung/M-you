@@ -9,6 +9,9 @@ import type {
   InsightTone,
   InsightPrimaryActionType,
   InsightActionSpec,
+  InsightDomain,
+  SecurityAlertLevel,
+  InsightActionChip,
 } from "./home-contract";
 
 export type InsightTopic = "payment" | "spending" | "allocation" | "investment";
@@ -19,7 +22,7 @@ export interface SnapshotCandidate {
   id: string;
   topic: InsightTopic;
   priority: number;
-  severity: "urgent" | "attention" | "info";
+  severity: "urgent" | "attention" | "info" | "warning";
   confidence: "recorded" | "estimated";
   title: string;
   body: string;
@@ -33,6 +36,9 @@ export interface SnapshotCandidate {
   action: "overview" | "chat";
   question: string;
   // Reframed fields
+  domain?: InsightDomain;
+  securityLevel?: SecurityAlertLevel;
+  scenarioCode?: "BT1" | "BT3" | "BT4" | "BT5" | "SC3" | "ALL_CLEAR";
   category?: InsightCategory;
   categoryLabel?: string;
   slotGroup?: InsightSlotGroup;
@@ -44,6 +50,7 @@ export interface SnapshotCandidate {
   actionType?: InsightPrimaryActionType;
   actionHref?: string;
   actionLabel?: string;
+  chips?: InsightActionChip[];
 }
 
 export interface SecuritySummaryInput {
@@ -52,6 +59,11 @@ export interface SecuritySummaryInput {
   hasActiveHold?: boolean;
   hasMaturingFd?: boolean;
   hasPendingOff?: boolean;
+  hasActiveCase?: boolean; // SC3: có hồ sơ tra soát đang mở trong src/lib/security/case-store.ts
+  largeUnknownInflow?: { amount: number; senderName?: string }; // BT5 (T7b): nhận >= 10 triệu từ TK lạ
+  baitInflow?: { count: number; lastAmount: number; senderName?: string }; // BT4 (T7a): nhận >= 3 khoản nhỏ liên tiếp từ 1 TK lạ
+  highBalanceInflow?: { amount: number }; // BT3: nhận khoản >= 50 triệu
+  isNewUserOnboarding?: boolean; // BT1
 }
 
 export function formatVndVietnamese(amount: number): string {
@@ -240,6 +252,161 @@ export function selectTop3DiverseCandidates(candidates: SnapshotCandidate[]): Sn
   }
 
   return selected.slice(0, 3);
+}
+
+export const ALL_CLEAR_SECURITY_CANDIDATE: SnapshotCandidate = {
+  id: "security:all_clear",
+  topic: "spending",
+  domain: "SECURITY",
+  securityLevel: "GREEN",
+  scenarioCode: "ALL_CLEAR",
+  category: "SECURITY_GREEN",
+  categoryLabel: "An toàn",
+  slotGroup: "GROW_AND_GUIDE",
+  tone: "security",
+  priority: 10,
+  severity: "info",
+  confidence: "recorded",
+  title: "Tài khoản đang được Khiên bảo vệ M-Your canh gác 24/7.",
+  body: "Mọi giao dịch và đăng nhập gần đây đều an toàn, chưa phát hiện dấu hiệu bất thường.",
+  impactLine: "Mọi giao dịch và đăng nhập gần đây đều an toàn, chưa phát hiện dấu hiệu bất thường.",
+  badgeText: "An toàn",
+  actionType: "navigate_security_hub",
+  actionHref: "/settings",
+  actionLabel: "Trung tâm bảo mật",
+  primaryAction: { type: "navigate_security_hub", label: "Trung tâm bảo mật", href: "/settings" },
+  chips: [
+    { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings", variant: "primary" },
+    { label: "Xem 3 thủ đoạn phổ biến", actionType: "open_security_handbook", variant: "secondary" },
+  ],
+  metric: { label: "Mức độ an toàn", value: 100, unit: "percent" },
+  facts: { safe: true },
+  action: "overview",
+  question: "Khiên bảo vệ M-Your đang bảo vệ những gì cho tài khoản của tôi?",
+};
+
+export const FALLBACK_PFM_CANDIDATE: SnapshotCandidate = {
+  id: "pulse:steady_state",
+  topic: "spending",
+  domain: "PFM",
+  category: "PERIODIC_PULSE",
+  categoryLabel: "Nhịp tiền định kỳ",
+  slotGroup: "GROW_AND_GUIDE",
+  tone: "info",
+  priority: 99,
+  severity: "info",
+  confidence: "recorded",
+  title: "Nhịp chi tiêu tuần này đang được duy trì ổn định.",
+  body: "Các hũ ngân sách và dòng tiền đều nằm trong ngưỡng an toàn.",
+  impactLine: "Các hũ ngân sách và dòng tiền đều nằm trong ngưỡng an toàn.",
+  badgeText: "Ổn định",
+  actionType: "navigate_pfm",
+  actionHref: "/pfm",
+  actionLabel: "Xem tổng quan",
+  primaryAction: { type: "navigate_pfm", label: "Xem tổng quan", href: "/pfm" },
+  chips: [
+    { label: "Xem tổng quan", actionType: "navigate_pfm", href: "/pfm", variant: "primary" },
+  ],
+  metric: { label: "Trạng thái chi tiêu", value: 100, unit: "percent" },
+  facts: { steady: true },
+  action: "overview",
+  question: "Tóm tắt tình hình chi tiêu và nhịp dòng tiền tuần này của tôi.",
+};
+
+export function getDefaultChipsForPfm(candidate: SnapshotCandidate): InsightActionChip[] {
+  if (candidate.chips && candidate.chips.length > 0) return candidate.chips;
+  switch (candidate.category) {
+    case "UPCOMING_OBLIGATION":
+      return [{ label: "Thanh toán ngay", actionType: "navigate_transfer", href: "/transfer", variant: "primary" }];
+    case "CASHFLOW_RISK":
+      return [{ label: "Bù tiền hũ", actionType: "open_jar_transfer", variant: "primary" }];
+    case "ANOMALY_LEAKAGE":
+      return [{ label: "Xem chi tiết", actionType: "navigate_pfm", href: "/pfm", variant: "primary" }];
+    case "GOAL_PROGRESS":
+      return [{ label: "Xem mục tiêu", actionType: "navigate_goals", href: "/goals", variant: "primary" }];
+    case "OPTIMIZATION":
+      return [{ label: "Tối ưu cùng M-Your", actionType: "chat_handoff", variant: "primary" }];
+    case "PERIODIC_PULSE":
+      return [{ label: "Xem tổng quan", actionType: "navigate_pfm", href: "/pfm", variant: "primary" }];
+    case "RECOGNITION_RECAP":
+      return [{ label: "Xem hành trình", actionType: "navigate_wrapped", href: "/wrapped", variant: "primary" }];
+    case "DISCOVERY_GUIDE":
+      return [{ label: "Khám phá", actionType: "navigate_pfm", href: "/pfm", variant: "primary" }];
+    default:
+      return [{ label: "Xem chi tiết", actionType: "navigate_pfm", href: "/pfm", variant: "primary" }];
+  }
+}
+
+/**
+ * 5-Slide Carousel Orchestration:
+ * [Security Đỏ / Vàng (0..2)] -> [PFM (1..3)] -> [Security Xanh (0..2)]
+ * Total count: 2 to 5 slides.
+ */
+export function selectOrderedHomeCandidates(candidates: SnapshotCandidate[]): SnapshotCandidate[] {
+  // 1. PFM: domain === 'PFM' or undefined
+  const pfmCandidates = candidates.filter((c) => c.domain === "PFM" || (!c.domain && !c.id.startsWith("security:")));
+  pfmCandidates.sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+
+  const selectedPfm: SnapshotCandidate[] = [];
+  const seenCategories = new Set<string>();
+
+  for (const c of pfmCandidates) {
+    const cat = c.category ?? c.topic;
+    if (!seenCategories.has(cat)) {
+      seenCategories.add(cat);
+      selectedPfm.push({
+        ...c,
+        domain: "PFM",
+        chips: c.chips ?? getDefaultChipsForPfm(c),
+      });
+      if (selectedPfm.length === 3) break;
+    }
+  }
+
+  if (selectedPfm.length < 3) {
+    const selectedIds = new Set(selectedPfm.map((c) => c.id));
+    for (const c of pfmCandidates) {
+      if (!selectedIds.has(c.id)) {
+        selectedIds.add(c.id);
+        selectedPfm.push({
+          ...c,
+          domain: "PFM",
+          chips: c.chips ?? getDefaultChipsForPfm(c),
+        });
+        if (selectedPfm.length === 3) break;
+      }
+    }
+  }
+
+  if (selectedPfm.length === 0) {
+    selectedPfm.push(FALLBACK_PFM_CANDIDATE);
+  }
+
+  // 2. SECURITY: domain === 'SECURITY' or id starts with 'security:'
+  const secCandidates = candidates.filter((c) => c.domain === "SECURITY" || c.id.startsWith("security:"));
+  const levelPriority = { RED: 0, AMBER: 1, GREEN: 2 };
+  secCandidates.sort((a, b) => {
+    const la = a.securityLevel ? levelPriority[a.securityLevel] : 3;
+    const lb = b.securityLevel ? levelPriority[b.securityLevel] : 3;
+    if (la !== lb) return la - lb;
+    return a.priority - b.priority || a.id.localeCompare(b.id);
+  });
+
+  let selectedSecurity = secCandidates.slice(0, 2);
+  if (selectedSecurity.length === 0) {
+    selectedSecurity = [ALL_CLEAR_SECURITY_CANDIDATE];
+  }
+
+  // 3. Partition security into urgent (RED / AMBER) and green (GREEN)
+  const urgentSecurity = selectedSecurity.filter(
+    (c) => c.securityLevel === "RED" || c.securityLevel === "AMBER"
+  );
+  const greenSecurity = selectedSecurity.filter(
+    (c) => c.securityLevel === "GREEN" || !c.securityLevel
+  );
+
+  // 4. Return [urgentSecurity] -> [selectedPfm] -> [greenSecurity], clamped at 5
+  return [...urgentSecurity, ...selectedPfm, ...greenSecurity].slice(0, 5);
 }
 
 /** Legacy 2-candidate diversity algorithm for backward compatibility */
@@ -920,61 +1087,195 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     });
   }
 
-  // Nhóm 8: DISCOVERY_GUIDE - Tích hợp Security Hub
-  if (securitySummary?.hasActiveHold || securitySummary?.hasPendingOff) {
-    candidates.push({
-      id: "security:hold_alert",
-      topic: "spending",
-      category: "DISCOVERY_GUIDE",
-      categoryLabel: "Khám phá & Bảo mật",
-      slotGroup: "PROTECT",
-      tone: "urgent",
-      priority: 1,
-      severity: "urgent",
-      confidence: "recorded",
-      title: "Đang có giao dịch cần xác nhận bảo vệ",
-      body: "Hệ thống đang tạm giữ giao dịch hoặc có yêu cầu thay đổi Khiên bảo vệ tài khoản cần bạn xác nhận.",
-      impactLine: "Cần bạn kiểm tra tại Security Hub để đảm bảo an toàn tài khoản.",
-      badgeText: "Bảo vệ tài khoản",
-      actionType: "navigate_security_hub",
-      actionHref: "/settings",
-      primaryAction: {
-        type: "navigate_security_hub",
-        label: "Mở Security Hub",
-        href: "/settings",
-      },
-      metric: { label: "Cảnh báo bảo mật", value: 1, unit: "count" },
-      facts: { has_active_hold: true },
-      action: "overview",
-      question: "Tôi có giao dịch nào đang bị tạm giữ hoặc yêu cầu thay đổi bảo mật cần xử lý không?",
-    });
-  } else if (securitySummary && (!securitySummary.hasEmergencyContact || (typeof securitySummary.score === "number" && securitySummary.score < 80))) {
-    candidates.push({
-      id: "security:guide",
-      topic: "spending",
-      category: "DISCOVERY_GUIDE",
-      categoryLabel: "Khám phá & Bảo mật",
-      slotGroup: "GROW_AND_GUIDE",
-      tone: "security",
-      priority: 3,
-      severity: "info",
-      confidence: "recorded",
-      title: "Cẩm nang bảo vệ tài khoản",
-      body: "Bổ sung Người liên hệ khẩn cấp trong Security Hub để tăng lớp bảo vệ khi có giao dịch bất thường.",
-      impactLine: "Bổ sung liên hệ khẩn cấp tại Security Hub để bảo vệ tài khoản.",
-      badgeText: typeof securitySummary.score === "number" ? `Điểm ${securitySummary.score}/100` : "Bảo mật",
-      actionType: "open_security_handbook",
-      actionHref: "/settings",
-      primaryAction: {
-        type: "open_security_handbook",
-        label: "Xem cẩm nang bảo mật",
-        href: "/settings",
-      },
-      metric: { label: "Điểm bảo mật hiện tại", value: securitySummary.score ?? 45, unit: "points" },
-      facts: { security_score: securitySummary.score ?? 45, has_emergency: securitySummary.hasEmergencyContact ?? false },
-      action: "overview",
-      question: "Hướng dẫn tôi cách cài đặt Người thân khẩn cấp và các lớp bảo vệ trong Security Hub của MSB.",
-    });
+  // Ma trận Detectors Bảo mật (Security / Fraud)
+  if (securitySummary) {
+    // 1. SC3 / Hold (Mức ĐỎ)
+    if (securitySummary.hasActiveCase || securitySummary.hasActiveHold || securitySummary.hasPendingOff) {
+      candidates.push({
+        id: "security:sc3_active_case",
+        topic: "spending",
+        domain: "SECURITY",
+        securityLevel: "RED",
+        scenarioCode: "SC3",
+        category: "SECURITY_RED",
+        categoryLabel: "Bảo mật · Đỏ",
+        slotGroup: "PROTECT",
+        tone: "urgent",
+        priority: 0,
+        severity: "urgent",
+        confidence: "recorded",
+        title: "Hồ sơ của bạn đang được xử lý.",
+        body: "Lưu ý: bất kỳ ai đề nghị 'hỗ trợ lấy lại tiền' có thu phí đều là lừa đảo. MSB chỉ cập nhật hồ sơ trong app này.",
+        impactLine: "Lưu ý: bất kỳ ai đề nghị 'hỗ trợ lấy lại tiền' có thu phí đều là lừa đảo. MSB chỉ cập nhật hồ sơ trong app này.",
+        badgeText: "Bảo mật · Đỏ",
+        actionType: "view_fraud_case",
+        actionHref: "/settings",
+        actionLabel: "Xem trạng thái hồ sơ",
+        primaryAction: {
+          type: "view_fraud_case",
+          label: "Xem trạng thái hồ sơ",
+          href: "/settings",
+        },
+        chips: [
+          { label: "Xem trạng thái hồ sơ", actionType: "view_fraud_case", href: "/settings", variant: "primary" },
+        ],
+        metric: { label: "Trạng thái bảo mật", value: 1, unit: "count" },
+        facts: { has_active_case: Boolean(securitySummary.hasActiveCase), has_active_hold: Boolean(securitySummary.hasActiveHold) },
+        action: "overview",
+        question: "Trạng thái xử lý hồ sơ tra soát của tôi hiện tại như thế nào?",
+      });
+    }
+
+    // 2. BT5 / T7b - Nhận tiền lớn từ TK lạ (Mức ĐỎ)
+    if (securitySummary.largeUnknownInflow && securitySummary.largeUnknownInflow.amount >= 10_000_000) {
+      const amt = securitySummary.largeUnknownInflow.amount;
+      candidates.push({
+        id: "security:bt5_large_unknown_inflow",
+        topic: "spending",
+        domain: "SECURITY",
+        securityLevel: "RED",
+        scenarioCode: "BT5",
+        category: "SECURITY_RED",
+        categoryLabel: "Cảnh báo Đỏ",
+        slotGroup: "PROTECT",
+        tone: "urgent",
+        priority: 0.5,
+        severity: "urgent",
+        confidence: "recorded",
+        title: `Bạn vừa nhận ${formatVndVietnamese(amt)} từ tài khoản lạ.`,
+        body: "Nếu có người báo chuyển nhầm và nhờ chuyển trả vào tài khoản khác, đừng làm. MSB sẽ tra soát và hoàn trả về đúng tài khoản gốc.",
+        impactLine: "Nếu có người báo chuyển nhầm và nhờ chuyển trả vào tài khoản khác, đừng làm. MSB sẽ tra soát và hoàn trả về đúng tài khoản gốc.",
+        badgeText: "Cảnh báo Đỏ",
+        actionType: "request_msb_investigation",
+        actionLabel: "Yêu cầu MSB tra soát",
+        primaryAction: {
+          type: "request_msb_investigation",
+          label: "Yêu cầu MSB tra soát",
+        },
+        chips: [
+          { label: "Yêu cầu MSB tra soát", actionType: "request_msb_investigation", prompt: "Tôi vừa nhận khoản tiền lạ và muốn yêu cầu MSB tra soát hoàn trả về tài khoản gốc.", variant: "primary" },
+          { label: "Tôi biết khoản này", actionType: "mark_known_sender", variant: "secondary" },
+        ],
+        metric: { label: "Khoản tiền lạ", value: amt, unit: "VND" },
+        facts: { amount: amt, sender: securitySummary.largeUnknownInflow.senderName ?? "unknown" },
+        action: "chat",
+        question: "Tôi vừa nhận khoản tiền lạ từ tài khoản khác, MSB hướng dẫn tôi cách xử lý an toàn?",
+      });
+    }
+
+    // 3. BT4 / T7a - Nhận mồi khoản nhỏ liên tiếp (Mức VÀNG)
+    if (securitySummary.baitInflow && securitySummary.baitInflow.count >= 3) {
+      const bait = securitySummary.baitInflow;
+      candidates.push({
+        id: "security:bt4_bait_inflow",
+        topic: "spending",
+        domain: "SECURITY",
+        securityLevel: "AMBER",
+        scenarioCode: "BT4",
+        category: "SECURITY_AMBER",
+        categoryLabel: "Cảnh báo Vàng",
+        slotGroup: "PROTECT",
+        tone: "warning",
+        priority: 1,
+        severity: "attention",
+        confidence: "recorded",
+        title: `Bạn vừa nhận ${formatVndVietnamese(bait.lastAmount)} từ tài khoản lạ.`,
+        body: "Nếu đây là 'hoa hồng làm nhiệm vụ', đó thường là bước mồi của lừa đảo.",
+        impactLine: "Nếu đây là 'hoa hồng làm nhiệm vụ', đó thường là bước mồi của lừa đảo.",
+        badgeText: "Cảnh báo Vàng",
+        actionType: "open_security_handbook",
+        actionLabel: "Xem thủ đoạn",
+        primaryAction: {
+          type: "open_security_handbook",
+          label: "Xem thủ đoạn",
+        },
+        chips: [
+          { label: "Xem thủ đoạn", actionType: "open_security_handbook", variant: "primary" },
+          { label: "Tôi biết người này", actionType: "mark_known_sender", variant: "secondary" },
+        ],
+        metric: { label: "Khoản nhận mồi gần nhất", value: bait.lastAmount, unit: "VND" },
+        facts: { count: bait.count, last_amount: bait.lastAmount, sender: bait.senderName ?? "unknown" },
+        action: "overview",
+        question: "Dấu hiệu bẫy hoa hồng làm nhiệm vụ lừa đảo qua tài khoản ngân hàng là gì?",
+      });
+    }
+
+    // 4. BT3 - Số dư tăng mạnh chưa có người thân khẩn cấp (Mức XANH)
+    if (!securitySummary.hasEmergencyContact && (Boolean(securitySummary.highBalanceInflow) || casaBalance >= 50_000_000)) {
+      const balanceAmount = securitySummary.highBalanceInflow?.amount ?? casaBalance;
+      candidates.push({
+        id: "security:bt3_high_balance",
+        topic: "spending",
+        domain: "SECURITY",
+        securityLevel: "GREEN",
+        scenarioCode: "BT3",
+        category: "SECURITY_GREEN",
+        categoryLabel: "Bảo mật · Xanh",
+        slotGroup: "GROW_AND_GUIDE",
+        tone: "security",
+        priority: 8,
+        severity: "info",
+        confidence: "recorded",
+        title: `Khoản ${formatVndVietnamese(balanceAmount)} vừa về. Thêm người thân khẩn cấp để bảo vệ tài khoản.`,
+        body: "Luôn có người cùng bạn kiểm tra khi có giao dịch bất thường.",
+        impactLine: "Luôn có người cùng bạn kiểm tra khi có giao dịch bất thường.",
+        badgeText: "Bảo mật · Xanh",
+        actionType: "open_emergency_contact",
+        actionHref: "/settings",
+        actionLabel: "Thêm người thân",
+        primaryAction: {
+          type: "open_emergency_contact",
+          label: "Thêm người thân",
+          href: "/settings",
+        },
+        chips: [
+          { label: "Thêm người thân", actionType: "open_emergency_contact", href: "/settings", variant: "primary" },
+          { label: "Tự khóa chuyển tiền", actionType: "navigate_security_hub", href: "/settings", variant: "secondary" },
+          { label: "Để sau", actionType: "dismiss", variant: "ghost" },
+        ],
+        metric: { label: "Số dư khả dụng", value: balanceAmount, unit: "VND" },
+        facts: { liquid_balance: balanceAmount },
+        action: "overview",
+        question: "Làm thế nào để thêm Người liên hệ khẩn cấp bảo vệ số dư tài khoản của tôi?",
+      });
+    }
+
+    // 5. BT1 / BT2 - Làm quen bảo mật / Điểm bảo mật thấp (Mức XANH)
+    if (securitySummary.isNewUserOnboarding || (typeof securitySummary.score === "number" && securitySummary.score < 80)) {
+      const scoreVal = securitySummary.score ?? 70;
+      candidates.push({
+        id: "security:bt1_onboarding",
+        topic: "spending",
+        domain: "SECURITY",
+        securityLevel: "GREEN",
+        scenarioCode: "BT1",
+        category: "SECURITY_GREEN",
+        categoryLabel: "Bảo mật · Xanh",
+        slotGroup: "GROW_AND_GUIDE",
+        tone: "security",
+        priority: 9,
+        severity: "info",
+        confidence: "recorded",
+        title: "Bạn đã biết những phương thức bảo mật của MSB chưa?",
+        body: `Điểm bảo mật: ${scoreVal}/100. Bật mã chống giả mạo (+15) và thêm người thân khẩn cấp (+10) để lên mức Cao.`,
+        impactLine: `Điểm bảo mật: ${scoreVal}/100. Bật mã chống giả mạo (+15) và thêm người thân khẩn cấp (+10) để lên mức Cao.`,
+        badgeText: "Bảo mật · Xanh",
+        actionType: "open_security_handbook",
+        actionLabel: "Xem 3 thủ đoạn phổ biến",
+        primaryAction: {
+          type: "open_security_handbook",
+          label: "Xem 3 thủ đoạn phổ biến",
+        },
+        chips: [
+          { label: "Xem 3 thủ đoạn phổ biến", actionType: "open_security_handbook", variant: "primary" },
+          { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings", variant: "secondary" },
+        ],
+        metric: { label: "Điểm bảo mật", value: scoreVal, unit: "points" },
+        facts: { score: scoreVal },
+        action: "overview",
+        question: "Những phương thức bảo vệ tài khoản khuyến nghị của MSB gồm những gì?",
+      });
+    }
   }
 
   // Nhóm 8: DISCOVERY_GUIDE - Tính năng tự động phân bổ hũ khi lương về
@@ -1004,7 +1305,8 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
       question: "Làm thế nào để thiết lập quy tắc tự động chia tiền vào các hũ khi tài khoản nhận lương?",
     });
   }
-  candidates.sort((a, b) => a.priority - b.priority || Number(b.severity === "urgent") - Number(a.severity === "urgent") || a.id.localeCompare(b.id));
+
+  const orderedCandidates = selectOrderedHomeCandidates(candidates);
   const history = Array.from({ length: 6 }, (_, i) => {
     const key = addMonthsToKey(month, -i);
     return { month: key, ...cash(monthPeriodFromKey(key)) };
@@ -1045,7 +1347,7 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     transactions: sorted.slice(0, 500).map((t) => ({ id: t.id, postedAt: t.postedAt, amount: t.amount, currency: t.currency,
       direction: t.direction, type: t.type, categoryId: t.categoryId, merchant: t.merchantName.slice(0, 100),
       status: t.status, source: t.source, recurring: t.isRecurring, rebalance: t.rebalance })),
-    candidates,
+    candidates: orderedCandidates,
   };
 }
 export type CustomerFinancialSnapshot = ReturnType<typeof buildCustomerSnapshot>;

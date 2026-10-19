@@ -85,15 +85,13 @@ describe("snapshot and insight cache integration", () => {
     expect(typeof res.healthScore.overallScore).toBe("number");
     expect(res.healthScore.policyVersion).toBe("pfm-health-v0");
     expect(res.insights.length).toBeGreaterThanOrEqual(1);
-    expect(res.insights.length).toBeLessThanOrEqual(3);
+    expect(res.insights.length).toBeLessThanOrEqual(5);
     expect(res.insights[0].source).toBe("agent");
     if (res.insights.length > 1) {
       expect(res.insights[1].source).toBe("fallback");
       expect(res.insights[0].candidate.id).not.toBe(res.insights[1].candidate.id);
     }
-    expect(res.healthAssessment).toBeDefined();
-    expect(res.healthAssessment?.summary).toContain("Tình hình tài chính");
-    expect(res.healthAssessment?.pillarAssessments).toHaveLength(3);
+    expect(res.healthAssessment).toBeNull();
   });
 
   it("ignores upstream assessment when snapshot_id mismatches but retains candidate selection", async () => {
@@ -144,5 +142,37 @@ describe("snapshot and insight cache integration", () => {
     // Legacy single-card parsed was ignored, recomputed carousel with healthScore and insights
     expect(res.healthScore).toBeDefined();
     expect(Array.isArray(res.insights)).toBe(true);
+  });
+
+  it("produces ordered candidates [Security RED/AMBER] -> [PFM 1..3] -> [Security GREEN] with fallback all_clear", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    const res = await generateHomeInsight("CIF_0001", input);
+    expect(res.secondaryInsights).toBeDefined();
+    expect(res.secondaryInsights!.length).toBeGreaterThanOrEqual(2);
+    expect(res.secondaryInsights!.length).toBeLessThanOrEqual(5);
+
+    // Verify Green security candidate is present at the end
+    const lastCard = res.secondaryInsights![res.secondaryInsights!.length - 1];
+    expect(["security:bt1_onboarding", "security:all_clear"]).toContain(lastCard.candidate.id);
+    expect(lastCard.securityLevel).toBe("GREEN");
+
+    // Verify ordering
+    let seenPfm = false;
+    let seenGreen = false;
+    for (const card of res.secondaryInsights!) {
+      const isUrgentSecurity = card.domain === "security" && (card.securityLevel === "RED" || card.securityLevel === "AMBER");
+      const isGreenSecurity = card.domain === "security" && card.securityLevel === "GREEN";
+      const isPfm = card.domain === "pfm" || !card.domain;
+
+      if (isUrgentSecurity) {
+        expect(seenPfm).toBe(false);
+        expect(seenGreen).toBe(false);
+      } else if (isPfm) {
+        seenPfm = true;
+        expect(seenGreen).toBe(false);
+      } else if (isGreenSecurity) {
+        seenGreen = true;
+      }
+    }
   });
 });
