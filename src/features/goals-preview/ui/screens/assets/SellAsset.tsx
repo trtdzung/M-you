@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { assetValue } from "../../../engine";
@@ -9,7 +9,7 @@ import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
 import { Amount, BottomActions, ConfirmSheet, EmptyState, MoneyInput, ScreenHeader, SliderRow, SummaryRows } from "../../shared";
-import { card, hint, primaryButton, screenPadding, sectionTitle, warningBox } from "../../shared/styles";
+import { card, hint, primaryButton, screenPadding, sectionTitle } from "../../shared/styles";
 import { findGoal, pct, progressAfter, quoteSale } from "./helpers";
 
 /** Bán / tất toán tài sản. Linh hoạt: tiền về tài khoản mục tiêu. Cố định: ghi nhận đã bán. */
@@ -50,7 +50,10 @@ export function SellAsset({ params }: ScreenProps) {
       <ScreenHeader title={`${verb} tài sản`} subtitle={asset.name} />
 
       <section className={cn(card, "flex flex-col gap-1")}>
-        <p className="text-[13px] text-muted">Giá trị hiện tại</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[13px] text-muted">Giá trị hiện tại</p>
+          {quote?.early && <InfoTooltip warning label="tất toán trước hạn" text={`${quote.note}. ${quote.lostInterest > 0 ? `Phần lãi bị giảm theo báo giá hiện tại: ${formatVnd(quote.lostInterest)}.` : "Kiểm tra mức lãi áp dụng khi tất toán trước hạn trước khi xác nhận."}`} />}
+        </div>
         <Amount amount={isLiquid ? quote?.gross : asset.value} source={asset.source} className="text-2xl font-bold" />
       </section>
 
@@ -81,19 +84,10 @@ export function SellAsset({ params }: ScreenProps) {
         </section>
       )}
 
-      {quote?.early && (
-        <p className={cn(warningBox, "flex items-start gap-2")}>
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden />
-          <span>
-            {quote.note}. Bạn sẽ mất khoảng <b>{formatVnd(quote.lostInterest)}</b> tiền lãi so với giữ đến ngày đáo hạn.
-          </span>
-        </p>
-      )}
-      {quote && !quote.early && quote.fee > 0 && <p className={warningBox}>{quote.note}.</p>}
       {!isLiquid && asset.countPercent > 0 && <p className={hint}>Khi bán, phần tài sản đang tính vào mục tiêu sẽ được thay bằng tiền mặt.</p>}
 
       <section className={cn(card, "flex flex-col gap-2")}>
-        <h2 className={sectionTitle}>Bạn nhận được</h2>
+        <div className="flex items-center justify-between gap-2"><h2 className={sectionTitle}>Bạn nhận được</h2>{quote && !quote.early && quote.fee > 0 && <InfoTooltip warning label="phí bán tài sản" text={`${quote.note}.`} />}</div>
         <SummaryRows
           rows={[
             ...(fee > 0 ? [{ label: "Phí bán", value: fee, source: "msb" as const }] : []),
