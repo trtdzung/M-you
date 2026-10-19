@@ -6,7 +6,7 @@ import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
 import { initialPreviewState, previewReducer } from "./reducer";
-import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, type WorldPayload } from "./server-sync";
+import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, requestMarketRefresh, type WorldPayload } from "./server-sync";
 import { hydrateMarket } from "../data/market";
 import { usePersonaCif } from "@/providers/context";
 import { usePanelActive } from "@/components/shell/PanelActive";
@@ -61,6 +61,10 @@ interface PreviewContextValue {
   suggestions: AgentSuggestion[] | null;
   /** Records a click on a suggestion button ("clicked" for navigation, "acted" for a store action). */
   recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
+  /** Asks the server to re-fetch market prices in the background; never blocks. */
+  refreshPrices: () => void;
+  /** True while a price refresh started by `refreshPrices` is still running. */
+  pricesRefreshing: boolean;
 }
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
@@ -80,8 +84,11 @@ function useServerWorld(
   dispatch: (a: PreviewAction) => void;
   suggestions: AgentSuggestion[] | null;
   recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
+  refreshPrices: () => void;
+  pricesRefreshing: boolean;
 } {
   const [hydrated, setHydrated] = useState(false);
+  const [pricesRefreshing, setPricesRefreshing] = useState(false);
   const [suggestions, setSuggestions] = useState<AgentSuggestion[] | null>(null);
   const suggestionRunRef = useRef(0);
   const queueRef = useRef<ActionQueue | null>(null);
@@ -134,6 +141,7 @@ function useServerWorld(
     queueRef.current = null;
     cancelPollRef.current?.();
     cancelPollRef.current = null;
+    setPricesRefreshing(false);
     if (entryScreen) rawDispatch({ type: "nav/reset", screen: entryScreen });
     if (!cif) {
       setHydrated(true);
@@ -184,7 +192,32 @@ function useServerWorld(
     [cif],
   );
 
-  return { hydrated, dispatch, suggestions, recordSuggestionEvent };
+  /** "Cập nhật lại": starts a server price sync (not awaited by the UI), then polls like the first load. */
+  const refreshPrices = useCallback(() => {
+    if (!cif || pricesRefreshing) return;
+    setPricesRefreshing(true);
+    const resync = () => {
+      const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, ...world } = stateRef.current;
+      rawDispatch({ type: "world/sync", world });
+    };
+    void requestMarketRefresh()
+      .then((market) => {
+        hydrateMarket(market.instruments);
+        resync();
+        if (!market.refreshing) {
+          setPricesRefreshing(false);
+          return;
+        }
+        cancelPollRef.current?.();
+        cancelPollRef.current = pollMarket(resync, () => {
+          cancelPollRef.current = null;
+          setPricesRefreshing(false);
+        });
+      })
+      .catch(() => setPricesRefreshing(false));
+  }, [cif, pricesRefreshing, rawDispatch, stateRef]);
+
+  return { hydrated, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing };
 }
 
 export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
@@ -193,7 +226,7 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   const [state, rawDispatch] = useReducer(previewReducer, undefined, initialPreviewState);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const { hydrated, dispatch, suggestions, recordSuggestionEvent } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
+  const { hydrated, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
 
   useEffect(() => {
     const onBack = (event: Event) => {
@@ -220,8 +253,8 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent }),
-    [state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent],
+    () => ({ state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing }),
+    [state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }

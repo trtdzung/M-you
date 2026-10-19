@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
-import { FixedAssetDetailSheet } from "../assets/FixedAssetDetailSheet";
+import { FixedAssetDetailSheet, priceDateOf } from "../assets/FixedAssetDetailSheet";
 import { LiquidAssetDetail } from "../assets/LiquidAssetDetail";
 import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink, Gem, CircleDollarSign, PieChart, FileText, Home } from "lucide-react";
 import { getInstrument } from "../../../data/market";
@@ -119,6 +119,9 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                         {a.countPercent}% của {formatVndCompact(now)}
                         {instrument && a.quantity !== undefined ? ` · ${a.quantity.toLocaleString("vi-VN")} ${instrument.unit} theo giá hôm nay` : a.accrual ? " · gốc + lãi tới hôm nay" : " tự khai"}
                       </p>
+                      {instrument && priceDateOf(instrument.priceSeries, state.clock.today) && (
+                        <p className="mt-1 text-[12px] text-muted">Giá ngày {formatISODate(priceDateOf(instrument.priceSeries, state.clock.today))}</p>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="text-[12px] text-muted">{auto ? "Tự cập nhật hằng ngày" : `Định giá ${formatISODate(a.valuationDate)}`}</p>

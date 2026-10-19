@@ -42,6 +42,12 @@ export async function fetchMarket(): Promise<MarketPayload> {
   return (await res.json()) as MarketPayload;
 }
 
+export async function requestMarketRefresh(): Promise<MarketPayload> {
+  const res = await fetch(`${BASE}/market/refresh`, { method: "POST", cache: "no-store" });
+  if (!res.ok) throw new Error(`POST goals-v2/market/refresh ${res.status}`);
+  return (await res.json()) as MarketPayload;
+}
+
 type ActionResult = { ok: true; payload: WorldPayload } | { ok: false; error: string; payload: WorldPayload | null };
 
 async function postAction(cif: string, requestId: string, action: PreviewAction): Promise<ActionResult> {
