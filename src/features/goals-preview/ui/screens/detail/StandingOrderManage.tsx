@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../../engine";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
@@ -9,10 +9,10 @@ import { selectGoalTxns } from "../../../store/selectors";
 import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { MoneyInput } from "../../shared/MoneyInput";
+import { AmountCard, formatShort } from "../../shared/AmountCard";
 import { DayOfMonthPicker, Switch } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
-import { card, chip, chipSelected, errorBox, ghostButton, infoBox, primaryButton, secondaryButton, sectionTitle } from "../../shared/styles";
+import { card, errorBox, ghostButton, infoBox, primaryButton, secondaryButton, sectionTitle } from "../../shared/styles";
 import { canTransact, GoalNotFound, useGoalContext } from "./common";
 
 type Pending = "save" | "cancel" | null;
@@ -84,16 +84,12 @@ export function StandingOrderManage({ params }: ScreenProps) {
         <p className={infoBox}>Mục tiêu này không còn dùng trích tự động.</p>
       ) : (!exists || active) && (
         <>
-          <section className={`${card} flex flex-col gap-3`} aria-label="Số tiền mỗi tháng">
-            <MoneyInput label="Số tiền mỗi tháng" value={amount} onChange={setAmount} />
-            {ctx.required > 0 && (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className={amount === ctx.required ? chipSelected : chip} onClick={() => setAmount(ctx.required)}>
-                  Đủ kịp hạn · {formatVndCompact(ctx.required)}
-                </button>
-              </div>
-            )}
-          </section>
+          <AmountCard
+            title="Số tiền mỗi tháng"
+            value={amount}
+            onChange={setAmount}
+            chips={ctx.required > 0 ? [{ label: `Đủ kịp hạn ${formatShort(ctx.required)}`, amount: ctx.required }] : []}
+          />
 
           <section className={`${card} flex flex-col gap-3`} aria-label="Ngày trích">
             <div className="flex items-center gap-1">

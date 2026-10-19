@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
-import { AmountCard } from "../../shared/AmountCard";
+import { AmountCard, formatShort } from "../../shared/AmountCard";
 import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { ScreenHeader } from "../../shared/ScreenHeader";
@@ -28,8 +28,8 @@ export function DepositFlow({ params }: ScreenProps) {
   const over = amount !== null && amount > balance;
   const phase2 = stage.phase === 2;
   const chips = [
-    ...(ctx.required > 0 ? [{ label: `${phase2 ? "Đủ kỳ trả góp" : "Đủ kịp hạn"} · ${formatVndCompact(ctx.required)}`, amount: ctx.required }] : []),
-    ...(balance > 0 ? [{ label: `Tối đa · ${formatVndCompact(balance)}`, amount: balance }] : []),
+    ...(ctx.required > 0 ? [{ label: `${phase2 ? "Đủ kỳ trả góp" : "Đủ kịp hạn"} ${formatShort(ctx.required)}`, amount: ctx.required }] : []),
+    ...(balance > 0 ? [{ label: `Tối đa ${formatShort(balance)}`, amount: balance }] : []),
   ];
   // Progress of the current phase (phase 2 = loan principal), before and after this deposit.
   const nowPct = Math.round((stage.value / Math.max(1, stage.target)) * 100);

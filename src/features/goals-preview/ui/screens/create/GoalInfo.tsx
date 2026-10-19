@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Lock, MoveHorizontal, Pencil } from "lucide-react";
-import { amountInWords } from "@/features/goals/ui/form/amount-in-words";
-import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
 import { addMonths, dayOfMonth, formatISODate, formatMonths, monthsBetween, monthsLeft } from "../../../engine/dates";
 import { allocateSurplus } from "../../../engine/feasibility";
@@ -11,16 +10,15 @@ import type { ScreenProps } from "../../../model/screens";
 import { paramNumber, paramString } from "../../../model/screens";
 import type { GoalFlexibility, GoalTemplate } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
+import { AmountCard, formatShort, SuggestChip } from "../../shared/AmountCard";
 import { BottomActions } from "../../shared/BottomActions";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { parseVndInput } from "../../shared/MoneyInput";
 import { MonthYearSheet } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle, figure } from "../../shared/styles";
 import { FLEX_INFO, WIZARD_STEPS, isFlexible, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
 
-const groupFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 const QUICK_MONTHS = [
   { months: 6, label: "6 tháng" },
@@ -131,10 +129,10 @@ export function GoalInfo({ params }: ScreenProps) {
       fixes.push({ label: `Lùi tới T${Number(d.slice(5, 7))}/${d.slice(0, 4)}`, apply: () => { setDate(d); setPickDate(true); } });
     }
     const reduced = Math.floor((start + free * left) / 1_000_000) * 1_000_000;
-    if (reduced >= MIN_AMOUNT && reduced < amount) fixes.push({ label: `Giảm còn ${formatVndCompact(reduced)}`, apply: () => setAmount(reduced) });
+    if (reduced >= MIN_AMOUNT && reduced < amount) fixes.push({ label: `Giảm còn ${formatShort(reduced)}`, apply: () => setAmount(reduced) });
     const neededDeposit = Math.ceil((amount - free * left) / 1_000_000) * 1_000_000;
     if (neededDeposit > start && neededDeposit <= state.customer.mainCasaBalance) {
-      fixes.push({ label: `Nạp ngay ${formatVndCompact(neededDeposit)}`, apply: () => setDeposit(neededDeposit) });
+      fixes.push({ label: `Nạp ngay ${formatShort(neededDeposit)}`, apply: () => setDeposit(neededDeposit) });
     }
   }
   const stuck = tone === "negative" && fixes.length === 0;
@@ -165,33 +163,13 @@ export function GoalInfo({ params }: ScreenProps) {
       </section>
       {touched && errors.name && <p className={fieldError}>{errors.name}</p>}
 
-      <section className={`${card} flex flex-col gap-3`} aria-labelledby="goal-amount-label">
-        <div className="flex items-center gap-1">
-          <h2 id="goal-amount-label" className={sectionTitle}>Bạn cần bao nhiêu?</h2>
-          {amount ? <InfoTooltip label="cách đọc số tiền" text={amountInWords(amount)} /> : null}
-        </div>
-        <div className="flex items-baseline gap-2">
-          <input
-            aria-labelledby="goal-amount-label"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="0"
-            value={amount === null ? "" : groupFormatter.format(amount)}
-            onChange={(e) => setAmount(parseVndInput(e.target.value))}
-            aria-invalid={touched && errors.amount ? true : undefined}
-            className={cn("min-h-12 w-full min-w-0 rounded-lg bg-transparent text-[28px] font-bold tabular-nums text-text", ring)}
-          />
-          <span className="text-sm text-muted">VND</span>
-        </div>
-        {touched && errors.amount && <p className={fieldError}>{errors.amount}</p>}
-        <div className="flex flex-wrap gap-2">
-          {quickAmounts.map((a) => (
-            <button key={a} type="button" className={a === amount ? chipSelected : chip} onClick={() => setAmount(a)}>
-              {formatVndCompact(a)}
-            </button>
-          ))}
-        </div>
-      </section>
+      <AmountCard
+        title="Bạn cần bao nhiêu?"
+        value={amount}
+        onChange={setAmount}
+        error={touched && errors.amount ? errors.amount : undefined}
+        chips={quickAmounts.map((a) => ({ label: formatShort(a), amount: a }))}
+      />
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Thời hạn">
         <div className="flex items-center gap-1">
@@ -253,26 +231,14 @@ export function GoalInfo({ params }: ScreenProps) {
         </div>
       </section>
 
-      <section className={`${card} flex flex-col gap-2`} aria-labelledby="goal-deposit-label">
-        <div className="flex items-center gap-1">
-          <h2 id="goal-deposit-label" className={sectionTitle}>Chuyển ngay từ tài khoản chính</h2>
-          <InfoTooltip label="nạp ban đầu" text={`Không bắt buộc. Số dư tài khoản chính: ${formatVnd(state.customer.mainCasaBalance)}. Để trống nếu muốn bắt đầu từ 0 đồng.`} />
-        </div>
-        <div className="flex items-baseline gap-2">
-          <input
-            aria-labelledby="goal-deposit-label"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="0"
-            value={deposit === null || deposit === 0 ? "" : groupFormatter.format(deposit)}
-            onChange={(e) => setDeposit(parseVndInput(e.target.value))}
-            aria-invalid={errors.deposit ? true : undefined}
-            className={cn("min-h-11 w-full min-w-0 rounded-lg bg-transparent text-[20px] font-bold tabular-nums text-text placeholder:text-muted", ring)}
-          />
-          <span className="text-sm text-muted">VND</span>
-        </div>
-        {errors.deposit && <p className={fieldError}>{errors.deposit}</p>}
-      </section>
+      <AmountCard
+        title="Chuyển ngay từ tài khoản chính"
+        value={deposit === 0 ? null : deposit}
+        onChange={setDeposit}
+        error={errors.deposit || undefined}
+        help={`Không bắt buộc. Số dư tài khoản chính: ${formatVnd(state.customer.mainCasaBalance)}. Để trống nếu muốn bắt đầu từ 0 VND.`}
+        chips={state.customer.mainCasaBalance > 0 ? [{ label: `Tối đa ${formatShort(state.customer.mainCasaBalance)}`, amount: state.customer.mainCasaBalance }] : []}
+      />
 
       <section
         aria-live="polite"
@@ -318,9 +284,7 @@ export function GoalInfo({ params }: ScreenProps) {
         {fixes.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">
             {fixes.map((f) => (
-              <button key={f.label} type="button" className={chip} onClick={f.apply}>
-                {f.label}
-              </button>
+              <SuggestChip key={f.label} label={f.label} selected={false} onClick={f.apply} />
             ))}
           </div>
         )}

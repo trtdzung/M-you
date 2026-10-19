@@ -10,7 +10,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { MoneyInput } from "../../shared/MoneyInput";
+import { AmountCard, formatShort } from "../../shared/AmountCard";
 import { DayOfMonthPicker, Switch } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
@@ -84,9 +84,16 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
         </div>
         {autoOn && (
           <>
-            <MoneyInput label="Số tiền mỗi tháng" value={autoAmount} onChange={setAutoAmount} error={autoValid ? undefined : "Hãy nhập số tiền trích mỗi tháng."} />
+            <AmountCard
+              bare
+              title="Số tiền mỗi tháng"
+              value={autoAmount}
+              onChange={setAutoAmount}
+              error={autoValid ? undefined : "Hãy nhập số tiền trích mỗi tháng."}
+              chips={monthly > 0 ? [{ label: `Đủ kịp hạn ${formatShort(monthly)}`, amount: monthly }] : []}
+            />
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-text">Vào ngày</span>
+              <h3 className={sectionTitle}>Vào ngày</h3>
               <DayOfMonthPicker value={day} onChange={setDay} />
               <p className="text-[13px] text-muted">Lần đầu: {formatISODate(nextDayOfMonth(state.clock.today, day))}</p>
             </div>

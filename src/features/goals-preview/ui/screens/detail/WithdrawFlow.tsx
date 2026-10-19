@@ -5,7 +5,7 @@ import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-mon
 import { cn } from "@/lib/cn";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
-import { AmountCard } from "../../shared/AmountCard";
+import { AmountCard, formatShort } from "../../shared/AmountCard";
 import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { InfoTooltip } from "../../shared/InfoTooltip";
@@ -71,7 +71,7 @@ export function WithdrawFlow({ params }: ScreenProps) {
             title="Số tiền muốn rút"
             value={amount}
             onChange={setAmount}
-            chips={balance > 0 ? [{ label: `Tối đa · ${formatVndCompact(balance)}`, amount: balance }] : []}
+            chips={balance > 0 ? [{ label: `Tối đa ${formatShort(balance)}`, amount: balance }] : []}
             autoFocus
             error={over ? `Tài khoản mục tiêu chỉ có ${formatVnd(balance)} tiền mặt.` : undefined}
           />
