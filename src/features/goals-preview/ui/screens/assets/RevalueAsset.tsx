@@ -49,8 +49,9 @@ export function RevalueAsset({ params }: ScreenProps) {
       <ScreenHeader title="Định giá lại" subtitle={asset.name} />
 
       <section className={cn(card, "flex flex-col gap-2")}>
-        <p className="text-[13px] text-muted">{FIXED_CATEGORY_LABEL[asset.category]} · giá trị hiện ghi nhận</p>
-        <Amount amount={asset.value} source={asset.source} className="text-2xl font-bold" />
+        <div className="flex items-center justify-between gap-2"><p className="text-[13px] text-muted">{FIXED_CATEGORY_LABEL[asset.category]} · giá trị hiện ghi nhận</p><SourceTag source="self_reported" /></div>
+        <p className={hint}>Các giá trị trên màn này do bạn tự khai.</p>
+        <Amount amount={asset.value} className="text-2xl font-bold" />
         <p className={hint}>
           Định giá ngày {dateVi(asset.valuationDate)} ({ageDays <= 0 ? "hôm nay" : `${ageDays} ngày trước`}). Đang tính {asset.countPercent}% vào mục tiêu.
         </p>
@@ -60,7 +61,6 @@ export function RevalueAsset({ params }: ScreenProps) {
       <section className={cn(card, "flex flex-col gap-4")}>
         <div className="flex items-center justify-between">
           <h2 className={sectionTitle}>Giá trị mới</h2>
-          <SourceTag source="self_reported" />
         </div>
         <MoneyInput label="Giá trị ước tính mới" value={value} onChange={setValue} />
         <div className="flex flex-col gap-1.5">
@@ -82,7 +82,7 @@ export function RevalueAsset({ params }: ScreenProps) {
           </b>
         </p>
         <p className="text-sm text-text">
-          Phần tính vào mục tiêu: {formatVnd(oldCounted)} → <b>{formatVnd(newCounted)}</b> <SourceTag source="self_reported" className="align-middle" />
+          Phần tính vào mục tiêu: {formatVnd(oldCounted)} → <b>{formatVnd(newCounted)}</b>
         </p>
         <p className="text-sm text-text">
           Tiến độ: {pct(progress.before)} → <b>{pct(progress.after)}</b>
@@ -94,12 +94,12 @@ export function RevalueAsset({ params }: ScreenProps) {
         <ul className="divide-y divide-border text-sm">
           <li className="flex items-center justify-between py-2.5">
             <span className="text-muted">{dateVi(asset.valuationDate)} · mới nhất</span>
-            <Amount amount={asset.value} source={asset.source} />
+            <Amount amount={asset.value} />
           </li>
           {asset.costBasis !== asset.value && (
             <li className="flex items-center justify-between py-2.5">
               <span className="text-muted">{dateVi(asset.createdAt)} · lần khai đầu</span>
-              <Amount amount={asset.costBasis} source="self_reported" />
+              <Amount amount={asset.costBasis} />
             </li>
           )}
         </ul>
@@ -119,9 +119,10 @@ export function RevalueAsset({ params }: ScreenProps) {
       <ConfirmSheet
         open={confirm}
         title="Xác nhận định giá lại"
+        description="Giá cũ và giá mới đều là giá trị bạn tự khai."
         rows={[
-          { label: "Giá cũ", value: asset.value, source: "self_reported" },
-          { label: "Giá mới", value: newValue, source: "self_reported", emphasis: true },
+          { label: "Giá cũ", value: asset.value },
+          { label: "Giá mới", value: newValue, emphasis: true },
           { label: "Ngày định giá", value: dateVi(date) },
           { label: "Tỷ lệ tính vào mục tiêu", value: `${percent}%` },
           { label: "Tiến độ mục tiêu", value: `${pct(progress.before)} → ${pct(progress.after)}` },
