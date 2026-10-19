@@ -114,7 +114,8 @@ async function runSync(runId: number): Promise<void> {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
        ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name, full_name = COALESCE(excluded.full_name, gv2_instruments.full_name),
          unit = excluded.unit, fractional = excluded.fractional, source = excluded.source,
-         external_ref = excluded.external_ref, active = 1`,
+         external_ref = excluded.external_ref,
+         active = CASE WHEN gv2_instruments.kind = 'external_fund' THEN gv2_instruments.active ELSE 1 END`,
     );
     const upsertPrice = db.prepare(
       `INSERT INTO gv2_prices (instrument_id, price_date, price, raw_price, source, fetched_at)
@@ -139,6 +140,11 @@ async function runSync(runId: number): Promise<void> {
       db.transaction(() => {
         for (const i of r.instruments) {
           upsertInstrument.run(i.id, i.kind, i.name, i.fullName ?? null, i.unit, i.fractional ? 1 : 0, i.source, i.externalRef);
+        }
+        if (r.source === "funds" && r.listedIds && r.listedIds.length >= 30) {
+          db.prepare("UPDATE gv2_instruments SET listed = 0 WHERE kind = 'external_fund'").run();
+          const markListed = db.prepare("UPDATE gv2_instruments SET listed = 1 WHERE kind = 'external_fund' AND id = ?");
+          for (const id of r.listedIds) markListed.run(id);
         }
         for (const [id, list] of byId) {
           list.sort((a, b) => a.priceDate.localeCompare(b.priceDate));

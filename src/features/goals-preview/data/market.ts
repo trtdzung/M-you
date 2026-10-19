@@ -13,6 +13,7 @@ export interface MarketInstrument {
   name: string;
   /** Company name / fund full name — optional, for search & descriptive labels. */
   fullName?: string;
+  listed?: boolean;
   /** Unit the customer counts in ("chỉ", "cổ phiếu", "CCQ"). */
   unit: string;
   /** Quantities may be fractional (gold in chỉ, fund units). */

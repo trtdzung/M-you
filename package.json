@@ -14,6 +14,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "sync:fund-directory": "node scripts/sync-fund-directory.mjs",
     "sync:stock-directory": "node scripts/sync-stock-directory.mjs",
     "db:seed": "node scripts/seed-db.mjs",
     "pack": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-src.ps1",

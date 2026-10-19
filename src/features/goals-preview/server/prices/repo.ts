@@ -2,6 +2,7 @@ import "server-only";
 
 import type { MarketInstrument, MarketKind } from "../../data/market";
 import { goalsV2Db } from "../db";
+import { seedFundDirectory } from "./fund-directory";
 import { seedStockDirectory } from "./directory";
 
 /** Một lượt đồng bộ `running` bắt đầu trong khoảng này được coi là còn chạy. */
@@ -14,6 +15,7 @@ interface InstrumentRow {
   full_name: string | null;
   unit: string;
   fractional: number;
+  listed: number;
 }
 
 interface PriceRow {
@@ -42,10 +44,11 @@ function normalizeLabels(row: InstrumentRow): { name: string; fullName?: string 
 /** Công cụ đang hoạt động kèm chuỗi giá tăng dần theo ngày (chỉ công cụ có ít nhất 1 giá). */
 export function readMarketInstruments(): MarketInstrument[] {
   seedStockDirectory();
+  seedFundDirectory();
   const db = goalsV2Db();
   const instruments = db
     .prepare(`SELECT i.id, i.kind, i.name, CASE WHEN i.kind = 'stock' THEN d.company_name ELSE i.full_name END AS full_name,
-      i.unit, i.fractional FROM gv2_instruments i LEFT JOIN gv2_stock_directory d
+      i.unit, i.fractional, i.listed FROM gv2_instruments i LEFT JOIN gv2_stock_directory d
       ON d.code = COALESCE(NULLIF(i.external_ref, ''), i.name)
       WHERE i.active = 1 ORDER BY i.id`)
     .all() as InstrumentRow[];
@@ -74,6 +77,7 @@ export function readMarketInstruments(): MarketInstrument[] {
       ...(fullName ? { fullName } : {}),
       unit: i.unit,
       fractional: i.fractional === 1,
+      ...(i.listed === 0 ? { listed: false } : {}),
       priceSeries,
     });
   }

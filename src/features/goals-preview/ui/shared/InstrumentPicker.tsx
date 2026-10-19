@@ -97,7 +97,7 @@ export function InstrumentPicker({
     return () => { cancelled = true; };
   }, [open, kind]);
 
-  const all = sortedInstruments(kind);
+  const all = sortedInstruments(kind).filter(m => kind !== "external_fund" || m.listed !== false);
   // Chưa gõ: chỉ các mã đã có giá ("Phổ biến"); gõ rồi mới tìm trong cả danh mục mã niêm yết.
   if (kind === "stock" && query.trim()) {
     for (const entry of directory) {

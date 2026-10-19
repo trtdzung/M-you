@@ -34,6 +34,8 @@ export interface SourceResult {
   instruments: SourceInstrument[];
   /** Lỗi theo nguồn (không ném ra ngoài). */
   errors: string[];
+  /** Present only after a successful Fmarket list request, independent of NAV availability. */
+  listedIds?: string[];
 }
 
 /** Từ khi nào cần lấy lịch sử cho một công cụ (ISO `YYYY-MM-DD`). */
@@ -299,5 +301,5 @@ export async function fetchFunds(now: Date, since: SinceFn): Promise<SourceResul
     });
     points.push(...r.points);
   }
-  return { source: "funds", points, instruments, errors };
+  return { source: "funds", points, instruments, errors, listedIds: [...new Set(results.flatMap(r => r ? [r.id] : []))] };
 }
