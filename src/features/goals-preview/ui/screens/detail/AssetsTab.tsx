@@ -23,7 +23,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
 
   return (
     <div className="flex flex-col gap-4">
-      <Sheet open={detailId !== null} title={liquid.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
+      <Sheet bodyClassName="flex flex-col !overflow-hidden !pb-0" open={detailId !== null} title={liquid.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
         {detailId && <LiquidAssetDetail params={{ goalId, assetId: detailId }} embedded onNavigate={() => setDetailId(null)} />}
       </Sheet>
       <section className="flex flex-col gap-2">

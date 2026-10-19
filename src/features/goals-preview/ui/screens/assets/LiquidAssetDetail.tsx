@@ -70,7 +70,8 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
   ];
 
   return (
-    <div className={screenPadding}>
+    <div className={embedded ? "flex min-h-0 flex-1 flex-col" : screenPadding}>
+      <div className={embedded ? "no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4" : "flex flex-col gap-4"}>
       {!embedded && <ScreenHeader title={asset.name} subtitle={`${LIQUID_CATEGORY_LABEL[asset.category]} · ${goal.name}`} />}
 
       <section className={cn(card, "flex flex-col gap-1")}>
@@ -150,7 +151,8 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
 
       {matured && <p className={cn(warningBox)}>Khoản tiền gửi đã đáo hạn. Hãy chọn tái tục hoặc chuyển tiền về tài khoản mục tiêu.</p>}
 
-      <div className="flex flex-col gap-2 pt-2">
+      </div>
+      <div className={embedded ? "flex shrink-0 flex-col gap-2 border-t border-border bg-surface pb-[calc(16px+var(--safe-area-bottom,0px))] pt-3" : "flex flex-col gap-2 pt-2"}>
         {matured && asset.category === "term_deposit" ? (
           <>
             <button type="button" className={primaryButton} onClick={() => go("MaturityChoice")}>
