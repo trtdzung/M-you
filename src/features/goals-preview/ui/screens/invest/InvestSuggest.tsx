@@ -12,7 +12,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions, EmptyState, ScreenHeader } from "../../shared";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { RiskProfileSheet } from "../../shared/RiskProfileSheet";
-import { card, heroNumber, hint, infoBox, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
+import { card, heroNumber, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { dateVi, findGoal } from "../assets/helpers";
 
 interface Projection {
@@ -43,7 +43,7 @@ function project(s: InvestSuggestion, amount: number, today: string, targetDate:
 export function InvestSuggest({ params }: ScreenProps) {
   const { state, nav, dispatch } = usePreview();
   const goal = findGoal(state, paramString(params, "goalId"));
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState(0);
   const [askRisk, setAskRisk] = useState(state.customer.riskProfileAsked !== true);
 
   if (!goal) {
@@ -90,7 +90,7 @@ export function InvestSuggest({ params }: ScreenProps) {
     ].filter(Boolean).join(" ");
     return { s, p, gain: p.invested - hold, fund, tip };
   });
-  const index = Math.min(selected ?? Math.max(0, suggestions.findIndex((s) => s.recommended)), suggestions.length - 1);
+  const index = Math.min(selected, suggestions.length - 1);
   const current = suggestions[index];
 
   return (
@@ -114,7 +114,6 @@ export function InvestSuggest({ params }: ScreenProps) {
           {view.map(({ s, p, gain, fund, tip }, i) => {
             const active = i === index;
             const Icon = fund ? TrendingUp : PiggyBank;
-            const product = getInvestProduct(s.productId);
             return (
               <section key={`${s.productId}-${s.termMonths ?? 0}`} className="relative">
                 <button
@@ -137,17 +136,10 @@ export function InvestSuggest({ params }: ScreenProps) {
                     </span>
                     <Icon size={18} className="shrink-0 text-primary-strong" aria-hidden />
                     <span className="text-[16px] font-semibold text-text">{s.title}</span>
-                    {s.recommended && <span className={cn(infoBox, "shrink-0 !rounded-full !px-2 !py-0.5 !text-[11px] font-semibold")}>Gợi ý</span>}
                   </span>
                   <span className="pl-7 text-[13px] text-muted">
                     {p.returnLabel} · {s.maturityDate ? `đáo hạn ${dateVi(s.maturityDate).slice(3)}` : fund ? "giá thay đổi hằng ngày" : "rút được mọi lúc"} · {RISK_LEVEL_LABEL[s.riskLevel].toLowerCase()}
                   </span>
-                  {product?.kind === "term_deposit" && (
-                    <span className={cn(hint, "pl-7")}>
-                      Kỳ hạn {Math.min(...product.terms.map((t) => t.months))}–{Math.max(...product.terms.map((t) => t.months))} tháng · {String(s.minRatePa).replace(".", ",")}–{String(s.maxRatePa).replace(".", ",")}%/năm, chọn kỳ hạn ở bước sau
-                    </span>
-                  )}
-                  {s.maturesAfterTarget && <span className={cn(hint, "pl-7")}>Kỳ hạn ngắn nhất đáo hạn sau ngày mục tiêu</span>}
                   <span className="pl-7 text-sm text-text">Đầu tư {formatVndCompact(s.suggestedAmount)}</span>
                   <span className="pl-7 text-sm text-text">
                     Dự kiến{" "}
