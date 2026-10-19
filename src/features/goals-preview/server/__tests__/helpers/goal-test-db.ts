@@ -3,10 +3,12 @@
  * readonly (không ghi file gốc), gắn mock `getDb`, đánh dấu đồng bộ giá hôm nay
  * để `ensurePricesFresh` không gọi mạng.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { needsGoalAccountMigration, rebuildAccountsForGoal } from "@/lib/db-migrate-goal-account";
+import { migrateSecurityEngine } from "@/lib/security/db-migrate";
 import { ensureGoalV2Tables } from "../../db";
 
 export const CIF = "CIF_0001";
@@ -36,6 +38,11 @@ export async function openGoalFixtureDb(): Promise<GoalFixture> {
   const db = new Database(dest);
   db.pragma("journal_mode = WAL");
   ensureGoalV2Tables(db);
+  // DB commit có thể cũ hơn code: áp các migration của `getDb` (accounts cho phép 'goal', bảng
+  // security_engine_state mà `goalToday` đọc) để fixture không lệch theo file .sqlite3.
+  if (needsGoalAccountMigration(db)) rebuildAccountsForGoal(db);
+  db.exec(readFileSync(join(process.cwd(), "data", "schema.sql"), "utf8"));
+  migrateSecurityEngine(db);
   markPriceSyncFresh(db);
   return {
     db,
