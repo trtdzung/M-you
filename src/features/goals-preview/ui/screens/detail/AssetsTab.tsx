@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { Sheet } from "@/components/primitives";
+import { LiquidAssetDetail } from "../assets/LiquidAssetDetail";
 import { ChevronRight, Plus, Landmark, Car, Package } from "lucide-react";
 import { formatVnd, formatVndCompact } from "@/lib/format";
 import { assetGain, assetValue, formatISODate, goalAssets } from "../../../engine";
@@ -12,6 +15,7 @@ import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav } = usePreview();
+  const [detailId, setDetailId] = useState<string | null>(null);
   const { state, goal } = ctx;
   const assets = goalAssets(state, goalId);
   const liquid = assets.flatMap((a) => (a.type === "liquid" ? [a] : []));
@@ -19,6 +23,9 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
 
   return (
     <div className="flex flex-col gap-4">
+      <Sheet open={detailId !== null} title={liquid.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
+        {detailId && <LiquidAssetDetail params={{ goalId, assetId: detailId }} embedded onNavigate={() => setDetailId(null)} />}
+      </Sheet>
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center"><h2 className={sectionTitle}>Linh hoạt</h2><InfoTooltip label="tài sản linh hoạt" text="Sản phẩm MSB như tiền gửi, quỹ hoặc trái phiếu. Khả năng bán, rút tiền và giá trị nhận lại phụ thuộc từng sản phẩm." /></div>
@@ -39,7 +46,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
               const gain = assetGain(a, state);
               return (
                 <li key={a.id}>
-                  <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => nav.push("LiquidAssetDetail", { goalId, assetId: a.id })}>
+                  <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => setDetailId(a.id)}>
                     <div className="flex items-start gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong"><Landmark size={20} aria-hidden /></span>
                       <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{LIQUID_CATEGORY_LABEL[a.category]}</p></div>

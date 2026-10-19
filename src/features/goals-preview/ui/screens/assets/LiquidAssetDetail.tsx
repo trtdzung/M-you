@@ -10,12 +10,12 @@ import { LIQUID_CATEGORY_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
-import { Amount, BottomActions, EmptyState, ScreenHeader, SourceTag, SummaryRows } from "../../shared";
+import { Amount, EmptyState, ScreenHeader, SourceTag, SummaryRows } from "../../shared";
 import { card, hint, primaryButton, progressTrack, screenPadding, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
 import { dateVi, findGoal } from "./helpers";
 
 /** Chi tiết tài sản linh hoạt (sản phẩm MSB). */
-export function LiquidAssetDetail({ params }: ScreenProps) {
+export function LiquidAssetDetail({ params, embedded = false, onNavigate }: ScreenProps & { embedded?: boolean; onNavigate?: () => void }) {
   const { state, nav } = usePreview();
   const asset = selectAsset(state, paramString(params, "assetId"));
   const goal = findGoal(state, asset?.goalId);
@@ -29,6 +29,10 @@ export function LiquidAssetDetail({ params }: ScreenProps) {
     );
   }
 
+  const go = (screen: "SellAsset" | "MaturityChoice") => {
+    onNavigate?.();
+    nav.push(screen, { assetId: asset.id });
+  };
   const today = state.clock.today;
   const product = getInvestProduct(asset.productId);
   const value = assetValue(asset, state);
@@ -67,7 +71,7 @@ export function LiquidAssetDetail({ params }: ScreenProps) {
 
   return (
     <div className={screenPadding}>
-      <ScreenHeader title={asset.name} subtitle={`${LIQUID_CATEGORY_LABEL[asset.category]} · ${goal.name}`} />
+      {!embedded && <ScreenHeader title={asset.name} subtitle={`${LIQUID_CATEGORY_LABEL[asset.category]} · ${goal.name}`} />}
 
       <section className={cn(card, "flex flex-col gap-1")}>
         <p className="text-[13px] text-muted">Giá trị hiện tại</p>
@@ -146,22 +150,22 @@ export function LiquidAssetDetail({ params }: ScreenProps) {
 
       {matured && <p className={cn(warningBox)}>Khoản tiền gửi đã đáo hạn. Hãy chọn tái tục hoặc chuyển tiền về tài khoản mục tiêu.</p>}
 
-      <BottomActions>
+      <div className="flex flex-col gap-2 pt-2">
         {matured && asset.category === "term_deposit" ? (
           <>
-            <button type="button" className={primaryButton} onClick={() => nav.push("MaturityChoice", { assetId: asset.id })}>
+            <button type="button" className={primaryButton} onClick={() => go("MaturityChoice")}>
               Xử lý khoản đáo hạn
             </button>
-            <button type="button" className={secondaryButton} onClick={() => nav.push("SellAsset", { assetId: asset.id })}>
+            <button type="button" className={secondaryButton} onClick={() => go("SellAsset")}>
               Tất toán
             </button>
           </>
         ) : (
-          <button type="button" className={primaryButton} onClick={() => nav.push("SellAsset", { assetId: asset.id })}>
+          <button type="button" className={primaryButton} onClick={() => go("SellAsset")}>
             {asset.category === "fund" || asset.category === "bond" ? "Bán" : "Tất toán"}
           </button>
         )}
-      </BottomActions>
+      </div>
     </div>
   );
 }
