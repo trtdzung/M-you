@@ -119,6 +119,8 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
       if (localPoint(event).x - originX < 72) return;
       const target = edgeBackHref(pathname);
       if (target === "history") backWithTransition(() => router.back());
+      // Goals prototype keeps its own screen stack: edge-swipe pops it instead of leaving the page.
+      else if (pathname.startsWith("/goals-preview")) window.dispatchEvent(new Event("goals-preview:back"));
       else if (pathname.startsWith("/goals")) backWithTransition(() => router.replace(goalReturnHref(new URLSearchParams(window.location.search).get("from"))));
       else if (target) pushWithTransition((href) => router.push(href), target);
     }
