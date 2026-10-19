@@ -152,27 +152,30 @@ describe("HomeInsightWidget Carousel & Health Score", () => {
     const carouselSection = screen.getByRole("region", {
       name: "Gợi ý tài chính và Sức khỏe tài chính",
     });
-    fireEvent.touchStart(carouselSection, { touches: [{ clientX: 200 }] });
-    fireEvent.touchEnd(carouselSection, { changedTouches: [{ clientX: 100 }] });
+    const swipeTrack = carouselSection.querySelector(".touch-pan-y") as HTMLElement;
+    fireEvent.touchStart(swipeTrack, { touches: [{ clientX: 200 }] });
+    fireEvent.touchEnd(swipeTrack, { changedTouches: [{ clientX: 100 }] });
 
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
     expect(screen.getByText(card1.title)).toBeInTheDocument();
     expect(screen.getByText(/Còn lại · Ăn uống:/)).toBeInTheDocument();
 
-    // Navigate to Slide 3 using next button arrow
-    fireEvent.click(screen.getByRole("button", { name: "Slide sau" }));
+    // Navigate to Slide 3 using mouse drag swipe
+    fireEvent.mouseDown(swipeTrack, { clientX: 250, button: 0 });
+    fireEvent.mouseMove(swipeTrack, { clientX: 100 });
+    fireEvent.mouseUp(swipeTrack);
 
     expect(screen.getByText("3 / 3")).toBeInTheDocument();
     expect(screen.getByText(card2.title)).toBeInTheDocument();
     expect(screen.getByText(/Tiền hoàn lại:/)).toBeInTheDocument();
 
+    // Verify arrow buttons are absent (swipe only)
+    expect(screen.queryByRole("button", { name: "Slide sau" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Slide trước" })).not.toBeInTheDocument();
+
     // Navigate with Keyboard ArrowLeft
     fireEvent.keyDown(carouselSection, { key: "ArrowLeft" });
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
-
-    // Navigate with previous button arrow
-    fireEvent.click(screen.getByRole("button", { name: "Slide trước" }));
-    expect(screen.getByText("1 / 3")).toBeInTheDocument();
   });
 
   it("opens Health Score sheet with metric breakdown, coverage explanation, and agent assessment", async () => {
