@@ -1,18 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical, Pause, Play, XCircle } from "lucide-react";
+import { ChevronRight, MoreVertical, Pause, Play, XCircle } from "lucide-react";
 import { Sheet, SegmentedControl } from "@/components/primitives";
-import { formatVnd } from "@/lib/format";
+import { formatVndCompact } from "@/lib/format";
 import { daysToTarget, formatISODate, phaseOf } from "../../../engine";
 import { agentCardsFor } from "./agentCards";
 import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
-import { Amount } from "../../shared/Amount";
 import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadge";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
+import { SummaryRows } from "../../shared/SummaryRows";
 import { card, listRow, ring } from "../../shared/styles";
 import { AssetsTab } from "./AssetsTab";
 import { CashTab } from "./CashTab";
@@ -35,6 +35,7 @@ export function GoalDetail({ params }: ScreenProps) {
   const ctx = useGoalContext(goalId);
   const [tab, setTab] = useState<Tab>(() => parseTab(paramString(params, "tab")));
   const [menu, setMenu] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
   if (!ctx || !goalId) return <GoalNotFound title="Chi tiết mục tiêu" />;
 
   const { goal } = ctx;
@@ -61,23 +62,39 @@ export function GoalDetail({ params }: ScreenProps) {
         }
       />
 
-      <section className={`${card} flex flex-col gap-3`} aria-label="Tiến độ mục tiêu">
-        <div className="flex flex-wrap items-center gap-2">
+      <button type="button" aria-label="Xem chi tiết tiến độ mục tiêu" aria-haspopup="dialog" onClick={() => setProgressOpen(true)} className={`${card} flex w-full flex-col gap-3 text-left ${ring}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm text-muted">{history ? "Giá trị khi kết thúc" : "Đã tích luỹ"}</span>
           <GoalStatusBadge status={goal.status} />
-          {(goal.status === "accumulating" || goal.status === "repaying") && <ProgressStateBadge state={ctx.progress} />}
-          <span className="ml-auto text-[12px] text-muted">
-            {history ? `Hạn ${formatISODate(goal.targetDate)}` : days > 0 ? `Còn ${days} ngày` : days === 0 ? "Đến hạn hôm nay" : `Quá hạn ${-days} ngày`}
-          </span>
         </div>
-        <div className="flex flex-col gap-1">
-          <Amount amount={shownTotal} source={ctx.value.source} className="text-[28px] font-bold text-text" />
-          <span className="text-sm text-muted">Mục tiêu {formatVnd(goal.targetAmount)}</span>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-[28px] font-bold text-text tabular-nums">{formatVndCompact(shownTotal)}</span>
+          <span className="text-sm text-muted">/ {formatVndCompact(goal.targetAmount)}</span>
         </div>
-        <SplitProgressBar cash={history ? shownTotal : ctx.value.cash} assets={history ? 0 : ctx.value.assets} target={goal.targetAmount} />
-        <p className="text-[12px] text-muted">
-          {pct}% mục tiêu · {phase === 1 ? "Giai đoạn 1: tích luỹ" : "Giai đoạn 2: tích luỹ & trả nợ"} · hạn {formatISODate(goal.targetDate)}
-        </p>
-      </section>
+        <SplitProgressBar cash={history ? shownTotal : ctx.value.cash} assets={history ? 0 : ctx.value.assets} target={goal.targetAmount} showLegend={false} />
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="font-semibold text-text">{pct}% mục tiêu</span>
+          <span className="text-muted">Hạn {formatISODate(goal.targetDate)}</span>
+        </div>
+        <span className="flex items-center justify-between text-[13px] font-semibold text-primary-strong">Xem chi tiết tiến độ <ChevronRight size={18} aria-hidden /></span>
+      </button>
+
+      <Sheet open={progressOpen} title="Chi tiết tiến độ" onClose={() => setProgressOpen(false)}>
+        <p className="mb-3 text-sm text-muted">{goal.name} · {phase === 1 ? "Giai đoạn tích luỹ" : "Giai đoạn tích luỹ & trả nợ"}</p>
+        <SummaryRows rows={[
+          { label: history ? "Giá trị khi kết thúc" : "Tổng giá trị tính vào mục tiêu", value: shownTotal, source: ctx.value.source, emphasis: true },
+          { label: "Số tiền mục tiêu", value: goal.targetAmount },
+          ...(!history ? [
+            { label: "Tiền trong tài khoản mục tiêu", value: ctx.value.cash, source: "msb" as const },
+            ...(ctx.value.liquid > 0 ? [{ label: "Tài sản linh hoạt", value: ctx.value.liquid, source: "msb" as const }] : []),
+            ...(ctx.value.fixedCounted > 0 ? [{ label: "Tài sản cố định được tính", value: ctx.value.fixedCounted, source: "self_reported" as const, hint: "Giá trị tự khai sau khi áp dụng tỷ lệ tính vào mục tiêu" }] : []),
+            { label: "Còn cần tích luỹ", value: Math.max(0, goal.targetAmount - shownTotal) },
+          ] : []),
+          { label: "Ngày mục tiêu", value: formatISODate(goal.targetDate) },
+        ]} />
+        {!history && <div className="mt-4 flex flex-wrap items-center gap-2"><ProgressStateBadge state={ctx.progress} /><span className="text-sm text-muted">{days > 0 ? `Còn ${days} ngày` : days === 0 ? "Đến hạn hôm nay" : `Quá hạn ${-days} ngày`}</span></div>}
+        {ctx.value.source === "self_reported" && <p className="mt-3 text-sm leading-5 text-muted">Tổng giá trị gồm tiền tại MSB và tài sản tự khai, không phải toàn bộ là tiền có thể rút.</p>}
+      </Sheet>
 
       <SegmentedControl<Tab>
         ariaLabel="Nội dung mục tiêu"

@@ -6,7 +6,6 @@ import { formatVnd } from "@/lib/format";
 import { addDays, daysBetween, formatISODate, assetValue } from "../../../engine";
 import { cn } from "@/lib/cn";
 import { usePreview } from "../../../store/PreviewStore";
-import { Amount } from "../../shared/Amount";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { SummaryRows } from "../../shared/SummaryRows";
 import { card, infoBox, primaryButton, ring, secondaryButton, sectionTitle, successBox, warningBox } from "../../shared/styles";
@@ -183,21 +182,6 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
             </li>
           ))}
         </ol>
-      </section>
-
-      <section className={`${card} flex flex-col gap-1`}>
-        <h2 className={sectionTitle}>Giá trị hiện tại</h2>
-        <SummaryRows
-          rows={[
-            { label: "Tiền trong tài khoản mục tiêu", value: ctx.value.cash, source: "msb" },
-            { label: "Tài sản linh hoạt", value: ctx.value.liquid, source: "msb" },
-            { label: "Tài sản cố định (phần được tính)", value: ctx.value.fixedCounted, source: "self_reported" },
-            { label: "Tổng", value: ctx.value.total, source: ctx.value.source, emphasis: true },
-          ]}
-        />
-        <p className="pt-1 text-[12px] text-muted">
-          Còn thiếu: <Amount amount={Math.max(0, goal.targetAmount - ctx.value.total)} source="estimated" />
-        </p>
       </section>
 
       <ConfirmSheet
