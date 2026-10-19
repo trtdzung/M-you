@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppMonthKey } from "@/state/app-clock";
+
 import { useMemo, useState } from "react";
 import { ErrorState, SkeletonCard } from "@/components/states";
 import { SpendingSection, type DonutSide } from "@/components/report/SpendingSection";
@@ -13,7 +15,6 @@ import { WrappedEntryCard } from "@/components/wrapped/WrappedEntryCard";
 import type { JarDonutDatum } from "@/components/report/SpendingDonut";
 import { cashflowTrend, monthPeriodFromKey, selectUnlabeledSpend } from "@/domain/engine";
 import { useInsights } from "@/state/useInsights";
-import { currentMonthKey } from "@/lib/demo-clock";
 
 /**
  * Tổng quan — the current-month picture in four sections: "Tổng quan thu chi"
@@ -24,12 +25,13 @@ import { currentMonthKey } from "@/lib/demo-clock";
  * Wealth/net-worth lives on its own tab.
  */
 export function OverviewTab() {
+  const appMonthKey = useAppMonthKey();
   // Always the current month, independent of any month picked on other tabs.
-  const { loading, error, financials, transactions, raw } = useInsights(currentMonthKey());
+  const { loading, error, financials, transactions, raw } = useInsights(appMonthKey);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMonthKey, setReportMonthKey] = useState<string | null>(null);
 
-  const monthKey = financials?.monthKey ?? currentMonthKey();
+  const monthKey = financials?.monthKey ?? appMonthKey;
   // 12 months so the trend card can toggle two 6-month windows.
   const trend = useMemo(() => cashflowTrend(transactions, monthKey, 12), [transactions, monthKey]);
   // The labeling sheet's list — the SAME selector, same inputs as the card's

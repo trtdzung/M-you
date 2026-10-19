@@ -1,10 +1,11 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { markApplied, proposalKey, wasApplied } from "@/lib/agent-applied";
-import { transferNow } from "@/lib/demo-clock";
 import { usePersona } from "@/providers/context";
 import { useFinancials } from "@/state/useFinancials";
 import { useAutoFundWith } from "@/state/use-auto-fund";
@@ -38,12 +39,13 @@ const fieldClass =
  * balance yet CAN receive — the deposit is its first balance.
  */
 export function AgentDistributeCard({ form, fullWidth = false }: { form: DistributeAmountUi; fullWidth?: boolean }) {
+  const appNow = useAppNow();
   const { persona } = usePersona();
   const fin = useFinancials();
   const autoFund = useAutoFundWith({ transactions: fin.transactions, raw: fin.raw });
   const { postLedger, mutationError } = useJarConfig();
   const key = proposalKey(persona.cif, form);
-  const postedAt = useMemo(() => transferNow().toISOString(), []);
+  const postedAt = appNow.toISOString();
   const [status, setStatus] = useState<"idle" | "saving" | "done">(() => (wasApplied(key) ? "done" : "idle"));
   const [refused, setRefused] = useState(false);
   const [rows, setRows] = useState<Row[]>(() => form.allocations.map((a, i) => ({ key: i, jarId: a.to_jar_id, amount: a.amount })));

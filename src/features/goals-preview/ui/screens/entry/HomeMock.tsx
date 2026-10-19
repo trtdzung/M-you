@@ -2,8 +2,6 @@
 
 import { ArrowLeftRight, ChevronRight, CreditCard, Landmark, PiggyBank, Plus, Target, type LucideIcon } from "lucide-react";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import { AgentSuggestionCard } from "../../../agent-sim/AgentSuggestionCard";
-import { visibleSuggestions } from "../../../agent-sim/rules";
 import { formatISODate, monthsLeft } from "../../../engine/dates";
 import { idleCash } from "../../../engine/invest";
 import { requiredMonthly } from "../../../engine/feasibility";
@@ -14,6 +12,7 @@ import type { PreviewState } from "../../../model/state";
 import type { Goal } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectActiveGoals, selectTopGoal } from "../../../store/selectors";
+import { ServerSuggestionList } from "../detail/agentCards";
 import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadge";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
 import { card, divider, ring, sectionTitle, screenPadding } from "../../shared/styles";
@@ -60,7 +59,6 @@ export function HomeMock({ params }: ScreenProps) {
   const { state, nav, toast } = usePreview();
   const top = selectTopGoal(state);
   const active = selectActiveGoals(state);
-  const suggestions = visibleSuggestions(state).slice(0, 2);
   const outOfScope = () => toast("Tính năng này nằm ngoài phạm vi mô phỏng.", "info");
 
   const depositGoal = active.find((g) => idleCash(state, g) > 0) ?? active.find((g) => g.status === "accumulating") ?? top;
@@ -139,13 +137,7 @@ export function HomeMock({ params }: ScreenProps) {
         )}
       </section>
 
-      {suggestions.length > 0 && (
-        <section className="flex flex-col gap-3" aria-label="Gợi ý từ M-You">
-          {suggestions.map((s) => (
-            <AgentSuggestionCard key={s.id} suggestion={s} />
-          ))}
-        </section>
-      )}
+      <ServerSuggestionList limit={2} ariaLabel="Gợi ý từ M-You" />
 
       <section className={`${card} grid grid-cols-4 gap-2`} aria-label="Tiện ích nhanh">
         <QuickTile icon={ArrowLeftRight} label="Chuyển tiền" onClick={outOfScope} />

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { computeFinancials, type RawData } from "@/domain/engine/finance-compose";
-import { DEMO_NOW, currentMonthKey } from "@/lib/demo-clock";
+import { appNow, appMonthKey } from "@/lib/app-clock";
 import { readAccounts } from "@/lib/accounts-store";
 import { readCategories } from "@/lib/categories-store";
 import { readCorrections } from "@/lib/corrections-store";
@@ -22,7 +22,7 @@ export function isDemoCif(cif: string): boolean {
 
 /** Reads the same persisted account, jar, taxonomy and corrected transaction view as PFM. */
 export function currentHomeInsight(cif: string, profileToken: string | null = null) {
-  const month = currentMonthKey();
+  const month = appMonthKey(cif);
   const jarConfig = readJarConfig(cif);
   const accounts = readAccounts(cif);
   const categories = readCategories(cif, { includeArchived: true });
@@ -33,15 +33,15 @@ export function currentHomeInsight(cif: string, profileToken: string | null = nu
   const raw: RawData = {
     accounts, transactions, assets: [], liabilities: [], budgets: [], snapshots: [], goals: [], products: [],
   };
-  const fin = computeFinancials(raw, month, { now: DEMO_NOW, transactions, jarConfig, categories });
+  const fin = computeFinancials(raw, month, { now: appNow(cif), transactions, jarConfig, categories });
   const candidates = [
-    ...jarPlanCandidates(month, fin.jarBudget, DEMO_NOW),
+    ...jarPlanCandidates(month, fin.jarBudget, appNow(cif)),
     ...spendingPressureCandidates(fin),
   ];
   const profile = readFinancialProfile(cif, profileToken);
   if (profile) {
     const opportunity = productOpportunityCandidate({ fin, accounts,
-      liabilities: profile.liabilities, goals: profile.goals, now: DEMO_NOW });
+      liabilities: profile.liabilities, goals: profile.goals, now: appNow(cif) });
     if (opportunity) candidates.push(opportunity);
   }
   const selected = resolvePriority(candidates, 1)[0] ?? null;

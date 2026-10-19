@@ -3,14 +3,13 @@
 import { useId, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Sheet } from "@/components/primitives";
-import { transferNow } from "@/lib/demo-clock";
-import { todayVn } from "../../../model/today";
+import { useAppToday } from "@/state/app-clock";
 import { GOALS_COPY } from "../../copy";
 import { fieldError, input, label, primaryButton } from "../../styles";
 
 /** "YYYY-MM-DD" of the day after the demo "today" (a goal must end after today). */
-function tomorrow(): string {
-  const d = new Date(`${todayVn(transferNow())}T00:00:00.000Z`);
+function tomorrow(today: string): string {
+  const d = new Date(`${today}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 }
@@ -27,8 +26,8 @@ export function GoalDateField({
   customCalendar?: boolean;
 }) {
   const id = useId();
-  const min = tomorrow();
-  const today = todayVn(transferNow());
+  const today = useAppToday();
+  const min = tomorrow(today);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"days" | "months" | "years">("days");
   const minYear = Number(min.slice(0, 4));
@@ -105,7 +104,7 @@ export function GoalDateField({
       </> : <input
         id={id}
         type="date"
-        min={tomorrow()}
+        min={min}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}

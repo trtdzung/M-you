@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { validateGoalCreate } from "../model/validate-goal";
 import { analyze } from "../advisor/analyze";
 import { buildAdvisorContext } from "../advisor/context";
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (!cif) return missingCif();
   if (!isObj(body.draft)) return invalid({ draft: "Thiếu nháp mục tiêu" });
   const overrides = isObj(body.overrides) ? body.overrides : {};
-  const now = transferNow();
+  const now = appNow(cif);
 
   const merged = {
     ...body.draft,

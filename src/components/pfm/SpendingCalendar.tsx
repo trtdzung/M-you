@@ -7,7 +7,7 @@ import { monthPeriodFromKey, netExpenseByCategory, VN_UTC_OFFSET_MS, addMonthsTo
 import { Card, SectionHeader } from "@/components/primitives";
 import { formatVnd } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { DEMO_NOW } from "@/lib/demo-clock";
+import { useAppNow } from "@/state/app-clock";
 
 const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"] as const;
 const COMPACT_NUMBER = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
@@ -72,7 +72,8 @@ export function SpendingCalendar({
   onOpenReport: (monthKey: string) => void;
 }) {
   const [visibleMonth, setVisibleMonth] = useState(monthKey);
-  const today = new Date(DEMO_NOW.getTime() + VN_UTC_OFFSET_MS).getUTCDate();
+  const now = useAppNow();
+  const today = new Date(now.getTime() + VN_UTC_OFFSET_MS).getUTCDate();
   const [selectedDate, setSelectedDate] = useState(() => dayKey(monthKey, Math.min(today, dayCount(monthKey))));
 
   const [year, month] = visibleMonth.split("-").map(Number);

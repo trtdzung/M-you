@@ -18,6 +18,10 @@ import type { Jar, JarConfig } from "@/domain/models";
  */
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/app-clock", async () => {
+  const { transferNow, currentMonthKey } = await import("@/lib/demo-clock");
+  return { appNow: () => transferNow(), appMonthKey: () => currentMonthKey() };
+});
 
 const holder = vi.hoisted(() => ({ db: null as InstanceType<typeof import("better-sqlite3")> | null }));
 vi.mock("@/lib/db", () => ({ getDb: () => holder.db }));

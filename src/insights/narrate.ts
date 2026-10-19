@@ -5,7 +5,7 @@
  */
 
 import type { Insight, InsightFact, InsightSeverity } from "@/domain/models";
-import { DEMO_NOW, monthKeyLabel, prevMonthKey } from "@/lib/demo-clock";
+import { transferNow, monthKeyLabel, prevMonthKey } from "@/lib/demo-clock";
 import { formatVnd } from "@/lib/format";
 
 /** Label of the month before the given "YYYY-MM" key (comparison period). */
@@ -45,7 +45,7 @@ export function buildInsight(input: BuildInsightInput): Insight {
     explanation: input.explanation,
     sourceFacts: input.facts,
     comparisonPeriod: input.comparisonPeriod,
-    generatedAt: DEMO_NOW.toISOString(),
+    generatedAt: transferNow().toISOString(),
     confidence: input.confidence ?? 0.9,
     assumptions: input.assumptions ?? [],
     actionType: input.actionType,

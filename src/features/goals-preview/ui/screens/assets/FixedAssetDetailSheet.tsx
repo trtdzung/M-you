@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInstrument } from "../../../data/market";
-import { assetValue, isAutoValued, seriesPriceAt } from "../../../engine";
+import { assetValue, formatISODate, isAutoValued, seriesPriceAt } from "../../../engine";
+import type { ISODate, PricePoint } from "../../../model/types";
 import { FIXED_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { InfoTooltip } from "../../shared/InfoTooltip";
@@ -13,8 +14,18 @@ import { primaryButton, heroNumber, secondaryButton } from "../../shared/styles"
 import { isStaleValuation } from "../detail/common";
 import { dateVi } from "./helpers";
 
+/** Date of the price point in use: the last point on or before the goal's today. */
+export function priceDateOf(series: PricePoint[], today: ISODate): ISODate | undefined {
+  let found: ISODate | undefined;
+  for (const point of series) {
+    if (point.date <= today) found = point.date;
+    else break;
+  }
+  return found;
+}
+
 export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; onClose: () => void }) {
-  const { state, nav, dispatch } = usePreview();
+  const { state, nav, dispatch, refreshPrices, pricesRefreshing } = usePreview();
   const asset = state.assets.find((item) => item.id === assetId);
   const [editQty, setEditQty] = useState(false);
   const [qty, setQty] = useState("");
@@ -26,6 +37,8 @@ export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; o
   const stale = !auto && isStaleValuation(asset.valuationDate, state.clock.today);
   const instrument = getInstrument(asset.instrumentId);
   const unitPrice = instrument ? seriesPriceAt(instrument.priceSeries, state.clock.today, state.market.fundPriceShiftPct) : 0;
+  const priceDate = instrument ? priceDateOf(instrument.priceSeries, state.clock.today) : undefined;
+  const earliestDate = instrument && !priceDate ? instrument.priceSeries[0]?.date : undefined;
   const newQty = Number(qty.replace(",", "."));
 
   return (
@@ -59,6 +72,19 @@ export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; o
             <p className="text-sm tabular-nums text-text">
               {asset.quantity.toLocaleString("vi-VN")} {instrument.unit} × {formatVnd(unitPrice)} = <b>{formatVnd(now)}</b>
             </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] text-muted">
+                {priceDate ? `Giá ngày ${formatISODate(priceDate)}` : earliestDate ? `Giá sớm nhất có: ${dateVi(earliestDate)}` : ""}
+              </p>
+              <button
+                type="button"
+                disabled={pricesRefreshing}
+                onClick={refreshPrices}
+                className="text-[13px] font-semibold text-primary-strong disabled:opacity-60"
+              >
+                {pricesRefreshing ? "Đang cập nhật…" : "Cập nhật lại"}
+              </button>
+            </div>
             <p className="text-[12px] text-muted">Giá {instrument.name} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}</p>
             {editQty && (
               <div className="flex items-baseline gap-2 border-b-2 border-border pb-1 focus-within:border-primary">

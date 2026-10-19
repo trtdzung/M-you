@@ -1,8 +1,9 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import Link from "next/link";
 import { CircleHelp, FlaskConical, PenLine, Search, ShieldCheck, Smartphone, TriangleAlert } from "lucide-react";
-import { transferNow } from "@/lib/demo-clock";
 import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts, isTransferLocked } from "@/state/security/selectors";
@@ -26,6 +27,7 @@ const dateLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { day: "2-dig
 
 /** Settings › Bảo mật: score, Scam Shield entry points and the existing auth rows. */
 export function SecurityHub() {
+  const appNow = useAppNow();
   useScreenEvent("hub_open");
   const router = useRouter();
   const { persona } = usePersona();
@@ -38,7 +40,7 @@ export function SecurityHub() {
   const pendingContacts = security.emergencyContacts.some(contact => contact.status === "pending");
   // Score mixes the old demo auth fields with the Scam Shield store.
   const score = securityScore({ passwordUpdated: demo.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1], faceId: demo.faceId, advanced: demo.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
-  const lockUntil = isTransferLocked(security, transferNow().getTime()) ? security.transferLockUntil : null;
+  const lockUntil = isTransferLocked(security, appNow.getTime()) ? security.transferLockUntil : null;
   const offAt = security.pendingOff.aiProtect;
 
   return <div className="shield-screen shield-hub">

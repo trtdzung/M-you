@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { toGoalView } from "../server/goal-view";
 import { getGoal, resumeExpiredPauses } from "../server/goals-repo";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { listLedger } from "../server/ledger-repo";
 import { cifOf, missingCif, notFound, type RouteCtx } from "./_http";
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   const cif = cifOf(req.nextUrl.searchParams.get("cif"));
   if (!cif) return missingCif();
   const { id } = await ctx.params;
-  const now = transferNow();
+  const now = appNow(cif);
   resumeExpiredPauses(cif, now);
   const goal = getGoal(cif, id);
   if (!goal) return notFound();

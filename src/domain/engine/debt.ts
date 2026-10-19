@@ -1,3 +1,4 @@
+import { transferNow } from "@/lib/demo-clock";
 /**
  * Debt-repayment projection — a deterministic amortization what-if: "if I pay X
  * per month, when is this cleared and how much interest?". Engine owns the math;
@@ -38,7 +39,7 @@ export interface DebtSimInput {
 }
 
 export function simulateDebtRepayment(liability: Liability, input: DebtSimInput = {}): DebtProjection {
-  const asOf = input.asOf ?? new Date();
+  const asOf = input.asOf ?? transferNow();
   const startKey = dateToMonthKey(asOf);
   const principal = liability.outstandingPrincipal;
   const rate = liability.interestRate;

@@ -1,5 +1,5 @@
 import { getInvestProduct, getLoanProduct } from "../data/products";
-import { DEFAULT_SCENARIO_ID, getScenario } from "../data/scenarios";
+import { getScenario } from "../data/scenarios";
 import { makeAsset } from "../engine/assets";
 import { advanceTime, applySalary, describeAdvance, payDueInstalments, runStandingOrder } from "../engine/advance";
 import { addMonths, daysBetween, formatISODate, monthsBetween, nextDayOfMonth } from "../engine/dates";
@@ -7,13 +7,14 @@ import { findGoal, goalBalance, makeAccountNumber, nextId, postTxn } from "../en
 import { applyLifecycle, refreshLoanStatuses } from "../engine/lifecycle";
 import { affordability, annuityPayment, buildSchedule, outstandingPrincipal } from "../engine/loan";
 import { assetValue, depositAccrued, fundPriceAt, goalValue } from "../engine/value";
-import type { PreviewState } from "../model/state";
+import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { Goal, LiquidAsset, ToastTone } from "../model/types";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import type { PreviewAction, SimEvent } from "./actions";
 
 export const STORAGE_KEY = "goals-preview:v1";
+const EMPTY_SCENARIO_ID = "empty";
 const MAX_TOASTS = 4;
 
 // ---------------------------------------------------------------- init
@@ -29,17 +30,19 @@ export function stateFromScenario(scenarioId: string, jump = false): PreviewStat
   const target = jump ? scenario.jumpTo : undefined;
   const stack: ScreenEntry[] = [entry(1, "GoalList", target?.screen === "GoalList" ? target.params : undefined)];
   if (target && target.screen !== "GoalList") stack.push(entry(2, target.screen, target.params));
-  return { ...world, dismissedSuggestionIds: [], nav: { stack }, toasts: [] };
+  return { ...world, dismissedSuggestionIds: [], nav: { stack }, navSeq: stack.length, toasts: [] };
 }
 
+/** Customer's empty world: the state before the first server world arrives (never demo data). */
 export function initialPreviewState(): PreviewState {
-  return stateFromScenario(DEFAULT_SCENARIO_ID);
+  return stateFromScenario(EMPTY_SCENARIO_ID);
 }
 
 // ---------------------------------------------------------------- helpers
 
 function toast(draft: PreviewState, message: string, tone: ToastTone = "success"): void {
-  draft.toasts = [...draft.toasts, { id: nextId(draft, "toast"), message, tone }].slice(-MAX_TOASTS);
+  draft.navSeq = (draft.navSeq ?? 0) + 1;
+  draft.toasts = [...draft.toasts, { id: `toast-${draft.navSeq}`, message, tone }].slice(-MAX_TOASTS);
 }
 
 /** Returns the original state with only an error toast added (no world change). */
@@ -108,21 +111,21 @@ function refreshFundSnapshots(draft: PreviewState): void {
 
 function navReducer(state: PreviewState, action: PreviewAction): PreviewState | null {
   const stack = state.nav.stack;
-  const seq = state.seq + 1;
+  const seq = (state.navSeq ?? 0) + 1;
   switch (action.type) {
     case "nav/params":
       return { ...state, nav: { stack: stack.map((item, index) => index === stack.length - 1 ? { ...item, params: { ...item.params, ...action.params } } : item) } };
     case "nav/push":
-      return { ...state, seq, nav: { stack: [...stack, entry(seq, action.screen, action.params)] } };
+      return { ...state, navSeq: seq, nav: { stack: [...stack, entry(seq, action.screen, action.params)] } };
     case "nav/replace":
-      return { ...state, seq, nav: { stack: [...stack.slice(0, -1), entry(seq, action.screen, action.params)] } };
+      return { ...state, navSeq: seq, nav: { stack: [...stack.slice(0, -1), entry(seq, action.screen, action.params)] } };
     case "nav/pop": {
       const count = Math.max(1, action.count ?? 1);
       if (stack.length <= 1) return state;
       return { ...state, nav: { stack: stack.slice(0, Math.max(1, stack.length - count)) } };
     }
     case "nav/reset":
-      return { ...state, seq, nav: { stack: [entry(seq, action.screen ?? "GoalList", action.params)] } };
+      return { ...state, navSeq: seq, nav: { stack: [entry(seq, action.screen ?? "GoalList", action.params)] } };
     case "nav/popTo": {
       const index = stack.map((e) => e.screen).lastIndexOf(action.screen);
       if (index === -1) return state;
@@ -131,6 +134,45 @@ function navReducer(state: PreviewState, action: PreviewAction): PreviewState | 
     default:
       return null;
   }
+}
+
+/**
+ * Replaces the data part with the server world. Temporary goal ids follow `goalIdMap` (from the createGoal
+ * responses, never guessed). A screen whose param is an unsaved goal id — or a lastCreatedGoalId the server world
+ * does not have and the map does not resolve — is dropped with every screen above it.
+ */
+function syncWorld(state: PreviewState, world: WorldState, goalIdMap: Record<string, string> = {}, unsavedGoalIds: readonly string[] = []): PreviewState {
+  const mapId = (value: string) => (Object.hasOwn(goalIdMap, value) ? goalIdMap[value] : value);
+  const last = state.lastCreatedGoalId;
+  const lastLost = last !== undefined && (unsavedGoalIds.includes(last) || (!Object.hasOwn(goalIdMap, last) && !world.goals.some((g) => g.id === last)));
+  const lost = (value: unknown) => typeof value === "string" && (unsavedGoalIds.includes(value) || (lastLost && value === last));
+
+  const cut = state.nav.stack.findIndex((item) => lost(item.params.goalId));
+  const mapped = (value: unknown) => typeof value === "string" && Object.hasOwn(goalIdMap, value);
+  let navSeq = state.navSeq;
+  let nav = state.nav;
+  if (cut === 0) {
+    // Nothing left below the dropped screen: back to the goal list.
+    navSeq = (navSeq ?? 0) + 1;
+    nav = { stack: [entry(navSeq, "GoalList")] };
+  } else if (cut > 0 || state.nav.stack.some((item) => mapped(item.params.goalId))) {
+    const kept = cut > 0 ? state.nav.stack.slice(0, cut) : state.nav.stack;
+    nav = {
+      stack: kept.map((item) => {
+        if (!mapped(item.params.goalId)) return item;
+        const params: ScreenParams = { ...item.params, goalId: mapId(item.params.goalId as string) };
+        return { ...item, params };
+      }),
+    };
+  }
+  return {
+    ...world,
+    nav,
+    navSeq,
+    toasts: state.toasts,
+    dismissedSuggestionIds: state.dismissedSuggestionIds,
+    lastCreatedGoalId: last === undefined || lastLost ? undefined : mapId(last),
+  };
 }
 
 // ---------------------------------------------------------------- reducer
@@ -142,6 +184,9 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
   switch (action.type) {
     case "hydrate":
       return action.state;
+
+    case "world/sync":
+      return syncWorld(state, action.world, action.goalIdMap, action.unsavedGoalIds);
 
     case "reset": {
       const next = stateFromScenario(state.scenarioId);
@@ -185,6 +230,12 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       draft.market.fundPriceShiftPct = action.pct;
       refreshFundSnapshots(draft);
       toast(draft, `Giá chứng chỉ quỹ ${action.pct >= 0 ? "+" : ""}${action.pct}% so với chuỗi giá gốc.`, "info");
+      return draft;
+    }
+
+    case "setRiskProfile": {
+      draft.customer = { ...draft.customer, riskProfile: action.profile, riskProfileAsked: true };
+      toast(draft, "Đã lưu khẩu vị đầu tư của bạn.", "success");
       return draft;
     }
 
@@ -239,7 +290,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
         number: makeAccountNumber(draft.seq),
         name: `TK mục tiêu – ${goal.name}`,
         balance: 0,
-        interestRatePa: 0.5,
+        interestRatePa: 0,
         openedAt: today,
         status: "open",
       });

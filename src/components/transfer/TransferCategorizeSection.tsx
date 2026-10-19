@@ -1,5 +1,7 @@
 "use client";
 
+import { transferNow } from "@/lib/demo-clock";
+
 import { useMemo, useRef, useState } from "react";
 import { ChevronRight, Tag } from "lucide-react";
 import { Sheet } from "@/components/primitives";
@@ -99,7 +101,7 @@ export function TransferCategorizeSection({
       // into a jar that's now over-budget. Unwind any prior rebalance (H5) and
       // re-fund the residual overspend from the waterfall on the TRIGGER period
       // (H4 — derive the snapshot from the txn's own date, not the viewed month).
-      const postedAt = currentTxn?.postedAt ?? new Date().toISOString();
+      const postedAt = currentTxn?.postedAt ?? transferNow().toISOString();
       const result = autoFund.reconcile({
         triggerTxnId: txnId,
         categoryId,

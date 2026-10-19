@@ -1,10 +1,11 @@
+import { useAppNow } from "@/state/app-clock";
 import { assessProgress } from "../../engine/progress";
-import { transferNow } from "@/lib/demo-clock";
 import type { SavingsGoalView } from "../../model/types";
 
 export function LedgerPreview({ goal, amount, kind }: { goal: SavingsGoalView; amount?: number; kind: "deposit" | "withdraw" }) {
+  const appNow = useAppNow();
   const balance = goal.currentAmount + (kind === "deposit" ? 1 : -1) * (amount ?? 0);
-  const progress = assessProgress({ ...goal, currentAmount: balance, now: transferNow() });
+  const progress = assessProgress({ ...goal, currentAmount: balance, now: appNow });
   return <div className="rounded-2xl border border-border bg-surface-muted p-4 text-[14px]">
     <p className="font-semibold text-text">{goal.name}</p>
     <dl className="mt-3 space-y-2"><div className="flex flex-wrap justify-between gap-2"><dt className="text-muted">Đã tích lũy</dt><dd>{goal.currentAmount.toLocaleString("en-US")} VND</dd></div>

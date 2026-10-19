@@ -1,4 +1,4 @@
-import { FUND_BOND, FUND_EQUITY, ONLINE_DEPOSIT, SAVINGS_FLEX } from "../data/products";
+import { ONLINE_DEPOSIT, SAVINGS_FLEX } from "../data/products";
 import type { WorldState } from "../model/state";
 import type { Goal, ISODate, RiskLevel } from "../model/types";
 import { addMonths, monthsLeft } from "./dates";
@@ -57,7 +57,7 @@ export interface InvestSuggestion {
  * Rules (MSB products only so the goal can track them):
  * - < 12 months left → tiết kiệm linh hoạt or a short deposit maturing before the date.
  * - 12–36 months → term deposit maturing before the target date.
- * - > 36 months → term deposit, and a fund (bond fund; equity only for "growth" risk profile).
+ * - > 36 months → term deposit (MSB has no funds or bonds).
  */
 export function investSuggestions(world: World, goal: Goal, amount = idleCash(world, goal)): InvestSuggestion[] {
   if (amount <= 0) return [];
@@ -94,26 +94,6 @@ export function investSuggestions(world: World, goal: Goal, amount = idleCash(wo
       estimatedAtMaturity: amount + depositAccrued(amount, term.ratePa, today, maturityDate),
       maturityDate,
     });
-  }
-  if (band === "long") {
-    out.push({
-      productId: FUND_BOND.id,
-      riskLevel: FUND_BOND.riskLevel,
-      title: FUND_BOND.name,
-      reason: "Còn trên 3 năm, có thể chấp nhận biến động nhỏ để lợi nhuận tốt hơn tiền gửi.",
-      caution: "Giá chứng chỉ quỹ thay đổi hằng ngày, không cam kết lợi nhuận.",
-      suggestedAmount: Math.floor(amount / 2 / 1_000_000) * 1_000_000 || amount,
-    });
-    if (world.customer.riskProfile === "growth") {
-      out.push({
-        productId: FUND_EQUITY.id,
-        riskLevel: FUND_EQUITY.riskLevel,
-        title: FUND_EQUITY.name,
-        reason: "Khẩu vị tăng trưởng và thời gian dài giúp vượt qua các đợt giảm giá.",
-        caution: "Có thể giảm 10–20% trong ngắn hạn. Chỉ nên dùng phần tiền chưa cần trong 3 năm.",
-        suggestedAmount: Math.floor(amount / 3 / 1_000_000) * 1_000_000 || amount,
-      });
-    }
   }
   return out;
 }

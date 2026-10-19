@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { assessFeasibility } from "../engine/feasibility";
 import { buildLevers } from "../engine/levers";
 import { averageSurplus } from "../engine/surplus";
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (!body) return badBody();
   const cif = cifOf(body.cif);
   if (!cif) return missingCif();
-  const now = transferNow();
+  const now = appNow(cif);
 
   const checked = validateGoalCreate(
     { name: "x", flexibility: "flexible", ...body, monthlyContribution: null, openingAmount: null },

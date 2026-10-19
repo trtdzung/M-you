@@ -1,3 +1,5 @@
+import { refreshAppClock } from "@/lib/demo-clock";
+
 // Client calls for the simulation panel and the quick-action sheet. Demo data only.
 
 export const STRANGER = { name: "NGUYEN VAN LA", account: "9704999911110001", bank: "Vietcombank" };
@@ -96,6 +98,7 @@ export async function putClock(cif: string, patch: Partial<Pick<ClockView, "offs
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, ...patch }),
   });
   await ensure(res, "Không đặt được đồng hồ.");
+  if (patch.offsetMs !== undefined) refreshAppClock(cif);
   emitEngineChange();
   return res.json() as Promise<ClockView>;
 }

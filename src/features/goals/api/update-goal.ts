@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { validateGoalUpdate } from "../model/validate-goal";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { loadGoalView } from "../server/goal-view";
@@ -13,7 +13,7 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
   const cif = cifOf(body.cif);
   if (!cif) return missingCif();
   const { id } = await ctx.params;
-  const now = transferNow();
+  const now = appNow(cif);
   const result = validateGoalUpdate(body, now);
   if (!result.ok) return invalid(result.errors);
   const goal = updateGoal(cif, id, result.value, now);

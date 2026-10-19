@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Car, CircleDollarSign, FileText, Gem, Home, Landmark, Package, PieChart, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import { getInstrument, instrumentsOf, type MarketKind } from "../../../data/market";
+import { getInstrument, hydrateMarket, instrumentsOf, MARKET_INSTRUMENTS, type MarketInstrument, type MarketKind } from "../../../data/market";
 import { addMonths, outsideValue, seriesPriceAt } from "../../../engine";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import type { FixedAssetCategory } from "../../../model/types";
@@ -13,7 +13,7 @@ import { AmountCard, SuggestChip } from "../../shared/AmountCard";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { Switch } from "../../shared/Pickers";
 import { BottomActions, ConfirmSheet, EmptyState, ScreenHeader, SliderRow, SourceTag } from "../../shared";
-import { card, input, label, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
+import { card, input, label, primaryButton, ring, screenPadding, secondaryButton, sectionTitle } from "../../shared/styles";
 import { findGoal, pct, progressAfter, dateVi } from "./helpers";
 
 type Valuation = "manual" | "market" | "accrual";
@@ -91,6 +91,9 @@ export function AddFixedAsset({ params }: ScreenProps) {
   const [counted, setCounted] = useState(true);
   const [percent, setPercent] = useState(PHYSICAL[0].percent);
   const [confirm, setConfirm] = useState(false);
+  const [symbolInput, setSymbolInput] = useState("");
+  const [symbolChecking, setSymbolChecking] = useState(false);
+  const [symbolError, setSymbolError] = useState<string | undefined>();
 
   if (!goal) {
     return (
@@ -107,6 +110,33 @@ export function AddFixedAsset({ params }: ScreenProps) {
     setInstrumentId(t.valuation === "market" ? instrumentsOf(t.category as MarketKind)[0]?.id : undefined);
     setQuantity("");
     setTerm(t.category === "deposit" || t.category === "bond" ? TERMS[t.category][1] : undefined);
+  };
+
+  const addSymbol = async () => {
+    const symbol = symbolInput.trim().toUpperCase();
+    if (!symbol || symbolChecking) return;
+    setSymbolChecking(true);
+    setSymbolError(undefined);
+    try {
+      const res = await fetch("/api/goals-v2/market/instruments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const body = (await res.json().catch(() => null)) as { instrument?: MarketInstrument; error?: string } | null;
+      if (res.ok && body?.instrument) {
+        const added = body.instrument;
+        hydrateMarket([...MARKET_INSTRUMENTS.filter((m) => m.id !== added.id), added]);
+        setInstrumentId(added.id);
+        setSymbolInput("");
+      } else {
+        setSymbolError(body?.error ?? "Chưa kiểm tra được mã cổ phiếu lúc này. Bạn thử lại sau nhé.");
+      }
+    } catch {
+      setSymbolError("Chưa kiểm tra được mã cổ phiếu lúc này. Bạn thử lại sau nhé.");
+    } finally {
+      setSymbolChecking(false);
+    }
   };
 
   const instrument = getInstrument(instrumentId);
@@ -190,6 +220,31 @@ export function AddFixedAsset({ params }: ScreenProps) {
               <SuggestChip key={m.id} label={m.name} selected={m.id === instrumentId} onClick={() => setInstrumentId(m.id)} />
             ))}
           </div>
+          {type.category === "stock" && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="asset-symbol" className={label}>Mã cổ phiếu khác</label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="asset-symbol"
+                  className={input}
+                  value={symbolInput}
+                  maxLength={10}
+                  placeholder="VD: DGC"
+                  autoCapitalize="characters"
+                  onChange={(e) => {
+                    setSymbolInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+                    setSymbolError(undefined);
+                  }}
+                />
+                <div className="w-28 shrink-0">
+                  <button type="button" className={secondaryButton} disabled={symbolChecking || symbolInput.trim() === ""} onClick={addSymbol}>
+                    {symbolChecking ? "Đang kiểm tra…" : "Thêm"}
+                  </button>
+                </div>
+              </div>
+              {symbolError && <p className="text-sm text-negative">{symbolError}</p>}
+            </div>
+          )}
           {instrument && (
             <div className="flex flex-col gap-1.5">
               <label htmlFor="asset-qty" className={label}>Số lượng ({instrument.unit})</label>

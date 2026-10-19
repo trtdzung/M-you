@@ -15,7 +15,7 @@ import { readAccounts } from "@/lib/accounts-store";
 import { readJarConfig } from "@/lib/jars-store";
 import { readManualTxns } from "@/lib/manual-txns-store";
 import { readTransactions } from "@/lib/transactions-store";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 
 /**
  * Server-side consistency guard for one `dieu-chinh-hu` rebalance leg (plan
@@ -54,7 +54,7 @@ export function rebalanceLegViolation(cif: string, txn: Transaction): NextRespon
 
   // The leg itself (a re-POST / PATCH of the same id) must not count toward its own cap.
   const txns = liveTxns(cif).filter((t) => t.id !== txn.id);
-  const now = transferNow();
+  const now = appNow(cif);
   const period = monthPeriodFromKey(dateToMonthKey(new Date(txn.postedAt), now));
   const asOf = Number.isFinite(Date.parse(txn.postedAt)) ? new Date(txn.postedAt).toISOString() : balanceAsOf(period, now);
   const balances = jarBalances(config, txns, asOf, period.to);

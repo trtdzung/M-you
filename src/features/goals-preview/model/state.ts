@@ -27,14 +27,16 @@ export interface PreviewState {
   dismissedSuggestionIds: string[];
   nav: { stack: ScreenEntry[] };
   toasts: Toast[];
-  /** Monotonic counter for deterministic ids. */
+  /** Monotonic counter for deterministic business ids. Only business actions move it (same as the server). */
   seq: number;
+  /** Client-only counter for screen keys and toast ids; never sent to the server. */
+  navSeq?: number;
   /** Id of the goal most recently created by `createGoal` (wizard reads it). */
   lastCreatedGoalId?: string;
 }
 
 /** The data part of a scenario (no nav / toasts / dismissals). */
-export type WorldState = Omit<PreviewState, "nav" | "toasts" | "dismissedSuggestionIds" | "lastCreatedGoalId">;
+export type WorldState = Omit<PreviewState, "nav" | "navSeq" | "toasts" | "dismissedSuggestionIds" | "lastCreatedGoalId">;
 
 export interface ScenarioJump {
   screen: ScreenId;

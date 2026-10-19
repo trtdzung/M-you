@@ -7,7 +7,10 @@
  */
 
 import { createContext, useContext, useMemo, useState } from "react";
-import { availableMonths, currentMonthKey, type MonthOption } from "@/lib/demo-clock";
+import { monthKeyLabel, type MonthOption } from "@/lib/demo-clock";
+
+import { useAppMonthKey } from "./app-clock";
+import { addMonthsToKey } from "@/domain/engine/types";
 
 interface PeriodContextValue {
   month: string;
@@ -18,10 +21,11 @@ interface PeriodContextValue {
 const PeriodContext = createContext<PeriodContextValue | null>(null);
 
 export function PeriodProvider({ children }: { children: React.ReactNode }) {
-  const [month, setMonth] = useState<string>(currentMonthKey());
+  const currentMonth = useAppMonthKey();
+  const [month, setMonth] = useState<string>(currentMonth);
   const value = useMemo<PeriodContextValue>(
-    () => ({ month, setMonth, options: availableMonths() }),
-    [month],
+    () => ({ month, setMonth, options: Array.from({ length: 6 }, (_, i) => { const key = addMonthsToKey(currentMonth, -i); return { key, label: monthKeyLabel(key) }; }) }),
+    [month, currentMonth],
   );
   return <PeriodContext.Provider value={value}>{children}</PeriodContext.Provider>;
 }

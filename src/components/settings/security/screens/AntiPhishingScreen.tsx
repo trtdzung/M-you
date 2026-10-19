@@ -1,8 +1,11 @@
 "use client";
 
+import { transferNow } from "@/lib/demo-clock";
+
+import { useAppNow } from "@/state/app-clock";
+
 import { useState } from "react";
 import { MessageSquareLock } from "lucide-react";
-import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { Action, Badge, Notice, Panel } from "../../settings-ui";
 import { ConfirmFaceSheet } from "../ConfirmFaceSheet";
@@ -20,13 +23,14 @@ function SmsPreview({ code }: { code: string }) {
 
 /** Settings › Mã chống giả mạo. Setting or changing the code needs a face check; turning off waits 24h. */
 export function AntiPhishingScreen() {
+  const appNow = useAppNow();
   const code = useSecurityStore(state => state.antiPhishingCode);
   const offAt = useSecurityStore(state => state.pendingOff.antiPhishing);
   const { saveAntiPhishingCode, requestOff: requestStoreOff, cancelOff, applyOff } = useSecurityStore.getState();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [confirm, setConfirm] = useState<"save" | "off" | null>(null);
-  const pending = isPending(offAt, transferNow().getTime());
+  const pending = isPending(offAt, appNow.getTime());
 
   const save = () => {
     saveAntiPhishingCode(draft);

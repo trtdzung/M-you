@@ -2,12 +2,13 @@
 
 import { useLayoutEffect, useRef } from "react";
 import { SkeletonCard } from "@/components/states";
+import { EmptyState } from "./shared/EmptyState";
 import { usePreview } from "../store/PreviewStore";
 import { SCREEN_REGISTRY } from "./registry";
 
 /** Renders the top entry of the in-store screen stack. */
 export function ScreenHost() {
-  const { nav, hydrated } = usePreview();
+  const { nav, hydrated, loadStatus, reload } = usePreview();
   const entry = nav.current;
 
   const positions = useRef<Record<string, number>>({});
@@ -20,6 +21,9 @@ export function ScreenHost() {
     return () => container.removeEventListener("scroll", save);
   }, [entry.key, hydrated]);
 
+  if (loadStatus === "error") {
+    return <EmptyState title="Chưa tải được dữ liệu mục tiêu." description="" ctaLabel="Thử lại" onCta={reload} />;
+  }
   if (!hydrated) return <SkeletonCard className="mt-4 h-40" />;
   const def = SCREEN_REGISTRY[entry.screen] ?? SCREEN_REGISTRY.GoalList;
   const Screen = def.component;

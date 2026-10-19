@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { computeFinancials, type RawData } from "@/domain/engine/finance-compose";
 import { jarSpendable } from "@/domain/engine";
 import type { Amount } from "@/domain/engine/types";
-import { currentMonthKey, transferNow } from "@/lib/demo-clock";
+import { appMonthKey, appNow } from "@/lib/app-clock";
 import { readAccounts } from "@/lib/accounts-store";
 import { readCorrections } from "@/lib/corrections-store";
 import { readJarConfig } from "@/lib/jars-store";
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const cif = params.get("cif");
   if (!cif) return NextResponse.json({ error: "cif is required" }, { status: 422 });
-  const month = params.get("month") ?? currentMonthKey();
+  const month = params.get("month") ?? appMonthKey(cif);
   if (!MONTH_RE.test(month)) return NextResponse.json({ error: "month must be YYYY-MM" }, { status: 422 });
 
   try {
@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
       goals: [],
       products: [],
     };
-    // One clock (Red Team #1): the same `transferNow()` that stamps ledger rows.
-    const fin = computeFinancials(raw, month, { now: transferNow(), transactions, jarConfig });
+    // One clock (Red Team #1): the same `appNow(cif)` that stamps ledger rows.
+    const fin = computeFinancials(raw, month, { now: appNow(cif), transactions, jarConfig });
     const jarById = new Map(jarConfig.jars.map((j) => [j.id, j]));
 
     const jars = fin.jarEnvelope.jars.map((line) => {

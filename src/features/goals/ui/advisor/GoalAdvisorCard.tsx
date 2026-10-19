@@ -1,9 +1,9 @@
+import { useAppNow } from "@/state/app-clock";
 import type { Analysis, AnalyzeDraft, PlanId } from "../../advisor/analysis-types";
 import { cashflowSentence, understoodSentence, verdictSentence } from "../../advisor/templates";
 import type { AdvisorOverrides } from "../../client/hooks/use-goal-advisor";
 import type { AdvisorNarration } from "../../client/hooks/use-advisor-narration";
 import { monthsLeft } from "../../engine/months";
-import { transferNow } from "@/lib/demo-clock";
 import { GOALS_COPY } from "../copy";
 import { primaryButton } from "../styles";
 import { AnalysisSteps } from "./AnalysisSteps";
@@ -27,10 +27,11 @@ export interface GoalAdvisorCardProps {
 
 /** Three-step analysis of a coach draft, the verdict, the plans; the form opens only when the customer asks. */
 export function GoalAdvisorCard(p: GoalAdvisorCardProps) {
+  const appNow = useAppNow();
   const c = GOALS_COPY.advisor;
   const a = p.analysis;
   const steps = [
-    { title: c.step1, text: understoodSentence(p.draft, monthsLeft(transferNow(), p.draft.targetDate)) },
+    { title: c.step1, text: understoodSentence(p.draft, monthsLeft(appNow, p.draft.targetDate)) },
     { title: c.step2, text: a ? cashflowSentence(a) : null },
     { title: c.step3, text: a ? verdictSentence(a) : null },
   ];

@@ -9,7 +9,6 @@ import "server-only";
 
 import { AGENT_PREFERENCES_MAX, EMPTY_AGENT_PREFERENCES, type AgentPreferences } from "@/domain/models";
 import { getDb } from "./db";
-import { transferNow } from "./demo-clock";
 
 interface Row {
   cif: string;
@@ -104,6 +103,6 @@ export function writeAgentPreferences(cif: string, prefs: AgentPreferences): Age
          notes = excluded.notes,
          updated_at = excluded.updated_at`,
     )
-    .run({ cif, ...prefs, updatedAt: transferNow().toISOString() });
+    .run({ cif, ...prefs, updatedAt: new Date().toISOString() });
   return readAgentPreferences(cif);
 }

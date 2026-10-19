@@ -17,6 +17,7 @@ import {
   needsJarLedgerMigration,
   seedJarLedgerFromLimits,
 } from "./db-migrate-jar-ledger";
+import { needsGoalAccountMigration, rebuildAccountsForGoal } from "./db-migrate-goal-account";
 import { migrateSecurityEngine } from "./security/db-migrate";
 
 let instance: Database.Database | null = null;
@@ -31,6 +32,14 @@ export function getDb(): Database.Database {
   // the file up first — a failed backup throws and nothing below runs.
   const migrateJarLedger = needsJarLedgerMigration(db);
   if (migrateJarLedger) backupDbFile(db, dbPath);
+  // Migration (goal-backend T1): rebuild `accounts` so its CHECK allows 'goal'.
+  // Backup first (skipped when the jar-ledger backup above already copied the
+  // untouched file); must run before schema.sql (its CREATE IF NOT EXISTS would
+  // keep the old CHECK).
+  if (needsGoalAccountMigration(db)) {
+    if (!migrateJarLedger) backupDbFile(db, dbPath);
+    rebuildAccountsForGoal(db);
+  }
   // Migration: the `jar_allocations` ledger was retired with the single-number
   // jar model (a jar's `budget_limit` is now its allocation — no separate earmark
   // table). Drop the legacy table if an older DB file still carries it, so the

@@ -34,6 +34,7 @@ import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { applyAgentPlan } from "@/lib/agent-rebalance";
 import { deleteTransferDraft, getTransferDraft, isTransferDraftUsed } from "@/lib/transfer-draft-store";
 import { backWithTransition, pushWithTransition } from "@/lib/view-transition";
+import { findBankByName } from "@/lib/transfer-banks";
 import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
 import type { FundingAssessment } from "@/domain/engine";
 import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
@@ -288,11 +289,22 @@ export function TransferConfirm() {
     let primaryTxnId: string;
     try {
       // A jar's money physically sits in CASA, so every source debits CASA.
-      const needsAccounts = fundable || !draft?.sourceAccountId;
+      const needsAccounts = fundable || !draft?.sourceAccountId || Boolean(draft?.accountNumber);
       const accounts = needsAccounts ? await providers.listAccounts() : [];
       const accountToDebit = draft?.sourceAccountId ?? accounts.find((a) => a.type === "current")?.id ?? null;
       if (accountToDebit) {
-        const record = primaryRecord(input);
+        // Paying one of the customer's own goal accounts AT MSB is a plain internal transfer,
+        // never jar spending; the server moves both legs off the counterparty number + bank.
+        const toOwnGoal =
+          Boolean(draft?.accountNumber) &&
+          findBankByName(draft?.recipientBankName)?.id === "msb" &&
+          accounts.some((a) => a.type === "goal" && a.accountNumber === draft?.accountNumber);
+        const base = primaryRecord(toOwnGoal ? { ...input, categoryId: CATEGORY.transfer, type: "transfer" } : input);
+        const record: Transaction = {
+          ...base,
+          ...(draft?.accountNumber ? { counterpartyAccountNumber: draft.accountNumber } : {}),
+          ...(draft?.recipientBankName ? { counterpartyBankName: draft.recipientBankName } : {}),
+        };
         await providers.applyAccountDebit(accountToDebit, amount, record); // atomic debit + insert
         adoptManualTxn(record);
         primaryTxnId = record.id;

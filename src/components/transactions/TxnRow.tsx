@@ -7,7 +7,7 @@ import { useCategories } from "@/state/categories";
 import type { Correction } from "@/state/corrections";
 import { Money, SourceBadge } from "@/components/primitives";
 import { formatRelativeDate } from "@/lib/format";
-import { DEMO_NOW } from "@/lib/demo-clock";
+import { useAppNow } from "@/state/app-clock";
 import { cn } from "@/lib/cn";
 import { CategoryProvenanceBadge } from "./CategoryProvenanceBadge";
 
@@ -29,6 +29,7 @@ const STATUS_META: Record<TransactionStatus, { label: string; className: string 
  */
 export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: (t: Transaction) => void; correction?: Correction }) {
   const { labels } = useCategories();
+  const now = useAppNow();
   const category = categoryLabel(txn.categoryId, labels);
   const status = STATUS_META[txn.status];
   const isCredit = txn.direction === "credit";
@@ -50,7 +51,7 @@ export function TxnRow({ txn, onEdit, correction }: { txn: Transaction; onEdit: 
           <span>{category}</span>
           {correction?.status !== "pending" && <CategoryProvenanceBadge correction={correction} />}
           <span aria-hidden>·</span>
-          <span>{formatRelativeDate(txn.postedAt, DEMO_NOW)}</span>
+          <span>{formatRelativeDate(txn.postedAt, now)}</span>
           <SourceBadge source={txn.source} />
           <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", status.className)}>{status.label}</span>
         </div>

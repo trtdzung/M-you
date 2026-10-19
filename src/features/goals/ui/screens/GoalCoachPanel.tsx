@@ -1,9 +1,12 @@
 "use client";
 
+import { transferNow } from "@/lib/demo-clock";
+
+import { useAppNow } from "@/state/app-clock";
+
 import { useRef, useState } from "react";
 import { MessageSquarePlus, MoreHorizontal, Sparkles } from "lucide-react";
 import { Sheet, SheetSlot, useRetained } from "@/components/primitives";
-import { transferNow } from "@/lib/demo-clock";
 import { useGoalCoach } from "../../client/hooks/use-goal-coach";
 import { useAdvisorNarration } from "../../client/hooks/use-advisor-narration";
 import { useGoalAdvisor } from "../../client/hooks/use-goal-advisor";
@@ -24,10 +27,11 @@ import { CreateGoalFlow } from "./CreateGoalFlow";
 
 /** Goal Coach on /goals: say a goal, answer a few chips, review the pre-filled form. */
 export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => void; active?: boolean }) {
+  const appNow = useAppNow();
   const coach = useGoalCoach();
   // One working draft for everything on the card: the coach's draft plus the customer's edits by words.
-  const baseDraft = coach.draft ? coachDraftToAnalyze(coach.draft, transferNow()) : null;
-  const analyzeDraft = baseDraft ? applyAdjustments(baseDraft, coach.adjustments, transferNow()) : null;
+  const baseDraft = coach.draft ? coachDraftToAnalyze(coach.draft, appNow) : null;
+  const analyzeDraft = baseDraft ? applyAdjustments(baseDraft, coach.adjustments, appNow) : null;
   const draftKey = coach.requestId ? `${coach.requestId}:${coach.adjustments.length}` : null;
   const advisor = useGoalAdvisor(analyzeDraft, draftKey);
   const narration = useAdvisorNarration(analyzeDraft ? draftKey : null, analyzeDraft?.name ?? null, advisor.analysis, coach.conversationId);
@@ -37,12 +41,12 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
   const reviewPrefill = coach.draft
     ? chosen && analyzeDraft
       ? {
-          ...draftToForm(coach.draft, transferNow()),
+          ...draftToForm(coach.draft, appNow),
           targetAmount: String(chosen.targetAmount),
           targetDate: chosen.targetDate,
           openingAmount: analyzeDraft.openingAmount > 0 ? String(analyzeDraft.openingAmount) : "",
         }
-      : draftToForm(coach.draft, transferNow())
+      : draftToForm(coach.draft, appNow)
     : null;
   const [reviewing, setReviewing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -186,7 +190,7 @@ export function GoalCoachPanel({ onCreated, active = true }: { onCreated: () => 
         <h3 className="text-[18px] font-semibold text-text">Mục tiêu của bạn</h3>
         <p className="mt-3 break-words text-[16px] font-medium">{coach.draft.name}</p>
         <p className="mt-2 text-[24px] font-semibold tabular-nums">{coach.draft.target_amount.toLocaleString("en-US")} <span className="text-[13px] font-normal text-muted">VND</span></p>
-        <p className="mt-2 text-[14px] text-muted">Hạn dự kiến: {draftToForm(coach.draft, transferNow()).targetDate.split("-").reverse().join("/") || "Cần bổ sung"}</p>
+        <p className="mt-2 text-[14px] text-muted">Hạn dự kiến: {draftToForm(coach.draft, appNow).targetDate.split("-").reverse().join("/") || "Cần bổ sung"}</p>
         <p className="mt-3 text-[13px] leading-5 text-muted">M-You đã điền thông tin từ cuộc trò chuyện. Bạn kiểm tra và chỉnh sửa trước khi lưu.</p>
         <button type="button" className={`${primaryButton} mt-4 w-full`} onClick={() => setReviewing(true)}>Kiểm tra và tạo mục tiêu</button>
       </section>}

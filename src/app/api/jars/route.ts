@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dedupeCategories, stripCategories, uniqueJarId } from "@/domain/jar-rules";
 import type { JarConfig, JarLedgerEntry } from "@/domain/models";
 import { getDb } from "@/lib/db";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { appendJarLedger, ledgerEntryId } from "@/lib/jar-ledger-store";
 import { readJarConfig, sanitizeJarCreate, sanitizeJars, writeJarConfig } from "@/lib/jars-store";
 import { capViolation, categoryViolation, reservedIdViolation } from "./jar-write-guards";
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   const rejected = reservedIdViolation([jar.id], true) ?? categoryViolation(cif, jar.categoryIds);
   if (rejected) return rejected;
 
-  const now = transferNow();
+  const now = appNow(cif);
   const nowIso = now.toISOString();
   const current = readJarConfig(cif);
   const created = { ...jar, id: uniqueJarId(current.jars, jar.id) };
@@ -114,7 +114,7 @@ export async function PUT(req: NextRequest) {
   // D3: no deposits here — a new id has balance `null` until the user deposits.
   // The cap still runs (a category shuffle re-attributes spend since each anchor)
   // against the stored ledger + anchors of the ids that survive the replace.
-  const now = transferNow();
+  const now = appNow(cif);
   const current = readJarConfig(cif);
   const anchors = new Map(current.jars.map((j) => [j.id, j.createdAt]));
   const next: JarConfig = {

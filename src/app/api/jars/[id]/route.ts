@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripCategories } from "@/domain/jar-rules";
 import { getDb } from "@/lib/db";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { readJarConfig, sanitizeJarPatch, writeJarConfig } from "@/lib/jars-store";
 import { deleteRebalanceLegsForJar } from "@/lib/manual-txns-store";
 import { capViolation, categoryViolation } from "../jar-write-guards";
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   // balance — it re-attributes spend since each anchor — so only then is the
   // balance-lens cap checked, on the same clock that stamps ledger rows.
   if (patch.categoryIds) {
-    const overCap = capViolation(cif, { ...current, jars }, current, transferNow());
+    const overCap = capViolation(cif, { ...current, jars }, current, appNow(cif));
     if (overCap) return overCap;
   }
   return NextResponse.json(writeJarConfig(cif, { version: 3, jars }));

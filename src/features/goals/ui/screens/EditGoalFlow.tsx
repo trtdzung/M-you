@@ -1,8 +1,9 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { assessFeasibility } from "../../engine/feasibility";
 import { parseVndInput } from "@/components/settings/parse-vnd-input";
-import { transferNow } from "@/lib/demo-clock";
 import { useState } from "react";
 import { useGoalMutations } from "../../client/hooks/use-goal-mutations";
 import type { GoalUpdateInput, SavingsGoalView } from "../../model/types";
@@ -21,6 +22,7 @@ export function EditGoalFlow({
   onSaved: () => void;
   open?: boolean;
 }) {
+  const appNow = useAppNow();
   const form = useGoalForm(goal);
   const [formError, setFormError] = useState<string | null>(null);
   const { update, pending } = useGoalMutations();
@@ -40,7 +42,7 @@ export function EditGoalFlow({
 
   const parsed = parseVndInput(form.values.targetAmount);
   const preview = parsed.kind === "ok" && parsed.value > 0 && /^\d{4}-\d{2}-\d{2}$/.test(form.values.targetDate)
-    ? assessFeasibility({ targetAmount: parsed.value, currentAmount: goal.currentAmount, targetDate: form.values.targetDate, now: transferNow(), surplus: "unknown" }) : null;
+    ? assessFeasibility({ targetAmount: parsed.value, currentAmount: goal.currentAmount, targetDate: form.values.targetDate, now: appNow, surplus: "unknown" }) : null;
   return (
     <GoalFormSheet
       open={open}

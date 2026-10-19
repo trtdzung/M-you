@@ -1,13 +1,15 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { buildGoalTimeline } from "./goal-timeline-data";
-import { transferNow } from "@/lib/demo-clock";
 import { formatGoalMoney as formatVndCompact } from "../shared/format-goal-money";
 import type { GoalLedgerEntry, SavingsGoalView } from "../../model/types";
 
 export function GoalTimeline({ goal, ledger }: { goal: SavingsGoalView; ledger: GoalLedgerEntry[] }) {
-  const now = transferNow().getTime();
+  const appNow = useAppNow();
+  const now = appNow.getTime();
   const points = buildGoalTimeline(goal, ledger, new Date(now));
   const dateLabel = (time: number) => {
     const date = new Date(time);

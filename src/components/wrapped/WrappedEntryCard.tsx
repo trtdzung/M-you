@@ -1,11 +1,12 @@
 "use client";
 
+import { useAppMonthKey } from "@/state/app-clock";
+
 import { useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { Transaction } from "@/domain/models";
 import { wrappedCoverage, wrappedEndMonthKey } from "@/domain/wrapped";
-import { currentMonthKey } from "@/lib/demo-clock";
 import { WRAPPED_ENABLED } from "@/lib/wrapped-flag";
 import { WRAPPED_ENTRY } from "./wrapped-ui-copy";
 
@@ -22,9 +23,10 @@ import { WRAPPED_ENTRY } from "./wrapped-ui-copy";
  * decorative, the link text is title + teaser.
  */
 export function WrappedEntryCard({ transactions }: { transactions: Transaction[] }) {
+  const appMonthKey = useAppMonthKey();
   const sufficient = useMemo(
-    () => WRAPPED_ENABLED && wrappedCoverage(transactions, wrappedEndMonthKey(currentMonthKey())).sufficient,
-    [transactions],
+    () => WRAPPED_ENABLED && wrappedCoverage(transactions, wrappedEndMonthKey(appMonthKey)).sufficient,
+    [transactions, appMonthKey],
   );
   if (!sufficient) return null;
 

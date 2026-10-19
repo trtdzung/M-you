@@ -7,7 +7,7 @@ import "server-only";
  * offset. `engineAlertTime` additionally pins the hour warnings are judged at.
  */
 
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { getDb } from "@/lib/db";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -42,7 +42,7 @@ export function writeEngineClock(cif: string, patch: Partial<EngineClock>): Engi
 
 /** "Now" for the engine: demo clock + the persona's test-tools offset. */
 export function engineNow(cif: string, realNow?: Date): Date {
-  return new Date(transferNow(realNow).getTime() + readEngineClock(cif).offsetMs);
+  return appNow(cif, realNow);
 }
 
 /** When a transfer is judged: `engineNow`, or the same VN day at the pinned hour. */

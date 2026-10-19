@@ -11,6 +11,7 @@ import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions, EmptyState, ScreenHeader } from "../../shared";
 import { InfoTooltip } from "../../shared/InfoTooltip";
+import { RiskProfileSheet } from "../../shared/RiskProfileSheet";
 import { card, heroNumber, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { dateVi, findGoal } from "../assets/helpers";
 
@@ -40,9 +41,10 @@ function project(s: InvestSuggestion, amount: number, today: string, targetDate:
 
 /** Gợi ý đầu tư tiền nhàn rỗi trong tài khoản mục tiêu. */
 export function InvestSuggest({ params }: ScreenProps) {
-  const { state, nav } = usePreview();
+  const { state, nav, dispatch } = usePreview();
   const goal = findGoal(state, paramString(params, "goalId"));
   const [selected, setSelected] = useState(0);
+  const [askRisk, setAskRisk] = useState(state.customer.riskProfileAsked !== true);
 
   if (!goal) {
     return (
@@ -175,6 +177,8 @@ export function InvestSuggest({ params }: ScreenProps) {
           Đầu tư {formatVndCompact(current.suggestedAmount)}
         </button>
       </BottomActions>
+
+      <RiskProfileSheet open={askRisk} onSave={(profile) => dispatch({ type: "setRiskProfile", profile })} onClose={() => setAskRisk(false)} />
     </div>
   );
 }

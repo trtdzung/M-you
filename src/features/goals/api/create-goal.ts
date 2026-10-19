@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { validateGoalCreate } from "../model/validate-goal";
 import { createGoalOnce } from "../server/create-goal";
 import { goalCashflowInput } from "../server/cashflow-input";
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   if (!body) return badBody();
   const cif = cifOf(body.cif);
   if (!cif) return missingCif();
-  const now = transferNow();
+  const now = appNow(cif);
   const result = validateGoalCreate(body, now);
   if (!result.ok) return invalid(result.errors);
   const { goal, created } = createGoalOnce(cif, result.value, now);

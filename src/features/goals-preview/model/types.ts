@@ -29,6 +29,7 @@ export interface CustomerProfile {
   /** Ngày nhận lương trong tháng (1–28). */
   salaryDay: number;
   riskProfile: RiskProfile;
+  riskProfileAsked?: boolean;
   /** Số tháng dữ liệu giao dịch app đã có. */
   dataMonths: number;
 }

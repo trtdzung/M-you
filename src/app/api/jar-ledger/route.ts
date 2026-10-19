@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { JarLedgerEntry } from "@/domain/models";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { appendJarLedger, ledgerEntryId, sanitizeLedgerBatch } from "@/lib/jar-ledger-store";
 import { readJarConfig, readJarRowIds } from "@/lib/jars-store";
 import { capViolation, ledgerBatchViolation } from "../jars/jar-write-guards";
@@ -11,7 +11,7 @@ import { capViolation, ledgerBatchViolation } from "../jars/jar-write-guards";
  *
  * The ledger is a display partition of CASA — nothing here moves money
  * (invariant #3); every row is `self_reported` (#5). Ids, timestamps and
- * `is_opening` are server-minted, on the SAME clock (`transferNow()`) the balance
+ * `is_opening` are server-minted, on the SAME clock (`appNow(cif)`) the balance
  * reads use, so a just-written row is always visible (Red Team #1).
  *
  *  - 422: missing `cif`; bad `entries` (not 1–50, bad kind, amount not a whole
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const batch = sanitizeLedgerBatch(body?.entries);
   if (!batch) return NextResponse.json({ error: "entries is invalid" }, { status: 422 });
 
-  const now = transferNow();
+  const now = appNow(cif);
   const createdAt = now.toISOString();
   const entries: JarLedgerEntry[] = batch.map((e, i) => ({
     id: ledgerEntryId(now, i),

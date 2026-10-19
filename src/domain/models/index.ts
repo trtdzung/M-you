@@ -161,7 +161,7 @@ export interface TransactionQuery {
 // Account
 // ---------------------------------------------------------------------------
 
-export type AccountType = "current" | "savings" | "credit_card";
+export type AccountType = "current" | "savings" | "credit_card" | "goal";
 
 export interface Account {
   id: string;

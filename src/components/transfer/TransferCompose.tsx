@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { useEffect, useMemo, useState } from "react";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
@@ -12,7 +14,6 @@ import { useProviders } from "@/providers/context";
 import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
 import { useAutoFundWith } from "@/state/use-auto-fund";
-import { transferNow } from "@/lib/demo-clock";
 import { maskAccount } from "@/lib/mask-account";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
 import { isNavigationTransitionPending, navigateWithTransition, backWithTransition, pushWithTransition } from "@/lib/view-transition";
@@ -35,6 +36,7 @@ import { AgentTopupSheet } from "./AgentTopupSheet";
 type Step = "pick" | "bank-entry" | "save-recipient" | "amount";
 
 export function TransferCompose() {
+  const appNow = useAppNow();
   useScreenEvent("transfer_screen_open");
   const providers = useProviders();
   const router = useRouter();
@@ -50,7 +52,7 @@ export function TransferCompose() {
   const autoFund = useAutoFundWith({ transactions: fin.transactions, raw: fin.raw });
   // S10/U7: the SAME clock Confirm assesses with and posts the txn at, so the
   // funding verdict here is always for the posted txn's month (not the viewed one).
-  const postedAt = useMemo(() => transferNow().toISOString(), []);
+  const postedAt = appNow.toISOString();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -112,7 +114,7 @@ export function TransferCompose() {
       .then(([nextBeneficiaries, nextTransactions, nextAccounts]) => {
         if (!active) return;
         // Balances are DB-backed and already reflect prior transfer debits.
-        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current");
+        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current" || account.type === "goal");
         setBeneficiaries(nextBeneficiaries);
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
@@ -214,7 +216,7 @@ export function TransferCompose() {
   const riskFlags = useMemo(() => assessTransferRisk({ amount: numericAmount, isNewPayee: recipient?.isNewPayee ?? false }), [numericAmount, recipient]);
   // Scam Shield: a lock the customer set blocks the flow before confirm.
   const lockState = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, transferLockUntil: state.transferLockUntil })));
-  const block = isTransferBlocked(lockState, transferNow().getTime());
+  const block = isTransferBlocked(lockState, appNow.getTime());
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
   function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation"> = {}) {
@@ -232,7 +234,7 @@ export function TransferCompose() {
         ? `Hũ ${selectedJar.label}`
         : source?.kind === "pool"
           ? POOL_SOURCE_LABEL
-          : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
+          : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : selectedAccount!.type === "goal" ? "Mục tiêu" : "Tiết kiệm"}`,
       // Jar money physically sits in the CASA account, so a jar source debits the
       // (single, current-only `accounts`) CASA account too; an account source
       // debits the account the user picked. A pool source debits the CASA account

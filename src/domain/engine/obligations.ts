@@ -1,3 +1,4 @@
+import { transferNow } from "@/lib/demo-clock";
 /**
  * Upcoming obligations within a horizon: liability payments (from due dates)
  * and predicted next occurrences of recurring bills. Amounts that are not known
@@ -42,7 +43,7 @@ export function upcomingObligations(
   liabilities: Liability[],
   options: ObligationOptions = {},
 ): Obligation[] {
-  const now = options.now ?? new Date();
+  const now = options.now ?? transferNow();
   const horizonMs = (options.horizonDays ?? 30) * 86_400_000;
   const nowMs = now.getTime();
   const out: Obligation[] = [];

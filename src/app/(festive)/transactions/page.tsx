@@ -10,7 +10,6 @@ import { TransactionListSection } from "@/components/transactions/TransactionLis
 import { useCategories } from "@/state/categories";
 import { useFinancials } from "@/state/useFinancials";
 import { usePeriod } from "@/state/period";
-import { availableMonths } from "@/lib/demo-clock";
 
 /**
  * Giao dịch tổng hợp mọi tài khoản (Red Team #10 — view giữ nguyên, KHÔNG
@@ -23,10 +22,10 @@ import { availableMonths } from "@/lib/demo-clock";
  */
 export default function TransactionsPage() {
   const { loading, error, transactions } = useFinancials();
-  const { month, setMonth } = usePeriod();
+  const { month, setMonth, options } = usePeriod();
   const params = useSearchParams();
   const monthParam = params?.get("month");
-  const requestedMonth = monthParam && availableMonths().some((option) => option.key === monthParam) ? monthParam : null;
+  const requestedMonth = monthParam && options.some((option) => option.key === monthParam) ? monthParam : null;
   const categoryParam = params?.get("category");
   const { byId: categoryById, loaded: categoriesLoaded } = useCategories();
   const initialCategoryId =
