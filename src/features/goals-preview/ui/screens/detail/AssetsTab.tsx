@@ -16,7 +16,8 @@ import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav } = usePreview();
-  const [fixedDetailId, setFixedDetailId] = useState<string | null>(null);
+  const fixedDetailId = typeof nav.current.params.fixedAssetId === "string" ? nav.current.params.fixedAssetId : null;
+  const setFixedDetailId = (id: string | null) => nav.updateParams({ fixedAssetId: id ?? undefined });
   const [detailId, setDetailId] = useState<string | null>(null);
   const { state, goal } = ctx;
   const assets = goalAssets(state, goalId);
@@ -55,7 +56,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                       <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{LIQUID_CATEGORY_LABEL[a.category]}</p></div>
                     </div>
                     <div>
-                      <p className="text-[12px] text-muted">Đóng góp vào mục tiêu</p>
+                      <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
                       <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{formatVndCompact(Math.round(assetValue(a, state) * a.countPercent / 100))}</p>
                       {a.countPercent < 100 && <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị hiện tại {formatVndCompact(assetValue(a, state))}</p>}
                       {gain !== 0 && <p className={`mt-1 text-[12px] ${gain > 0 ? "text-positive" : "text-negative"}`}>{gain > 0 ? "Lãi" : "Lỗ"} {formatVnd(Math.abs(gain))} so với vốn</p>}
@@ -91,7 +92,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                       <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]}</p></div>
                     </div>
                     <div>
-                      <p className="text-[12px] text-muted">Đóng góp vào mục tiêu</p>
+                      <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
                       <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{formatVndCompact(Math.round(a.value * a.countPercent / 100))}</p>
                       <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị tự khai {formatVndCompact(a.value)}</p>
                     </div>
