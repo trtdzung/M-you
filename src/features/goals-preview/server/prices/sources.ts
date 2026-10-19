@@ -211,13 +211,13 @@ async function stockHistory(symbol: string, since: string, now: Date): Promise<S
 }
 
 /**
- * Tên công ty từ finfo-api VNDirect (`/v4/stocks?q=code:XXX` → companyName / shortName).
+ * Tên công ty từ api-finfo VNDirect (`/v4/stocks?q=code:XXX` → companyName / shortName).
  * Lỗi mạng hoặc thiếu field → undefined (caller dùng fallback tĩnh).
  */
 export async function fetchStockCompanyName(symbol: string): Promise<string | undefined> {
   try {
     // Tên chỉ để hiển thị: chờ ngắn, hết giờ thì dùng fallback (không làm chậm việc thêm mã).
-    const json = await fetchJson(`https://finfo-api.vndirect.com.vn/v4/stocks?q=code:${encodeURIComponent(symbol)}`, undefined, NAME_TIMEOUT_MS);
+    const json = await fetchJson(`https://api-finfo.vndirect.com.vn/v4/stocks?q=code:${encodeURIComponent(symbol)}`, undefined, NAME_TIMEOUT_MS);
     const rows = isRecord(json) && Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
     const row = rows.find((r) => isRecord(r) && String(r.code ?? "").toUpperCase() === symbol);
     if (!isRecord(row)) return undefined;
