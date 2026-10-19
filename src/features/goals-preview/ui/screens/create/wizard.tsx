@@ -13,7 +13,7 @@ import { useNav, usePreview } from "../../../store/PreviewStore";
 import { EmptyState } from "../../shared/EmptyState";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 
-export const WIZARD_STEPS = ["Chọn mục tiêu", "Thông tin", "Vốn ban đầu", "Kiểm tra", "Mở tài khoản"];
+export const WIZARD_STEPS = ["Chọn mục tiêu", "Lập kế hoạch", "Mở tài khoản"];
 
 export interface TemplateConfig {
   id: GoalTemplate;
