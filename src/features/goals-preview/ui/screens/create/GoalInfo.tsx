@@ -12,10 +12,11 @@ import { paramString } from "../../../model/screens";
 import type { GoalFlexibility, GoalTemplate } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions } from "../../shared/BottomActions";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { parseVndInput } from "../../shared/MoneyInput";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, chip, chipSelected, fieldError, hint, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle } from "../../shared/styles";
+import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { FLEX_INFO, WIZARD_STEPS, isFlexible, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
 
 const groupFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -122,7 +123,6 @@ export function GoalInfo({ params }: ScreenProps) {
           <Icon size={30} strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-muted">{name.trim() === config.title ? "Tên mục tiêu" : config.title}</p>
           <label className="flex items-center gap-2">
             <span className="sr-only">Tên mục tiêu</span>
             <input
@@ -140,7 +140,10 @@ export function GoalInfo({ params }: ScreenProps) {
       {touched && errors.name && <p className={fieldError}>{errors.name}</p>}
 
       <section className={`${card} flex flex-col gap-3`} aria-labelledby="goal-amount-label">
-        <h2 id="goal-amount-label" className={sectionTitle}>Bạn cần bao nhiêu?</h2>
+        <div className="flex items-center gap-1">
+          <h2 id="goal-amount-label" className={sectionTitle}>Bạn cần bao nhiêu?</h2>
+          {amount ? <InfoTooltip label="cách đọc số tiền" text={amountInWords(amount)} /> : null}
+        </div>
         <div className="flex items-baseline gap-2">
           <input
             aria-labelledby="goal-amount-label"
@@ -154,7 +157,6 @@ export function GoalInfo({ params }: ScreenProps) {
           />
           <span className="text-sm text-muted">đồng</span>
         </div>
-        {amount ? <p className="-mt-2 text-[13px] leading-5 text-muted">{amountInWords(amount)}</p> : null}
         {touched && errors.amount && <p className={fieldError}>{errors.amount}</p>}
         <div className="flex flex-wrap gap-2">
           {quickAmounts.map((a) => (
@@ -166,7 +168,10 @@ export function GoalInfo({ params }: ScreenProps) {
       </section>
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Thời hạn">
-        <h2 className={sectionTitle}>Muốn đạt vào lúc nào?</h2>
+        <div className="flex items-center gap-1">
+          <h2 className={sectionTitle}>Muốn đạt vào lúc nào?</h2>
+          {!errors.date && <InfoTooltip label="ngày đạt mục tiêu" text={`Đạt vào ${formatISODate(date)} · còn khoảng ${formatMonths(Math.max(0, months))}.`} />}
+        </div>
         <div className="flex flex-wrap gap-2">
           {quickDates.map((q) => (
             <button key={q.months} type="button" className={q.date === date && !pickDate ? chipSelected : chip} onClick={() => { setDate(q.date); setPickDate(false); }}>
@@ -195,17 +200,14 @@ export function GoalInfo({ params }: ScreenProps) {
             </select>
           </div>
         )}
-        {errors.date ? (
-          <p className={fieldError}>{errors.date}</p>
-        ) : (
-          <p className={hint}>
-            Đạt vào {formatISODate(date)} · còn khoảng {formatMonths(Math.max(0, months))}
-          </p>
-        )}
+        {errors.date && <p className={fieldError}>{errors.date}</p>}
       </section>
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Mức linh hoạt">
-        <h2 className={sectionTitle}>Kế hoạch có thay đổi được không?</h2>
+        <div className="flex items-center gap-1">
+          <h2 className={sectionTitle}>Kế hoạch có linh hoạt không?</h2>
+          <InfoTooltip label="mức linh hoạt" text={`${FLEX_INFO.fixed.title}: ${FLEX_INFO.fixed.text} ${FLEX_INFO.flexible.title}: ${FLEX_INFO.flexible.text}`} />
+        </div>
         <div role="radiogroup" aria-label="Mức linh hoạt" className="grid grid-cols-2 gap-1 rounded-full bg-surface-muted p-1">
           {(["fixed", "flexible"] as const).map((key) => {
             const opt = FLEX_INFO[key];
@@ -229,7 +231,6 @@ export function GoalInfo({ params }: ScreenProps) {
             );
           })}
         </div>
-        <p className={hint}>{FLEX_INFO[flexKey].text}</p>
       </section>
 
       <section
@@ -242,31 +243,37 @@ export function GoalInfo({ params }: ScreenProps) {
           tone === "muted" && "bg-surface-tint",
         )}
       >
-        <p className="text-[13px] text-muted">Mỗi tháng cần góp khoảng</p>
+        <div className="flex items-center gap-1">
+          <p className="text-[13px] text-muted">Mỗi tháng cần góp khoảng</p>
+          <InfoTooltip
+            label="mức góp mỗi tháng"
+            warning={tone === "negative"}
+            text={
+              free === "unknown"
+                ? "Chưa đủ dữ liệu thu chi để so với số dư hằng tháng."
+                : share === null
+                  ? "Số dư hằng tháng đã dành hết cho các mục tiêu khác và khoản trả góp."
+                  : share <= 1
+                    ? `Bằng khoảng ${Math.round(share * 100)}% số dư còn trống mỗi tháng (${formatVnd(free)}), sau các mục tiêu khác và khoản trả góp.`
+                    : `Vượt số dư còn trống mỗi tháng (${formatVnd(free)}). Thử lùi ngày hoặc giảm số tiền.`
+            }
+          />
+        </div>
         <p className="text-[26px] font-bold tabular-nums text-text">{monthly > 0 ? formatVnd(monthly) : "—"}</p>
-        {share !== null && free !== "unknown" ? (
-          <>
-            <div className={progressTrack}>
+        {share !== null && (
+          <div className="flex items-center gap-3">
+            <div className={cn(progressTrack, "flex-1")}>
               <div
                 className={cn("h-full rounded-full", tone === "positive" ? "bg-positive" : tone === "warning" ? "bg-warning" : "bg-negative")}
                 style={{ width: `${Math.min(100, Math.round(share * 100))}%` }}
               />
             </div>
-            <p className="text-[13px] leading-5 text-text">
-              {share <= 1
-                ? `≈ ${Math.round(share * 100)}% số dư còn trống mỗi tháng (${formatVndCompact(free)})`
-                : `Vượt số dư còn trống mỗi tháng (${formatVndCompact(free)}). Thử lùi ngày hoặc giảm số tiền.`}
-            </p>
-          </>
-        ) : (
-          <p className="text-[13px] leading-5 text-muted">
-            {free === "unknown" ? "Chưa đủ dữ liệu thu chi để so với số dư hằng tháng." : "Số dư hằng tháng đã dành hết cho các mục tiêu khác."}
-          </p>
+            <span className="text-[13px] font-semibold tabular-nums text-text">{share <= 1 ? `${Math.round(share * 100)}% số dư` : "Vượt số dư"}</span>
+          </div>
         )}
       </section>
 
       <BottomActions>
-        {valid && amount && <p className="text-center text-[13px] font-semibold text-text">{formatVndCompact(amount)} · {formatMonths(Math.max(0, months))} · ~{formatVndCompact(monthly)}/tháng</p>}
         <button type="button" className={primaryButton} onClick={onContinue} disabled={pending || (touched && !valid)}>
           Tiếp tục
         </button>
