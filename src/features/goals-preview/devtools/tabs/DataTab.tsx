@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../engine/dates";
 import { goalValue } from "../../engine/value";
 import { getScenario } from "../../data/scenarios";

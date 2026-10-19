@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, PartyPopper } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../../engine/dates";
 import { requiredMonthly } from "../../../engine/feasibility";
 import { goalValue } from "../../../engine/value";

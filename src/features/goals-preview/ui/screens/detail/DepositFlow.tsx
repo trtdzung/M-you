@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { Amount } from "../../shared/Amount";

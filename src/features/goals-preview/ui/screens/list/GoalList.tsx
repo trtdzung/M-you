@@ -1,5 +1,6 @@
 "use client";
 
+import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { useRouter, usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Plus } from "lucide-react";
@@ -18,12 +19,6 @@ import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadg
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
 import { card, chip, chipSelected, infoBox, primaryButton, ring, secondaryButton } from "../../shared/styles";
-
-function compactGoalAmount(value: number): string {
-  if (Math.abs(value) < 1_000_000) return `${new Intl.NumberFormat("vi-VN").format(value)} đ`;
-  const unit = Math.abs(value) >= 1_000_000_000 ? 1_000_000_000 : 1_000_000;
-  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(value / unit)} ${unit === 1_000_000 ? "triệu" : "tỷ"}`;
-}
 
 type Tab = "active" | "history";
 
@@ -50,8 +45,8 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
 
       </div>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[22px] font-bold tabular-nums text-text">{compactGoalAmount(finished ? goal.finalValue! : v.total)}</span>
-        <span className="text-sm text-muted">/ {compactGoalAmount(goal.targetAmount)}</span>
+        <span className="text-[22px] font-bold tabular-nums text-text">{formatVndCompact(finished ? goal.finalValue! : v.total)}</span>
+        <span className="text-sm text-muted">/ {formatVndCompact(goal.targetAmount)}</span>
       </div>
       <SplitProgressBar cash={cash} assets={assets} target={goal.targetAmount} showLegend={false} />
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, HelpCircle } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate, formatMonths } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";

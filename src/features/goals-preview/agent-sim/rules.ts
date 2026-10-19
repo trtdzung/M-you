@@ -1,4 +1,4 @@
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { daysBetween, dayOfMonth, formatISODate, monthsBetween, monthsLeft } from "../engine/dates";
 import { goalOptions, isSaving, requiredMonthly, feasibility } from "../engine/feasibility";
 import { idleCash, investSuggestions } from "../engine/invest";

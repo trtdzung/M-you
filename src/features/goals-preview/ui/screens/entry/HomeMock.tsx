@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftRight, ChevronRight, CreditCard, Landmark, PiggyBank, Plus, Target, type LucideIcon } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { AgentSuggestionCard } from "../../../agent-sim/AgentSuggestionCard";
 import { visibleSuggestions } from "../../../agent-sim/rules";
 import { formatISODate, monthsLeft } from "../../../engine/dates";

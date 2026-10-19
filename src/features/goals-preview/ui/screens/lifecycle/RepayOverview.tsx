@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { daysBetween, formatISODate, outstandingPrincipal } from "../../../engine";
 import { LOAN_ROW_LABEL } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";

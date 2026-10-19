@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate, formatMonths, monthsBetween } from "../../../engine";
 import { TEMPLATE_EMOJI } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";

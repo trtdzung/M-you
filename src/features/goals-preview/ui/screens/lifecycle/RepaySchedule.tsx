@@ -1,6 +1,6 @@
 "use client";
 
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
 import { formatISODate, totalInterest } from "../../../engine";
 import { LOAN_ROW_LABEL } from "../../../model/labels";

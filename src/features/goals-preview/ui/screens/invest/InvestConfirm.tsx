@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
 import { addMonths, daysBetween, depositAccrued, idleCash, monthsLeft } from "../../../engine";
 import { RISK_LEVEL_LABEL } from "../../../model/labels";

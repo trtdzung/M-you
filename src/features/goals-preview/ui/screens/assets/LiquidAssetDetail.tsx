@@ -3,7 +3,7 @@
 import { AlertTriangle, CalendarDays, Target } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
 import { assetGain, assetValue, depositAccrued, fundPriceAt, formatISOMonth } from "../../../engine";
 import { LIQUID_CATEGORY_LABEL } from "../../../model/labels";

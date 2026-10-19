@@ -1,7 +1,7 @@
 "use client";
 
 import { Sheet } from "@/components/primitives";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { FIXED_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { InfoTooltip } from "../../shared/InfoTooltip";

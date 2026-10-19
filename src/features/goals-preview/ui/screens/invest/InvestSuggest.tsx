@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PiggyBank, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
 import { cashBuffer, daysBetween, fundPriceAt, goalAccount, idleCash, investSuggestions, monthsLeft, addMonths, type InvestSuggestion } from "../../../engine";
 import { RISK_LEVEL_LABEL } from "../../../model/labels";

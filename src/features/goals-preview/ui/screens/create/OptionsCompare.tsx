@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { addMonths, formatISODate, formatMonths } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
 import type { Goal } from "../../../model/types";

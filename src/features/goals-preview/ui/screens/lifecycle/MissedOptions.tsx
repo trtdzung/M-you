@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarClock, Landmark, Target, XCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
 import { addMonths, formatISODate, formatMonths, goalValue } from "../../../engine";
 import { paramString, type ScreenProps } from "../../../model/screens";

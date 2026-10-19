@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
 import { getLoanProduct, loanProductFor } from "../../../data/products";
 import { feasibility, goalValue, loanPurposeFor, MAX_DTI, quoteLoan, type LoanQuote } from "../../../engine";

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, CalendarCheck, LineChart, PartyPopper } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { addDays, daysBetween, formatISODate, assetValue } from "../../../engine";
 import { cn } from "@/lib/cn";
 import { usePreview } from "../../../store/PreviewStore";

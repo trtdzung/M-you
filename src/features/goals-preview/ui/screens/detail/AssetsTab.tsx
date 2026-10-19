@@ -5,7 +5,7 @@ import { Sheet } from "@/components/primitives";
 import { FixedAssetDetailSheet } from "../assets/FixedAssetDetailSheet";
 import { LiquidAssetDetail } from "../assets/LiquidAssetDetail";
 import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink } from "lucide-react";
-import { formatVnd, formatVndCompact } from "@/lib/format";
+import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { assetGain, assetValue, formatISODate, goalAssets } from "../../../engine";
 import { FIXED_CATEGORY_LABEL, LIQUID_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";

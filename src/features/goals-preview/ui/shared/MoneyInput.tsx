@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { amountInWords } from "@/features/goals/ui/form/amount-in-words";
-import { formatVnd, formatVndCompact } from "@/lib/format";
+import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
 import { chip, fieldError, hint as hintClass, input, label as labelClass } from "./styles";
 
@@ -70,7 +70,7 @@ export function MoneyInput({
           className={cn(input, "pr-14 text-[18px] font-semibold tabular-nums", shownError && "border-negative")}
         />
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted">
-          VND
+          đồng
         </span>
       </div>
       <div id={hintId} className="flex flex-col gap-0.5">

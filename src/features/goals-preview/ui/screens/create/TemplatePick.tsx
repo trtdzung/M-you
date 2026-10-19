@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { formatVndCompact } from "@/lib/format";
+import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { formatMonths } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
 import { TEMPLATE_LABEL } from "../../../model/labels";

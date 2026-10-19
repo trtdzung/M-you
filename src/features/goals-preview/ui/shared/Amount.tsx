@@ -1,4 +1,5 @@
-import { Money } from "@/components/primitives";
+import { isUnknownAmount } from "@/lib/format";
+import { formatVnd } from "../../format-money";
 import { cn } from "@/lib/cn";
 import type { ValueSource } from "../../model/types";
 import { SOURCE_TITLE } from "../../model/labels";
@@ -21,7 +22,9 @@ export function Amount({
 }) {
   return (
     <span title={source ? SOURCE_TITLE[source] : undefined} aria-description={source ? SOURCE_TITLE[source] : undefined} className={cn("inline-flex items-center gap-1.5", className)}>
-      <Money amount={amount} sign={sign} showPlus={showPlus} unknownLabel={unknownLabel} />
+      <span className={cn("tabular-nums", sign === "credit" && "text-positive", sign === "debit" && "text-text", isUnknownAmount(amount) && "text-muted")}>
+        {isUnknownAmount(amount) ? unknownLabel ?? "chưa rõ" : `${sign === "debit" || (amount as number) < 0 ? "−" : showPlus && (sign === "credit" || (amount as number) > 0) ? "+" : ""}${formatVnd(Math.abs(amount as number))}`}
+      </span>
     </span>
   );
 }

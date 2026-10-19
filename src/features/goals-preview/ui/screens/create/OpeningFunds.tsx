@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import type { ScreenProps } from "../../../model/screens";
 import { FIXED_CATEGORY_LABEL } from "../../../model/labels";
 import type { FixedAssetCategory, ValueSource } from "../../../model/types";

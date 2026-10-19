@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Landmark } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
 import type { Goal } from "../../../model/types";

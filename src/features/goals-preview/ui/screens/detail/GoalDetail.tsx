@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronRight, MoreVertical, Pause, Play, XCircle } from "lucide-react";
 import { Sheet, SegmentedControl } from "@/components/primitives";
-import { formatVndCompact } from "@/lib/format";
+import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { daysToTarget, formatISODate, phaseOf } from "../../../engine";
 import { agentCardsFor } from "./agentCards";
 import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";

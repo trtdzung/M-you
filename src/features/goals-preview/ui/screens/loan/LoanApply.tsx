@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd, maskAccountNumber } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
+import { maskAccountNumber } from "@/lib/format";
 import { TEMPLATE_LABEL } from "../../../model/labels";
 import { addMonths, buildSchedule, formatISODate, formatMonths, quoteLoan, totalInterest } from "../../../engine";
 import { paramNumber, type ScreenProps } from "../../../model/screens";

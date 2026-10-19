@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Circle } from "lucide-react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate, formatMonths } from "../../../engine";
 import type { ScreenProps } from "../../../model/screens";
 import { BottomActions, GoalStatusBadge, ScreenHeader, SummaryRows } from "../../shared";

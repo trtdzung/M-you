@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Car, Gem, Home, Package, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import type { FixedAssetCategory } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";

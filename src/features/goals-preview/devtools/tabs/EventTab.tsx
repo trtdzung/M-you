@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import type { SimEvent } from "../../store/actions";
 import type { Goal } from "../../model/types";
 import { usePreview } from "../../store/PreviewStore";
@@ -68,7 +68,7 @@ export function EventTab({ goal }: { goal: Goal | undefined }) {
       <ToolSection title="Sự kiện" hint={goal ? `Áp dụng cho: ${goal.name}` : "Chưa chọn mục tiêu"}>
         <ButtonGrid>
           <button type="button" className={toolButton} onClick={() => fire("salary")}>Lương về</button>
-          <button type="button" className={toolButton} onClick={() => fire("bigExpense")}>Chi tiêu lớn (−12 tr)</button>
+          <button type="button" className={toolButton} onClick={() => fire("bigExpense")}>Chi tiêu lớn (−12 triệu đồng)</button>
           <button type="button" className={toolButton} onClick={() => fire("standingOrderFail")}>Trích định kỳ thất bại</button>
           <button type="button" className={toolButton} onClick={() => fire("overdue")}>Quá hạn trả góp</button>
         </ButtonGrid>

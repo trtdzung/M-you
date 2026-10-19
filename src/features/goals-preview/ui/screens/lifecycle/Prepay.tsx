@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { addMonths, buildSchedule, annuityPayment, formatISODate, outstandingPrincipal, totalInterest } from "../../../engine";
 import type { ScreenProps } from "../../../model/screens";
 import { BottomActions, ConfirmSheet, MoneyInput, ScreenHeader, SummaryRows } from "../../shared";

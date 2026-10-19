@@ -4,7 +4,7 @@ import { useState } from "react";
 import { MoreVertical, Unlink } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";

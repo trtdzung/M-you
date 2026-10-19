@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { LOAN_PRODUCTS } from "../../../data/products";
 import { buildSchedule, formatMonths, quoteLoan, totalInterest } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";

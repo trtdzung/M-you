@@ -5,7 +5,7 @@ import { addDays, dayOfMonth, formatMonths, nextDayOfMonth } from "./dates";
 import { findGoal, postTxn } from "./ledger";
 import { applyLifecycle, refreshLoanStatuses, type LifecycleEvent } from "./lifecycle";
 import { depositAccrued, fundPriceAt } from "./value";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 
 export interface AdvanceSummary {
   days: number;

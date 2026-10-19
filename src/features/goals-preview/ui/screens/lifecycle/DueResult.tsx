@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { daysToTarget, formatISODate, goalValue } from "../../../engine";
 import type { ScreenProps } from "../../../model/screens";
 import { Amount, BottomActions, ConfirmSheet, GoalStatusBadge, ScreenHeader, SplitProgressBar } from "../../shared";

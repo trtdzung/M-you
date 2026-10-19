@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, CircleAlert, Copy, SlidersHorizontal } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../../engine";
 import { TXN_LABEL } from "../../../model/labels";
 import { TXN_DIRECTION, type GoalTxnKind } from "../../../model/types";

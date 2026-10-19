@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { addMonths, dayOfMonth, formatISODate, formatMonths, monthsBetween } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
 import { paramString } from "../../../model/screens";

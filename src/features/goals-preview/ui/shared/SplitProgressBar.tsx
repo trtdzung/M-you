@@ -1,4 +1,4 @@
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
 import { progressTrack } from "./styles";
 

@@ -10,7 +10,7 @@ import { assetValue, depositAccrued, fundPriceAt, goalValue } from "../engine/va
 import type { PreviewState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { Goal, LiquidAsset, ToastTone } from "../model/types";
-import { formatVnd } from "@/lib/format";
+import { formatVnd } from "@/features/goals-preview/format-money";
 import type { PreviewAction, SimEvent } from "./actions";
 
 export const STORAGE_KEY = "goals-preview:v1";
