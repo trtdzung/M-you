@@ -66,7 +66,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_jar_ledger_opening ON jar_ledger (cif, jar_
 CREATE TABLE IF NOT EXISTS accounts (
   cif TEXT NOT NULL,
   id TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('current', 'savings', 'credit_card')),
+  type TEXT NOT NULL CHECK (type IN ('current', 'savings', 'credit_card', 'goal')),
   institution TEXT NOT NULL,
   currency TEXT NOT NULL,
   balance REAL NOT NULL,

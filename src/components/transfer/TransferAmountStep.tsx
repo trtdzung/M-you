@@ -19,6 +19,7 @@ const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
   current: "Tài khoản thanh toán",
   savings: "Tài khoản tiết kiệm",
   credit_card: "Thẻ tín dụng",
+  goal: "Mục tiêu",
 };
 
 export const POOL_SOURCE_LABEL = "Chưa phân bổ";
@@ -141,6 +142,9 @@ export function TransferAmountStep({
             </div>
             <ChevronDown size={16} className="shrink-0 text-muted" />
           </button>
+          {sourceAccount?.type === "goal" && (
+            <p className="mt-2 text-xs text-warning">Đây là tiền của mục tiêu. Chuyển đi sẽ làm chậm tiến độ mục tiêu.</p>
+          )}
         </div>
 
         <div>

@@ -112,7 +112,7 @@ export function TransferCompose() {
       .then(([nextBeneficiaries, nextTransactions, nextAccounts]) => {
         if (!active) return;
         // Balances are DB-backed and already reflect prior transfer debits.
-        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current");
+        const eligibleAccounts = nextAccounts.filter((account) => account.type === "current" || account.type === "goal");
         setBeneficiaries(nextBeneficiaries);
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
@@ -232,7 +232,7 @@ export function TransferCompose() {
         ? `Hũ ${selectedJar.label}`
         : source?.kind === "pool"
           ? POOL_SOURCE_LABEL
-          : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : "Tiết kiệm"}`,
+          : `${selectedAccount!.institution} · ${selectedAccount!.type === "current" ? "Thanh toán" : selectedAccount!.type === "goal" ? "Mục tiêu" : "Tiết kiệm"}`,
       // Jar money physically sits in the CASA account, so a jar source debits the
       // (single, current-only `accounts`) CASA account too; an account source
       // debits the account the user picked. A pool source debits the CASA account

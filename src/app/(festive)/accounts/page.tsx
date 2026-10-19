@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftRight, Wallet, PiggyBank, CreditCard, ChevronDown } from "lucide-react";
+import { ArrowLeftRight, Wallet, PiggyBank, CreditCard, ChevronDown, Target } from "lucide-react";
 import { ScreenHeader } from "@/components/shell/ScreenHeader";
 import { formatVnd } from "@/lib/format";
 import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/states";
@@ -16,6 +16,7 @@ export default function AccountsPage() {
   const groups = [
     { title: "Tài khoản", Icon: Wallet, items: depositAccounts },
     { title: "Tiền gửi & Đầu tư", Icon: PiggyBank, items: accounts.filter((a) => a.type === "savings") },
+    { title: "Tài khoản mục tiêu", Icon: Target, items: accounts.filter((a) => a.type === "goal") },
     { title: "Thẻ tín dụng", Icon: CreditCard, items: accounts.filter((a) => a.type === "credit_card") },
   ];
   const totalBalance = depositAccounts.every((a) => Number.isFinite(a.balance))

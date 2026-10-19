@@ -12,7 +12,7 @@ const KINDS: { id: IncomeKind; label: string }[] = [
   { id: "transfer", label: "Chuyển khoản" },
 ];
 
-const TYPE_LABEL = { current: "Thanh toán", savings: "Tiết kiệm", credit_card: "Thẻ" };
+const TYPE_LABEL = { current: "Thanh toán", savings: "Tiết kiệm", credit_card: "Thẻ", goal: "Mục tiêu" };
 
 /** Money in: a manual credit, plus the three shortcuts the scenarios need. */
 export function IncomingPanel() {
