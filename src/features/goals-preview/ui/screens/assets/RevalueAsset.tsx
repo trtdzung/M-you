@@ -91,7 +91,10 @@ export function RevalueAsset({ params }: ScreenProps) {
       </section>
 
       <section className={cn(card, "flex flex-col gap-4")}>
-        <h2 className={sectionTitle}>Lịch sử định giá</h2>
+        <div className="flex items-center gap-1">
+          <h2 className={sectionTitle}>Lịch sử định giá</h2>
+          <InfoTooltip label="lịch sử định giá" text="Bản xem trước chỉ lưu giá khai báo ban đầu và giá gần nhất." />
+        </div>
         <ol>
           {[
             { date: asset.valuationDate, value: asset.value, title: "Ghi nhận gần nhất" },
@@ -106,7 +109,6 @@ export function RevalueAsset({ params }: ScreenProps) {
             </li>
           ))}
         </ol>
-        <p className={hint}>Bản xem trước chỉ lưu giá khai báo ban đầu và giá gần nhất.</p>
       </section>
 
       <Sheet open={menu} title="Tuỳ chọn tài sản" onClose={() => setMenu(false)}>
