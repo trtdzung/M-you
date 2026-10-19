@@ -7,6 +7,7 @@ import { FIXED_CATEGORY_LABEL, LIQUID_CATEGORY_LABEL } from "../../../model/labe
 import { usePreview } from "../../../store/PreviewStore";
 import { Amount } from "../../shared/Amount";
 import { SourceTag } from "../../shared/SourceTag";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { card, listRow, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
 import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
@@ -21,10 +22,9 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
     <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className={sectionTitle}>Linh hoạt</h2>
+          <div className="flex items-center"><h2 className={sectionTitle}>Linh hoạt</h2><InfoTooltip label="tài sản linh hoạt" text="Sản phẩm MSB như tiền gửi, quỹ hoặc trái phiếu. Khả năng bán, rút tiền và giá trị nhận lại phụ thuộc từng sản phẩm." /></div>
           <SourceTag source="msb" />
         </div>
-        <p className="text-[13px] text-muted">Sản phẩm MSB có giá biết trước, có thể bán khi cần.</p>
         {liquid.length === 0 ? (
           <div className={`${card} flex flex-col gap-2 text-center`}>
             <p className="text-sm text-muted">Chưa có tài sản linh hoạt. Đưa tiền nhàn rỗi vào tiết kiệm, quỹ hoặc trái phiếu để sinh lời.</p>
@@ -66,10 +66,9 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <h2 className={sectionTitle}>Cố định</h2>
+          <div className="flex items-center"><h2 className={sectionTitle}>Cố định</h2><InfoTooltip label="tài sản cố định" text="Nhà, xe, vàng… có giá trị do bạn tự khai. Chỉ phần giá trị theo tỷ lệ bạn chọn được tính vào mục tiêu." /></div>
           <SourceTag source="self_reported" />
         </div>
-        <p className="text-[13px] text-muted">Nhà, xe, vàng… giá do bạn tự khai, chỉ tính một phần vào mục tiêu.</p>
         {fixed.length === 0 ? (
           <p className={`${card} text-center text-sm text-muted`}>Chưa có tài sản cố định nào được khai báo.</p>
         ) : (
