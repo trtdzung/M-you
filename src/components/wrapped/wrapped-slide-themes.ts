@@ -3,11 +3,11 @@ import type { WrappedLineKind, WrappedSlideId } from "@/domain/wrapped";
 
 /**
  * Per-slide MSB theme in two modes.
- *  - `brand` (opening, archetype, closing): the `.wrapped-brand-field` orange-red
+ *  - `brand` (opening, closing): the `.wrapped-brand-field` orange-red
  *    gradient (globals.css). White on its dark stop is only 4.49:1, so ONLY large
  *    text (title, hero, 19px-bold hero caption) sits on it; every other element
  *    lives in a white `WrappedSurfaceCard`.
- *  - `light` (the other six): a solid cream or peach field with navy ink.
+ *  - `light` (the other seven): a solid cream or peach field with navy ink.
  * The frame exposes the theme as `--wr-*` CSS vars; surface cards re-scope ink/muted
  * to navy/`#5f6775`, so visuals (always inside a surface) read the same in both
  * modes. Chart colours: `accent` `#c2410c` (5.18:1 on white, white text on it 5.18:1)
@@ -70,7 +70,7 @@ export const SLIDE_THEMES: Record<WrappedSlideId, WrappedSlideTheme> = {
   "top-merchants": light("#faf8f6"),
   habits: light("#fff1ea"),
   recurring: light("#faf8f6"),
-  archetype: brand,
+  archetype: light("#fff1ea"),
   health: light("#fff1ea"),
   closing: brand,
 };

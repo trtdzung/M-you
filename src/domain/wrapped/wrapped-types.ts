@@ -21,6 +21,7 @@ export type ArchetypeId = "steady-planner" | "weekend-explorer" | "balanced";
 
 /** Fixed deck order. */
 export const WRAPPED_SLIDE_ORDER = [
+  "health",
   "opening",
   "total-spend",
   "jar-share",
@@ -28,7 +29,6 @@ export const WRAPPED_SLIDE_ORDER = [
   "habits",
   "recurring",
   "archetype",
-  "health",
   "closing",
 ] as const;
 

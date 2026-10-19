@@ -6,10 +6,10 @@
 
 import { MIN_EXPENSE_TXNS, MIN_MONTHS, type WrappedCoverage } from "@/domain/wrapped";
 
-export const WRAPPED_TITLE = "Tổng kết chi tiêu 6 tháng";
+export const WRAPPED_TITLE = "Sức khỏe tài chính của bạn";
 
 export const WRAPPED_ENTRY = {
-  title: "Tổng kết 6 tháng gần đây",
+  title: "Sức khỏe tài chính của bạn",
   body: "Xem lại chi tiêu của bạn qua vài trang ngắn.",
   cta: "Xem ngay",
 } as const;
