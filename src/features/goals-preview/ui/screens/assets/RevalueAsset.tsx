@@ -11,7 +11,7 @@ import { FIXED_CATEGORY_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
-import { Amount, BottomActions, ConfirmSheet, EmptyState, MoneyInput, ScreenHeader, SliderRow, SourceTag } from "../../shared";
+import { Amount, ConfirmSheet, EmptyState, MoneyInput, ScreenHeader, SliderRow, SourceTag } from "../../shared";
 import { card, hint, input, label, primaryButton, screenPadding, sectionTitle, ring, listRow } from "../../shared/styles";
 import { dateVi, findGoal, pct, progressAfter } from "./helpers";
 
@@ -114,11 +114,11 @@ export function RevalueAsset({ params }: ScreenProps) {
         <p className="mt-2 text-sm leading-5 text-muted">Tài sản không bị bán. Giá trị của tài sản sẽ không còn được tính vào mục tiêu này.</p>
       </Sheet>
 
-      <BottomActions docked>
+      <div className="pt-2 pb-4">
         <button type="button" className={primaryButton} disabled={!valid} onClick={() => setConfirm(true)}>
           Cập nhật giá trị
         </button>
-      </BottomActions>
+      </div>
 
       <ConfirmSheet
         open={confirm}
