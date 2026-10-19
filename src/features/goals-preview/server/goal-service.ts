@@ -8,12 +8,13 @@ import "server-only";
 
 import { hydrateMarket, type MarketInstrument } from "../data/market";
 import { advanceTime } from "../engine/advance";
-import { daysBetween } from "../engine/dates";
+import { addMonths, daysBetween } from "../engine/dates";
 import type { PreviewState, WorldState } from "../model/state";
 import type { PreviewAction } from "../store/actions";
 import { previewReducer } from "../store/reducer";
 import { engineNow } from "@/lib/security/clock";
 import { advanceGoalClock } from "./clock";
+import { buildCustomerProfile } from "./customer-context";
 import { goalsV2Db } from "./db";
 import { applyPostings, GoalInsufficientFundsError } from "./postings";
 import { readMarketInstruments, readPriceStatus } from "./prices/repo";
@@ -272,21 +273,36 @@ function loadAndCatchUp(cif: string, strict = false): WorldState {
     customer: loadWorld(cif, { profileAsOf: processedThrough }).customer,
   };
   const customer = start.customer;
-  const complete = customer.monthlySurplus !== "unknown";
-  const saved = complete ? null : readSimProfile(cif);
-  if (saved) {
-    start.customer = { ...customer, monthlyIncome: saved.monthlyIncome, monthlyExpenses: saved.monthlyExpenses, salaryDay: saved.salaryDay };
+  let profileToSave = customer.monthlyIncome > 0 ? {
+    monthlyIncome: customer.monthlyIncome,
+    monthlyExpenses: customer.monthlyExpenses,
+    salaryDay: customer.salaryDay,
+    asOf: processedThrough,
+  } : null;
+  let profile = profileToSave ?? readSimProfile(cif);
+  if (!profile) {
+    for (let months = 1; months <= 24; months++) {
+      const asOf = addMonths(processedThrough, -months);
+      const historical = buildCustomerProfile(cif, asOf, customer.riskProfile);
+      if (historical.monthlyIncome <= 0) continue;
+      profileToSave = {
+        monthlyIncome: historical.monthlyIncome,
+        monthlyExpenses: historical.monthlyExpenses,
+        salaryDay: historical.salaryDay,
+        asOf,
+      };
+      profile = profileToSave;
+      break;
+    }
+  }
+  if (profile) {
+    start.customer = { ...customer, monthlyIncome: profile.monthlyIncome, monthlyExpenses: profile.monthlyExpenses, salaryDay: profile.salaryDay };
   }
   const { state: next } = advanceTime(start, days);
   try {
     goalsV2Db().transaction(() => {
       applyPostings(cif, start, next, null);
-      if (complete) writeSimProfile(cif, {
-        monthlyIncome: customer.monthlyIncome,
-        monthlyExpenses: customer.monthlyExpenses,
-        salaryDay: customer.salaryDay,
-        asOf: processedThrough,
-      });
+      if (profileToSave) writeSimProfile(cif, profileToSave);
     })();
   } catch (err) {
     if (strict) throw err;
