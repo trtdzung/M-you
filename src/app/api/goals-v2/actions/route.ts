@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { applyAction } from "@/features/goals-preview/server/goal-service";
-import type { PreviewAction } from "@/features/goals-preview/store/actions";
 
 /**
  * POST /api/goals-v2/actions — body { cif, requestId, action }.
  * 200 { world, market } · 422 { error, world, market } khi thao tác bị từ chối (không ghi gì).
+ * `action` chỉ nhận thao tác nghiệp vụ trong danh sách cho phép, kiểm kiểu từng trường (`parseGoalAction`).
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "action is invalid" }, { status: 422 });
   }
   try {
-    const result = applyAction(cif, requestId, action as PreviewAction);
+    const result = applyAction(cif, requestId, action);
     if (!result.ok) return NextResponse.json({ error: result.error, world: result.world, market: result.market }, { status: 422 });
     return NextResponse.json({ world: result.world, market: result.market });
   } catch (err) {

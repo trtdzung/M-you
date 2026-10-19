@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Transaction } from "@/domain/models";
 import { AccountNotFoundError, debitAccount } from "@/lib/accounts-store";
 import { ManualTxnIdConflictError } from "@/lib/manual-txns-store";
-import { creditOwnGoalAccountIfMatch } from "@/features/goals-preview/server/incoming";
+import {
+  GoalTransferConflictError,
+  GoalTransferRejectedError,
+  guardTransferReplay,
+  isOwnGoalTransfer,
+  transferToOwnGoalAccount,
+} from "@/features/goals-preview/server/incoming";
 
 /**
  * POST /api/accounts/debit — record a confirmed transfer's debit against an
@@ -48,12 +54,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "txn is invalid or does not match amount" }, { status: 422 });
   }
   try {
-    const accounts = debitAccount(cif, accountId, amount, txn as Transaction | undefined);
-    if (txn) creditOwnGoalAccountIfMatch(cif, txn as Transaction);
+    const record = txn as Transaction | undefined;
+    // D22: to one of the customer's own goal accounts at MSB = internal transfer (both legs, one transaction).
+    if (record && isOwnGoalTransfer(cif, record)) {
+      return NextResponse.json(transferToOwnGoalAccount(cif, accountId, amount, record));
+    }
+    const accounts = guardTransferReplay(cif, record, () => debitAccount(cif, accountId, amount, record));
     return NextResponse.json(accounts);
   } catch (err) {
     if (err instanceof AccountNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 });
     if (err instanceof ManualTxnIdConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
+    if (err instanceof GoalTransferConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
+    if (err instanceof GoalTransferRejectedError) return NextResponse.json({ error: err.message }, { status: 422 });
     console.error("Account debit failed", err);
     return NextResponse.json({ error: "debit failed" }, { status: 500 });
   }

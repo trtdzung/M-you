@@ -62,10 +62,23 @@ function goalAccountNumber(cif: string, seq: number): string {
  */
 function normalizeOpenedAccounts(cif: string, prev: WorldState, next: WorldState): void {
   const known = new Set(prev.accounts.map((a) => a.id));
+  const db = goalsV2Db();
+  const taken = db.prepare(
+    `SELECT 1 AS x FROM accounts WHERE account_number = @n
+     UNION ALL SELECT 1 AS x FROM gv2_goal_accounts WHERE number = @n LIMIT 1`,
+  );
+  const assigned = new Set<string>();
   for (const account of next.accounts) {
     if (known.has(account.id)) continue;
-    const seq = Number(/^acc-(\d+)$/.exec(account.id)?.[1] ?? next.seq);
-    account.number = goalAccountNumber(cif, seq);
+    // R3: số chưa có ở `accounts` / `gv2_goal_accounts` của MỌI cif; trùng → tăng phần seq tới khi trống.
+    let seq = Number(/^acc-(\d+)$/.exec(account.id)?.[1] ?? next.seq);
+    let number = goalAccountNumber(cif, seq);
+    for (let tries = 0; assigned.has(number) || taken.get({ n: number }); tries++) {
+      if (tries >= 1_000_000) throw new GoalPostingMismatchError("no free goal account number");
+      number = goalAccountNumber(cif, ++seq);
+    }
+    assigned.add(number);
+    account.number = number;
     const realId = goalAccountId(account.goalId);
     if (account.id === realId) continue;
     const oldId = account.id;
