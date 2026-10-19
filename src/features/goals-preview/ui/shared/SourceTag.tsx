@@ -9,8 +9,8 @@ const TONE: Record<ValueSource, string> = {
 };
 
 /**
- * Provenance pill (MSB / Tự khai / Ước tính). Unlike the app-wide SourceBadge
- * (hidden by product decision), this prototype shows it on every number.
+ * Group-level provenance pill (MSB / Tự khai / Ước tính).
+ * Amounts inherit the group source instead of repeating this pill.
  */
 export function SourceTag({ source, className }: { source: ValueSource; className?: string }) {
   return (

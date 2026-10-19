@@ -130,7 +130,7 @@ export function GoalList({ params }: ScreenProps) {
               <Amount amount={summary.monthly} source="msb" className="font-semibold text-text" />
             </div>
             <div>
-              <p className="text-[12px] text-muted">Mức dư còn lại/tháng</p>
+              <p className="text-[12px] text-muted">Dư dự kiến/tháng</p>
               <Amount
                 amount={summary.left}
                 source={summary.left === "unknown" ? undefined : "estimated"}
