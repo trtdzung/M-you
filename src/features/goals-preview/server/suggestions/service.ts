@@ -8,6 +8,7 @@ import "server-only";
 
 import type { AgentSuggestion, WorldState } from "../../model/state";
 import { goalToday } from "../clock";
+import { fetchAgentWording } from "./agent-wording";
 import { getWorld } from "../goal-service";
 import { buildSignals, cardKindOf, type SuggestionSignal } from "./signals";
 import {
@@ -27,14 +28,9 @@ export interface GoalSuggestionsResult {
   refreshing: boolean;
 }
 
-/**
- * Hook gọi agent viết lại lời cho các tín hiệu (T9 nối). Chạy ở nền, kết quả hợp lệ
- * lưu bằng `saveAgentWording`. Hiện để trống.
- */
+/** Gọi agent viết lại lời cho các tín hiệu (ở nền); kết quả hợp lệ lưu bằng `saveAgentWording`. */
 export async function requestAgentWording(cif: string, world: WorldState, signals: SuggestionSignal[]): Promise<void> {
-  void cif;
-  void world;
-  void signals;
+  await fetchAgentWording(cif, world, signals);
 }
 
 /** cif đang có lời gọi agent chạy dở. */

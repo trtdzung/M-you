@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import type { PreviewState } from "../model/state";
+import type { AgentSuggestion, PreviewState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
@@ -10,6 +10,30 @@ import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, type WorldPaylo
 import { hydrateMarket } from "../data/market";
 import { usePersonaCif } from "@/providers/context";
 import { usePanelActive } from "@/components/shell/PanelActive";
+
+const SUGGESTIONS_URL = "/api/goals-v2/suggestions";
+const SUGGESTION_POLL_MS = 3000;
+const SUGGESTION_POLL_MAX = 10;
+
+interface SuggestionsPayload {
+  suggestions: AgentSuggestion[];
+  refreshing: boolean;
+}
+
+async function fetchSuggestions(cif: string): Promise<SuggestionsPayload> {
+  const res = await fetch(`${SUGGESTIONS_URL}?cif=${encodeURIComponent(cif)}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET goals-v2/suggestions ${res.status}`);
+  return (await res.json()) as SuggestionsPayload;
+}
+
+/** Fire-and-forget: a lost event only costs a log line. */
+export function postSuggestionEvent(cif: string, suggestionId: string, event: "shown" | "clicked" | "dismissed" | "acted"): void {
+  void fetch(`${SUGGESTIONS_URL}/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cif, suggestionId, event }),
+  }).catch(() => undefined);
+}
 
 /** Window event the shell's edge-swipe back fires on /goals-preview (see AppChrome). */
 export const PREVIEW_BACK_EVENT = "goals-preview:back";
@@ -33,6 +57,10 @@ interface PreviewContextValue {
   toast: (message: string, tone?: ToastTone) => void;
   /** False until the first server world has loaded (avoid flashing default data). */
   hydrated: boolean;
+  /** Server suggestions ("M-You gợi ý"); null until the first load (or when it failed). */
+  suggestions: AgentSuggestion[] | null;
+  /** Records a click on a suggestion button ("clicked" for navigation, "acted" for a store action). */
+  recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
 }
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
@@ -47,15 +75,42 @@ function useServerWorld(
   stateRef: MutableRefObject<PreviewState>,
   cif: string | null,
   entryScreen?: ScreenId,
-): { hydrated: boolean; dispatch: (a: PreviewAction) => void } {
+): {
+  hydrated: boolean;
+  dispatch: (a: PreviewAction) => void;
+  suggestions: AgentSuggestion[] | null;
+  recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
+} {
   const [hydrated, setHydrated] = useState(false);
+  const [suggestions, setSuggestions] = useState<AgentSuggestion[] | null>(null);
+  const suggestionRunRef = useRef(0);
   const queueRef = useRef<ActionQueue | null>(null);
   const cancelPollRef = useRef<(() => void) | null>(null);
+
+  /** Loads suggestions without blocking anything; while the server waits for the agent, asks again every 3 s (max 10). */
+  const loadSuggestions = useCallback((cif: string) => {
+    const run = ++suggestionRunRef.current;
+    void (async () => {
+      for (let i = 0; i <= SUGGESTION_POLL_MAX; i += 1) {
+        if (i > 0) await new Promise((resolve) => setTimeout(resolve, SUGGESTION_POLL_MS));
+        if (run !== suggestionRunRef.current) return;
+        try {
+          const payload = await fetchSuggestions(cif);
+          if (run !== suggestionRunRef.current) return;
+          setSuggestions(payload.suggestions);
+          if (!payload.refreshing) return;
+        } catch {
+          if (i === 0) return;
+        }
+      }
+    })();
+  }, []);
 
   const applyPayload = useCallback(
     (payload: WorldPayload) => {
       hydrateMarket(payload.market.instruments);
       rawDispatch({ type: "world/sync", world: payload.world });
+      if (cif) loadSuggestions(cif);
       if (payload.market.refreshing && !cancelPollRef.current) {
         cancelPollRef.current = pollMarket(
           () => {
@@ -68,11 +123,13 @@ function useServerWorld(
         );
       }
     },
-    [rawDispatch, stateRef],
+    [rawDispatch, stateRef, cif, loadSuggestions],
   );
 
   useEffect(() => {
     let alive = true;
+    suggestionRunRef.current += 1;
+    setSuggestions(null);
     queueRef.current?.dispose();
     queueRef.current = null;
     cancelPollRef.current?.();
@@ -106,6 +163,7 @@ function useServerWorld(
       queueRef.current?.dispose();
       queueRef.current = null;
       cancelPollRef.current?.();
+      suggestionRunRef.current += 1;
     };
   }, [cif, entryScreen, rawDispatch, applyPayload, stateRef]);
 
@@ -113,11 +171,20 @@ function useServerWorld(
     (action: PreviewAction) => {
       rawDispatch(action);
       if (!isLocalOnlyAction(action)) queueRef.current?.enqueue(action);
+      // "Để sau" / "Ẩn gợi ý": the server hides the suggestion for 7 days.
+      if (action.type === "dismissSuggestion" && cif) postSuggestionEvent(cif, action.id, "dismissed");
     },
-    [rawDispatch],
+    [rawDispatch, cif],
   );
 
-  return { hydrated, dispatch };
+  const recordSuggestionEvent = useCallback(
+    (suggestionId: string, event: "clicked" | "acted") => {
+      if (cif) postSuggestionEvent(cif, suggestionId, event);
+    },
+    [cif],
+  );
+
+  return { hydrated, dispatch, suggestions, recordSuggestionEvent };
 }
 
 export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
@@ -126,7 +193,7 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   const [state, rawDispatch] = useReducer(previewReducer, undefined, initialPreviewState);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const { hydrated, dispatch } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
+  const { hydrated, dispatch, suggestions, recordSuggestionEvent } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
 
   useEffect(() => {
     const onBack = (event: Event) => {
@@ -152,7 +219,10 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
     [stack, updateParams, push, replace, pop, popTo, reset],
   );
 
-  const value = useMemo(() => ({ state, dispatch, nav, toast, hydrated }), [state, dispatch, nav, toast, hydrated]);
+  const value = useMemo(
+    () => ({ state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent }),
+    [state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent],
+  );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }
 
