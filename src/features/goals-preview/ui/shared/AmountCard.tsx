@@ -54,7 +54,7 @@ export function AmountCard({
           aria-invalid={error ? true : undefined}
           className={cn("min-h-12 w-full min-w-0 rounded-lg bg-transparent text-[28px] font-bold tabular-nums text-text placeholder:text-muted", ring)}
         />
-        <span className="text-sm text-muted">đồng</span>
+        <span className="text-sm text-muted">VND</span>
       </div>
       {error && <p className={fieldError}>{error}</p>}
       {chips.length > 0 && (

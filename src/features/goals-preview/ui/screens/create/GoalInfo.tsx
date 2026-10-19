@@ -181,7 +181,7 @@ export function GoalInfo({ params }: ScreenProps) {
             aria-invalid={touched && errors.amount ? true : undefined}
             className={cn("min-h-12 w-full min-w-0 rounded-lg bg-transparent text-[28px] font-bold tabular-nums text-text", ring)}
           />
-          <span className="text-sm text-muted">đồng</span>
+          <span className="text-sm text-muted">VND</span>
         </div>
         {touched && errors.amount && <p className={fieldError}>{errors.amount}</p>}
         <div className="flex flex-wrap gap-2">
@@ -269,7 +269,7 @@ export function GoalInfo({ params }: ScreenProps) {
             aria-invalid={errors.deposit ? true : undefined}
             className={cn("min-h-11 w-full min-w-0 rounded-lg bg-transparent text-[20px] font-bold tabular-nums text-text placeholder:text-muted", ring)}
           />
-          <span className="text-sm text-muted">đồng</span>
+          <span className="text-sm text-muted">VND</span>
         </div>
         {errors.deposit && <p className={fieldError}>{errors.deposit}</p>}
       </section>

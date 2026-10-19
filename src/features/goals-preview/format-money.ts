@@ -4,7 +4,7 @@ const exact = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
 export function formatVnd(amount: MaybeAmount): string {
-  return isUnknownAmount(amount) ? "—" : `${exact.format(amount as number)} đồng`;
+  return isUnknownAmount(amount) ? "—" : `${exact.format(amount as number)} VND`;
 }
 
 /** Readable units for summaries; exact amounts remain available in details. */

@@ -70,7 +70,7 @@ export function MoneyInput({
           className={cn(input, "pr-14 text-[20px] font-semibold tabular-nums", shownError && "border-negative")}
         />
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted">
-          đồng
+          VND
         </span>
       </div>
       <div id={hintId} className="flex flex-col gap-0.5">
