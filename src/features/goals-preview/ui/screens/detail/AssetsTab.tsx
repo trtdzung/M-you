@@ -108,7 +108,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                       <p className={`mt-1 ${figure}`}>{formatVndCompact(Math.round(now * a.countPercent / 100))}</p>
                       <p className="mt-1 text-[12px] text-muted">
                         {a.countPercent}% của {formatVndCompact(now)}
-                        {instrument && a.quantity !== undefined ? ` · ${a.quantity.toLocaleString("vi-VN")} ${instrument.unit} theo giá hôm nay` : a.accrual ? " · gốc + lãi tới hôm nay" : " tự khai"}
+                        {instrument && a.quantity !== undefined ? ` · ${a.quantity.toLocaleString("vi-VN")} ${instrument.unit}` : a.accrual ? " · gốc + lãi tới hôm nay" : " tự khai"}
                       </p>
                       {instrument && priceDateOf(instrument.priceSeries, state.clock.today) && (
                         <p className="mt-1 text-[12px] text-muted">Giá ngày {formatISODate(priceDateOf(instrument.priceSeries, state.clock.today))}</p>

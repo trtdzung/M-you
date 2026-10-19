@@ -19,6 +19,7 @@ export interface MarketInstrument {
   /** Quantities may be fractional (gold in chỉ, fund units). */
   fractional: boolean;
   priceSeries: PricePoint[];
+  quotedAt?: string;
 }
 
 /** asset.name when creating from a market instrument (≤60 chars). */

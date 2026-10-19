@@ -12,7 +12,7 @@ import {
   type MarketInstrument,
   type MarketKind,
 } from "../../data/market";
-import { seriesPriceAt } from "../../engine";
+import { seriesPriceAt, seriesPointAt, formatISODate } from "../../engine";
 import type { ISODate } from "../../model/types";
 import { input, label, listRow, ring, secondaryButton } from "./styles";
 
@@ -181,7 +181,7 @@ export function InstrumentPicker({
             <p className="text-[16px] font-bold text-text">{selected.name}</p>
             {selected.fullName && <p className="mt-0.5 truncate text-[13px] text-muted">{selected.fullName}</p>}
             <p className="mt-1.5 text-[13px] tabular-nums text-muted">
-              Giá hôm nay: {priceLabel(price)}/{selected.unit}
+              {kind === "stock" ? "Giá đóng cửa ngày" : "NAV ngày"} {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}: {priceLabel(price)}/{selected.unit}
             </p>
           </div>
           <button type="button" className={cn(secondaryButton, "!min-h-11 !w-auto shrink-0 !px-4")} onClick={() => setOpen(true)}>

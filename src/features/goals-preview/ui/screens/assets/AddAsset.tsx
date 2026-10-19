@@ -5,7 +5,7 @@ import { Car, CircleDollarSign, FileText, Gem, Home, Landmark, Package, PieChart
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { assetNameFromInstrument, getInstrument, instrumentsOf } from "../../../data/market";
-import { addMonths, outsideValue, seriesPriceAt } from "../../../engine";
+import { addMonths, outsideValue, seriesPriceAt, seriesPointAt, formatISODate } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import type { DeclaredAssetCategory } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
@@ -181,6 +181,11 @@ export function AddAsset({ params }: ScreenProps) {
         ? !!instrument && qty > 0
         : !!accrual && startDate <= today;
   const source = valuation === "manual" ? ("self_reported" as const) : ("estimated" as const);
+  const priceDate = formatISODate(instrument ? seriesPointAt(instrument.priceSeries, today)?.date : undefined).slice(0, 5);
+  const quoteTime = instrument?.quotedAt
+    ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(instrument.quotedAt))
+    : undefined;
+  const valueLabel = valuation === "manual" ? "Giá trị tự khai" : valuation === "market" ? `Giá trị ước tính theo giá ngày ${priceDate}` : "Giá trị ước tính hôm nay";
   const unitPrice = instrument ? seriesPriceAt(instrument.priceSeries, today, shift) : 0;
 
   return (
@@ -286,7 +291,7 @@ export function AddAsset({ params }: ScreenProps) {
                 <span className="shrink-0 text-sm font-semibold text-muted">{instrument.unit}</span>
               </div>
               {type.category === "gold" && (
-                <p className="text-[13px] text-muted">Giá hôm nay: {formatVnd(unitPrice)}/{instrument.unit}</p>
+                <p className="text-[13px] text-muted">Giá mua vào{quoteTime ? ` lúc ${quoteTime}` : ""} ngày {priceDate}: {formatVnd(unitPrice)}/{instrument.unit}</p>
               )}
             </div>
           )}
@@ -329,8 +334,8 @@ export function AddAsset({ params }: ScreenProps) {
       )}
 
       {valuation !== "manual" && (
-        <section className={cn(card, "flex items-center justify-between gap-3")} aria-label="Giá trị ước tính hôm nay">
-          <span className="text-[13px] text-muted">Giá trị ước tính hôm nay</span>
+        <section className={cn(card, "flex items-center justify-between gap-3")} aria-label={valueLabel}>
+          <span className="text-[13px] text-muted">{valueLabel}</span>
           <span className="text-[16px] font-bold tabular-nums text-text">{autoValue ? formatVnd(autoValue) : "—"}</span>
         </section>
       )}
@@ -365,7 +370,7 @@ export function AddAsset({ params }: ScreenProps) {
           { label: "Mục tiêu", value: goal.name },
           { label: "Tài sản", value: finalName },
           ...(valuation === "market" && instrument ? [{ label: "Số lượng", value: `${formatQtyInput(quantity)} ${instrument.unit}` }] : []),
-          { label: valuation === "manual" ? "Giá trị tự khai" : "Giá trị ước tính hôm nay", value: assetValue, source },
+          { label: valueLabel, value: assetValue, source },
           ...(valuation === "manual" ? [{ label: "Ngày định giá", value: dateVi(date) }] : []),
           { label: "Tính vào mục tiêu", value: counted ? `${percent}%` : "Không tính" },
           { label: "Phần cộng vào mục tiêu", value: countedValue, source, emphasis: true },

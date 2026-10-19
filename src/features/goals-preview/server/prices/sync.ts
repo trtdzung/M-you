@@ -31,9 +31,11 @@ function claimRun(db: ReturnType<typeof goalsV2Db>, force: boolean, syncDate: st
       .get(new Date(Date.now() - SYNC_LOCK_MS).toISOString());
     if (locked) return null;
     if (!force) {
+      const closeAt = new Date(`${syncDate}T15:00:00+07:00`).toISOString();
+      const afterClose = new Date().toISOString() >= closeAt;
       const fresh = db
-        .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE sync_date = ? AND status IN ('ok','partial') LIMIT 1")
-        .get(syncDate);
+        .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE sync_date = ? AND status IN ('ok','partial') AND (? = 0 OR started_at >= ?) LIMIT 1")
+        .get(syncDate, afterClose ? 1 : 0, closeAt);
       if (fresh) return null;
     }
     const info = db

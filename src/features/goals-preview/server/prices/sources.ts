@@ -148,7 +148,9 @@ function stockUrl(symbol: string, since: string, now: Date): string {
   return `https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${from}&to=${to}`;
 }
 
-function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint[] {
+function stockPoints(symbol: string, json: Record<string, unknown>, now: Date): SourcePoint[] {
+  const today = vnDate(now);
+  const beforeClose = new Date(now.getTime() + VN_OFFSET_MS).getUTCHours() < 15;
   const t = json.t as unknown[];
   const c = json.c as unknown[];
   const points: SourcePoint[] = [];
@@ -156,9 +158,11 @@ function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint
     const ts = Number(t[i]);
     const close = Number(c[i]);
     if (!Number.isFinite(ts) || !(close > 0)) continue;
+    const priceDate = vnDate(new Date(ts * 1000));
+    if (beforeClose && priceDate === today) continue;
     points.push({
       instrumentId: `stock-${symbol.toLowerCase()}`,
-      priceDate: vnDate(new Date(ts * 1000)),
+      priceDate,
       price: Math.round(close * 1000),
       rawPrice: close,
       source: "vndirect",
@@ -170,7 +174,7 @@ function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint
 async function stockHistory(symbol: string, since: string, now: Date): Promise<SourcePoint[]> {
   const json = await fetchJson(stockUrl(symbol, since, now));
   if (!isRecord(json) || !Array.isArray(json.t) || !Array.isArray(json.c)) throw new Error("phản hồi không có t/c");
-  return stockPoints(symbol, json);
+  return stockPoints(symbol, json, now);
 }
 
 export type StockLookup =
@@ -200,7 +204,7 @@ export async function lookupStock(symbolRaw: string, now: Date): Promise<StockLo
     if (!isRecord(json)) return { status: "error", message: "phản hồi không hợp lệ" };
     if (json.s === "no_data") return { status: "not_found" };
     if (!Array.isArray(json.t) || !Array.isArray(json.c)) return { status: "error", message: "phản hồi không có t/c" };
-    const points = stockPoints(symbol, json);
+    const points = stockPoints(symbol, json, now);
     return points.length === 0 ? { status: "not_found" } : { status: "ok", symbol, points };
   } catch (e) {
     return { status: "error", message: errMsg(e) };

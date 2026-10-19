@@ -22,6 +22,7 @@ interface PriceRow {
   instrument_id: string;
   price_date: string;
   price: number;
+  fetched_at: string;
 }
 
 /**
@@ -54,7 +55,7 @@ export function readMarketInstruments(): MarketInstrument[] {
     .all() as InstrumentRow[];
   const prices = db
     .prepare(
-      `SELECT p.instrument_id, p.price_date, p.price FROM gv2_prices p
+      `SELECT p.instrument_id, p.price_date, p.price, p.fetched_at FROM gv2_prices p
          JOIN gv2_instruments i ON i.id = p.instrument_id AND i.active = 1
         ORDER BY p.instrument_id, p.price_date ASC`,
     )
@@ -79,6 +80,7 @@ export function readMarketInstruments(): MarketInstrument[] {
       fractional: i.fractional === 1,
       ...(i.listed === 0 ? { listed: false } : {}),
       priceSeries,
+      ...(i.kind === "gold" ? { quotedAt: prices.filter((p) => p.instrument_id === i.id).at(-1)?.fetched_at } : {}),
     });
   }
   return out;
