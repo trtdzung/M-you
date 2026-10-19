@@ -30,6 +30,8 @@ export const SCREEN_IDS = [
   "InvestConfirm",
   "MaturityChoice",
   // loan + lifecycle (T5)
+  "LoanAppHome",
+  "LoanAppSurvey",
   "LoanSimulator",
   "LoanBlocked",
   "LoanApply",
