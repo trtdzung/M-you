@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, CircleAlert, Copy } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, CircleAlert, Copy, SlidersHorizontal } from "lucide-react";
+import { Sheet } from "@/components/primitives";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { formatISODate } from "../../../engine";
@@ -11,7 +12,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { selectGoalTxns } from "../../../store/selectors";
 import { Amount } from "../../shared/Amount";
 import { SourceTag } from "../../shared/SourceTag";
-import { card, input, ring, sectionTitle, secondaryButton } from "../../shared/styles";
+import { card, ring, sectionTitle, secondaryButton } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
 
 type Filter = "all" | "deposit" | "withdraw" | "interest" | "invest" | "maturity" | "loan_disbursement" | "loan_repayment" | "failed";
@@ -32,6 +33,7 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav, toast } = usePreview();
   const { goal, account, state } = ctx;
   const [filter, setFilter] = useState<Filter>("all");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [limit, setLimit] = useState(10);
   const txns = selectGoalTxns(state, goalId);
   const kinds = FILTERS.find((f) => f.value === filter)?.kinds;
@@ -109,10 +111,22 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className={sectionTitle}>Lịch sử giao dịch</h2>
-          <select aria-label="Lọc loại giao dịch" value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setLimit(10); }} className={`${input} !w-auto max-w-full !py-2 !text-[13px]`}>
-            {FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
+          <button type="button" aria-label="Lọc loại giao dịch" aria-haspopup="dialog" onClick={() => setFilterOpen(true)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold transition-colors", ring, filter === "all" ? "border-border bg-surface text-text hover:bg-surface-muted" : "border-primary/20 bg-primary-soft text-primary-strong")}>
+            <SlidersHorizontal size={16} aria-hidden />
+            {FILTERS.find((f) => f.value === filter)?.label}
+            <ChevronDown size={14} aria-hidden className="opacity-60" />
+          </button>
         </div>
+        <Sheet open={filterOpen} title="Loại giao dịch" onClose={() => setFilterOpen(false)}>
+          <div role="group" aria-label="Chọn loại giao dịch" className="grid grid-cols-2 gap-2">
+            {FILTERS.map((option) => (
+              <button key={option.value} type="button" aria-pressed={filter === option.value} onClick={() => { setFilter(option.value); setLimit(10); setFilterOpen(false); }} className={cn("flex min-h-12 items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold", ring, filter === option.value ? "border-primary/30 bg-primary-soft text-primary-strong" : "border-border bg-surface text-text hover:bg-surface-muted")}>
+                {option.label}
+                {filter === option.value && <Check size={17} aria-hidden className="shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </Sheet>
         <p className="text-[12px] text-muted">{shown.length} giao dịch{filter !== "all" ? ` · ${FILTERS.find((f) => f.value === filter)?.label}` : ""}</p>
         {shown.length === 0 ? (
           <p className="rounded-card bg-surface-muted p-4 text-center text-sm text-muted">Chưa có giao dịch nào.</p>
