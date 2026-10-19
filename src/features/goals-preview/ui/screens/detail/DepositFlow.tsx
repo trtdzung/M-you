@@ -35,6 +35,7 @@ export function DepositFlow({ params }: ScreenProps) {
   const nowPct = Math.round((stage.value / Math.max(1, stage.target)) * 100);
   const after = stage.value + (valid ? amount! : 0);
   const afterPct = Math.round((after / Math.max(1, stage.target)) * 100);
+  const reaches = valid && after >= stage.target;
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -62,14 +63,17 @@ export function DepositFlow({ params }: ScreenProps) {
           <section className={`${card} flex flex-col gap-3`} aria-label="Tiến độ sau khi nạp">
             <div className="flex items-center justify-between gap-2">
               <h2 className={sectionTitle}>{phase2 ? "Tiến độ trả khoản vay" : "Tiến độ mục tiêu"}</h2>
-              <span className="text-[13px] font-semibold tabular-nums text-text">
-                {valid ? `${nowPct}% → ${afterPct}%` : `${nowPct}%`}
+              <span className={`text-[13px] font-semibold tabular-nums ${reaches ? "text-positive" : "text-text"}`}>
+                {!valid ? `${nowPct}%` : reaches ? `${nowPct}% → Đủ ✓` : `${nowPct}% → ${afterPct}%`}
               </span>
             </div>
-            <SplitProgressBar cash={stage.principalPaid + value.cash + (valid ? amount! : 0)} assets={value.assets} target={stage.target} showLegend={false} />
-            {valid && after >= stage.target && (
-              <p className="text-[13px] font-semibold text-positive">{phase2 ? "Đủ tiền để tất toán khoản vay." : "Bạn sẽ đủ tiền cho mục tiêu."}</p>
-            )}
+            <SplitProgressBar
+              cash={stage.principalPaid + value.cash}
+              assets={value.assets}
+              pending={valid ? amount! : 0}
+              target={stage.target}
+              showLegend={false}
+            />
           </section>
         </>
       )}
