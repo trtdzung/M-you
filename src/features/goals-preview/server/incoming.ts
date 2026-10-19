@@ -63,9 +63,12 @@ function sameTransfer(stored: Transaction, txn: Transaction): boolean {
 /**
  * Đã có bản ghi cùng id: nội dung giống → `true` (gửi lại, không ghi gì nữa);
  * khác → `GoalTransferConflictError`. Chưa có → `false`. Gọi trong transaction.
+ * D30: có dòng `gv2_transfer_sources` mà nguồn trừ thật khác `sourceAccountId` → khác;
+ * chưa có dòng (giao dịch trước T16) → chỉ so `sameTransfer`.
  */
-function checkReplay(cif: string, txn: Transaction): boolean {
-  const row = goalsV2Db().prepare("SELECT source, payload FROM transactions WHERE cif = ? AND id = ?").get(cif, txn.id) as
+function checkReplay(cif: string, txn: Transaction, sourceAccountId: string): boolean {
+  const db = goalsV2Db();
+  const row = db.prepare("SELECT source, payload FROM transactions WHERE cif = ? AND id = ?").get(cif, txn.id) as
     | { source: string; payload: string }
     | undefined;
   if (!row) return false;
@@ -75,10 +78,31 @@ function checkReplay(cif: string, txn: Transaction): boolean {
   } catch {
     stored = null;
   }
-  if (row.source !== "self_reported" || !stored || !sameTransfer(stored, txn)) {
+  const origin = db
+    .prepare("SELECT source_account_id AS id FROM gv2_transfer_sources WHERE cif = ? AND txn_id = ?")
+    .get(cif, txn.id) as { id: string } | undefined;
+  if (
+    row.source !== "self_reported" ||
+    !stored ||
+    !sameTransfer(stored, txn) ||
+    (origin !== undefined && origin.id !== sourceAccountId)
+  ) {
     throw new GoalTransferConflictError(`transaction ${txn.id} already exists with different content`);
   }
   return true;
+}
+
+/**
+ * D30: lưu nguồn trừ thật của lần ghi đầu, gọi trong cùng transaction với bút toán.
+ * Chỉ tới đây khi chưa có dòng `transactions` cùng id, nên dòng nguồn cũ (nếu còn sót
+ * lại sau khi giao dịch bị xoá) được thay.
+ */
+function recordTransferSource(cif: string, txnId: string, sourceAccountId: string): void {
+  goalsV2Db()
+    .prepare(
+      "INSERT OR REPLACE INTO gv2_transfer_sources (cif, txn_id, source_account_id, created_at) VALUES (?, ?, ?, ?)",
+    )
+    .run(cif, txnId, sourceAccountId, new Date().toISOString());
 }
 
 /** Loại tài khoản nguồn của cif (`undefined` = không có). */
@@ -114,14 +138,16 @@ export function guardTransferReplay<T>(
   return db
     .transaction(() => {
       const record = txn ? debitRecordFor(cif, sourceAccountId, txn) : undefined;
-      if (record && checkReplay(cif, record)) return debit(record);
+      if (record && checkReplay(cif, record, sourceAccountId)) return debit(record);
       if (sourceType(cif, sourceAccountId) === "goal") {
         const row = db.prepare("SELECT available_balance AS b FROM accounts WHERE cif = ? AND id = ?").get(cif, sourceAccountId) as
           | { b: number }
           | undefined;
         if (!row || row.b < amount) throw new GoalTransferRejectedError("Số dư không đủ để hoàn tất giao dịch.");
       }
-      return debit(record);
+      const result = debit(record);
+      if (record) recordTransferSource(cif, record.id, sourceAccountId);
+      return result;
     })
     .immediate();
 }
@@ -143,7 +169,7 @@ export function transferToOwnGoalAccount(cif: string, sourceAccountId: string, a
   const db = goalsV2Db();
   db.transaction(() => {
     const record = debitRecordFor(cif, sourceAccountId, txn);
-    if (checkReplay(cif, record)) return;
+    if (checkReplay(cif, record, sourceAccountId)) return;
     const number = txn.counterpartyAccountNumber;
     const target = number && isMsb(txn.counterpartyBankName) ? openGoalAccountByNumber(cif, number) : undefined;
     if (!target) throw new GoalTransferRejectedError("Tài khoản mục tiêu không còn mở.");
@@ -197,6 +223,7 @@ export function transferToOwnGoalAccount(cif: string, sourceAccountId: string, a
       target.goal_id,
       txn.note ?? "Nhận chuyển khoản",
     );
+    recordTransferSource(cif, record.id, sourceAccountId);
   }).immediate();
   return readAccounts(cif);
 }

@@ -119,6 +119,14 @@ CREATE TABLE IF NOT EXISTS gv2_suggestion_events (
   event TEXT NOT NULL CHECK (event IN ('shown','clicked','dismissed','acted')),
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS gv2_transfer_sources (
+  cif TEXT NOT NULL,
+  txn_id TEXT NOT NULL,
+  source_account_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (cif, txn_id)
+);
 `;
 
 /** Idempotent: creates every Goals v2 table when missing. */
