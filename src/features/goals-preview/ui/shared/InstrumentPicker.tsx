@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { Search } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { cn } from "@/lib/cn";
@@ -47,6 +47,8 @@ export function InstrumentPicker({
   onManualFund?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Sheet chạy lại hiệu ứng focus khi onClose đổi; giữ hàm ổn định để ô tìm kiếm không mất focus khi gõ.
+  const close = useCallback(() => setOpen(false), []);
   const [query, setQuery] = useState("");
   const [checking, setChecking] = useState(false);
   const [addError, setAddError] = useState<string | undefined>();
@@ -149,7 +151,7 @@ export function InstrumentPicker({
           addError={addError}
           symbolQuery={symbolQuery}
           kind={kind}
-          onClose={() => setOpen(false)}
+          onClose={close}
           onQuery={(v) => {
             setQuery(v);
             setAddError(undefined);
@@ -189,7 +191,7 @@ export function InstrumentPicker({
         addError={addError}
         symbolQuery={symbolQuery}
         kind={kind}
-        onClose={() => setOpen(false)}
+        onClose={close}
         onQuery={(v) => {
           setQuery(v);
           setAddError(undefined);
