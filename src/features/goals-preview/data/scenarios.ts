@@ -1,9 +1,10 @@
 import type { Scenario, WorldState } from "../model/state";
 import { buildWorld } from "./builder";
-import { FUND_BOND, FUND_EQUITY, LOAN_CAR, ONLINE_DEPOSIT } from "./products";
+import { outsideValue } from "../engine/value";
+import { BOND_MSB, FUND_BOND, FUND_EQUITY, LOAN_CAR, ONLINE_DEPOSIT, SAVINGS_FLEX } from "./products";
 
 /**
- * 13 scripted scenarios + demo (mixed) + empty. Each `build()` returns a fresh
+ * 14 scripted scenarios + demo (mixed) + empty. Each `build()` returns a fresh
  * world; the sim date is 16/10/2026 everywhere. Goal ids are deterministic
  * per scenario (goal-1001, …) — use `firstGoalId(world)` instead of hardcoding.
  */
@@ -439,6 +440,57 @@ export const SCENARIOS: Scenario[] = [
           },
         ],
       }),
+  },
+  {
+    id: "s14-all-assets",
+    code: "14",
+    title: "Đủ loại tài sản",
+    description: "Mua nhà phố 8 tỷ với tiền mặt, 5 sản phẩm MSB và 7 tài sản ngoài MSB: nhà, xe, vàng, cổ phiếu, chứng chỉ quỹ, tiền gửi và trái phiếu ở nơi khác.",
+    highlights: ["Tab Tài sản: MSB + ngoài MSB", "Vàng / cổ phiếu / quỹ tự định giá theo số lượng", "Tiền gửi, trái phiếu ngoài: gốc + lãi"],
+    jumpTo: { screen: "GoalDetail", params: { goalId: "goal-1001", tab: "assets" } },
+    build: () => {
+      // Outside market / accrual assets: stored value is only a fallback, the engine re-values them daily.
+      const at = (spec: Parameters<typeof outsideValue>[0]) => outsideValue(spec, "2026-10-16") ?? 0;
+      const gold = { instrumentId: "gold-sjc", quantity: 20 };
+      const stock = { instrumentId: "stock-fpt", quantity: 2_000 };
+      const fund = { instrumentId: "fund-equity-ext", quantity: 5_000 };
+      const deposit = { accrual: { principal: 400 * TR, ratePa: 5.2, startDate: "2026-04-15", maturityDate: "2027-04-15" } };
+      const bond = { accrual: { principal: 500 * TR, ratePa: 8.5, startDate: "2025-11-01", maturityDate: "2028-11-01" } };
+      return buildWorld({
+        scenarioId: "s14-all-assets",
+        customer: { monthlyIncome: 80 * TR, monthlySurplus: 35 * TR, mainCasaBalance: 120 * TR, riskProfile: "growth" },
+        goals: [
+          {
+            name: "Mua nhà phố",
+            template: "house",
+            target: 8_000 * TR,
+            createdAt: "2024-01-10",
+            targetDate: "2029-12-31",
+            opening: 800 * TR,
+            monthly: 30 * TR,
+            dayOfMonth: 10,
+            flexibility: "date_flexible",
+            assets: [
+              // Sản phẩm MSB (tài sản linh hoạt)
+              { type: "liquid", category: "savings", productId: SAVINGS_FLEX.id, amount: 60 * TR, createdAt: "2026-03-01" },
+              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 300 * TR, termMonths: 12, createdAt: "2025-12-01" },
+              { type: "liquid", category: "fund", productId: FUND_BOND.id, amount: 150 * TR, createdAt: "2025-06-15" },
+              { type: "liquid", category: "fund", productId: FUND_EQUITY.id, amount: 100 * TR, createdAt: "2026-01-10" },
+              { type: "liquid", category: "bond", productId: BOND_MSB.id, amount: 200 * TR, createdAt: "2025-09-01" },
+              // Tài sản ngoài MSB: vật chất (tự khai)
+              { type: "fixed", name: "Căn hộ cũ Bình Thạnh (định bán)", category: "house", value: 2_600 * TR, costBasis: 1_900 * TR, valuationDate: "2026-08-01", countPercent: 60 },
+              { type: "fixed", name: "Xe Honda CR-V 2021", category: "car", value: 750 * TR, costBasis: 1_050 * TR, valuationDate: "2026-02-01", countPercent: 50 },
+              // Tài sản ngoài MSB: tài chính (tự định giá)
+              { type: "fixed", name: "Vàng miếng SJC", category: "gold", value: at(gold), valuationDate: "2026-09-01", countPercent: 80, ...gold },
+              { type: "fixed", name: "Cổ phiếu FPT", category: "stock", value: at(stock), valuationDate: "2026-09-01", countPercent: 70, institution: "Công ty chứng khoán XYZ", ...stock },
+              { type: "fixed", name: "Quỹ cổ phiếu (công ty quản lý quỹ khác)", category: "external_fund", value: at(fund), valuationDate: "2026-09-01", countPercent: 80, ...fund },
+              { type: "fixed", name: "Tiền gửi Vietcombank 12 tháng", category: "deposit", value: at(deposit), valuationDate: "2026-04-15", countPercent: 100, institution: "Vietcombank", ...deposit },
+              { type: "fixed", name: "Trái phiếu doanh nghiệp ABC", category: "bond", value: at(bond), valuationDate: "2025-11-01", countPercent: 90, institution: "Công ty ABC", ...bond },
+            ],
+          },
+        ],
+      });
+    },
   },
   {
     id: "empty",
