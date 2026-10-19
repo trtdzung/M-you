@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
-import { Info } from "lucide-react";
+import { Info, TriangleAlert } from "lucide-react";
 import { ring } from "./styles";
 
-export function InfoTooltip({ label, text }: { label: string; text: string }) {
+export function InfoTooltip({ label, text, warning = false }: { label: string; text: string; warning?: boolean }) {
+  const Icon = warning ? TriangleAlert : Info;
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const id = useId();
@@ -41,7 +42,7 @@ export function InfoTooltip({ label, text }: { label: string; text: string }) {
     <span ref={root} className="relative inline-flex" onMouseEnter={() => setOpen(true)} onMouseLeave={() => { if (!pinned) setOpen(false); }}>
       <button
         type="button"
-        aria-label={`Thông tin về ${label}`}
+        aria-label={`${warning ? "Cảnh báo" : "Thông tin về"} ${label}`}
         aria-describedby={open ? id : undefined}
         onFocus={() => setOpen(true)}
         onBlur={() => { setOpen(false); setPinned(false); }}
@@ -49,7 +50,7 @@ export function InfoTooltip({ label, text }: { label: string; text: string }) {
         onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); setPinned(false); } }}
         className={`group flex h-11 w-11 items-center justify-center rounded-full transition-colors ${open ? "text-primary-strong" : "text-muted hover:text-primary-strong"} ${ring}`}
       >
-        <span className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${open ? "bg-primary-soft" : "group-hover:bg-surface/80"}`}><Info size={17} aria-hidden /></span>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${open ? "bg-primary-soft" : "group-hover:bg-surface/80"}`}><Icon size={17} aria-hidden className={warning ? "text-warning" : undefined} /></span>
       </button>
       {open && (
         <span

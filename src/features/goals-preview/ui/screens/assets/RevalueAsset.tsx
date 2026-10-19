@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { MoreVertical, Unlink } from "lucide-react";
+import { Sheet } from "@/components/primitives";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { daysBetween } from "../../../engine";
@@ -9,7 +12,7 @@ import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
 import { Amount, BottomActions, ConfirmSheet, EmptyState, MoneyInput, ScreenHeader, SliderRow, SourceTag } from "../../shared";
-import { card, dangerButton, hint, input, label, primaryButton, screenPadding, sectionTitle, warningBox } from "../../shared/styles";
+import { card, hint, input, label, primaryButton, screenPadding, sectionTitle, ring, listRow } from "../../shared/styles";
 import { dateVi, findGoal, pct, progressAfter } from "./helpers";
 
 /** Định giá lại tài sản cố định, hoặc bỏ khỏi mục tiêu. */
@@ -22,6 +25,7 @@ export function RevalueAsset({ params }: ScreenProps) {
   const [value, setValue] = useState<number | null>(asset?.value ?? null);
   const [date, setDate] = useState(today);
   const [percent, setPercent] = useState(asset?.countPercent ?? 100);
+  const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -46,16 +50,15 @@ export function RevalueAsset({ params }: ScreenProps) {
 
   return (
     <div className={screenPadding}>
-      <ScreenHeader title="Định giá lại" subtitle={asset.name} />
+      <ScreenHeader title="Định giá lại" subtitle={asset.name} right={<button type="button" aria-label="Tuỳ chọn tài sản" onClick={() => setMenu(true)} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text hover:bg-surface/80 ${ring}`}><MoreVertical size={22} aria-hidden /></button>} />
 
-      <section className={cn(card, "flex flex-col gap-2")}>
-        <div className="flex items-center justify-between gap-2"><p className="text-[13px] text-muted">{FIXED_CATEGORY_LABEL[asset.category]} · giá trị hiện ghi nhận</p><SourceTag source="self_reported" /></div>
-        <p className={hint}>Các giá trị trên màn này do bạn tự khai.</p>
-        <Amount amount={asset.value} className="text-2xl font-bold" />
-        <p className={hint}>
-          Định giá ngày {dateVi(asset.valuationDate)} ({ageDays <= 0 ? "hôm nay" : `${ageDays} ngày trước`}). Đang tính {asset.countPercent}% vào mục tiêu.
-        </p>
-        {ageDays > 365 && <p className={warningBox}>Giá này đã hơn 12 tháng. Hãy cập nhật để tiến độ mục tiêu sát thực tế.</p>}
+      <section className={cn(card, "flex flex-col gap-3")}>
+        <div className="flex items-center justify-between gap-2"><p className="text-[13px] text-muted">Giá trị hiện tại · {FIXED_CATEGORY_LABEL[asset.category]}</p><SourceTag source="self_reported" /></div>
+        <Amount amount={asset.value} className="text-[26px] font-bold text-text" />
+        <dl className="flex flex-col gap-2 border-t border-border pt-3 text-sm">
+          <div className="flex items-center justify-between gap-2"><dt className="text-muted">Cập nhật lần cuối</dt><dd className="flex items-center gap-1"><span>{dateVi(asset.valuationDate)}</span>{ageDays > 365 && <InfoTooltip warning label="giá trị đã cũ" text="Giá trị này được cập nhật hơn một năm trước. Hãy nhập giá hiện tại để tính lại tiến độ mục tiêu." />}</dd></div>
+          <div className="flex items-baseline justify-between gap-2"><dt className="text-muted">Tính vào mục tiêu ({asset.countPercent}%)</dt><dd className="font-semibold text-text whitespace-nowrap">{formatVnd(oldCounted)}</dd></div>
+        </dl>
       </section>
 
       <section className={cn(card, "flex flex-col gap-4")}>
@@ -106,11 +109,12 @@ export function RevalueAsset({ params }: ScreenProps) {
         <p className={hint}>Bản xem trước chỉ lưu giá khai báo ban đầu và giá gần nhất.</p>
       </section>
 
-      <button type="button" className={dangerButton} onClick={() => setConfirmRemove(true)}>
-        Bỏ tài sản khỏi mục tiêu
-      </button>
+      <Sheet open={menu} title="Tuỳ chọn tài sản" onClose={() => setMenu(false)}>
+        <button type="button" className={`${listRow} rounded-2xl text-negative`} onClick={() => { setMenu(false); setConfirmRemove(true); }}><Unlink size={20} aria-hidden />Bỏ tài sản khỏi mục tiêu</button>
+        <p className="mt-2 text-sm leading-5 text-muted">Tài sản không bị bán. Giá trị của tài sản sẽ không còn được tính vào mục tiêu này.</p>
+      </Sheet>
 
-      <BottomActions>
+      <BottomActions docked>
         <button type="button" className={primaryButton} disabled={!valid} onClick={() => setConfirm(true)}>
           Cập nhật giá trị
         </button>
