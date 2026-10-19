@@ -117,6 +117,9 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
       if (!tracked) return;
       suppressClick = true;
       if (localPoint(event).x - originX < 72) return;
+      if (pathname === "/pfm" && new URLSearchParams(window.location.search).get("tab") === "goals") {
+        if (!window.dispatchEvent(new Event("goals-preview:back", { cancelable: true }))) return;
+      }
       const target = edgeBackHref(pathname);
       if (target === "history") backWithTransition(() => router.back());
       // Goals prototype keeps its own screen stack: edge-swipe pops it instead of leaving the page.

@@ -6,6 +6,7 @@ import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
 import { STORAGE_KEY, initialPreviewState, previewReducer } from "./reducer";
+import { usePanelActive } from "@/components/shell/PanelActive";
 
 /** Window event the shell's edge-swipe back fires on /goals-preview (see AppChrome). */
 export const PREVIEW_BACK_EVENT = "goals-preview:back";
@@ -57,6 +58,7 @@ function useHydrated(dispatch: (a: PreviewAction) => void, entryScreen?: ScreenI
 }
 
 export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
+  const active = usePanelActive();
   const [state, dispatch] = useReducer(previewReducer, undefined, initialPreviewState);
   const hydrated = useHydrated(dispatch, entryScreen);
 
@@ -70,10 +72,14 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   }, [state, hydrated]);
 
   useEffect(() => {
-    const onBack = () => dispatch({ type: "nav/pop" });
+    const onBack = (event: Event) => {
+      if (!active || state.nav.stack.length <= 1) return;
+      event.preventDefault();
+      dispatch({ type: "nav/pop" });
+    };
     window.addEventListener(PREVIEW_BACK_EVENT, onBack);
     return () => window.removeEventListener(PREVIEW_BACK_EVENT, onBack);
-  }, []);
+  }, [active, state.nav.stack.length]);
 
   const stack = state.nav.stack;
   const push = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/push", screen, params }), []);

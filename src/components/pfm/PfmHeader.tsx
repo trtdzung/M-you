@@ -12,7 +12,9 @@ import { ArrowLeft } from "lucide-react";
 export function PfmHeader() {
   const router = useRouter();
   function back() {
-    if (new URLSearchParams(window.location.search).get("tab") === "settings") {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "goals" && !window.dispatchEvent(new Event("goals-preview:back", { cancelable: true }))) return;
+    if (tab === "settings") {
       router.replace("/pfm?tab=budget", { scroll: false });
     } else {
       backWithTransition(() => router.replace("/"));
