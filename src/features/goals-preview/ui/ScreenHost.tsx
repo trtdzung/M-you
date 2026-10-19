@@ -11,7 +11,8 @@ export function ScreenHost() {
   const entry = nav.current;
 
   useEffect(() => {
-    document.getElementById("main-content")?.scrollTo({ top: 0 });
+    const container = document.getElementById("pfm-panel-goals") ?? document.getElementById("main-content");
+    container?.scrollTo({ top: 0 });
   }, [entry.key]);
 
   if (!hydrated) return <SkeletonCard className="mt-4 h-40" />;

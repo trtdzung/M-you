@@ -38,7 +38,7 @@ function isPreviewState(value: unknown): value is PreviewState {
   return v.version === 1 && Array.isArray(v.goals) && Array.isArray(v.nav?.stack) && v.nav.stack.length > 0 && !!v.clock?.today;
 }
 
-function useHydrated(dispatch: (a: PreviewAction) => void): boolean {
+function useHydrated(dispatch: (a: PreviewAction) => void, entryScreen?: ScreenId): boolean {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     try {
@@ -50,14 +50,15 @@ function useHydrated(dispatch: (a: PreviewAction) => void): boolean {
     } catch {
       // Corrupt or blocked storage: keep the default scenario.
     }
+    if (entryScreen) dispatch({ type: "nav/reset", screen: entryScreen });
     setHydrated(true);
-  }, [dispatch]);
+  }, [dispatch, entryScreen]);
   return hydrated;
 }
 
-export function PreviewStoreProvider({ children }: { children: ReactNode }) {
+export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
   const [state, dispatch] = useReducer(previewReducer, undefined, initialPreviewState);
-  const hydrated = useHydrated(dispatch);
+  const hydrated = useHydrated(dispatch, entryScreen);
 
   useEffect(() => {
     if (!hydrated) return;

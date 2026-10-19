@@ -8,7 +8,7 @@ import { OverviewTab } from "./OverviewTab";
 import { BudgetTab } from "@/components/budget/BudgetTab";
 import { PfmTxnList } from "@/components/transactions/PfmTxnList";
 import { HuCategoryTab } from "@/components/settings/HuCategoryTab";
-import { GoalsListScreen } from "@/features/goals";
+import { GoalsPreviewApp } from "@/features/goals-preview/GoalsPreviewApp";
 
 /**
  * Single-route PFM host: client-side tab switching with no navigation, no data
@@ -99,6 +99,6 @@ const PFM_PANELS: { id: PfmTabId; node: () => React.ReactNode }[] = [
   { id: "overview", node: () => <OverviewTab /> },
   { id: "transactions", node: () => <PfmTxnList /> },
   { id: "budget", node: () => <BudgetTab /> },
-  { id: "goals", node: () => <GoalsListScreen /> },
+  { id: "goals", node: () => <GoalsPreviewApp embedded /> },
   { id: "settings", node: () => <HuCategoryTab /> },
 ];
