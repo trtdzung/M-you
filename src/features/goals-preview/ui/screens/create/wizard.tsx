@@ -25,19 +25,21 @@ export interface TemplateConfig {
   months: number;
   flexibility: GoalFlexibility;
   hint: string;
+  /** Quick-pick target amounts on the info step. */
+  quickAmounts: number[];
 }
 
 const TR = 1_000_000;
 
 export const TEMPLATES: TemplateConfig[] = [
-  { id: "house", title: "Mua nhà", icon: House, defaultName: "Mua nhà", amount: 1_500 * TR, months: 60, flexibility: "date_flexible", hint: "Thường 1–3 tỷ · 5–10 năm" },
-  { id: "car", title: "Mua xe", icon: Car, defaultName: "Mua xe", amount: 600 * TR, months: 36, flexibility: "date_flexible", hint: "Thường 500–900 triệu · 2–4 năm" },
-  { id: "education", title: "Học phí", icon: GraduationCap, defaultName: "Học phí cho con", amount: 200 * TR, months: 48, flexibility: "date_fixed", hint: "Thường 100–400 triệu · theo năm học" },
-  { id: "travel", title: "Du lịch", icon: Plane, defaultName: "Chuyến du lịch", amount: 50 * TR, months: 12, flexibility: "amount_flexible", hint: "Thường 20–100 triệu · 6–18 tháng" },
-  { id: "emergency", title: "Quỹ dự phòng", icon: LifeBuoy, defaultName: "Quỹ dự phòng", amount: 120 * TR, months: 12, flexibility: "date_flexible", hint: "Nên bằng 3–6 tháng chi tiêu" },
-  { id: "retirement", title: "Hưu trí", icon: TreePalm, defaultName: "Quỹ hưu trí", amount: 2_000 * TR, months: 120, flexibility: "date_flexible", hint: "Dài hạn · 10 năm trở lên" },
-  { id: "wedding", title: "Đám cưới", icon: Heart, defaultName: "Đám cưới", amount: 250 * TR, months: 18, flexibility: "date_fixed", hint: "Thường 150–400 triệu · 1–2 năm" },
-  { id: "other", title: "Tự tạo", icon: Target, defaultName: "", amount: 100 * TR, months: 24, flexibility: "date_flexible", hint: "Đặt tên và số tiền theo ý bạn" },
+  { id: "house", title: "Mua nhà", icon: House, defaultName: "Mua nhà", amount: 1_500 * TR, months: 60, flexibility: "date_flexible", hint: "Thường 1–3 tỷ · 5–10 năm", quickAmounts: [1_000 * TR, 1_500 * TR, 2_000 * TR, 3_000 * TR] },
+  { id: "car", title: "Mua xe", icon: Car, defaultName: "Mua xe", amount: 600 * TR, months: 36, flexibility: "date_flexible", hint: "Thường 500–900 triệu · 2–4 năm", quickAmounts: [400 * TR, 600 * TR, 800 * TR, 1_000 * TR] },
+  { id: "education", title: "Học phí", icon: GraduationCap, defaultName: "Học phí cho con", amount: 200 * TR, months: 48, flexibility: "date_fixed", hint: "Thường 100–400 triệu · theo năm học", quickAmounts: [100 * TR, 200 * TR, 300 * TR, 400 * TR] },
+  { id: "travel", title: "Du lịch", icon: Plane, defaultName: "Chuyến du lịch", amount: 50 * TR, months: 12, flexibility: "amount_flexible", hint: "Thường 20–100 triệu · 6–18 tháng", quickAmounts: [30 * TR, 50 * TR, 80 * TR, 100 * TR] },
+  { id: "emergency", title: "Quỹ dự phòng", icon: LifeBuoy, defaultName: "Quỹ dự phòng", amount: 120 * TR, months: 12, flexibility: "date_flexible", hint: "Nên bằng 3–6 tháng chi tiêu", quickAmounts: [60 * TR, 120 * TR, 180 * TR] },
+  { id: "retirement", title: "Hưu trí", icon: TreePalm, defaultName: "Quỹ hưu trí", amount: 2_000 * TR, months: 120, flexibility: "date_flexible", hint: "Dài hạn · 10 năm trở lên", quickAmounts: [1_000 * TR, 2_000 * TR, 3_000 * TR, 5_000 * TR] },
+  { id: "wedding", title: "Đám cưới", icon: Heart, defaultName: "Đám cưới", amount: 250 * TR, months: 18, flexibility: "date_fixed", hint: "Thường 150–400 triệu · 1–2 năm", quickAmounts: [150 * TR, 250 * TR, 400 * TR] },
+  { id: "other", title: "Tự tạo", icon: Target, defaultName: "", amount: 100 * TR, months: 24, flexibility: "date_flexible", hint: "Đặt tên và số tiền theo ý bạn", quickAmounts: [50 * TR, 100 * TR, 200 * TR, 500 * TR] },
 ];
 
 /** Quỹ dự phòng = 6 tháng chi tiêu của khách (không thấp hơn mức mặc định). */
@@ -45,6 +47,12 @@ export function suggestedTarget(config: TemplateConfig, customer: PreviewState["
   if (config.id !== "emergency") return { amount: config.amount, fromExpenses: false };
   const sixMonths = Math.round((customer.monthlyExpenses * 6) / 1_000_000) * 1_000_000;
   return sixMonths > config.amount ? { amount: sixMonths, fromExpenses: true } : { amount: config.amount, fromExpenses: false };
+}
+
+/** Quick picks for the amount field; the emergency fund uses 3 / 6 / 12 months of spending. */
+export function quickAmountsFor(config: TemplateConfig, customer: PreviewState["customer"]): number[] {
+  if (config.id !== "emergency" || customer.monthlyExpenses <= 0) return config.quickAmounts;
+  return [3, 6, 12].map((m) => Math.round((customer.monthlyExpenses * m) / 1_000_000) * 1_000_000);
 }
 
 export function templateConfig(id: GoalTemplate | string | undefined): TemplateConfig {

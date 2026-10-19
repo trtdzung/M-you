@@ -16,7 +16,7 @@ export const secondaryButton = `inline-flex min-h-12 w-full items-center justify
 export const ghostButton = `inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold text-primary-strong transition-colors hover:bg-primary-soft/60 ${ring}`;
 export const dangerButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-negative/40 bg-surface px-4 text-[15px] font-semibold text-negative ${ring}`;
 export const chip = `inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-3.5 text-sm font-semibold text-text transition-colors hover:bg-surface-muted ${ring}`;
-export const chipSelected = `inline-flex min-h-11 items-center rounded-full border border-primary bg-primary-soft px-3.5 text-sm font-semibold text-primary-strong ${ring}`;
+export const chipSelected = `inline-flex min-h-11 items-center rounded-full border border-primary bg-primary px-3.5 text-sm font-semibold text-primary-fg ${ring}`;
 
 export const card = "rounded-card bg-surface p-4 shadow-card";
 export const listRow = `flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted ${ring}`;

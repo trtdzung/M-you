@@ -1,18 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatVnd } from "@/features/goals-preview/format-money";
-import { addMonths, dayOfMonth, formatISODate, formatMonths, monthsBetween } from "../../../engine/dates";
+import { CalendarDays, Lock, MoveHorizontal, Pencil } from "lucide-react";
+import { amountInWords } from "@/features/goals/ui/form/amount-in-words";
+import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
+import { cn } from "@/lib/cn";
+import { addMonths, dayOfMonth, formatISODate, formatMonths, monthsBetween, monthsLeft } from "../../../engine/dates";
+import { allocateSurplus } from "../../../engine/feasibility";
 import type { ScreenProps } from "../../../model/screens";
 import { paramString } from "../../../model/screens";
 import type { GoalFlexibility, GoalTemplate } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions } from "../../shared/BottomActions";
-import { MoneyInput } from "../../shared/MoneyInput";
+import { parseVndInput } from "../../shared/MoneyInput";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { chip, chipSelected, fieldError, hint, input, label, primaryButton, screenPadding } from "../../shared/styles";
-import { FLEX_INFO, WIZARD_STEPS, isFlexible, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
+import { card, chip, chipSelected, fieldError, hint, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle } from "../../shared/styles";
+import { FLEX_INFO, WIZARD_STEPS, isFlexible, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
+
+const groupFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 const QUICK_MONTHS = [
   { months: 6, label: "6 tháng" },
@@ -86,96 +92,181 @@ export function GoalInfo({ params }: ScreenProps) {
   };
 
   const months = monthsBetween(today, date);
+  const quickDates = QUICK_MONTHS.map((q) => ({ ...q, date: targetDateFromNow(today, q.months) }));
+  const customDate = !quickDates.some((q) => q.date === date);
+  const [pickDate, setPickDate] = useState(customDate);
+  const Icon = config.icon;
+  const quickAmounts = quickAmountsFor(config, state.customer);
+
+  // Live preview: what this plan asks for each month vs the surplus still free.
+  const surplus = state.customer.monthlySurplus;
+  const free = useMemo(() => {
+    if (surplus === "unknown") return "unknown" as const;
+    const loans = state.loans.filter((l) => l.status === "active").reduce((sum, l) => sum + l.monthlyPayment, 0);
+    const used = Object.values(allocateSurplus(state)).reduce<number>((sum, a) => sum + (typeof a === "number" ? a : 0), 0);
+    return Math.max(0, surplus - loans - used);
+  }, [state, surplus]);
+  const left = monthsLeft(today, date);
+  const monthly = amount && left > 0 ? Math.ceil(amount / left / 1000) * 1000 : 0;
+  const share = free === "unknown" || free <= 0 ? null : monthly / free;
+  const tone = share === null ? "muted" : share <= 0.5 ? "positive" : share <= 1 ? "warning" : "negative";
+  const flexKey = isFlexible(flex) ? "flexible" : "fixed";
 
   return (
     <div className={screenPadding}>
-      <ScreenHeader title="Thông tin mục tiêu" subtitle={config.title} />
+      <ScreenHeader title="Tạo mục tiêu" />
       <StepProgress steps={WIZARD_STEPS} current={1} />
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="goal-name" className={label}>
-          Tên mục tiêu
-        </label>
-        <input
-          id="goal-name"
-          value={name}
-          maxLength={40}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Ví dụ: Mua xe cho gia đình"
-          className={input}
-          aria-invalid={touched && errors.name ? true : undefined}
-        />
-        {touched && errors.name && <p className={fieldError}>{errors.name}</p>}
-      </div>
+      <section className={`${card} flex items-center gap-3`} aria-label="Tên mục tiêu">
+        <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
+          <Icon size={30} strokeWidth={1.8} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] text-muted">{name.trim() === config.title ? "Tên mục tiêu" : config.title}</p>
+          <label className="flex items-center gap-2">
+            <span className="sr-only">Tên mục tiêu</span>
+            <input
+              value={name}
+              maxLength={40}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Đặt tên mục tiêu"
+              className={cn("min-h-10 w-full min-w-0 rounded-lg bg-transparent text-[20px] font-bold text-text placeholder:text-muted", ring)}
+              aria-invalid={touched && errors.name ? true : undefined}
+            />
+            <Pencil size={16} aria-hidden className="shrink-0 text-muted" />
+          </label>
+        </div>
+      </section>
+      {touched && errors.name && <p className={fieldError}>{errors.name}</p>}
 
-      <MoneyInput
-        label="Số tiền cần có"
-        value={amount}
-        onChange={setAmount}
-        error={touched ? errors.amount : undefined}
-        hint={`Gợi ý cho “${config.title}”: ${formatVnd(suggestedAmount)}`}
-      />
-
-      <div className="flex flex-col gap-2">
-        <span className={label}>Muốn đạt vào lúc nào?</span>
+      <section className={`${card} flex flex-col gap-3`} aria-labelledby="goal-amount-label">
+        <h2 id="goal-amount-label" className={sectionTitle}>Bạn cần bao nhiêu?</h2>
+        <div className="flex items-baseline gap-2">
+          <input
+            aria-labelledby="goal-amount-label"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="0"
+            value={amount === null ? "" : groupFormatter.format(amount)}
+            onChange={(e) => setAmount(parseVndInput(e.target.value))}
+            aria-invalid={touched && errors.amount ? true : undefined}
+            className={cn("min-h-12 w-full min-w-0 rounded-lg bg-transparent text-[32px] font-bold tabular-nums text-text", ring)}
+          />
+          <span className="text-sm text-muted">đồng</span>
+        </div>
+        {amount ? <p className="-mt-2 text-[13px] leading-5 text-muted">{amountInWords(amount)}</p> : null}
+        {touched && errors.amount && <p className={fieldError}>{errors.amount}</p>}
         <div className="flex flex-wrap gap-2">
-          {QUICK_MONTHS.map((q) => {
-            const d = targetDateFromNow(today, q.months);
-            return (
-              <button key={q.months} type="button" className={d === date ? chipSelected : chip} onClick={() => setDate(d)}>
-                {q.label}
-              </button>
-            );
-          })}
+          {quickAmounts.map((a) => (
+            <button key={a} type="button" className={a === amount ? chipSelected : chip} onClick={() => setAmount(a)}>
+              {formatVndCompact(a)}
+            </button>
+          ))}
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <select aria-label="Tháng" className={input} value={month} onChange={(e) => setMonthYear(year, Number(e.target.value))}>
-            {MONTH_NAMES.map((n, i) => (
-              <option key={n} value={i + 1}>
-                {n}
-              </option>
-            ))}
-          </select>
-          <select aria-label="Năm" className={input} value={year} onChange={(e) => setMonthYear(Number(e.target.value), month)}>
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+      </section>
+
+      <section className={`${card} flex flex-col gap-3`} aria-label="Thời hạn">
+        <h2 className={sectionTitle}>Muốn đạt vào lúc nào?</h2>
+        <div className="flex flex-wrap gap-2">
+          {quickDates.map((q) => (
+            <button key={q.months} type="button" className={q.date === date && !pickDate ? chipSelected : chip} onClick={() => { setDate(q.date); setPickDate(false); }}>
+              {q.label}
+            </button>
+          ))}
+          <button type="button" className={pickDate ? chipSelected : chip} onClick={() => setPickDate(true)} aria-expanded={pickDate}>
+            <CalendarDays size={16} aria-hidden className="mr-1.5" /> {pickDate ? `T${month}/${year}` : "Chọn ngày khác"}
+          </button>
         </div>
+        {pickDate && (
+          <div className="grid grid-cols-2 gap-2">
+            <select aria-label="Tháng" className={input} value={month} onChange={(e) => setMonthYear(year, Number(e.target.value))}>
+              {MONTH_NAMES.map((n, i) => (
+                <option key={n} value={i + 1}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <select aria-label="Năm" className={input} value={year} onChange={(e) => setMonthYear(Number(e.target.value), month)}>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {errors.date ? (
           <p className={fieldError}>{errors.date}</p>
         ) : (
           <p className={hint}>
-            Ngày đạt mục tiêu: {formatISODate(date)} · còn khoảng {formatMonths(Math.max(0, months))}
+            Đạt vào {formatISODate(date)} · còn khoảng {formatMonths(Math.max(0, months))}
           </p>
         )}
-      </div>
+      </section>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className={label}>Kế hoạch này có thay đổi được không?</legend>
-        {[FLEX_INFO.fixed, FLEX_INFO.flexible].map((opt) => {
-          const selected = opt.value === "date_fixed" ? flex === "date_fixed" : isFlexible(flex);
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => setFlex(opt.value)}
-              className={`flex min-h-14 flex-col items-start gap-0.5 rounded-2xl border px-4 py-3 text-left transition-colors ${
-                selected ? "border-primary bg-primary-soft" : "border-border bg-surface hover:bg-surface-muted"
-              }`}
-            >
-              <span className="text-[15px] font-semibold text-text">{opt.title}</span>
-              <span className="text-[13px] leading-5 text-muted">{opt.text}</span>
-            </button>
-          );
-        })}
-      </fieldset>
+      <section className={`${card} flex flex-col gap-3`} aria-label="Mức linh hoạt">
+        <h2 className={sectionTitle}>Kế hoạch có thay đổi được không?</h2>
+        <div role="radiogroup" aria-label="Mức linh hoạt" className="grid grid-cols-2 gap-1 rounded-full bg-surface-muted p-1">
+          {(["fixed", "flexible"] as const).map((key) => {
+            const opt = FLEX_INFO[key];
+            const selected = flexKey === key;
+            const OptIcon = key === "fixed" ? Lock : MoveHorizontal;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setFlex(opt.value)}
+                className={cn(
+                  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold transition-colors",
+                  selected ? "bg-surface text-primary-strong shadow-card" : "text-muted",
+                  ring,
+                )}
+              >
+                <OptIcon size={16} aria-hidden /> {opt.title}
+              </button>
+            );
+          })}
+        </div>
+        <p className={hint}>{FLEX_INFO[flexKey].text}</p>
+      </section>
+
+      <section
+        aria-live="polite"
+        className={cn(
+          "flex flex-col gap-2 rounded-card p-4",
+          tone === "positive" && "bg-positive-soft",
+          tone === "warning" && "bg-warning-soft",
+          tone === "negative" && "bg-negative-soft",
+          tone === "muted" && "bg-surface-tint",
+        )}
+      >
+        <p className="text-[13px] text-muted">Mỗi tháng cần góp khoảng</p>
+        <p className="text-[26px] font-bold tabular-nums text-text">{monthly > 0 ? formatVnd(monthly) : "—"}</p>
+        {share !== null && free !== "unknown" ? (
+          <>
+            <div className={progressTrack}>
+              <div
+                className={cn("h-full rounded-full", tone === "positive" ? "bg-positive" : tone === "warning" ? "bg-warning" : "bg-negative")}
+                style={{ width: `${Math.min(100, Math.round(share * 100))}%` }}
+              />
+            </div>
+            <p className="text-[13px] leading-5 text-text">
+              {share <= 1
+                ? `≈ ${Math.round(share * 100)}% số dư còn trống mỗi tháng (${formatVndCompact(free)})`
+                : `Vượt số dư còn trống mỗi tháng (${formatVndCompact(free)}). Thử lùi ngày hoặc giảm số tiền.`}
+            </p>
+          </>
+        ) : (
+          <p className="text-[13px] leading-5 text-muted">
+            {free === "unknown" ? "Chưa đủ dữ liệu thu chi để so với số dư hằng tháng." : "Số dư hằng tháng đã dành hết cho các mục tiêu khác."}
+          </p>
+        )}
+      </section>
 
       <BottomActions>
+        {valid && amount && <p className="text-center text-[13px] font-semibold text-text">{formatVndCompact(amount)} · {formatMonths(Math.max(0, months))} · ~{formatVndCompact(monthly)}/tháng</p>}
         <button type="button" className={primaryButton} onClick={onContinue} disabled={pending || (touched && !valid)}>
           Tiếp tục
         </button>
