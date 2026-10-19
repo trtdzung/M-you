@@ -85,7 +85,10 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
                 {pricesRefreshing ? "Đang cập nhật…" : "Cập nhật lại"}
               </button>
             </div>
-            <p className="text-[12px] text-muted">Giá {instrument.name} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}</p>
+            <p className="text-[12px] text-muted">
+              Giá {instrument.name}
+              {instrument.fullName ? ` (${instrument.fullName})` : ""} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}
+            </p>
             {editQty && (
               <div className="flex items-baseline gap-2 border-b-2 border-border pb-1 focus-within:border-primary">
                 <input

@@ -4,16 +4,17 @@ import { useState } from "react";
 import { Car, CircleDollarSign, FileText, Gem, Home, Landmark, Package, PieChart, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import { getInstrument, hydrateMarket, instrumentsOf, MARKET_INSTRUMENTS, type MarketInstrument, type MarketKind } from "../../../data/market";
+import { assetNameFromInstrument, getInstrument, instrumentsOf } from "../../../data/market";
 import { addMonths, outsideValue, seriesPriceAt } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import type { DeclaredAssetCategory } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { AmountCard, SuggestChip } from "../../shared/AmountCard";
 import { InfoTooltip } from "../../shared/InfoTooltip";
+import { InstrumentPicker } from "../../shared/InstrumentPicker";
 import { Switch } from "../../shared/Pickers";
 import { BottomActions, ConfirmSheet, EmptyState, ScreenHeader, SliderRow, SourceTag } from "../../shared";
-import { card, input, label, primaryButton, ring, screenPadding, secondaryButton, sectionTitle } from "../../shared/styles";
+import { card, input, label, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { findGoal, pct, progressAfter, dateVi } from "./helpers";
 import { countedValue as wizardCounted, wizardAssets } from "../create/wizard";
 
@@ -71,53 +72,6 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
   );
 }
 
-/** Bỏ dấu, viết thường để tìm không phân biệt dấu. */
-function normalize(text: string): string {
-  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
-}
-
-/** Ô tìm kiếm mã / tên công cụ (cổ phiếu, quỹ); chỉ hiện kết quả khi khách gõ. */
-function InstrumentSearch({ kind, selectedId, onPick }: { kind: MarketKind; selectedId: string | undefined; onPick: (id: string) => void }) {
-  const [query, setQuery] = useState("");
-  const q = normalize(query.trim());
-  const results = q ? instrumentsOf(kind).filter((m) => normalize(m.name).includes(q)).slice(0, 8) : [];
-  const selected = selectedId ? getInstrument(selectedId) : undefined;
-  return (
-    <div className="flex flex-col gap-2">
-      <input
-        aria-label={kind === "stock" ? "Tìm mã cổ phiếu" : "Tìm quỹ"}
-        className={input}
-        value={query}
-        placeholder={kind === "stock" ? "Tìm mã cổ phiếu, VD: FPT" : "Tìm quỹ theo tên hoặc mã"}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      {q && (
-        <ul className="flex flex-col overflow-hidden rounded-2xl border border-border bg-surface">
-          {results.length === 0 ? (
-            <li className="px-3 py-2.5 text-sm text-muted">Không tìm thấy kết quả.</li>
-          ) : (
-            results.map((m) => (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onPick(m.id);
-                    setQuery("");
-                  }}
-                  className={cn("flex min-h-11 w-full items-center px-3 text-left text-sm text-text hover:bg-surface-muted", ring)}
-                >
-                  {m.name}
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      )}
-      {selected && <SuggestChip label={selected.name} selected onClick={() => undefined} />}
-    </div>
-  );
-}
-
 /** Thêm tài sản ngoài MSB: tài sản vật chất (tự khai giá) hoặc tài sản tài chính ở nơi khác (tự định giá). */
 export function AddAsset({ params }: ScreenProps) {
   const { state, dispatch, nav } = usePreview();
@@ -145,9 +99,8 @@ export function AddAsset({ params }: ScreenProps) {
   const [counted, setCounted] = useState(true);
   const [percent, setPercent] = useState(PHYSICAL[0].percent);
   const [confirm, setConfirm] = useState(false);
-  const [symbolInput, setSymbolInput] = useState("");
-  const [symbolChecking, setSymbolChecking] = useState(false);
-  const [symbolError, setSymbolError] = useState<string | undefined>();
+  /** Quỹ ngoài danh sách Fmarket → tự khai giá (category vẫn external_fund). */
+  const [manualFund, setManualFund] = useState(false);
 
   if (!goal) {
     return (
@@ -161,54 +114,29 @@ export function AddAsset({ params }: ScreenProps) {
   const pick = (t: TypeDef) => {
     setType(t);
     setPercent(t.percent);
-    setInstrumentId(t.valuation === "market" ? instrumentsOf(t.category as MarketKind)[0]?.id : undefined);
+    setInstrumentId(undefined);
     setQuantity("");
+    setManualFund(false);
     setTerm(t.category === "deposit" || t.category === "bond" ? TERMS[t.category][1] : undefined);
   };
 
-  const addSymbol = async () => {
-    const symbol = symbolInput.trim().toUpperCase();
-    if (!symbol || symbolChecking) return;
-    setSymbolChecking(true);
-    setSymbolError(undefined);
-    try {
-      const res = await fetch("/api/goals-v2/market/instruments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ symbol }),
-      });
-      const body = (await res.json().catch(() => null)) as { instrument?: MarketInstrument; error?: string } | null;
-      if (res.ok && body?.instrument) {
-        const added = body.instrument;
-        hydrateMarket([...MARKET_INSTRUMENTS.filter((m) => m.id !== added.id), added]);
-        setInstrumentId(added.id);
-        setSymbolInput("");
-      } else {
-        setSymbolError(body?.error ?? "Chưa kiểm tra được mã cổ phiếu lúc này. Bạn thử lại sau nhé.");
-      }
-    } catch {
-      setSymbolError("Chưa kiểm tra được mã cổ phiếu lúc này. Bạn thử lại sau nhé.");
-    } finally {
-      setSymbolChecking(false);
-    }
-  };
-
+  const valuation: Valuation = manualFund ? "manual" : type.valuation;
   const instrument = getInstrument(instrumentId);
   const qty = Number(quantity.replace(",", "."));
   const ratePa = Number(rate.replace(",", "."));
   const accrual =
-    type.valuation === "accrual" && principal && ratePa >= 0 && rate !== ""
+    valuation === "accrual" && principal && ratePa >= 0 && rate !== ""
       ? { principal, ratePa, startDate, maturityDate: term ? addMonths(startDate, term) : undefined }
       : undefined;
   const autoValue =
-    type.valuation === "market"
+    valuation === "market"
       ? instrument && qty > 0
         ? outsideValue({ instrumentId, quantity: qty }, today, shift)
         : undefined
-      : type.valuation === "accrual" && accrual
+      : valuation === "accrual" && accrual
         ? outsideValue({ accrual }, today, shift)
         : undefined;
-  const assetValue = type.valuation === "manual" ? value ?? 0 : autoValue ?? 0;
+  const assetValue = valuation === "manual" ? value ?? 0 : autoValue ?? 0;
 
   const effPercent = counted ? percent : 0;
   const countedValue = Math.round((assetValue * effPercent) / 100);
@@ -221,14 +149,14 @@ export function AddAsset({ params }: ScreenProps) {
     : progressAfter(state, existingGoal!, countedValue);
   const finalName =
     name.trim() ||
-    (type.valuation === "market" && instrument ? instrument.name : type.valuation === "accrual" && institution.trim() ? `${type.label} · ${institution.trim()}` : type.label);
+    (valuation === "market" && instrument ? assetNameFromInstrument(instrument) : valuation === "accrual" && institution.trim() ? `${type.label} · ${institution.trim()}` : type.label);
   const valid =
-    type.valuation === "manual"
+    valuation === "manual"
       ? value !== null && value > 0 && date !== "" && date <= today
-      : type.valuation === "market"
+      : valuation === "market"
         ? !!instrument && qty > 0
         : !!accrual && startDate <= today;
-  const source = type.valuation === "manual" ? ("self_reported" as const) : ("estimated" as const);
+  const source = valuation === "manual" ? ("self_reported" as const) : ("estimated" as const);
   const unitPrice = instrument ? seriesPriceAt(instrument.priceSeries, today, shift) : 0;
 
   return (
@@ -241,36 +169,56 @@ export function AddAsset({ params }: ScreenProps) {
         <TypeGrid title="Tài sản tài chính" types={FINANCIAL} value={type.category} onPick={pick} />
       </section>
 
-      {type.valuation === "manual" && (
+      {valuation === "manual" && (
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Thông tin tài sản">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <h2 className={sectionTitle}>Giá trị ước tính</h2>
-              <InfoTooltip label="giá tự khai" text="Bạn tự khai, MSB không có giá thị trường cho tài sản này. Hãy khai sát với giá bán thực tế." />
+              <InfoTooltip
+                label="giá tự khai"
+                text={
+                  manualFund
+                    ? "Quỹ này chưa có giá tự động. Bạn tự khai giá trị hiện tại; MSB không xác minh."
+                    : "Bạn tự khai, MSB không có giá thị trường cho tài sản này. Hãy khai sát với giá bán thực tế."
+                }
+              />
             </div>
             <SourceTag source="self_reported" />
           </div>
           <AmountCard bare title="Giá trị" value={value} onChange={setValue} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor="asset-name" className={label}>Tên gọi</label>
-            <input id="asset-name" className={input} value={name} maxLength={60} placeholder={type.placeholder} onChange={(e) => setName(e.target.value)} />
+            <input id="asset-name" className={input} value={name} maxLength={60} placeholder={manualFund ? "VD: Quỹ ABC tại công ty quản lý quỹ" : type.placeholder} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="asset-date" className={label}>Ngày định giá</label>
             <input id="asset-date" type="date" className={input} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
             {date > today && <p className="text-sm text-negative">Ngày định giá không được ở tương lai.</p>}
           </div>
+          {manualFund && (
+            <button
+              type="button"
+              className="self-start text-[13px] font-semibold text-primary-strong"
+              onClick={() => {
+                setManualFund(false);
+                setValue(null);
+                setName("");
+              }}
+            >
+              Chọn quỹ có giá tự động
+            </button>
+          )}
         </section>
       )}
 
-      {type.valuation === "market" && (
+      {valuation === "market" && (
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Số lượng nắm giữ">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <h2 className={sectionTitle}>{type.category === "gold" ? "Loại vàng" : type.category === "stock" ? "Mã cổ phiếu" : "Quỹ"}</h2>
               <InfoTooltip
                 label="cách định giá"
-                text="Bạn chỉ khai số lượng. App tự tính giá trị theo giá thị trường hằng ngày (giá mô phỏng trong bản xem trước). Nhớ sửa số lượng khi mua thêm hoặc bán bớt."
+                text="Bạn chỉ khai số lượng. App tự tính giá trị theo giá thị trường hằng ngày. Nhớ sửa số lượng khi mua thêm hoặc bán bớt."
               />
             </div>
             <SourceTag source="estimated" />
@@ -282,32 +230,22 @@ export function AddAsset({ params }: ScreenProps) {
               ))}
             </div>
           ) : (
-            <InstrumentSearch kind={type.category as MarketKind} selectedId={instrumentId} onPick={setInstrumentId} />
-          )}
-          {type.category === "stock" && (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="asset-symbol" className={label}>Mã cổ phiếu khác</label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="asset-symbol"
-                  className={input}
-                  value={symbolInput}
-                  maxLength={10}
-                  placeholder="VD: DGC"
-                  autoCapitalize="characters"
-                  onChange={(e) => {
-                    setSymbolInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
-                    setSymbolError(undefined);
-                  }}
-                />
-                <div className="w-28 shrink-0">
-                  <button type="button" className={secondaryButton} disabled={symbolChecking || symbolInput.trim() === ""} onClick={addSymbol}>
-                    {symbolChecking ? "Đang kiểm tra…" : "Thêm"}
-                  </button>
-                </div>
-              </div>
-              {symbolError && <p className="text-sm text-negative">{symbolError}</p>}
-            </div>
+            <InstrumentPicker
+              kind={type.category as "stock" | "external_fund"}
+              value={instrumentId}
+              onChange={setInstrumentId}
+              today={today}
+              shiftPct={shift}
+              onManualFund={
+                type.category === "external_fund"
+                  ? () => {
+                      setManualFund(true);
+                      setInstrumentId(undefined);
+                      setQuantity("");
+                    }
+                  : undefined
+              }
+            />
           )}
           {instrument && (
             <div className="flex flex-col gap-1.5">
@@ -323,13 +261,15 @@ export function AddAsset({ params }: ScreenProps) {
                 />
                 <span className="shrink-0 text-sm font-semibold text-muted">{instrument.unit}</span>
               </div>
-              <p className="text-[13px] text-muted">Giá hôm nay: {formatVnd(unitPrice)}/{instrument.unit}</p>
+              {type.category === "gold" && (
+                <p className="text-[13px] text-muted">Giá hôm nay: {formatVnd(unitPrice)}/{instrument.unit}</p>
+              )}
             </div>
           )}
         </section>
       )}
 
-      {type.valuation === "accrual" && (
+      {valuation === "accrual" && (
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Thông tin khoản gửi">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
@@ -364,7 +304,7 @@ export function AddAsset({ params }: ScreenProps) {
         </section>
       )}
 
-      {type.valuation !== "manual" && (
+      {valuation !== "manual" && (
         <section className={cn(card, "flex items-center justify-between gap-3")} aria-label="Giá trị ước tính hôm nay">
           <span className="text-[13px] text-muted">Giá trị ước tính hôm nay</span>
           <span className="text-[16px] font-bold tabular-nums text-text">{autoValue ? formatVnd(autoValue) : "—"}</span>
@@ -400,9 +340,9 @@ export function AddAsset({ params }: ScreenProps) {
         rows={[
           { label: "Mục tiêu", value: goal.name },
           { label: "Tài sản", value: finalName },
-          ...(type.valuation === "market" && instrument ? [{ label: "Số lượng", value: `${quantity} ${instrument.unit}` }] : []),
-          { label: type.valuation === "manual" ? "Giá trị tự khai" : "Giá trị ước tính hôm nay", value: assetValue, source },
-          ...(type.valuation === "manual" ? [{ label: "Ngày định giá", value: dateVi(date) }] : []),
+          ...(valuation === "market" && instrument ? [{ label: "Số lượng", value: `${quantity} ${instrument.unit}` }] : []),
+          { label: valuation === "manual" ? "Giá trị tự khai" : "Giá trị ước tính hôm nay", value: assetValue, source },
+          ...(valuation === "manual" ? [{ label: "Ngày định giá", value: dateVi(date) }] : []),
           { label: "Tính vào mục tiêu", value: counted ? `${percent}%` : "Không tính" },
           { label: "Phần cộng vào mục tiêu", value: countedValue, source, emphasis: true },
         ]}
@@ -414,10 +354,10 @@ export function AddAsset({ params }: ScreenProps) {
             category: type.category,
             value: assetValue,
             countPercent: effPercent,
-            valuationDate: type.valuation === "manual" ? date : today,
+            valuationDate: valuation === "manual" ? date : today,
             source,
-            ...(type.valuation === "market" ? { instrumentId, quantity: qty } : {}),
-            ...(type.valuation === "accrual" ? { accrual, institution: institution.trim() || undefined } : {}),
+            ...(valuation === "market" ? { instrumentId, quantity: qty } : {}),
+            ...(valuation === "accrual" ? { accrual, institution: institution.trim() || undefined } : {}),
           };
           if (wizardGoal) {
             nav.popWith({ assets: JSON.stringify([...wizardGoal.assets, asset]) });

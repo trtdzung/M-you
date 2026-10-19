@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS gv2_instruments (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
   name TEXT NOT NULL,
+  full_name TEXT,
   unit TEXT NOT NULL,
   fractional INTEGER NOT NULL DEFAULT 0,
   source TEXT NOT NULL,
@@ -137,6 +138,8 @@ export function ensureGoalV2Tables(db: Database.Database): void {
   if (!cols.some((c) => c.name === "sim_profile")) db.exec("ALTER TABLE gv2_meta ADD COLUMN sim_profile TEXT");
   const logCols = db.prepare("PRAGMA table_info(gv2_action_log)").all() as { name: string }[];
   if (!logCols.some((c) => c.name === "created_goal_id")) db.exec("ALTER TABLE gv2_action_log ADD COLUMN created_goal_id TEXT");
+  const instrumentCols = db.prepare("PRAGMA table_info(gv2_instruments)").all() as { name: string }[];
+  if (!instrumentCols.some((c) => c.name === "full_name")) db.exec("ALTER TABLE gv2_instruments ADD COLUMN full_name TEXT");
 }
 
 const ready = new WeakSet<Database.Database>();
