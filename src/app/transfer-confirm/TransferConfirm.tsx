@@ -288,11 +288,19 @@ export function TransferConfirm() {
     let primaryTxnId: string;
     try {
       // A jar's money physically sits in CASA, so every source debits CASA.
-      const needsAccounts = fundable || !draft?.sourceAccountId;
+      const needsAccounts = fundable || !draft?.sourceAccountId || Boolean(draft?.accountNumber);
       const accounts = needsAccounts ? await providers.listAccounts() : [];
       const accountToDebit = draft?.sourceAccountId ?? accounts.find((a) => a.type === "current")?.id ?? null;
       if (accountToDebit) {
-        const record = primaryRecord(input);
+        // Paying one of the customer's own goal accounts is a plain internal transfer,
+        // never jar spending; the server credits that account off the counterparty number.
+        const toOwnGoal = Boolean(draft?.accountNumber) && accounts.some((a) => a.type === "goal" && a.accountNumber === draft?.accountNumber);
+        const base = primaryRecord(toOwnGoal ? { ...input, categoryId: CATEGORY.transfer, type: "transfer" } : input);
+        const record: Transaction = {
+          ...base,
+          ...(draft?.accountNumber ? { counterpartyAccountNumber: draft.accountNumber } : {}),
+          ...(draft?.recipientBankName ? { counterpartyBankName: draft.recipientBankName } : {}),
+        };
         await providers.applyAccountDebit(accountToDebit, amount, record); // atomic debit + insert
         adoptManualTxn(record);
         primaryTxnId = record.id;
