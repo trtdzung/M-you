@@ -204,7 +204,7 @@ export function Sheet({
         }}
         style={dragMode === "drag" || dragMode === "snap" ? { transform: `translateY(${dragY}px)` } : undefined}
         className={cn(
-          "relative max-h-[88dvh] w-full max-w-device-width overflow-y-auto rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
+          "no-scrollbar relative max-h-[88dvh] w-full max-w-device-width overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-card bg-surface px-4 pb-[calc(24px+var(--safe-area-bottom))] pt-4 shadow-nav",
           exiting
             ? "sheet-panel-out"
             : dragMode === "drag"
