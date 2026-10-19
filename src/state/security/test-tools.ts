@@ -1,12 +1,15 @@
 "use client";
 
-// Test-tools state (demo only): a simulated hour used ONLY to judge the
-// transfer alert on Confirm. Kept apart from the Scam Shield store and saved in
-// sessionStorage so it never mixes into a persona's security data.
+// Test-tools state (demo only): a simulated hour used ONLY to judge transfer
+// warnings. The hour lives on the server engine clock (`/api/security/clock`)
+// so the rule engine and the app agree; this store is its client copy. Kept
+// apart from the Scam Shield store so it never mixes into security data.
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { transferNow } from "@/lib/demo-clock";
+import { emitEngineChange } from "@/components/settings/security/test-tools/sim";
+import { getSecurityCif } from "./storage";
 
 type TestToolsStore = {
   /** Hour (0–23, Vietnam time) the alert is judged at; null = the real clock. */
@@ -21,17 +24,42 @@ export const useTestToolsStore = create<TestToolsStore>()(
   persist(
     (set) => ({
       alertHour: null,
-      setAlertHour: (hour) => set({ alertHour: hour }),
+      setAlertHour: (hour) => {
+        set({ alertHour: hour });
+        const cif = getSecurityCif();
+        if (cif) void saveAlertHour(cif, hour);
+      },
       appliedPreset: null,
       setAppliedPreset: (applied) => set({ appliedPreset: applied }),
     }),
     {
       name: "msb-pfm.test-tools",
       storage: createJSONStorage(() => sessionStorage),
-      partialize: (state) => ({ alertHour: state.alertHour, appliedPreset: state.appliedPreset }),
+      partialize: (state) => ({ appliedPreset: state.appliedPreset }),
     },
   ),
 );
+
+async function saveAlertHour(cif: string, alertHour: number | null): Promise<void> {
+  try {
+    const res = await fetch("/api/security/clock", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, alertHour }) });
+    if (res.ok) emitEngineChange();
+  } catch {
+    // demo tool: the local copy still applies on this screen
+  }
+}
+
+/** Load the persona's pinned alert hour from the engine clock into the client copy. */
+export async function loadAlertHour(cif: string): Promise<void> {
+  try {
+    const res = await fetch(`/api/security/clock?cif=${encodeURIComponent(cif)}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const { alertHour } = (await res.json()) as { alertHour: number | null };
+    useTestToolsStore.setState({ alertHour });
+  } catch {
+    // keep the current copy
+  }
+}
 
 type TestToolsFabStore = {
   /** Floating shortcut to the test-tools screen on every screen; off by default. */

@@ -1,0 +1,58 @@
+/* Scam Shield presentation only. No global element selectors or shared theme overrides. */
+.shield-screen { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.shield-screen .settings-panel { min-width:0; }
+.shield-screen .settings-row { flex-wrap:wrap; gap:12px; }
+.shield-screen .settings-row > span:first-child { min-width:180px; }
+.shield-screen .settings-row strong { font-size:16px; font-weight:600; line-height:1.5; }
+.shield-screen .settings-input { min-height:48px; font-size:16px; }
+.shield-screen .settings-action { min-height:48px; border-radius:10px; }
+.shield-screen button, .shield-screen a { touch-action:manipulation; }
+.shield-screen button:not([role="switch"]), .shield-screen a:not(.settings-row) { min-height:44px; }
+.shield-screen button[role="switch"] { position:relative; }
+.shield-screen button[role="switch"]::before { content:""; position:absolute; inset:-8px 0; }
+.shield-screen :is(button,a,input,textarea,select):focus-visible,
+:is(.shield-inline-notice,.shield-alert-actions) button:focus-visible { outline:2px solid #ff650b; outline-offset:3px; }
+.shield-inline-notice { position:relative; margin:16px 0; border:1px solid #dfe5ee; border-radius:20px; background:#fff; padding:20px; color:#10284b; overflow-wrap:anywhere; }
+[data-shield-slot]:empty { display:none; }
+.shield-notice-body { display:flex; flex-direction:column; gap:12px; padding-right:24px; }
+.shield-source { font-size:13px; color:#596983; font-weight:500; }
+.shield-progress { display:flex; gap:8px; margin-right:-24px; overflow-x:auto; scrollbar-width:none; }
+.shield-progress::-webkit-scrollbar { display:none; }
+.shield-progress-card { display:flex; flex:1 0 auto; flex-direction:column; gap:6px; min-width:max-content; border:1px solid #dfe5ee; border-radius:16px; background:#f7f9fc; padding:12px; }
+.shield-progress-card strong { font-size:14px; line-height:1.35; white-space:nowrap; }
+.shield-progress-card p { font-size:13px; color:#596983; white-space:nowrap; }
+.shield-screen .shield-progress-card button { align-self:stretch; margin-top:auto; width:auto; min-height:32px; height:32px; padding:0 12px; border:1px solid #ff650b; border-radius:999px; background:#fff; color:#a83e08; font-size:13px; font-weight:600; line-height:1; }
+.shield-notice-close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; justify-content:center; align-items:center; color:#596983; border-radius:50%; }
+.shield-action, .shield-notice-actions button { min-height:44px; padding:10px 14px; border:1px solid #ff650b; border-radius:10px; background:white; color:#a83e08; font-size:14px; line-height:1.5; font-weight:600; text-align:center; }
+.shield-action:disabled { opacity:.5; }
+.shield-notice-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.shield-danger-link { min-height:44px; text-align:left; color:#b42318; font-size:14px; font-weight:600; }
+.shield-recovery-summary { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; min-height:44px; cursor:pointer; font-size:16px; font-weight:600; list-style:none; }
+.shield-recovery-summary span { font-size:13px; color:#596983; font-weight:500; }
+.shield-recovery-summary::after { content:"Thu gọn / mở"; font-size:13px; color:#a83e08; }
+.shield-checklist { margin-top:12px; display:flex; flex-direction:column; gap:12px; font-size:15px; }
+.shield-checklist li { display:flex; align-items:center; gap:10px; }
+.shield-danger-primary, .shield-danger-secondary { width:100%; min-height:48px; padding:12px 16px; border-radius:10px; font-size:15px; line-height:1.5; font-weight:600; }
+.shield-danger-primary { color:white; background:#b42318; border:1px solid #b42318; }
+.shield-danger-secondary { color:#b42318; background:white; border:1px solid #b42318; }
+.shield-alert-actions { display:flex; flex-direction:column; gap:12px; }
+.shield-alert-content { display:flex; flex-direction:column; gap:16px; }
+.shield-red-reason { font-size:16px; line-height:1.6; color:#8f2018; padding:16px; border:1px solid #efc5c0; border-radius:16px; background:#fff3f1; }
+.shield-yellow-banner { display:flex; flex-direction:column; gap:12px; background:#fff8e8; border:1px solid #e5c77b; border-radius:18px; padding:12px 16px; color:#10284b; font-size:15px; line-height:1.6; }
+.shield-yellow-toggle { display:flex; align-items:center; gap:12px; width:100%; min-height:44px; padding:0; border:0; background:transparent; color:inherit; font:inherit; font-weight:600; text-align:left; cursor:pointer; }
+.shield-yellow-toggle svg:last-child { margin-left:auto; flex-shrink:0; transition:transform .15s; }
+.shield-yellow-toggle[aria-expanded="true"] svg:last-child { transform:rotate(180deg); }
+.shield-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.shield-options > .shield-action { width:100%; min-width:0; }
+.shield-option { min-height:48px; min-width:0; border-radius:12px; overflow-wrap:anywhere; padding:12px 6px; font-variant-numeric:tabular-nums; line-height:1.5; }
+.shield-details-summary { min-height:44px; padding:10px 0; cursor:pointer; color:#a83e08; font-size:14px; font-weight:600; }
+.shield-sample { white-space:normal; width:100%; min-height:48px; border:1px solid #dfe5ee; border-radius:12px; background:#fff; padding:12px; text-align:left; font-size:14px; line-height:1.5; }
+.shield-case-actions { display:grid; gap:12px; }
+.shield-case-actions > :not(:first-child) { background:white; color:#a83e08; border:1px solid #ff650b; }
+.shield-attachments { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; font-size:14px; }
+.shield-attachments li { padding:12px; border-radius:12px; background:#fff0e7; display:flex; flex-direction:column; gap:4px; }
+@media(max-width:360px) { .shield-options[aria-labelledby="hold-threshold"] { grid-template-columns:1fr; } }
+
+.shield-screen #case-answer + button { margin-top:16px; }
+
+.shield-case-actions button { border-radius:10px; }

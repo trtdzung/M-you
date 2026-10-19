@@ -1,49 +1,105 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Copy } from "lucide-react";
-import { useTestToolsStore } from "@/state/security/test-tools";
-import { Panel } from "../../settings-ui";
-import { TRANSFER_SCENARIOS, type ScenarioField, type TransferScenario } from "./scenarios";
+import { putTransferDraft } from "@/lib/transfer-draft-store";
+import { pokeInterventions } from "@/components/security/useInterventions";
+import { usePersona } from "@/providers/context";
+import { useSettingsDemo } from "../../SettingsDemoContext";
+import { Badge, Panel } from "../../settings-ui";
+import { buildScenario, type BuiltCard, type SignalProbe } from "./scenario-build";
+import { SCENARIO_CARDS, expectedLine, type ScenarioCardDef, type ScenarioField, type ScenarioGroup } from "./scenarios";
 
-const DOT = { green: "bg-positive", yellow: "bg-warning", red: "bg-negative" } as const;
-const hourLabel = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+const GROUPS: ScenarioGroup[] = ["BT", "Vàng", "Đỏ", "SC", "Giữ lệnh"];
+const TONE = { green: "good", yellow: "warn", red: "danger" } as const;
 
-function copy(text: string) {
-  // Clipboard may be blocked (permissions, insecure origin): nothing to do then.
+function copyText(text: string) {
   navigator.clipboard?.writeText(text).catch(() => {});
 }
 
 function FieldRow({ field }: { field: ScenarioField }) {
   return <div className="flex items-center gap-2 py-1.5 text-sm">
-    <span className="w-24 shrink-0 text-muted">{field.label}</span>
+    <span className="w-28 shrink-0 text-muted">{field.label}</span>
     <span className="min-w-0 flex-1 font-semibold">{field.value}</span>
-    {field.copy !== undefined && <button type="button" aria-label={`Sao chép ${field.label}`} onClick={() => copy(field.copy!)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary"><Copy size={18} aria-hidden /></button>}
+    {field.copy !== undefined && <button type="button" aria-label={`Sao chép ${field.label}`} onClick={() => copyText(field.copy!)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary"><Copy size={18} aria-hidden /></button>}
   </div>;
 }
 
-function ScenarioCard({ scenario, alertHour, onSetHour }: { scenario: TransferScenario; alertHour: number | null; onSetHour: (hour: number) => void }) {
-  return <article className="border-b border-border py-4 last:border-0">
-    <h3 className="flex items-center gap-2 font-semibold"><span aria-hidden className={`h-3 w-3 rounded-full ${DOT[scenario.level]}`} />{scenario.name}</h3>
-    <div className="mt-2">
-      {scenario.fields.map(field => <FieldRow key={field.label} field={field} />)}
-      <FieldRow field={{ label: "Giờ chấm", value: scenario.hour === null ? "Bất kỳ" : hourLabel(scenario.hour) }} />
-    </div>
-    <p className="mt-2 text-sm leading-relaxed"><strong>Mong đợi:</strong> {scenario.expected}</p>
+function SignalStatus({ signals, required }: { signals: SignalProbe[] | null; required: string[] }) {
+  if (!signals) return <p className="mt-2 text-sm text-muted">Tín hiệu: bấm Dựng để đọc engine.</p>;
+  const on = signals.map(signal => signal.code);
+  const missing = required.filter(code => !on.includes(code));
+  return <div className="mt-2 text-sm leading-relaxed">
+    <p><strong>Tín hiệu đang bật:</strong> {on.length ? on.join(", ") : "không có"}{required.length > 0 && (missing.length ? ` · thiếu ${missing.join(", ")}` : " · đủ cho thẻ này")}</p>
+    {signals.map(signal => <p key={signal.code} className="text-muted">{signal.code}: {signal.evidence}</p>)}
+  </div>;
+}
+
+function ScenarioCard({ card, built, busy, error, onBuild, onOpen }: {
+  card: ScenarioCardDef;
+  built?: BuiltCard;
+  busy: boolean;
+  error?: string;
+  onBuild: () => void;
+  onOpen: () => void;
+}) {
+  const fields = built?.fields ?? card.fields;
+  return <article className="border-b border-border py-4 last:border-0" data-testid={`scenario-${card.id}`}>
+    <h3 className="flex flex-wrap items-center gap-2 font-semibold">
+      <Badge tone={TONE[card.level]}>{card.level === "green" ? "Xanh" : card.level === "yellow" ? "Vàng" : "Đỏ"}</Badge>
+      {card.name}
+    </h3>
+    <div className="mt-2">{fields.map(field => <FieldRow key={field.label} field={field} />)}</div>
+    <p className="mt-2 text-sm leading-relaxed"><strong>Mong đợi:</strong> {expectedLine(card.copyId)}</p>
+    <SignalStatus signals={built?.signals ?? null} required={card.signals} />
+    {built?.note && <p className="mt-1 text-sm text-muted">{built.note}</p>}
+    {error && <p className="mt-1 text-sm text-negative" role="alert">{error}</p>}
+    <p className="mt-3 text-sm text-muted">Dựng lại sẽ xóa trạng thái mô phỏng trước của persona hiện tại.</p>
     <div className="mt-3 flex flex-wrap gap-2">
-      {scenario.hour !== null && scenario.hour !== alertHour && <button type="button" onClick={() => onSetHour(scenario.hour!)} className="rounded-full border border-primary px-3 py-1.5 text-xs font-semibold text-primary">Đặt giờ {hourLabel(scenario.hour)}</button>}
-      <Link href="/transfer" className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white">Mở màn chuyển tiền</Link>
+      <button type="button" disabled={busy} onClick={onBuild} className="shield-action disabled:opacity-40">Dựng</button>
+      <button type="button" disabled={busy} onClick={onOpen} className="shield-action bg-primary disabled:opacity-40">Mở màn</button>
     </div>
   </article>;
 }
 
-/** Step-by-step transfer cases to type in by hand on /transfer (no prefilled form). */
+/** One card per BT/DH/SC scenario: build the engine state, then open the screen. */
 export function ScenarioPanel() {
-  const alertHour = useTestToolsStore(state => state.alertHour);
-  const setAlertHour = useTestToolsStore(state => state.setAlertHour);
+  const router = useRouter();
+  const { persona } = usePersona();
+  const demo = useSettingsDemo();
+  const [built, setBuilt] = useState<Record<string, BuiltCard>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  return <Panel title="Kịch bản chuyển tiền">
-    <p className="pt-4 text-sm leading-relaxed text-muted">Ở Chuyển tiền, bấm &ldquo;Tài khoản/Số thẻ&rdquo;, nhập ngân hàng, số tài khoản và tên người nhận theo thẻ. Không dùng icon thêm người nhận: bước đó lưu người nhận vào danh sách &ldquo;Đã lưu&rdquo;. Số tiền 15 triệu tính cho tài khoản nguồn khoảng 21 triệu; persona khác thì nhập từ một nửa số dư trở lên.</p>
-    {TRANSFER_SCENARIOS.map(scenario => <ScenarioCard key={scenario.id} scenario={scenario} alertHour={alertHour} onSetHour={setAlertHour} />)}
+  const run = async (card: ScenarioCardDef) => {
+    setBusy(card.id);
+    setErrors(current => ({ ...current, [card.id]: "" }));
+    try {
+      const next = await buildScenario(card.id, persona.cif, () => demo.update({ passwordUpdated: false, advanced: false, faceId: false }));
+      setBuilt(current => ({ ...current, [card.id]: next }));
+      pokeInterventions();
+    } catch (err) {
+      setErrors(current => ({ ...current, [card.id]: err instanceof Error ? err.message : "Không dựng được." }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const open = (card: ScenarioCardDef) => {
+    const ready = built[card.id];
+    if (ready?.draft) putTransferDraft(ready.draft);
+    router.push(ready?.href ?? card.href);
+  };
+
+  return <Panel title="Thẻ kịch bản">
+    <p className="pt-4 text-sm leading-relaxed text-muted">Mỗi thẻ dựng lại engine của persona này (xóa dữ liệu giả lập trước), ghi đúng sự kiện rồi tắt Fraud agent để màn hiện câu nguyên văn. Mở màn đi tới chỗ cảnh báo hiện. Dòng Mong đợi lấy từ bảng kịch bản.</p>
+    <nav aria-label="Nhóm kịch bản" className="my-4 flex flex-wrap gap-2">{GROUPS.map((group, index) => <a className="shield-action" key={group} href={`#shield-scenarios-${index}`}>{group}</a>)}</nav>
+    {GROUPS.map((group, index) => <section key={group} id={`shield-scenarios-${index}`}>
+      <h2 className="pt-4 text-sm font-bold text-muted">{group}</h2>
+      {SCENARIO_CARDS.filter(card => card.group === group).map(card => (
+        <ScenarioCard key={card.id} card={card} built={built[card.id]} busy={busy !== null} error={errors[card.id]} onBuild={() => void run(card)} onOpen={() => open(card)} />
+      ))}
+    </section>)}
   </Panel>;
 }

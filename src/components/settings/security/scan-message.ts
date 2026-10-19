@@ -1,7 +1,7 @@
 // Rule-based scam check for pasted messages, links or numbers (demo rules). Pure, no React.
 
 export type ScanLevel = "danger" | "suspicious" | "clear";
-export type ScanResult = { level: ScanLevel; reasons: string[] };
+export type ScanResult = { level: ScanLevel; reasons: string[]; manipulationSigns?: string[]; source?: "rule" | "agent" };
 
 const OFFICIAL_DOMAIN = "msb.com.vn"; // mock
 // mock: obviously fake numbers standing in for a fraud watch list

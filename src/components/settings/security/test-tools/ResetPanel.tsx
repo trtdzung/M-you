@@ -11,18 +11,19 @@ export function ResetPanel() {
   const [done, setDone] = useState(false);
 
   const reset = () => {
-    resetTestState();
-    setConfirming(false);
-    setDone(true);
+    void resetTestState().then(() => {
+      setConfirming(false);
+      setDone(true);
+    }).catch(() => setConfirming(false));
   };
 
   return <Panel title="Đặt lại">
     <div className="py-4">
       <Action onClick={() => { setDone(false); setConfirming(true); }}>Đặt lại Scam Shield về mặc định</Action>
-      {done && <p className="mt-3 text-sm leading-relaxed text-muted" role="status">Đã đặt lại về mặc định (45/100 nếu chưa đổi phần Xác thực).</p>}
+      {done && <p className="mt-3 text-sm leading-relaxed text-muted" role="status">Đã xóa dữ liệu engine của persona và đưa Scam Shield về mặc định.</p>}
     </div>
     <Sheet open={confirming} title="Đặt lại Scam Shield?" onClose={() => setConfirming(false)}>
-      <p className="mb-5 text-sm leading-relaxed">Mọi cài đặt Scam Shield của persona này và giờ chấm cảnh báo giả lập sẽ về mặc định.</p>
+      <p className="mb-5 text-sm leading-relaxed">Mọi cài đặt Scam Shield và dữ liệu engine của persona này (sự kiện, đồng hồ, tần suất, giữ lệnh) sẽ về mặc định.</p>
       <Action onClick={reset}>Đặt lại</Action>
     </Sheet>
   </Panel>;

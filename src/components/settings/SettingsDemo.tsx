@@ -8,13 +8,16 @@ import { usePersona } from "@/providers/context";
 import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
 import { clearSecurityStorage } from "@/state/security/storage";
+import { postSecurityEvent } from "@/lib/security/post-event";
 import { useSettingsDemo } from "./SettingsDemoContext";
 import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 
 import { isShieldSection, type SettingsSection } from "./settings-sections";
 import { SHIELD_TITLES } from "./security/shield-copy";
 import { ShieldSection } from "./security/ShieldSection";
+import { RecoveryDeviceAction } from "./security/RecoveryDeviceAction";
 import { SecurityHub } from "./security/SecurityHub";
+import { KnowledgeScreen } from "./security/screens/KnowledgeScreen";
 import { settingsParent } from "@/lib/navigation-direction";
 const TITLES: Record<SettingsSection, string> = { ...SHIELD_TITLES, profile: "Thông tin cá nhân", security: "Bảo mật", pin: "Đổi mã PIN xác thực", password: "Đổi mật khẩu", face: "Xác thực khuôn mặt", advanced: "Xác thực nâng cao", questions: "Thiết lập câu hỏi bảo mật", devices: "Quản lý thiết bị truy cập", signature: "Chữ ký số", accounts: "Tài khoản và hạn mức", notifications: "Thông báo", appearance: "Giao diện", widgets: "Cài đặt Widget", language: "Ngôn ngữ", support: "Trung tâm hỗ trợ", privacy: "Quyền dữ liệu", knowledge: "Kiến thức bảo mật hữu ích" };
 const QUESTIONS = ["Thương hiệu đồ uống mà bạn yêu thích?", "Món ăn mà người thân trong gia đình bạn yêu thích nhất?", "Địa điểm du lịch mà bạn thích nhất?", "Tên quyển sách mà bạn thấy ấn tượng nhất?", "Tên người bạn mà bạn tin tưởng nhất?", "Bệnh viện nơi bạn được sinh ra?", "Tên người có ảnh hưởng nhất đến bạn?", "Chương trình truyền hình mà bạn thường xuyên xem nhất?", "Màu sắc mà bạn yêu thích nhất?", "Ngày sinh của người bạn yêu quý nhất trong gia đình?"];
@@ -61,7 +64,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "security") {
     content = <SecurityHub />;
   } else if (section === "pin" || section === "password") {
-    content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") demo.update({ passwordUpdated: true }); finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
+    content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") { demo.update({ passwordUpdated: true }); postSecurityEvent("password_changed", {}); } finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
   } else if (section === "face") {
     content = <><Panel><div className="flex items-center justify-between py-4"><strong>Trạng thái</strong><Badge good>Đã xác minh</Badge></div></Panel><Notice><strong className="text-blue-600">Thông tin thêm</strong><ul className="mt-3 list-disc space-y-4 pl-4"><li>Xác thực khuôn mặt áp dụng cho chuyển tiền, thanh toán giá trị cao và các cài đặt quan trọng.</li><li>Nhìn thẳng vào camera, đảm bảo khuôn mặt rõ nét và đủ ánh sáng.</li>Trạng thái trong màn này là dữ liệu demo. Bản giả lập không mở camera hoặc thu thập khuôn mặt.</ul></Notice></>;
   } else if (section === "advanced") {
@@ -69,7 +72,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "questions") {
     content = <QuestionForm onSuccess={() => { demo.update({ advanced: true }); finish("Đã thiết lập câu hỏi bảo mật trong giả lập. Câu trả lời không được lưu."); }} />;
   } else if (section === "devices") {
-    content = <>{["Apple iPhone 14 Plus", "Apple iPhone 14 Plus", "Apple iPhone 11"].map((device, i) => <Panel key={i}><div className="flex items-center gap-3 py-5"><Smartphone size={25} /><div className="flex-1"><strong>{device}</strong><p className="mt-2 text-sm text-muted">{i === 0 ? "Thiết bị hiện tại" : "Lần truy cập trước"} · Dữ liệu demo</p></div>{i === 0 ? <Badge good>Hoạt động</Badge> : <button className="text-sm text-primary" onClick={() => setSheet("device")}>Chi tiết</button>}</div></Panel>)}</>;
+    content = <><RecoveryDeviceAction />{["Apple iPhone 14 Plus", "Apple iPhone 14 Plus", "Apple iPhone 11"].map((device, i) => <Panel key={i}><div className="flex items-center gap-3 py-5"><Smartphone size={25} /><div className="flex-1"><strong>{device}</strong><p className="mt-2 text-sm text-muted">{i === 0 ? "Thiết bị hiện tại" : "Lần truy cập trước"} · Dữ liệu demo</p></div>{i === 0 ? <Badge good>Hoạt động</Badge> : <button className="text-sm text-primary" onClick={() => setSheet("device")}>Chi tiết</button>}</div></Panel>)}</>;
   } else if (section === "signature") {
     content = <Panel><Row label="Đăng ký chữ ký số" icon={FileCheck2} onClick={() => setSheet("signature-register")} /><Row label="Ký số tài liệu" icon={PenLine} onClick={() => setSheet("signature-sign")} /><Row label="Lịch sử ký số" icon={FileText} onClick={() => setSheet("signature-history")} /></Panel>;
   } else if (section === "profile") {
@@ -84,6 +87,8 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
     content = <><Panel title="Widget truy cập nhanh">{["Số dư tài khoản", "Chuyển tiền", "Quét QR"].map(label => <div className="settings-row" key={label}><span className="flex-1 font-semibold">{label}</span><Toggle label={label} checked={demo.widgets.includes(label)} onChange={() => demo.update({ widgets: demo.widgets.includes(label) ? demo.widgets.filter(x => x !== label) : [...demo.widgets, label] })} /></div>)}</Panel><Notice>Đây là bản xem trước cấu hình Widget. Bản giả lập web không cài Widget lên màn hình điện thoại.</Notice></>;
   } else if (section === "language") {
     content = <Panel><Row label="Tiếng Việt" trailing={<Check className="text-primary" size={20} />} onClick={() => finish("Tiếng Việt đang được sử dụng.")} /><Row label="English" detail="Chưa có trong bản giả lập" onClick={() => finish("Bản giả lập hiện hỗ trợ Tiếng Việt.")} /></Panel>;
+  } else if (section === "knowledge") {
+    content = <KnowledgeScreen />;
   } else if (section === "privacy") {
     content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
   } else if (isShieldSection(section)) {

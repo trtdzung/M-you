@@ -3,7 +3,7 @@
 // Scam Shield store (zustand, client only). Actions carry the business rules:
 // raising security applies at once, lowering it waits 24h (`pendingOff`,
 // contact "removing"). The store never reads React context; components pass in
-// what it needs. Persisted per persona through `storage.ts`.
+// what it needs. Persisted per persona through `storage.ts` (server API).
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -11,6 +11,7 @@ import { transferNow } from "@/lib/demo-clock";
 import { DAY_MS, withoutPending, type PendingOff } from "@/components/settings/security/pending";
 import { SECURITY_DEFAULTS } from "./defaults";
 import { securityStorage, setSecurityCif } from "./storage";
+import { postSecurityEvent } from "@/lib/security/post-event";
 import type { AlertLogEntry, EmergencyContact, SecurityState, TrustedContact } from "./types";
 
 export const MAX_EMERGENCY_CONTACTS = 2;
@@ -32,6 +33,10 @@ type SecurityActions = {
   applyRemoveContact: (id: string) => void;
   removeTrustedContact: (id: string) => void;
   addTrustedContact: (input: Omit<TrustedContact, "id">) => void;
+  /** UC 10 (b) hold: turning on applies now; turning off waits 24h (`requestOff("hold")`). */
+  setHold: (on: boolean, now?: number) => void;
+  /** Lowering the threshold raises security, so it applies now; raising it is refused. */
+  lowerHoldThreshold: (value: number) => void;
   /** Locking applies at once; unlocking early is `requestOff("transferLock")`. */
   lockTransfers: (days: number, now?: number) => void;
   /** Locking applies at once; unlocking is `requestOff("accountLock")`. */
@@ -51,7 +56,8 @@ const OFF_CHANGES: Record<OffKey, Partial<SecurityState>> = {
   aiProtect: { aiProtect: false },
   antiPhishing: { antiPhishingCode: null },
   transferLock: { transferLockUntil: null },
-  accountLock: { accountLocked: false, accountLockedAt: null },
+  accountLock: { cardsLocked: false, accountLocked: false, accountLockedAt: null },
+  hold: { holdEnabled: false },
 };
 
 const clockNow = () => transferNow().getTime();
@@ -92,9 +98,17 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     addTrustedContact: input => set(state => state.trustedContacts.some(contact => sameName(contact.name, input.name) && contact.account === input.account) ? state
       : { trustedContacts: [...state.trustedContacts, { ...input, id: newId() }] }),
 
+    setHold: (on, now = clockNow()) => {
+      if (on) set(state => ({ holdEnabled: true, pendingOff: withoutPending(state.pendingOff, "hold") }));
+      else get().requestOff("hold", now);
+    },
+    lowerHoldThreshold: value => set(state => (value > 0 && value < state.holdThreshold ? { holdThreshold: value } : state)),
     // A new lock also drops any unlock request still waiting.
     lockTransfers: (days, now = clockNow()) => set(state => ({ transferLockUntil: now + days * DAY_MS, pendingOff: withoutPending(state.pendingOff, "transferLock") })),
-    lockAccount: (now = clockNow()) => set(state => ({ accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") })),
+    lockAccount: (now = clockNow()) => {
+      set(state => ({ cardsLocked: true, accountLocked: true, accountLockedAt: now, pendingOff: withoutPending(state.pendingOff, "accountLock") }));
+      postSecurityEvent("account_locked", {});
+    },
     setFamilyAlerts: on => set({ familyAlerts: on }),
     setSecurityTips: on => set({ securityTips: on }),
     logAlert: ({ at = clockNow(), ...entry }) => set(state => ({ alertLog: [...state.alertLog, { ...entry, id: newId(), at }] })),

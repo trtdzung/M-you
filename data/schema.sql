@@ -209,3 +209,135 @@ CREATE TABLE IF NOT EXISTS agent_preferences (
   notes TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL
 );
+
+-- Scam Shield engine (notes: TASKS-engine E01). One row per persona (`cif`): the
+-- customer's protection settings as JSON (`SecurityState`, src/state/security/types.ts).
+-- Server-side so the rule engine and the fraud agent read the same copy the app shows.
+CREATE TABLE IF NOT EXISTS security_profiles (
+  cif TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- Scam Shield engine (E02). Append-only log of what happened to a persona
+-- (money in, transfers out, savings settled, device/password changes, screen
+-- sharing, screens opened, warnings shown/answered). The signal engine reads
+-- every time-window rule (60 min, 24 h, 10 min, 2 days…) from here.
+CREATE TABLE IF NOT EXISTS security_events (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  type TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_cif_at ON security_events (cif, at);
+
+-- Scam Shield engine clock per persona (E02): test tools shift "now" and pin the
+-- hour warnings are judged at. Kept apart from `security_profiles` because the
+-- app rewrites that row whole.
+CREATE TABLE IF NOT EXISTS security_engine_state (
+  cif TEXT PRIMARY KEY,
+  clock_offset_ms INTEGER NOT NULL DEFAULT 0,
+  alert_hour INTEGER CHECK (alert_hour IS NULL OR (alert_hour BETWEEN 0 AND 23)),
+  -- E14: when the customer opened the account (BT1 «Trong 7 ngày đầu»); null = unknown.
+  account_opened_at INTEGER,
+  -- T01: test tools skip the UC10 hold wait (the hold releases immediately).
+  skip_hold INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+
+-- Scam Shield engine (E04). Accounts on the fraud warning list — a MOCK of NHNN's
+-- SIMO list / MSB's internal list (SIMO has no public API for the hackathon).
+-- `bank` '' = any bank. Signal T2, scenario DH4, account lookup (UC 10).
+CREATE TABLE IF NOT EXISTS warned_accounts (
+  account TEXT NOT NULL,
+  bank TEXT NOT NULL DEFAULT '',
+  level TEXT NOT NULL CHECK (level IN ('danger', 'suspicious')),
+  source TEXT NOT NULL DEFAULT 'mock' CHECK (source IN ('mock')),
+  note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (account, bank)
+);
+-- demo data: obviously fake numbers (9704 0000 …), seeded once; test tools can edit.
+INSERT OR IGNORE INTO warned_accounts (account, bank, level, note) VALUES
+  ('9704000000000001', 'VietinBank', 'danger', 'Giả danh công an / cơ quan thuế'),
+  ('9704000000000002', 'BIDV', 'danger', 'Việc làm online, làm nhiệm vụ hưởng hoa hồng'),
+  ('9704000000000003', 'Techcombank', 'danger', 'Đầu tư lợi nhuận cao'),
+  ('9704000000000004', '', 'danger', 'Báo chuyển nhầm, nhờ chuyển trả sang tài khoản khác'),
+  ('9704000000000005', 'Vietcombank', 'suspicious', 'Trúng thưởng, yêu cầu nộp phí nhận quà'),
+  ('9704000000000006', '', 'suspicious', 'Giả danh người thân cấp cứu');
+
+-- Scam Shield engine (E08). One row per warning the engine decided to show
+-- (tooltip, banner, popup, full screen): the rule copy (spec wording), the agent
+-- copy when the fraud agent enriched it, and what the customer chose. Also the
+-- history the frequency rules ("1 lần/tháng", "không lặp trong 30 ngày") read.
+CREATE TABLE IF NOT EXISTS interventions (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  scenario TEXT NOT NULL,
+  level TEXT NOT NULL CHECK (level IN ('green', 'yellow', 'red')),
+  surface TEXT NOT NULL,
+  target TEXT NOT NULL,
+  dedupe_key TEXT,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'shown', 'answered', 'expired')),
+  context TEXT NOT NULL,
+  copy_rule TEXT NOT NULL,
+  copy_agent TEXT,
+  agent_status TEXT NOT NULL DEFAULT 'none',
+  countdown_sec INTEGER,
+  created_at INTEGER NOT NULL,
+  shown_at INTEGER,
+  answered_at INTEGER,
+  choice TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_interventions_cif_status ON interventions (cif, status);
+
+-- Scam Shield engine (E12). UC 10 (b) "giữ giao dịch khi có bất thường": a
+-- transfer to a new recipient at or above the customer's threshold waits until
+-- `release_at` (engine clock); the customer can cancel meanwhile.
+CREATE TABLE IF NOT EXISTS transfer_holds (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('holding', 'cancelled', 'sent')),
+  amount REAL NOT NULL,
+  review TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  release_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_holds_cif ON transfer_holds (cif, status);
+
+-- Scam Shield incident dossiers (E17). Attachments stay local and never reach an LLM.
+CREATE TABLE IF NOT EXISTS fraud_cases (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  status TEXT NOT NULL,
+  opened_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  answers TEXT NOT NULL,
+  dossier TEXT,
+  attachments TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_fraud_cases_cif ON fraud_cases (cif, opened_at);
+
+-- Scam Shield engine (A10). One row per fraud-agent call: which action ran,
+-- which tool names were used (never customer payloads), and whether the
+-- customer agreed. `customer_decision` stays null until they choose.
+CREATE TABLE IF NOT EXISTS ai_journal (
+  id TEXT PRIMARY KEY,
+  cif TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  agent TEXT NOT NULL,
+  action TEXT NOT NULL,
+  ref TEXT,
+  data_used TEXT NOT NULL,
+  output TEXT NOT NULL,
+  customer_decision TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ai_journal_cif_at ON ai_journal (cif, at);
+
+-- Kill switch for the Fraud agent (A10). No row means on. Env
+-- FRAUD_AGENT_ENABLED=0/false/off forces off and the test-tools toggle cannot override it.
+CREATE TABLE IF NOT EXISTS fraud_agent_switch (
+  agent TEXT PRIMARY KEY,
+  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+  updated_at INTEGER NOT NULL
+);

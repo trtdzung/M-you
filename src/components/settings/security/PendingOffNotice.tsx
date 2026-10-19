@@ -12,7 +12,7 @@ export function PendingOffNotice({ action, at, onCancel, onApply }: { action: st
     </div>
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-8">
       <button type="button" onClick={onCancel} className="rounded-full border border-warning bg-white px-4 py-2 font-semibold text-warning">Hủy yêu cầu</button>
-      <button type="button" onClick={onApply} className="text-xs text-muted underline underline-offset-4">Giả lập: đã qua 24 giờ</button>
+      <details className="w-full"><summary className="shield-details-summary">Công cụ mô phỏng</summary><p className="mb-2 text-sm text-muted">Chỉ dành cho kiểm thử: bỏ qua thời gian chờ trong bản mô phỏng.</p><button type="button" onClick={onApply} className="shield-action">Giả lập: đã qua 24 giờ</button></details>
     </div>
   </div>;
 }

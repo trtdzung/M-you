@@ -2,10 +2,13 @@
 
 import { useSecurityStore } from "@/state/security/store";
 import type { ShieldSection as Section } from "../settings-sections";
+import { CaseScreen } from "./screens/CaseScreen";
 import { AlertLogScreen } from "./screens/AlertLogScreen";
+import { AiJournalScreen } from "./screens/AiJournalScreen";
 import { AntiPhishingScreen } from "./screens/AntiPhishingScreen";
 import { EmergencyContactsScreen } from "./screens/EmergencyContactsScreen";
 import { ProtectScreen } from "./screens/ProtectScreen";
+import { LookupScreen } from "./screens/LookupScreen";
 import { ScanScreen } from "./screens/ScanScreen";
 import { SosScreen } from "./screens/SosScreen";
 import { TestToolsScreen } from "./screens/TestToolsScreen";
@@ -20,7 +23,10 @@ const SCREENS: Record<Section, () => React.JSX.Element> = {
   "trusted-contacts": TrustedContactsScreen,
   "transfer-lock": TransferLockScreen,
   scan: ScanScreen,
+  lookup: LookupScreen,
+  case: CaseScreen,
   "alert-log": AlertLogScreen,
+  "ai-journal": AiJournalScreen,
   sos: SosScreen,
   "test-tools": TestToolsScreen,
 };
@@ -29,5 +35,5 @@ const SCREENS: Record<Section, () => React.JSX.Element> = {
 export function ShieldSection({ section }: { section: Section }) {
   const hydrated = useSecurityStore(state => state.hasHydrated);
   const Screen = SCREENS[section];
-  return hydrated ? <Screen /> : <SecurityLoading />;
+  return <div className="shield-screen">{hydrated ? <Screen /> : <SecurityLoading />}</div>;
 }
