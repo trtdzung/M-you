@@ -282,6 +282,7 @@ export function TransferConfirm() {
       type: typeForCategory(primaryCategory, categoryById), // derived from kind, never hardcoded
       merchantName: name.trim(),
       postedAt,
+      createdVia: "transfer_confirm", // merchantName is the RECIPIENT — keeps a person out of Wrapped text
       ...(draft?.memo ? { note: draft.memo } : {}),
     };
     let primaryTxnId: string;

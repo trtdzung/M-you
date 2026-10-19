@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { SOURCE_FULL_LABEL } from "@/lib/source-labels";
 
 export type Source = "msb" | "self_reported" | "estimated" | "mock";
 
@@ -21,13 +22,6 @@ const SOURCE_META: Record<Source, { label: string; className: string }> = {
   },
 };
 
-const FULL_LABEL: Record<Source, string> = {
-  msb: "Dữ liệu từ MSB",
-  self_reported: "Người dùng tự khai báo",
-  estimated: "Giá trị ước tính",
-  mock: "Dữ liệu demo",
-};
-
 /**
  * Set to true to show the provenance pills again. They are hidden app-wide at the
  * product owner's request: in an all-mock demo the source pills (DEMO / TỰ KHAI /
@@ -37,6 +31,14 @@ const FULL_LABEL: Record<Source, string> = {
  */
 const SHOW_SOURCE_BADGE: boolean = false;
 
+/**
+ * Whether a `SourceBadge` for `source` would render anything. Layouts that wrap the
+ * badge in a container use this so they never draw an empty box while badges are off.
+ */
+export function sourceBadgeVisible(source: Source | null | undefined): source is Source {
+  return SHOW_SOURCE_BADGE && source != null;
+}
+
 /** Small accessible pill indicating the provenance of a value. */
 export function SourceBadge({
   source,
@@ -45,11 +47,11 @@ export function SourceBadge({
   source: Source;
   className?: string;
 }) {
-  if (!SHOW_SOURCE_BADGE) return null;
+  if (!sourceBadgeVisible(source)) return null;
   const meta = SOURCE_META[source];
   return (
     <span
-      title={FULL_LABEL[source]}
+      title={SOURCE_FULL_LABEL[source]}
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         meta.className,

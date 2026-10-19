@@ -134,6 +134,14 @@ export interface Transaction {
    * balance; the amount stays excluded from spend/thu/chi. Absent on every other txn.
    */
   rebalance?: RebalanceMeta;
+  /**
+   * Origin marker for a record written by the confirmed-transfer flow. Such a row
+   * is typed `expense` with the RECIPIENT's name as `merchantName` and no
+   * `counterpartyAccountNumber`, so without this marker it is indistinguishable
+   * from a merchant purchase — consumers that surface merchant names (Wrapped)
+   * use it to keep a person's name out of any text. Absent on every other txn.
+   */
+  createdVia?: "transfer_confirm";
 }
 
 export interface TransactionQuery {

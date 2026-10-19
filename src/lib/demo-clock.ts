@@ -50,10 +50,10 @@ export function availableMonths(): MonthOption[] {
   });
 }
 
-/** Label for a "YYYY-MM" key. */
+/** "2026-07" -> "Tháng 7/2026"; anything that is not a "YYYY-MM" key is returned untouched. */
 export function monthKeyLabel(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  return labelOf(y, m - 1);
+  const match = /^(\d{4})-(\d{2})$/.exec(key);
+  return match ? labelOf(Number(match[1]), Number(match[2]) - 1) : key;
 }
 
 /** Previous month key ("YYYY-MM"). */
