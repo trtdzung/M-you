@@ -197,6 +197,12 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       return draft;
     }
 
+    case "setRiskProfile": {
+      draft.customer = { ...draft.customer, riskProfile: action.profile, riskProfileAsked: true };
+      toast(draft, "Đã lưu khẩu vị đầu tư của bạn.", "success");
+      return draft;
+    }
+
     case "setCustomer": {
       draft.customer = { ...draft.customer, ...action.patch };
       toast(draft, "Đã cập nhật hồ sơ khách hàng mô phỏng.", "info");

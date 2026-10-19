@@ -190,7 +190,7 @@ export function loadWorld(cif: string): WorldState {
   const today = goalToday(cif);
   const meta = readGoalMeta(cif);
   // Hồ sơ khách đọc `accounts` / `transactions` (tự seed persona lần đầu) — gọi trước khi đọc số dư.
-  const customer = buildCustomerProfile(cif, today, meta.riskProfile ?? "conservative");
+  const customer = { ...buildCustomerProfile(cif, today, meta.riskProfile ?? "conservative"), riskProfileAsked: meta.riskProfile !== null };
 
   const goals = (db.prepare("SELECT payload FROM gv2_goals WHERE cif = ? ORDER BY sort_order ASC, id ASC").all(cif) as { payload: string }[])
     .map((r) => parseJson<Goal>(r.payload))

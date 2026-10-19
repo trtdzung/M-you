@@ -6,6 +6,7 @@ import type {
   GoalFlexibility,
   GoalTemplate,
   ISODate,
+  RiskProfile,
   ToastTone,
   ValueSource,
 } from "../model/types";
@@ -42,6 +43,7 @@ export type PreviewAction =
   | { type: "world/sync"; world: WorldState }
   | { type: "advanceTime"; days: number }
   | { type: "setFundPriceShift"; pct: number }
+  | { type: "setRiskProfile"; profile: RiskProfile }
   | { type: "setCustomer"; patch: Partial<CustomerProfile> }
   | { type: "triggerEvent"; event: SimEvent; goalId?: string }
   // --- create

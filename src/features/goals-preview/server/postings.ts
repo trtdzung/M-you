@@ -302,7 +302,7 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
       `INSERT INTO gv2_meta (cif, seq, processed_through, fund_price_shift_pct, risk_profile, updated_at) VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(cif) DO UPDATE SET seq = excluded.seq, processed_through = excluded.processed_through,
          fund_price_shift_pct = excluded.fund_price_shift_pct, risk_profile = excluded.risk_profile, updated_at = excluded.updated_at`,
-    ).run(cif, next.seq, processedThrough, next.market.fundPriceShiftPct, next.customer.riskProfile, new Date().toISOString());
+    ).run(cif, next.seq, processedThrough, next.market.fundPriceShiftPct, next.customer.riskProfileAsked === true ? next.customer.riskProfile : null, new Date().toISOString());
 
     // 5. Đọc lại số dư thật và so với kết quả reducer.
     const mainNow = readBalance.get(cif, main.id) as { b: number } | undefined;
