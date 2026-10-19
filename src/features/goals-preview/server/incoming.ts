@@ -81,16 +81,47 @@ function checkReplay(cif: string, txn: Transaction): boolean {
   return true;
 }
 
+/** Loại tài khoản nguồn của cif (`undefined` = không có). */
+function sourceType(cif: string, sourceAccountId: string): string | undefined {
+  const row = goalsV2Db().prepare("SELECT type FROM accounts WHERE cif = ? AND id = ?").get(cif, sourceAccountId) as
+    | { type: string }
+    | undefined;
+  return row?.type;
+}
+
 /**
- * Đường chuyển tiền thường (không phải nội bộ): kiểm gửi lại (D24) rồi chạy `debit`
- * (đường `debitAccount` cũ) trong cùng một transaction `IMMEDIATE`.
+ * D29: nguồn là tài khoản `goal` → chân trừ mang `accountId` = id tài khoản nguồn thật (sổ
+ * của tài khoản mục tiêu đủ chân). Nguồn khác → giữ nguyên bản ghi của màn Chuyển tiền.
  */
-export function guardTransferReplay<T>(cif: string, txn: Transaction | undefined, debit: () => T): T {
+function debitRecordFor(cif: string, sourceAccountId: string, txn: Transaction): Transaction {
+  return sourceType(cif, sourceAccountId) === "goal" ? { ...txn, accountId: sourceAccountId } : txn;
+}
+
+/**
+ * Đường chuyển tiền thường (không phải nội bộ), một transaction `IMMEDIATE`: kiểm gửi lại
+ * (D24) rồi chạy `debit` (đường `debitAccount` cũ) với bản ghi đã chuẩn hoá. Nguồn là tài
+ * khoản `goal` (D29): kiểm đủ số dư trước — thiếu → từ chối, không kẹp về 0, không ghi gì.
+ */
+export function guardTransferReplay<T>(
+  cif: string,
+  sourceAccountId: string,
+  amount: number,
+  txn: Transaction | undefined,
+  debit: (record: Transaction | undefined) => T,
+): T {
+  readAccounts(cif); // seed persona trước khi đọc loại tài khoản
   const db = goalsV2Db();
   return db
     .transaction(() => {
-      if (txn) checkReplay(cif, txn);
-      return debit();
+      const record = txn ? debitRecordFor(cif, sourceAccountId, txn) : undefined;
+      if (record && checkReplay(cif, record)) return debit(record);
+      if (sourceType(cif, sourceAccountId) === "goal") {
+        const row = db.prepare("SELECT available_balance AS b FROM accounts WHERE cif = ? AND id = ?").get(cif, sourceAccountId) as
+          | { b: number }
+          | undefined;
+        if (!row || row.b < amount) throw new GoalTransferRejectedError("Số dư không đủ để hoàn tất giao dịch.");
+      }
+      return debit(record);
     })
     .immediate();
 }
@@ -111,7 +142,8 @@ export function transferToOwnGoalAccount(cif: string, sourceAccountId: string, a
   readTransactions(cif);
   const db = goalsV2Db();
   db.transaction(() => {
-    if (checkReplay(cif, txn)) return;
+    const record = debitRecordFor(cif, sourceAccountId, txn);
+    if (checkReplay(cif, record)) return;
     const number = txn.counterpartyAccountNumber;
     const target = number && isMsb(txn.counterpartyBankName) ? openGoalAccountByNumber(cif, number) : undefined;
     if (!target) throw new GoalTransferRejectedError("Tài khoản mục tiêu không còn mở.");
@@ -123,7 +155,7 @@ export function transferToOwnGoalAccount(cif: string, sourceAccountId: string, a
     if (source.b < amount) throw new GoalTransferRejectedError("Số dư không đủ để hoàn tất giao dịch.");
 
     const transferGroupId = `gtg-${randomUUID()}`;
-    const debit: Transaction = { ...txn, type: "transfer", categoryId: CATEGORY.transfer, transferGroupId };
+    const debit: Transaction = { ...record, type: "transfer", categoryId: CATEGORY.transfer, transferGroupId };
     const credit: Transaction = {
       id: `${txn.id}-credit`,
       accountId: target.account_id,

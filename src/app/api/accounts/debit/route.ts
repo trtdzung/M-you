@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (record && isOwnGoalTransfer(cif, record)) {
       return NextResponse.json(transferToOwnGoalAccount(cif, accountId, amount, record));
     }
-    const accounts = guardTransferReplay(cif, record, () => debitAccount(cif, accountId, amount, record));
+    const accounts = guardTransferReplay(cif, accountId, amount, record, (r) => debitAccount(cif, accountId, amount, r));
     return NextResponse.json(accounts);
   } catch (err) {
     if (err instanceof AccountNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 });
