@@ -1,7 +1,8 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { useShallow } from "zustand/react/shallow";
-import { transferNow } from "@/lib/demo-clock";
 import { usePersona } from "@/providers/context";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts, isTransferLocked } from "@/state/security/selectors";
@@ -17,6 +18,7 @@ function Line({ label, value }: { label: string; value: string }) {
 
 /** Read-only snapshot of every Scam Shield value a tester may want to check. */
 export function StateSummary() {
+  const appNow = useAppNow();
   const { persona } = usePersona();
   const demo = useSettingsDemo();
   const alertHour = useTestToolsStore(state => state.alertHour);
@@ -27,7 +29,7 @@ export function StateSummary() {
   // Same inputs as the Hub, so the score matches it.
   const score = securityScore({ passwordUpdated: demo.passwordUpdated, faceId: demo.faceId, advanced: demo.advanced, aiProtect: s.aiProtect, antiPhishing: s.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: s.trustedContacts.length });
   const offAt = s.pendingOff.aiProtect;
-  const lockUntil = isTransferLocked(s, transferNow().getTime()) ? s.transferLockUntil : null;
+  const lockUntil = isTransferLocked(s, appNow.getTime()) ? s.transferLockUntil : null;
 
   return <Panel title="Trạng thái hiện tại">
     <Line label="Persona" value={persona.cif} />

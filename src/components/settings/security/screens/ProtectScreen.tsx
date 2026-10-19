@@ -1,9 +1,12 @@
 "use client";
 
+import { transferNow } from "@/lib/demo-clock";
+
+import { useAppNow } from "@/state/app-clock";
+
 import Link from "next/link";
 import { useState } from "react";
 import { ScrollText, Bot } from "lucide-react";
-import { transferNow } from "@/lib/demo-clock";
 import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts } from "@/state/security/selectors";
@@ -25,11 +28,12 @@ const LEVELS = [
 
 /** Settings › M-You bảo vệ bạn. Turning off waits 24h; turning on is immediate. */
 export function ProtectScreen() {
+  const appNow = useAppNow();
   const security = useSecurityStore(useShallow(state => ({ aiProtect: state.aiProtect, familyAlerts: state.familyAlerts, securityTips: state.securityTips, emergencyContacts: state.emergencyContacts, pendingOff: state.pendingOff })));
   const { setAiProtect, cancelOff, applyOff, setFamilyAlerts, setSecurityTips } = useSecurityStore.getState();
   const [confirming, setConfirming] = useState(false);
   const offAt = security.pendingOff.aiProtect;
-  const pending = isPending(offAt, transferNow().getTime());
+  const pending = isPending(offAt, appNow.getTime());
   // A contact being removed stays in effect until the 24h wait ends.
   const hasActiveContact = effectiveContacts(security).length > 0;
   const on = security.aiProtect;

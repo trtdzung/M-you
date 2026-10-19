@@ -1,10 +1,11 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { markApplied, proposalKey, wasApplied } from "@/lib/agent-applied";
-import { transferNow } from "@/lib/demo-clock";
 import { usePersona } from "@/providers/context";
 import { useFinancials } from "@/state/useFinancials";
 import { useAutoFundWith } from "@/state/use-auto-fund";
@@ -41,11 +42,12 @@ const fieldClass =
  * of a dead end.
  */
 export function AgentRebalanceCard({ form, fullWidth = false }: { form: RebalanceJarsUi; fullWidth?: boolean }) {
+  const appNow = useAppNow();
   const { persona } = usePersona();
   const fin = useFinancials();
   const autoFund = useAutoFundWith({ transactions: fin.transactions, raw: fin.raw });
   const key = proposalKey(persona.cif, form);
-  const postedAt = transferNow().toISOString();
+  const postedAt = appNow.toISOString();
   const [status, setStatus] = useState<"idle" | "saving" | "done">(() => (wasApplied(key) ? "done" : "idle"));
   const [problem, setProblem] = useState<string | null>(null);
   const [fromId, setFromId] = useState(form.from_jar_id);

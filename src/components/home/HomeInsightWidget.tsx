@@ -19,9 +19,12 @@ import type {
 import { saveInsightDraft } from "@/insights/proactive/chat-handoff";
 import { HealthScoreSheet } from "./HealthScoreSheet";
 
+import { useAppMonthKey } from "@/state/app-clock";
+
 const TOTAL_SLIDES = 3;
 
 export function HomeInsightWidget() {
+  const monthKey = useAppMonthKey();
   const { persona } = usePersona();
   const profile = useAssetLiabilities();
   const goals = useGoals();
@@ -58,7 +61,7 @@ export function HomeInsightWidget() {
     },
   });
   const revision = JSON.stringify([jars.config, corrections.corrections, manualTxns]);
-  const resultKey = payload + revision;
+  const resultKey = payload + revision + monthKey;
 
   const currentResult = data?.key === resultKey && ready ? data.result : null;
   const healthScore = currentResult?.healthScore ?? null;

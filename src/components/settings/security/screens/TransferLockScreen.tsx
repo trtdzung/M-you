@@ -1,9 +1,12 @@
 "use client";
 
+import { transferNow } from "@/lib/demo-clock";
+
+import { useAppNow } from "@/state/app-clock";
+
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Lock } from "lucide-react";
-import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { Action, Panel, Toggle } from "../../settings-ui";
 import { formatVnd } from "@/lib/format";
@@ -16,6 +19,7 @@ const DURATIONS = [1, 3, 7] as const;
 
 /** Settings › Tự khóa chuyển tiền. Locking applies at once; unlocking early needs a face check and waits 24h. */
 export function TransferLockScreen() {
+  const appNow = useAppNow();
   const transferLockUntil = useSecurityStore(state => state.transferLockUntil);
   const unlockAt = useSecurityStore(state => state.pendingOff.transferLock);
   const { lockTransfers, requestOff, cancelOff, applyOff } = useSecurityStore.getState();
@@ -23,7 +27,7 @@ export function TransferLockScreen() {
   const [confirming, setConfirming] = useState(false);
   // An expired lock counts as off.
   const until = transferLockUntil ?? undefined;
-  const now = transferNow().getTime();
+  const now = appNow.getTime();
   const locked = isPending(until, now);
   // Unlocking early waits 24h, so it only helps while more than 24h remain.
   const canUnlockEarly = locked && until - now > DAY_MS;
@@ -63,10 +67,11 @@ const THRESHOLDS = [10_000_000, 20_000_000, 50_000_000] as const;
  * decrease too, so it means turning off and on again.
  */
 function HoldPanel() {
+  const appNow = useAppNow();
   const hold = useSecurityStore(useShallow(state => ({ on: state.holdEnabled, threshold: state.holdThreshold, offAt: state.pendingOff.hold })));
   const { setHold, lowerHoldThreshold, cancelOff, applyOff } = useSecurityStore.getState();
   const [confirming, setConfirming] = useState(false);
-  const pending = isPending(hold.offAt, transferNow().getTime());
+  const pending = isPending(hold.offAt, appNow.getTime());
   return <>
     <Panel title="Giữ giao dịch khi có bất thường">
       <div className="settings-row">

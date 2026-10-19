@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppMonthKey } from "@/state/app-clock";
+
 /**
  * Current-month jar money for the settings screens (Cài đặt → Hũ & danh mục):
  * each jar's running SỐ DƯ and the "Chờ phân bổ" pool (`CASA − Σ spendable`).
@@ -11,7 +13,6 @@
 
 import { useMemo } from "react";
 import type { Amount } from "@/domain/engine/types";
-import { currentMonthKey } from "@/lib/demo-clock";
 import { useFinancials } from "./useFinancials";
 
 export interface CurrentJarFunds {
@@ -29,7 +30,8 @@ export function allocatableFromPool(pool: Amount): number | null {
 }
 
 export function useCurrentJarFunds(): CurrentJarFunds {
-  const { loading, error, financials } = useFinancials(currentMonthKey());
+  const appMonthKey = useAppMonthKey();
+  const { loading, error, financials } = useFinancials(appMonthKey);
   return useMemo<CurrentJarFunds>(() => {
     if (error) return { status: "error", pool: "unknown", balanceOf: () => null };
     if (loading || !financials) return { status: "loading", pool: "unknown", balanceOf: () => null };

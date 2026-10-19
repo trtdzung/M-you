@@ -27,9 +27,11 @@ function CustomerClock({ cif, children }: { cif: string | null; children: React.
   useEffect(() => {
     let alive = true;
     let generation = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
     const load = async () => {
+      clearTimeout(retryTimer);
       const run = ++generation;
-      setError(false);
       if (!cif) return;
       try {
         const res = await fetch(`/api/clock?cif=${encodeURIComponent(cif)}`, { cache: "no-store" });
@@ -38,15 +40,23 @@ function CustomerClock({ cif, children }: { cif: string | null; children: React.
         if (!alive || run !== generation) return;
         setClientAppClock(next.now, next.offsetMs);
         setClock(next);
+        failures = 0;
+        setError(false);
       } catch {
-        if (alive && run === generation) setError(true);
+        if (alive && run === generation) {
+          setError(true);
+          const delay = [2000, 5000, 15000][failures++] ?? 30000;
+          retryTimer = setTimeout(() => void load(), delay);
+        }
       }
     };
     const refresh = (event: Event) => {
       if ((event as CustomEvent<string>).detail === cif) void load();
     };
+    const focus = () => { if (failures > 0) void load(); };
     setClientAppClock(null);
     void load();
+    window.addEventListener("focus", focus);
     window.addEventListener(APP_CLOCK_REFRESH_EVENT, refresh);
     const timer = window.setInterval(() => {
       setClock(current => {
@@ -58,6 +68,8 @@ function CustomerClock({ cif, children }: { cif: string | null; children: React.
     return () => {
       alive = false;
       window.clearInterval(timer);
+      clearTimeout(retryTimer);
+      window.removeEventListener("focus", focus);
       setClientAppClock(null);
       window.removeEventListener(APP_CLOCK_REFRESH_EVENT, refresh);
     };
@@ -65,7 +77,7 @@ function CustomerClock({ cif, children }: { cif: string | null; children: React.
 
   if (error && !clock) return <div role="alert">Không tải được đồng hồ. <button onClick={() => setRetry(value => value + 1)}>Thử lại</button></div>;
   if (!clock) return <div role="status">Đang tải đồng hồ…</div>;
-  return <ClockContext.Provider value={clock}>{children}</ClockContext.Provider>;
+  return <ClockContext.Provider value={clock}>{error && <div role="alert" className="bg-amber-50 px-3 py-2 text-sm text-amber-900">Chưa cập nhật được ngày hệ thống, đang thử lại…</div>}{children}</ClockContext.Provider>;
 }
 
 function useClock(): ClockView {
@@ -78,8 +90,11 @@ export function useAppNow(): Date {
   const clock = useContext(ClockContext);
   return useMemo(() => clock ? new Date(clock.now) : transferNow(), [clock]);
 }
-export function useAppToday(): string { return useClock().today; }
-export function useAppMonthKey(): string { return useClock().monthKey; }
+export function useAppToday(): string {
+  const now = useAppNow();
+  return new Date(now.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+export function useAppMonthKey(): string { return dateToMonthKey(useAppNow()); }
 
 /** A changed offset also resets a manually selected reporting period. */
 export function AppClockPeriodSync() {

@@ -1,4 +1,4 @@
-import { transferNow } from "@/lib/demo-clock";
+import { useAppNow } from "@/state/app-clock";
 import type { AnalyzeDraft } from "../../advisor/analysis-types";
 import type { AdvisorOverrides } from "../../client/hooks/use-goal-advisor";
 import { monthsLeft, addMonthsToDate } from "../../engine/months";
@@ -25,8 +25,9 @@ export function PlanSliders({
   sentence: string | null;
   state: "ready" | "loading" | "failed";
 }) {
+  const appNow = useAppNow();
   const c = GOALS_COPY.advisor.sliders;
-  const now = transferNow();
+  const now = appNow;
   const baseMonths = monthsLeft(now, draft.targetDate);
   const months = overrides.targetDate ? monthsLeft(now, overrides.targetDate) : baseMonths;
   const amount = overrides.targetAmount ?? draft.targetAmount;

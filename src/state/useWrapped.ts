@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppMonthKey, useAppNow } from "@/state/app-clock";
+
 /**
  * Composes the Wrapped deck from the single financial source of truth. A deck built
  * before every dependent store has settled would be wrong (a late correction or
@@ -21,7 +23,6 @@ import { composeFinancialHealthScore } from "@/domain/engine/health-score-compos
 import { VN_UTC_OFFSET_MS } from "@/domain/engine/types";
 import type { FinancialHealthScoreResult } from "@/domain/models/health-score";
 import { CONSENT_CHANGED_EVENT, getConsent, hasScope } from "@/lib/consent";
-import { currentMonthKey, transferNow } from "@/lib/demo-clock";
 import { useAssetLiabilities } from "./assets";
 import { useCategories } from "./categories";
 import { useCorrections } from "./corrections";
@@ -54,8 +55,10 @@ function subscribeConsent(onChange: () => void): () => void {
 const hasTransactionsScope = (): boolean => hasScope(getConsent(), "transactions");
 
 export function useWrapped(): UseWrappedResult {
+  const appNow = useAppNow();
+  const appMonthKey = useAppMonthKey();
   // Pinned to the current month: the health score is "as of today", whatever month another tab picked.
-  const financials = useFinancials(currentMonthKey());
+  const financials = useFinancials(appMonthKey);
   const profile = useAssetLiabilities();
   const goals = useGoals();
   const jars = useJarConfig();
@@ -91,14 +94,14 @@ export function useWrapped(): UseWrappedResult {
   const healthScore = useMemo<FinancialHealthScoreResult | null>(() => {
     if (!canBuild || !raw || !fin) return null;
     try {
-      const now = transferNow();
+      const now = appNow;
       return composeFinancialHealthScore({
         financials: fin,
         accounts: raw.accounts,
         liabilities: [...raw.liabilities, ...profile.liabilities],
         transactions: financials.transactions,
         fixedCategoryIds,
-        month: currentMonthKey(),
+        month: appMonthKey,
         profileComplete,
         now,
         asOf: new Date(now.getTime() + VN_UTC_OFFSET_MS).toISOString().slice(0, 10),
@@ -108,7 +111,7 @@ export function useWrapped(): UseWrappedResult {
       console.error("Failed to compute the Wrapped health score", err);
       return null;
     }
-  }, [canBuild, raw, fin, financials.transactions, profile.liabilities, fixedCategoryIds, profileComplete]);
+  }, [canBuild, raw, fin, financials.transactions, profile.liabilities, fixedCategoryIds, profileComplete, appNow, appMonthKey]);
 
   const built = useMemo<{ deck: WrappedDeck | null; failed: boolean }>(() => {
     if (!canBuild) return { deck: null, failed: false };
@@ -118,7 +121,7 @@ export function useWrapped(): UseWrappedResult {
       categoryLabels: labels,
       fixedCategoryIds,
       userCorrectedIds,
-      endMonthKey: wrappedEndMonthKey(currentMonthKey()),
+      endMonthKey: wrappedEndMonthKey(appMonthKey),
       healthScore,
     };
     try {
@@ -129,7 +132,7 @@ export function useWrapped(): UseWrappedResult {
     }
     // `buildKey` is only a re-run trigger (retry after a build that threw).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canBuild, buildKey, financials.transactions, jars.config, labels, fixedCategoryIds, userCorrectedIds, healthScore]);
+  }, [appMonthKey, canBuild, buildKey, financials.transactions, jars.config, labels, fixedCategoryIds, userCorrectedIds, healthScore]);
 
   const { retry: retryFinancials, error: financialsError } = financials;
   const { retry: retryJars, error: jarsError } = jars;

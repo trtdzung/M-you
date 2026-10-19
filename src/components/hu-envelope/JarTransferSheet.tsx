@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppNow } from "@/state/app-clock";
+
 import { useId, useMemo, useRef, useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { Sheet } from "@/components/primitives";
@@ -15,7 +17,6 @@ import {
   validateTransfer,
 } from "@/domain/engine";
 import { cn } from "@/lib/cn";
-import { transferNow } from "@/lib/demo-clock";
 import { formatVnd } from "@/lib/format";
 import { useAutoFundWith } from "@/state/use-auto-fund";
 import { useJarConfig } from "@/state/jars";
@@ -55,9 +56,10 @@ export function JarTransferSheet({
   onDone: (summary: JarTransferSummary) => void;
   open?: boolean;
 }) {
+  const appNow = useAppNow();
   const { config } = useJarConfig();
   const autoFund = useAutoFundWith({ transactions, raw });
-  const postedAt = transferNow().toISOString();
+  const postedAt = appNow.toISOString();
   const ready = raw !== null;
   const snapshot = useMemo(() => (ready ? autoFund.snapshotAt(postedAt) : null), [ready, autoFund, postedAt]);
   const endpoints = useMemo(() => (snapshot ? transferEndpoints(snapshot) : []), [snapshot]);

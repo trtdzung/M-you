@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppMonthKey } from "@/state/app-clock";
+
 import { GoalJars } from "@/features/goals/ui/list/GoalJars";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,7 +12,6 @@ import { Empty, ErrorState, SkeletonCard, SkeletonScreen } from "@/components/st
 import { AllocationSheet } from "@/components/hu-envelope/AllocationSheet";
 import { useFinancials } from "@/state/useFinancials";
 import { useJarConfig } from "@/state/jars";
-import { currentMonthKey } from "@/lib/demo-clock";
 import { BudgetSummaryCard } from "./BudgetSummaryCard";
 import { HuBudgetCard } from "./HuBudgetCard";
 
@@ -30,12 +31,13 @@ import { HuBudgetCard } from "./HuBudgetCard";
  * month: "Chờ phân bổ" is a current stock (Red Team #2).
  */
 export function BudgetTab() {
+  const appMonthKey = useAppMonthKey();
   const { loading, error, financials } = useFinancials();
   const { config, error: jarError } = useJarConfig();
   const router = useRouter();
   const [coverOpen, setCoverOpen] = useState(false);
   const heldEnvelope = useRetained(
-    coverOpen && financials && financials.monthKey === currentMonthKey() && financials.jarEnvelope ? financials.jarEnvelope : null,
+    coverOpen && financials && financials.monthKey === appMonthKey && financials.jarEnvelope ? financials.jarEnvelope : null,
   );
 
   function openEditor(huId: string) {
@@ -62,7 +64,7 @@ export function BudgetTab() {
   const { lines, summary } = financials.jarBudget;
   const setLines = lines.filter((l) => l.limitState === "set");
   const unsetLines = lines.filter((l) => l.limitState === "unset");
-  const isCurrentMonth = financials.monthKey === currentMonthKey();
+  const isCurrentMonth = financials.monthKey === appMonthKey;
   const openCover = isCurrentMonth ? () => setCoverOpen(true) : undefined;
   const cardProps = { onEdit: openEditor, onCover: openCover, onAllocate: openCover };
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppMonthKey } from "@/state/app-clock";
+
 import { useEffect, useState } from "react";
 import { SheetSlot, useRetained } from "@/components/primitives";
 import type { Financials, RawData } from "@/domain/engine/finance-compose";
@@ -8,7 +10,6 @@ import { useJarConfig } from "@/state/jars";
 import { ErrorState } from "@/components/states";
 import { jarAccent } from "@/lib/category-colors";
 import { jarIcon } from "@/components/settings/jar-visuals";
-import { currentMonthKey } from "@/lib/demo-clock";
 import { PendingAllocationCard } from "./PendingAllocationCard";
 import { UnlabeledSpendCard } from "./UnlabeledSpendCard";
 import { UnlabeledSpendSheet } from "./UnlabeledSpendSheet";
@@ -48,6 +49,7 @@ export function HuOverviewRow({
   transactions?: Transaction[];
   raw?: RawData | null;
 }) {
+  const appMonthKey = useAppMonthKey();
   const { config, error: jarError } = useJarConfig();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
@@ -97,7 +99,7 @@ export function HuOverviewRow({
   // `pending.amount` is "Chờ phân bổ" (CASA − Σ spendable), identical to the sheet's
   // opening "Còn lại để chia" and the picker's "Chưa phân bổ" (D26); ≤ 0 → hidden.
   const hasJars = jars.length > 0;
-  const isCurrentMonth = financials.monthKey === currentMonthKey();
+  const isCurrentMonth = financials.monthKey === appMonthKey;
   const showPending = isCurrentMonth && hasJars && (pending.amount === "unknown" || pending.amount > 0);
 
   return (
