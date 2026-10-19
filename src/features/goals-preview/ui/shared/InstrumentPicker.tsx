@@ -127,7 +127,8 @@ export function InstrumentPicker({
     kind === "stock" &&
     !checking &&
     looksLikeSymbol(symbolQuery) &&
-    !all.some((m) => m.name.toUpperCase() === symbolQuery);
+    // Chỉ khi không có kết quả nào: còn kết quả thì khách chọn trong danh sách.
+    filtered.length === 0;
 
   const heading = q ? "Kết quả" : kind === "stock" ? "Phổ biến" : "Tất cả quỹ";
   const placeholder = kind === "stock" ? "Tìm mã hoặc tên cổ phiếu" : "Tìm mã hoặc tên quỹ";
