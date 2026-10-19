@@ -11,7 +11,7 @@ import { BottomActions } from "../../shared/BottomActions";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, ghostButton, infoBox, primaryButton, progressTrack, screenPadding, stepTitle, warningBox } from "../../shared/styles";
+import { card, ghostButton, infoBox, primaryButton, progressTrack, screenPadding, sectionTitle, warningBox, emphasisTitle } from "../../shared/styles";
 import { DraftGuard, WIZARD_STEPS, evalDraft, wizardDeposit } from "./wizard";
 
 /** Bước 4: kết quả kiểm tra khả thi. */
@@ -72,13 +72,13 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
       <section className={`rounded-card p-4 ${verdict.tone}`} aria-live="polite">
         <div className="flex items-center gap-3">
           {verdict.icon}
-          <h2 className="!text-[20px] !leading-7 !font-bold text-text">{verdict.title}</h2>
+          <h2 className={emphasisTitle}>{verdict.title}</h2>
         </div>
         <p className="mt-2 text-sm leading-5 text-text">{verdict.text}</p>
       </section>
 
       <section className={`${card} flex flex-col gap-3`}>
-        <h2 className={stepTitle}>Mục tiêu của bạn</h2>
+        <h2 className={sectionTitle}>Mục tiêu của bạn</h2>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-muted">Cần có</dt>
@@ -107,7 +107,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
 
       {unknown ? (
         <section className={`${card} flex flex-col gap-2`}>
-          <h2 className={stepTitle}>Còn thiếu gì?</h2>
+          <h2 className={sectionTitle}>Còn thiếu gì?</h2>
           <ul className="list-disc pl-5 text-sm leading-6 text-text">
             <li>
               Ứng dụng mới có <strong>{customer.dataMonths} tháng</strong> dữ liệu giao dịch của bạn, chưa đủ để ước tính số dư hằng tháng.
@@ -120,7 +120,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
         </section>
       ) : (
         <section className={`${card} flex flex-col gap-3`}>
-          <h2 className={stepTitle}>Số dư hằng tháng của bạn</h2>
+          <h2 className={sectionTitle}>Số dư hằng tháng của bạn</h2>
           <dl className="flex flex-col gap-2 text-sm">
             <div className="flex items-center justify-between gap-3">
               <dt className="text-muted">Dư mỗi tháng (ước tính)</dt>
@@ -149,7 +149,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
 
       {!unknown && projected !== null && (
         <section className={`${card} flex flex-col gap-3`}>
-          <h2 className={stepTitle}>Dự kiến đến ngày {formatISODate(goal.targetDate)}</h2>
+          <h2 className={sectionTitle}>Dự kiến đến ngày {formatISODate(goal.targetDate)}</h2>
           <div className="flex flex-col gap-1.5">
             <div className={progressTrack} role="img" aria-label={`Dự kiến đạt ${Math.round(projPct)}% mục tiêu`}>
               <div className="absolute inset-y-0 left-0 bg-primary/30" style={{ width: `${projPct}%` }} />

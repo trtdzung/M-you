@@ -22,12 +22,16 @@ export const card = "rounded-card bg-surface p-4 shadow-card";
 export const listRow = `flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted ${ring}`;
 export const divider = "divide-y divide-border";
 
-export const sectionTitle = "text-[15px] font-semibold text-text";
 /**
- * Section heading for the create-goal steps. `!` beats the app-wide
- * `.pfm-app-shell #main-content h2 { font-size: 18px }` rule when embedded in /pfm.
+ * Type scale for every goals-preview screen (px): 28 hero number (one per screen) · 22 page title / figure ·
+ * 20 emphasis title · 16 card title / input / callout · 15 section title · 14 body · 12–13 caption · 10–11 tag.
+ * Headings carry `!` so the app-wide `.pfm-app-shell #main-content h2 { font-size: 18px }` rule cannot resize them.
  */
-export const stepTitle = "!text-[15px] !leading-[22px] !font-semibold text-text";
+export const sectionTitle = "!text-[15px] !leading-[22px] !font-semibold text-text";
+export const heroNumber = "text-[28px] font-bold leading-9 tabular-nums text-text";
+export const figure = "text-[22px] font-bold leading-7 tabular-nums text-text";
+export const emphasisTitle = "!text-[20px] !leading-7 !font-bold text-text";
+export const calloutTitle = "text-[16px] font-bold leading-6 text-text";
 export const screenPadding = "flex flex-col gap-4 pb-6";
 
 export const warningBox = "rounded-2xl bg-warning-soft px-3.5 py-3 text-sm text-text";

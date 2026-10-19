@@ -18,7 +18,7 @@ import { EmptyState } from "../../shared/EmptyState";
 import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadge";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
-import { card, chip, chipSelected, infoBox, primaryButton, ring, secondaryButton } from "../../shared/styles";
+import { card, chip, chipSelected, infoBox, primaryButton, ring, secondaryButton, figure, heroNumber } from "../../shared/styles";
 
 type Tab = "active" | "history";
 
@@ -48,7 +48,7 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
 
       </div>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[22px] font-bold tabular-nums text-text">{formatVndCompact(finished ? goal.finalValue! : stage.value)}</span>
+        <span className={figure}>{formatVndCompact(finished ? goal.finalValue! : stage.value)}</span>
         <span className="text-sm text-muted">/ {formatVndCompact(target)}{phase2 ? " nợ gốc" : ""}</span>
       </div>
       <SplitProgressBar cash={cash} assets={assets} target={target} showLegend={false} />
@@ -119,7 +119,7 @@ export function GoalList({ params }: ScreenProps) {
         <section className={`${card} flex flex-col gap-3`} aria-label="Tổng quan mục tiêu">
           <div>
             <p className="text-[13px] text-muted">Tổng giá trị đang tích luỹ</p>
-            <Amount amount={summary.totalValue} source={active.some((g) => goalValue(state, g).source === "self_reported") ? "self_reported" : "msb"} className="text-[24px] font-bold text-text" />
+            <Amount amount={summary.totalValue} source={active.some((g) => goalValue(state, g).source === "self_reported") ? "self_reported" : "msb"} className={heroNumber} />
           </div>
           {active.some((g) => goalValue(state, g).source === "self_reported") && <p className="text-[12px] text-muted">Tổng gồm tiền tại MSB và tài sản tự khai.</p>}
           <div className="grid grid-cols-2 gap-3 text-sm">

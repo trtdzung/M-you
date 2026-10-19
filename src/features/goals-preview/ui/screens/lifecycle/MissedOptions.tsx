@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 import { addMonths, formatISODate, formatMonths, goalValue } from "../../../engine";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { BottomActions, ConfirmSheet, ScreenHeader, SliderRow } from "../../shared";
-import { card, infoBox, primaryButton, ring, screenPadding, secondaryButton } from "../../shared/styles";
+import { card, infoBox, primaryButton, ring, screenPadding, secondaryButton, calloutTitle } from "../../shared/styles";
 import { NotFoundScreen, loanGap, probeLoan, useLoanScreen } from "../loan/shared";
 
 type Option = "extend" | "reduce" | "loan" | "close";
@@ -103,7 +103,7 @@ export function MissedOptions({ params }: ScreenProps) {
       <ScreenHeader title="Chưa đạt mục tiêu" subtitle={goal.name} />
 
       <div className={infoBox}>
-        <p className="text-[17px] font-bold text-text">Còn thiếu {formatVnd(gap)}</p>
+        <p className={calloutTitle}>Còn thiếu {formatVnd(gap)}</p>
         <p className="mt-1 text-muted">
           Bạn đã có {formatVnd(value.total)} trên mục tiêu {formatVnd(goal.targetAmount)}. Đây không phải thất bại, chỉ là kế hoạch cần điều chỉnh. Chọn cách phù hợp nhất với bạn.
         </p>

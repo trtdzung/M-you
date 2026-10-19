@@ -13,7 +13,7 @@ import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadg
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
 import { SummaryRows } from "../../shared/SummaryRows";
-import { card, listRow, ring } from "../../shared/styles";
+import { card, listRow, ring, heroNumber } from "../../shared/styles";
 import { AssetsTab } from "./AssetsTab";
 import { CashTab } from "./CashTab";
 import { GoalNotFound, useGoalContext } from "./common";
@@ -71,7 +71,7 @@ export function GoalDetail({ params }: ScreenProps) {
           <GoalStatusBadge status={goal.status} />
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-[28px] font-bold text-text tabular-nums">{formatVndCompact(shownTotal)}</span>
+          <span className={heroNumber}>{formatVndCompact(shownTotal)}</span>
           <span className="text-sm text-muted">/ {formatVndCompact(shownTarget)}{phase === 2 ? " nợ gốc" : ""}</span>
         </div>
         <SplitProgressBar cash={history ? shownTotal : stage.principalPaid + ctx.value.cash} assets={history ? 0 : ctx.value.assets} target={shownTarget} showLegend={false} />

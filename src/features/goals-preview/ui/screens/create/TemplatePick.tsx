@@ -8,7 +8,7 @@ import { TEMPLATE_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, ghostButton, ring, screenPadding, stepTitle } from "../../shared/styles";
+import { card, ghostButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { TEMPLATES, WIZARD_STEPS, suggestedTarget } from "./wizard";
 
 /** Bước 1: chọn loại mục tiêu. */
@@ -24,7 +24,7 @@ export function TemplatePick(_props: ScreenProps) {
 
       {drafts.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Bản nháp đang dở">
-          <h2 className={stepTitle}>Bản nháp đang dở</h2>
+          <h2 className={sectionTitle}>Bản nháp đang dở</h2>
           {drafts.map((goal) => (
             <div key={goal.id} className={`${card} flex items-center gap-2 !p-2 pl-4`}>
               <button

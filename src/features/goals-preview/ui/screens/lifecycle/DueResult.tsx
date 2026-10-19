@@ -5,7 +5,7 @@ import { formatVnd } from "@/features/goals-preview/format-money";
 import { daysToTarget, formatISODate, goalValue } from "../../../engine";
 import type { ScreenProps } from "../../../model/screens";
 import { Amount, BottomActions, ConfirmSheet, GoalStatusBadge, ScreenHeader, SplitProgressBar } from "../../shared";
-import { card, infoBox, primaryButton, screenPadding, secondaryButton, successBox } from "../../shared/styles";
+import { card, infoBox, primaryButton, screenPadding, secondaryButton, successBox, calloutTitle, heroNumber } from "../../shared/styles";
 import { NotFoundScreen, loanGap, probeLoan, useLoanScreen } from "../loan/shared";
 
 /** Kết quả đến hạn: đủ tiền / thiếu (vay được) / thiếu (không vay được) / đạt sớm. */
@@ -21,7 +21,7 @@ export function DueResult({ params }: ScreenProps) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm text-muted">Bạn đã có</p>
-          <Amount amount={value.total} source={value.source} className="text-[22px] font-bold" />
+          <Amount amount={value.total} source={value.source} className={heroNumber} />
         </div>
         <GoalStatusBadge status={goal.status} />
       </div>
@@ -36,7 +36,7 @@ export function DueResult({ params }: ScreenProps) {
       <div className={screenPadding}>
         {header}
         <div className={successBox}>
-          <p className="text-[17px] font-bold text-text">Bạn đã đủ tiền từ {formatISODate(goal.reachedEarlyAt)}</p>
+          <p className={calloutTitle}>Bạn đã đủ tiền từ {formatISODate(goal.reachedEarlyAt)}</p>
           <p className="mt-1 text-muted">Sớm hơn hạn {formatISODate(goal.targetDate)} {Math.max(0, daysToTarget(goal, today))} ngày. Bạn có thể hoàn thành ngay hoặc tiếp tục tích luỹ.</p>
         </div>
         {progress}
@@ -74,7 +74,7 @@ export function DueResult({ params }: ScreenProps) {
       <div className={screenPadding}>
         {header}
         <div className={successBox}>
-          <p className="text-[17px] font-bold text-text">Chúc mừng, bạn đã đủ tiền!</p>
+          <p className={calloutTitle}>Chúc mừng, bạn đã đủ tiền!</p>
           <p className="mt-1 text-muted">Mục tiêu đã hoàn thành. Cùng nhìn lại hành trình của bạn.</p>
         </div>
         {progress}
@@ -96,7 +96,7 @@ export function DueResult({ params }: ScreenProps) {
         <div className={screenPadding}>
           {header}
           <div className={infoBox}>
-            <p className="text-[17px] font-bold text-text">Mục tiêu chưa đủ tiền, và đó là điều bình thường</p>
+            <p className={calloutTitle}>Mục tiêu chưa đủ tiền, và đó là điều bình thường</p>
             <p className="mt-1 text-muted">
               Bạn còn thiếu {formatVnd(gap)}. Với thu nhập hiện tại, khoản vay bù phần thiếu này chưa phù hợp. Có những cách nhẹ nhàng hơn để tiếp tục.
             </p>
@@ -114,7 +114,7 @@ export function DueResult({ params }: ScreenProps) {
       <div className={screenPadding}>
         {header}
         <div className={infoBox}>
-          <p className="text-[17px] font-bold text-text">Còn thiếu {formatVnd(gap)} so với mục tiêu</p>
+          <p className={calloutTitle}>Còn thiếu {formatVnd(gap)} so với mục tiêu</p>
           <p className="mt-1 text-muted">
             Bạn có 3 hướng: vay phần thiếu để đạt mục tiêu ngay, lùi ngày để tích luỹ thêm, hoặc giảm số tiền mục tiêu. Vay là phương án cuối.
           </p>

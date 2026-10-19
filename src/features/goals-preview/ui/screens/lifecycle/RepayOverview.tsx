@@ -6,7 +6,7 @@ import { daysBetween, formatISODate, outstandingPrincipal } from "../../../engin
 import { LOAN_ROW_LABEL } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";
 import { Amount, BottomActions, ConfirmSheet, GoalStatusBadge, ScreenHeader, SummaryRows } from "../../shared";
-import { card, divider, errorBox, listRow, primaryButton, progressTrack, screenPadding, successBox, warningBox } from "../../shared/styles";
+import { card, divider, errorBox, listRow, primaryButton, progressTrack, screenPadding, successBox, warningBox, calloutTitle, heroNumber } from "../../shared/styles";
 import { NotFoundScreen, Section, pct, useLoanScreen } from "../loan/shared";
 
 /** Tích luỹ & trả nợ: dư nợ, kỳ tới, quá hạn, và các lối đi (lịch trả, trả trước). */
@@ -29,7 +29,7 @@ export function RepayOverview({ params }: ScreenProps) {
       <div className={screenPadding}>
         {header}
         <div className={successBox}>
-          <p className="text-[17px] font-bold text-text">Bạn đã trả hết nợ</p>
+          <p className={calloutTitle}>Bạn đã trả hết nợ</p>
           <p className="mt-1 text-muted">Khoản vay {formatVnd(loan.principal)} đã tất toán.</p>
         </div>
         <BottomActions>
@@ -83,7 +83,7 @@ export function RepayOverview({ params }: ScreenProps) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted">Dư nợ gốc còn lại</p>
-            <Amount amount={outstanding} source="msb" className="text-[24px] font-bold" />
+            <Amount amount={outstanding} source="msb" className={heroNumber} />
           </div>
           <GoalStatusBadge status={goal.status} />
         </div>

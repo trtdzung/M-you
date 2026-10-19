@@ -16,7 +16,7 @@ import { InfoTooltip } from "../../shared/InfoTooltip";
 import { parseVndInput } from "../../shared/MoneyInput";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, stepTitle } from "../../shared/styles";
+import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle, figure } from "../../shared/styles";
 import { FLEX_INFO, WIZARD_STEPS, isFlexible, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
 
 const groupFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -130,7 +130,7 @@ export function GoalInfo({ params }: ScreenProps) {
               maxLength={40}
               onChange={(e) => setName(e.target.value)}
               placeholder="Đặt tên mục tiêu"
-              className={cn("min-h-10 w-full min-w-0 rounded-lg bg-transparent text-[18px] font-bold text-text placeholder:text-muted", ring)}
+              className={cn("min-h-10 w-full min-w-0 rounded-lg bg-transparent text-[20px] font-bold text-text placeholder:text-muted", ring)}
               aria-invalid={touched && errors.name ? true : undefined}
             />
             <Pencil size={16} aria-hidden className="shrink-0 text-muted" />
@@ -141,7 +141,7 @@ export function GoalInfo({ params }: ScreenProps) {
 
       <section className={`${card} flex flex-col gap-3`} aria-labelledby="goal-amount-label">
         <div className="flex items-center gap-1">
-          <h2 id="goal-amount-label" className={stepTitle}>Bạn cần bao nhiêu?</h2>
+          <h2 id="goal-amount-label" className={sectionTitle}>Bạn cần bao nhiêu?</h2>
           {amount ? <InfoTooltip label="cách đọc số tiền" text={amountInWords(amount)} /> : null}
         </div>
         <div className="flex items-baseline gap-2">
@@ -153,7 +153,7 @@ export function GoalInfo({ params }: ScreenProps) {
             value={amount === null ? "" : groupFormatter.format(amount)}
             onChange={(e) => setAmount(parseVndInput(e.target.value))}
             aria-invalid={touched && errors.amount ? true : undefined}
-            className={cn("min-h-12 w-full min-w-0 rounded-lg bg-transparent text-[30px] font-bold tabular-nums text-text", ring)}
+            className={cn("min-h-12 w-full min-w-0 rounded-lg bg-transparent text-[28px] font-bold tabular-nums text-text", ring)}
           />
           <span className="text-sm text-muted">đồng</span>
         </div>
@@ -169,7 +169,7 @@ export function GoalInfo({ params }: ScreenProps) {
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Thời hạn">
         <div className="flex items-center gap-1">
-          <h2 className={stepTitle}>Muốn đạt vào lúc nào?</h2>
+          <h2 className={sectionTitle}>Muốn đạt vào lúc nào?</h2>
           {!errors.date && <InfoTooltip label="ngày đạt mục tiêu" text={`Đạt vào ${formatISODate(date)} · còn khoảng ${formatMonths(Math.max(0, months))}.`} />}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -205,7 +205,7 @@ export function GoalInfo({ params }: ScreenProps) {
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Mức linh hoạt">
         <div className="flex items-center gap-1">
-          <h2 className={stepTitle}>Kế hoạch có linh hoạt không?</h2>
+          <h2 className={sectionTitle}>Kế hoạch có linh hoạt không?</h2>
           <InfoTooltip label="mức linh hoạt" text={`${FLEX_INFO.fixed.title}: ${FLEX_INFO.fixed.text} ${FLEX_INFO.flexible.title}: ${FLEX_INFO.flexible.text}`} />
         </div>
         <div role="radiogroup" aria-label="Mức linh hoạt" className="grid grid-cols-2 gap-1 rounded-full bg-surface-muted p-1">
@@ -259,7 +259,7 @@ export function GoalInfo({ params }: ScreenProps) {
             }
           />
         </div>
-        <p className="text-[22px] font-bold tabular-nums text-text">{monthly > 0 ? formatVnd(monthly) : "—"}</p>
+        <p className={figure}>{monthly > 0 ? formatVnd(monthly) : "—"}</p>
         {share !== null && (
           <div className="flex items-center gap-3">
             <div className={cn(progressTrack, "flex-1")}>

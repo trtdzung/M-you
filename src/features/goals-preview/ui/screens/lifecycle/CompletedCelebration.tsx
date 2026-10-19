@@ -5,7 +5,7 @@ import { formatISODate, formatMonths, monthsBetween } from "../../../engine";
 import { TEMPLATE_EMOJI } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";
 import { BottomActions, ScreenHeader, SummaryRows } from "../../shared";
-import { primaryButton, screenPadding, secondaryButton, warningBox } from "../../shared/styles";
+import { primaryButton, screenPadding, secondaryButton, warningBox, emphasisTitle } from "../../shared/styles";
 import { NotFoundScreen, Section, useLoanScreen } from "../loan/shared";
 
 const CONFETTI = [
@@ -65,7 +65,7 @@ export function CompletedCelebration({ params }: ScreenProps) {
         <div className="text-[56px] leading-none" aria-hidden>
           {TEMPLATE_EMOJI[goal.template]}
         </div>
-        <h2 className="mt-3 text-[22px] font-bold leading-7 text-text">Chúc mừng bạn!</h2>
+        <h2 className={`mt-3 ${emphasisTitle}`}>Chúc mừng bạn!</h2>
         <p className="mt-1 text-sm leading-5 text-muted">
           “{goal.name}” đã hoàn thành{goal.completedEarly ? " sớm hơn dự kiến" : ""}, đạt {formatVnd(goal.finalValue ?? goal.targetAmount)}.
         </p>

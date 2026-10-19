@@ -11,7 +11,7 @@ import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
 import { Amount, EmptyState, ScreenHeader, SourceTag, SummaryRows } from "../../shared";
-import { card, hint, primaryButton, screenPadding, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
+import { card, hint, primaryButton, screenPadding, secondaryButton, sectionTitle, warningBox, figure } from "../../shared/styles";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { dateVi, findGoal } from "./helpers";
 
@@ -77,18 +77,18 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
         <>
           <section className="flex flex-col gap-1 py-1">
             <p className="text-[13px] text-muted">Tiền đang gửi</p>
-            <Amount amount={asset.principal} unknownLabel="Chưa rõ tiền gốc" className="text-[26px] font-bold text-text" />
+            <Amount amount={asset.principal} unknownLabel="Chưa rõ tiền gốc" className={figure} />
             <p className="text-sm text-muted">{asset.ratePa !== undefined ? `Lãi suất ${String(asset.ratePa).replace(".", ",")}%/năm` : "Chưa rõ lãi suất"}</p>
           </section>
           <section className="flex flex-col gap-3 rounded-2xl bg-primary-soft p-4">
             <div className="flex items-center justify-between gap-2"><p className="text-[13px] font-medium text-primary-strong">{matured ? "Giá trị tại ngày đáo hạn (dự kiến)" : "Dự kiến nhận khi đáo hạn"}</p><InfoTooltip label="số tiền dự kiến nhận" text="Ước tính nếu giữ đến đáo hạn, không phải số tiền nhận khi tất toán hôm nay." /></div>
-            <Amount amount={atMaturity} unknownLabel="Chưa đủ dữ liệu" source="estimated" className="text-[26px] font-bold text-text" />
+            <Amount amount={atMaturity} unknownLabel="Chưa đủ dữ liệu" source="estimated" className={figure} />
             {asset.maturityDate && <p className="flex items-center gap-2 text-sm text-text"><CalendarDays size={16} aria-hidden />Ngày {dateVi(asset.maturityDate)}</p>}
             {asset.principal !== undefined && atMaturity !== undefined && <div className="flex flex-wrap justify-between gap-2 border-t border-primary/15 pt-3 text-[13px]"><span className="text-muted">Gốc {formatVnd(asset.principal)}</span><span className="font-semibold text-positive">Lãi dự kiến +{formatVnd(atMaturity - asset.principal)}</span></div>}
           </section>
           <section className="flex items-start gap-3 rounded-2xl border border-border p-4">
             <Target size={20} aria-hidden className="mt-0.5 shrink-0 text-primary-strong" />
-            <div className="min-w-0"><h2 className="text-sm font-semibold text-text">Góp vào {goal.name}</h2><p className="mt-1 text-sm leading-5 text-muted">{asset.countPercent}% giá trị hiện tại được tính vào mục tiêu: <span className="font-semibold text-text">{formatVnd(Math.round(value * asset.countPercent / 100))}</span>.</p>
+            <div className="min-w-0"><h2 className={sectionTitle}>Góp vào {goal.name}</h2><p className="mt-1 text-sm leading-5 text-muted">{asset.countPercent}% giá trị hiện tại được tính vào mục tiêu: <span className="font-semibold text-text">{formatVnd(Math.round(value * asset.countPercent / 100))}</span>.</p>
             {asset.maturityDate && <p className={`mt-2 text-[13px] leading-5 ${afterTarget ? "text-warning" : "text-positive"}`}>{afterTarget ? "Đáo hạn sau ngày mục tiêu. Tất toán sớm có thể làm giảm lãi." : "Đáo hạn trước hoặc đúng ngày mục tiêu."}</p>}</div>
           </section>
           <details className="rounded-2xl border border-border p-4">

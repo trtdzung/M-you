@@ -82,7 +82,7 @@ export function HomeMock({ params }: ScreenProps) {
 
       <section className={`${card} bg-primary text-primary-fg`} aria-label="Tài khoản chính">
         <p className="text-[13px] opacity-80">Tài khoản thanh toán · {state.customer.mainCasaNumber}</p>
-        <p className="mt-1 text-[26px] font-bold leading-8 tabular-nums">{formatVnd(state.customer.mainCasaBalance)}</p>
+        <p className="mt-1 text-[28px] font-bold leading-9 tabular-nums">{formatVnd(state.customer.mainCasaBalance)}</p>
       </section>
 
       <section className="flex flex-col gap-2" aria-label="Mục tiêu ưu tiên">

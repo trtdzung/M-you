@@ -10,6 +10,7 @@ import { paramNumber, paramString, type ScreenParams } from "../../../model/scre
 import type { Goal, GoalAccount, Loan, LoanProduct } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { EmptyState, ScreenHeader } from "../../shared";
+import { sectionTitle } from "../../shared/styles";
 
 /** Resolves goal / account / loan from screen params (goalId, loanId). */
 export function useLoanScreen(params: ScreenParams) {
@@ -153,7 +154,7 @@ export function DtiGauge({
 export function Section({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
   return (
     <section className={cn("flex flex-col gap-3", className)}>
-      {title && <h2 className="text-[15px] font-semibold text-text">{title}</h2>}
+      {title && <h2 className={sectionTitle}>{title}</h2>}
       {children}
     </section>
   );

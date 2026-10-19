@@ -9,7 +9,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { SummaryRows } from "../../shared/SummaryRows";
-import { card, infoBox, primaryButton, ring, secondaryButton, sectionTitle, successBox, warningBox } from "../../shared/styles";
+import { card, infoBox, primaryButton, ring, secondaryButton, sectionTitle, successBox, warningBox, figure } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
 
 interface TimelineItem {
@@ -153,7 +153,7 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
         {goal.status === "accumulating" || goal.status === "paused" || goal.status === "missed" || goal.status === "repaying" ? <>
           <div>
             <p className="text-[13px] text-muted">{phase2 ? "Cần góp mỗi tháng để đủ trả góp" : "Cần góp mỗi tháng"} · còn {fe.monthsLeft} tháng</p>
-            <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{typeof required === "number" ? formatVnd(required) : "Chưa đủ dữ liệu"}</p>
+            <p className={`mt-1 ${figure}`}>{typeof required === "number" ? formatVnd(required) : "Chưa đủ dữ liệu"}</p>
           </div>
           <dl className="flex flex-col gap-3 border-t border-border pt-3 text-sm">
             <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted">Đã đặt trích tự động</dt><dd className="font-semibold text-text">{goal.standingOrder?.active ? `${formatVnd(goal.standingOrder.amount)}/tháng` : "Chưa bật"}</dd></div>

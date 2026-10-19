@@ -6,7 +6,7 @@ import { FIXED_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { SourceTag } from "../../shared/SourceTag";
-import { primaryButton } from "../../shared/styles";
+import { primaryButton, heroNumber } from "../../shared/styles";
 import { isStaleValuation } from "../detail/common";
 import { dateVi } from "./helpers";
 
@@ -25,7 +25,7 @@ export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; o
           <div className="flex items-center gap-2"><span className="text-sm text-muted">{FIXED_CATEGORY_LABEL[asset.category]}</span><SourceTag source="self_reported" /></div>
           <section className="rounded-2xl bg-source-self-soft p-4">
             <p className="text-[13px] text-muted">Giá trị tính vào mục tiêu</p>
-            <p className="mt-1 text-[26px] font-bold tabular-nums text-text">{formatVnd(counted)}</p>
+            <p className={`mt-1 ${heroNumber}`}>{formatVnd(counted)}</p>
             <div className="mt-2 flex items-center justify-between gap-2"><p className="text-sm text-muted">{asset.countPercent}% giá trị tự khai {formatVnd(asset.value)}</p><InfoTooltip label="tỷ lệ tính vào mục tiêu" text="Chỉ phần giá trị theo tỷ lệ bạn chọn được tính vào tiến độ. Đây là tài sản tự khai, không phải tiền sẵn có trong tài khoản." /></div>
           </section>
           <p className="text-[13px] leading-5 text-muted">Đây là giá trị tài sản ước tính. Bạn cần bán tài sản để có tiền sử dụng cho mục tiêu.</p>

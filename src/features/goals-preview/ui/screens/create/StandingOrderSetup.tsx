@@ -14,7 +14,7 @@ import { EmptyState } from "../../shared/EmptyState";
 import { MoneyInput } from "../../shared/MoneyInput";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, chip, chipSelected, ghostButton, hint, infoBox, input, label, primaryButton, screenPadding, stepTitle } from "../../shared/styles";
+import { card, chip, chipSelected, ghostButton, hint, infoBox, input, label, primaryButton, screenPadding, sectionTitle } from "../../shared/styles";
 import { WIZARD_STEPS } from "./wizard";
 
 const QUICK_DAYS = [1, 5, 10, 15, 20, 25];
@@ -89,7 +89,7 @@ export function StandingOrderSetup({ params }: ScreenProps) {
       </div>
 
       <section className={`${card} flex flex-col gap-1`}>
-        <h2 className={stepTitle}>Nguồn tiền</h2>
+        <h2 className={sectionTitle}>Nguồn tiền</h2>
         <p className="text-sm text-text">Tài khoản chính {state.customer.mainCasaNumber}</p>
         <p className="text-[13px] text-muted">
           Số dư hiện tại: <Amount amount={balance} source="msb" />

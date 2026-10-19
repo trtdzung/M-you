@@ -12,7 +12,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { selectGoalTxns } from "../../../store/selectors";
 import { Amount } from "../../shared/Amount";
 import { SourceTag } from "../../shared/SourceTag";
-import { card, ring, sectionTitle, secondaryButton } from "../../shared/styles";
+import { card, ring, sectionTitle, secondaryButton, figure } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
 
 type Filter = "all" | "deposit" | "withdraw" | "interest" | "invest" | "maturity" | "loan_disbursement" | "loan_repayment" | "failed";
@@ -74,7 +74,7 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
           </div>
           <div>
             <p className="text-[12px] text-muted">Số dư</p>
-            <Amount amount={account.balance} className="text-[22px] font-bold text-text" />
+            <Amount amount={account.balance} className={figure} />
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>

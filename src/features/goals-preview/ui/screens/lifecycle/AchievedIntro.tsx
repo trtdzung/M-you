@@ -5,7 +5,7 @@ import { formatVnd } from "@/features/goals-preview/format-money";
 import { formatISODate, formatMonths } from "../../../engine";
 import type { ScreenProps } from "../../../model/screens";
 import { BottomActions, GoalStatusBadge, ScreenHeader, SummaryRows } from "../../shared";
-import { card, infoBox, primaryButton, screenPadding } from "../../shared/styles";
+import { card, infoBox, primaryButton, screenPadding, emphasisTitle } from "../../shared/styles";
 import { NotFoundScreen, Section, useLoanScreen } from "../loan/shared";
 
 /** Đạt mục tiêu khác Hoàn thành: giải thích giai đoạn 2 (tích luỹ & trả nợ). */
@@ -25,7 +25,7 @@ export function AchievedIntro({ params }: ScreenProps) {
 
       <section className="rounded-card bg-primary-soft p-4">
         <GoalStatusBadge status="achieved" />
-        <p className="mt-2 text-[20px] font-bold leading-7 text-text">Bạn đã có “{goal.name}”</p>
+        <p className={`mt-2 ${emphasisTitle}`}>Bạn đã có “{goal.name}”</p>
         <p className="mt-1 text-sm leading-5 text-muted">
           Nhờ khoản vay {loan ? formatVnd(loan.principal) : ""} bổ sung phần còn thiếu, mục tiêu {formatVnd(goal.targetAmount)} đã đạt được ngay.
         </p>

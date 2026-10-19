@@ -12,7 +12,7 @@ import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { SummaryRows } from "../../shared/SummaryRows";
-import { card, errorBox, primaryButton, screenPadding, stepTitle } from "../../shared/styles";
+import { card, errorBox, primaryButton, screenPadding, sectionTitle } from "../../shared/styles";
 import { DraftGuard, WIZARD_STEPS, formatAccountNumber, previewAccountNumber, wizardDeposit } from "./wizard";
 
 const INTEREST_RATE_PA = 0.5;
@@ -58,7 +58,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
             <Landmark size={22} aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 className={stepTitle}>Tài khoản mục tiêu</h2>
+            <h2 className={sectionTitle}>Tài khoản mục tiêu</h2>
             <p className="text-[13px] text-muted">Một tài khoản riêng chỉ để dành cho “{goal.name}”.</p>
           </div>
         </div>
@@ -66,7 +66,7 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
       </section>
 
       <section className={`${card} flex flex-col gap-2`}>
-        <h2 className={stepTitle}>Quy tắc rút tiền</h2>
+        <h2 className={sectionTitle}>Quy tắc rút tiền</h2>
         <ul className="list-disc pl-5 text-sm leading-6 text-text">
           <li>Bạn rút được bất cứ lúc nào về tài khoản chính, không mất phí.</li>
           <li>Rút trước khi đạt mục tiêu sẽ làm kế hoạch chậm lại, ứng dụng sẽ báo rõ mức ảnh hưởng.</li>

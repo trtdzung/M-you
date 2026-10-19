@@ -6,7 +6,7 @@ import { LOAN_PRODUCTS } from "../../../data/products";
 import { buildSchedule, formatMonths, quoteLoan, totalInterest } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import { Amount, BottomActions, GoalStatusBadge, ScreenHeader, SliderRow, SummaryRows } from "../../shared";
-import { card, chip, chipSelected, ghostButton, infoBox, primaryButton, screenPadding, warningBox } from "../../shared/styles";
+import { card, chip, chipSelected, ghostButton, infoBox, primaryButton, screenPadding, warningBox, figure } from "../../shared/styles";
 import { DtiGauge, INDICATIVE_NOTE, NotFoundScreen, Section, loanGap, productForGoal, resolveProduct, roundUp, useLoanScreen } from "./shared";
 
 /** Mô phỏng khoản vay: gap → chọn sản phẩm, số tiền, kỳ hạn → khoản trả & DTI. */
@@ -85,7 +85,7 @@ export function LoanSimulator({ params }: ScreenProps) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted">{isDue ? "Còn thiếu hôm nay" : "Dự kiến còn thiếu khi đến hạn"}</p>
-            <Amount amount={gap} source="estimated" className="text-[22px] font-bold" />
+            <Amount amount={gap} source="estimated" className={figure} />
           </div>
           <GoalStatusBadge status={goal.status} />
         </div>

@@ -67,7 +67,7 @@ export function MoneyInput({
           aria-describedby={hintId}
           value={value === null ? "" : groupFormatter.format(value)}
           onChange={(event) => onChange(parseVndInput(event.target.value))}
-          className={cn(input, "pr-14 text-[18px] font-semibold tabular-nums", shownError && "border-negative")}
+          className={cn(input, "pr-14 text-[20px] font-semibold tabular-nums", shownError && "border-negative")}
         />
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted">
           đồng

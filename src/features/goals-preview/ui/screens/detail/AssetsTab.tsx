@@ -11,7 +11,7 @@ import { FIXED_CATEGORY_LABEL, LIQUID_CATEGORY_LABEL } from "../../../model/labe
 import { usePreview } from "../../../store/PreviewStore";
 import { SourceTag } from "../../shared/SourceTag";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { card, ring, primaryButton, secondaryButton, sectionTitle } from "../../shared/styles";
+import { card, ring, primaryButton, secondaryButton, sectionTitle, figure } from "../../shared/styles";
 import { pct, progressAfter } from "../assets/helpers";
 import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
@@ -74,7 +74,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                     </div>
                     <div>
                       <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
-                      <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{formatVndCompact(Math.round(assetValue(a, state) * a.countPercent / 100))}</p>
+                      <p className={`mt-1 ${figure}`}>{formatVndCompact(Math.round(assetValue(a, state) * a.countPercent / 100))}</p>
                       {a.countPercent < 100 && <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị hiện tại {formatVndCompact(assetValue(a, state))}</p>}
                       {gain !== 0 && <p className={`mt-1 text-[12px] ${gain > 0 ? "text-positive" : "text-negative"}`}>{gain > 0 ? "Lãi" : "Lỗ"} {formatVnd(Math.abs(gain))} so với vốn</p>}
                     </div>
@@ -110,7 +110,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                     </div>
                     <div>
                       <p className="text-[12px] text-muted">Giá trị tính vào mục tiêu</p>
-                      <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{formatVndCompact(Math.round(a.value * a.countPercent / 100))}</p>
+                      <p className={`mt-1 ${figure}`}>{formatVndCompact(Math.round(a.value * a.countPercent / 100))}</p>
                       <p className="mt-1 text-[12px] text-muted">{a.countPercent}% giá trị tự khai {formatVndCompact(a.value)}</p>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">

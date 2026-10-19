@@ -13,7 +13,7 @@ import { MoneyInput } from "../../shared/MoneyInput";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SourceTag } from "../../shared/SourceTag";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, chip, chipSelected, errorBox, ghostButton, infoBox, input, label, primaryButton, screenPadding, secondaryButton, stepTitle } from "../../shared/styles";
+import { card, chip, chipSelected, errorBox, ghostButton, infoBox, input, label, primaryButton, screenPadding, secondaryButton, sectionTitle } from "../../shared/styles";
 import { DraftGuard, WIZARD_STEPS, wizardDeposit } from "./wizard";
 
 type AssetKind = FixedAssetCategory | "msb_deposit";
@@ -94,7 +94,7 @@ function OpeningFundsBody({ goalId, initialDeposit }: { goalId: string; initialD
       <StepProgress steps={WIZARD_STEPS} current={2} />
 
       <section className={`${card} flex flex-col gap-3`}>
-        <h2 className={stepTitle}>Chuyển tiền vào ngay</h2>
+        <h2 className={sectionTitle}>Chuyển tiền vào ngay</h2>
         <p className="text-[13px] leading-5 text-muted">
           Số dư tài khoản chính: <Amount amount={balance} source="msb" />
         </p>
@@ -108,7 +108,7 @@ function OpeningFundsBody({ goalId, initialDeposit }: { goalId: string; initialD
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className={stepTitle}>Tài sản sẵn có</h2>
+        <h2 className={sectionTitle}>Tài sản sẵn có</h2>
         <p className="text-[13px] leading-5 text-muted">
           Xe cũ, sổ tiết kiệm… có thể được tính một phần vào mục tiêu. Giá trị tự khai sẽ luôn được gắn nhãn rõ.
         </p>
@@ -135,7 +135,7 @@ function OpeningFundsBody({ goalId, initialDeposit }: { goalId: string; initialD
         {adding ? (
           <div className={`${card} flex flex-col gap-3`}>
             <div className="flex items-center justify-between">
-              <h3 className={stepTitle}>Thêm tài sản</h3>
+              <h3 className={sectionTitle}>Thêm tài sản</h3>
               <button type="button" aria-label="Đóng" onClick={resetForm} className={ghostButton}>
                 <X size={18} aria-hidden />
               </button>

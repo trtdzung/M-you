@@ -9,7 +9,7 @@ import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
 import { ConfirmSheet, EmptyState, MoneyInput, ScreenHeader, SliderRow } from "../../shared";
-import { card, hint, input, label, primaryButton, screenPadding, sectionTitle, ring, listRow } from "../../shared/styles";
+import { card, hint, input, label, primaryButton, screenPadding, sectionTitle, ring, listRow, figure } from "../../shared/styles";
 import { dateVi, findGoal, pct, progressAfter } from "./helpers";
 
 /** Định giá lại tài sản cố định, hoặc bỏ khỏi mục tiêu. */
@@ -67,7 +67,7 @@ export function RevalueAsset({ params }: ScreenProps) {
         <div className="rounded-2xl bg-surface-muted p-3">
           <p className="text-[13px] text-muted">Tiến độ sau cập nhật</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
-            <span className="text-[26px] font-bold text-text">{pct(progress.after)}</span>
+            <span className={figure}>{pct(progress.after)}</span>
             <span className="text-sm text-muted">{delta === 0 ? "Không thay đổi" : `Trước: ${pct(progress.before)}`}</span>
           </div>
         </div>
