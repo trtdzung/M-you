@@ -23,6 +23,7 @@ const WINDOW_MONTHS = 3;
 const GOAL_ACCOUNT_PREFIX = "goalacc-";
 
 const vnShifted = (iso: string): Date => new Date(new Date(iso).getTime() + VN_UTC_OFFSET_MS);
+const vnMonthKey = (iso: string): string => vnShifted(iso).toISOString().slice(0, 7);
 
 export function buildCustomerProfile(cif: string, today: ISODate, riskProfile: RiskProfile): CustomerProfile {
   const persona = PERSONA_LIST.find((p) => p.cif === cif);
@@ -41,21 +42,24 @@ export function buildCustomerProfile(cif: string, today: ISODate, riskProfile: R
       new Date(t.postedAt).getTime() <= endOfToday,
   );
 
+  // dataMonths: số tháng (lịch VN) có giao dịch tính tới today, trên toàn lịch sử.
+  const dataMonths = new Set(txns.map((t) => vnMonthKey(t.postedAt))).size;
+
   // 3 tháng trọn vẹn trước tháng của today.
   const [y, m] = today.split("-").map(Number);
   const periods = Array.from({ length: WINDOW_MONTHS }, (_, i) => monthPeriod(y, m - 1 - (i + 1)));
   const cash = periods.map((p) => aggregateCashflow(txns, p, fixedCategoryIds));
   // Tháng "có dữ liệu" = tháng trong kỳ có thu hoặc chi thật (engine đã loại chuyển khoản, nên
-  // tháng chỉ có chuyển khoản không tính). dataMonths đếm trong kỳ này, không đếm toàn lịch sử.
-  const dataMonths = cash.filter((c) => c.income > 0 || c.expense > 0).length;
+  // tháng chỉ có chuyển khoản không tính). Chỉ dùng để quyết định monthlySurplus.
+  const windowMonths = cash.filter((c) => c.income > 0 || c.expense > 0).length;
   // Chia cho số tháng trong kỳ thực sự có dữ liệu (tối thiểu 1), không chia cho tháng trống.
-  const avg = (sum: number) => Math.round(sum / (dataMonths || 1));
+  const avg = (sum: number) => Math.round(sum / (windowMonths || 1));
 
   const monthlyIncome = avg(cash.reduce((s, c) => s + c.income, 0));
   const monthlyExpenses = avg(cash.reduce((s, c) => s + c.expense, 0));
   // Trả nợ hiện có = tổng minimumPayment các khoản nợ của persona (bỏ null); thanh toán thẻ đã nằm trong chi tiêu.
   const existingDebtPayment = persona.liabilities.reduce((sum, l) => sum + (l.minimumPayment ?? 0), 0);
-  const monthlySurplus = dataMonths < WINDOW_MONTHS ? "unknown" : monthlyIncome - monthlyExpenses - existingDebtPayment;
+  const monthlySurplus = windowMonths < WINDOW_MONTHS ? "unknown" : monthlyIncome - monthlyExpenses - existingDebtPayment;
 
   // Ngày nhận lương: ngày hay gặp nhất của khoản thu ≥ 50% thu nhập TB; không có → khoản thu lớn nhất.
   const incomes = txns.filter(
