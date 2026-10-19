@@ -64,8 +64,14 @@ export function InstrumentPicker({
 
   const all = sortedInstruments(kind);
   const q = fold(query.trim());
+  // Mỗi từ khách gõ phải là đầu của một từ trong mã hoặc tên; mã bắt đầu bằng từ khoá xếp trước.
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const matches = (m: MarketInstrument) => {
+    const words = fold(`${m.name} ${m.fullName ?? ""}`).split(/[^a-z0-9]+/).filter(Boolean);
+    return tokens.every((t) => words.some((w) => w.startsWith(t)));
+  };
   const filtered = q
-    ? all.filter((m) => fold(`${m.name} ${m.fullName ?? ""}`).includes(q))
+    ? all.filter(matches).sort((a, b) => Number(fold(b.name).startsWith(tokens[0])) - Number(fold(a.name).startsWith(tokens[0])))
     : all;
 
   const symbolQuery = query.trim().toUpperCase();
