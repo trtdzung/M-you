@@ -98,8 +98,8 @@ describe("computeFinancials", () => {
 
   it("[Red Team C2] computes a numeric end-of-month only for the current month", async () => {
     const raw = await loadRaw("stable");
-    // DEMO_NOW is 2026-09 → the projection is valid.
-    const current = computeFinancials(raw, "2026-09");
+    // DEMO_NOW is 2026-10 → the projection is valid.
+    const current = computeFinancials(raw, "2026-10");
     expect(typeof current.endOfMonth.value).toBe("number");
     expect(current.endOfMonth.meta.source).toBe("estimated");
   });

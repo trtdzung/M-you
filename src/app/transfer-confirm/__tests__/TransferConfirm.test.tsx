@@ -425,16 +425,16 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
 
   it("S10/U7: assessment + posted date use the demo clock even when the real clock is in another month", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-10-10T03:00:00.000Z"));
+    vi.setSystemTime(new Date("2026-11-10T03:00:00.000Z"));
     try {
       h.draft = jarDraft();
       render(<TransferConfirm />);
       await completeTransfer();
       const assessedAt = h.assess.mock.calls.map((c) => (c[0] as { postedAt: string }).postedAt);
       expect(assessedAt.length).toBeGreaterThan(0);
-      expect(assessedAt.every((d) => d.startsWith("2026-09-15"))).toBe(true);
+      expect(assessedAt.every((d) => d.startsWith("2026-10-21"))).toBe(true);
       const record = h.applyAccountDebit.mock.calls[0][2] as { postedAt: string };
-      expect(record.postedAt).toBe("2026-09-15T03:00:00.000Z");
+      expect(record.postedAt).toBe("2026-10-21T03:00:00.000Z");
     } finally {
       vi.useRealTimers();
     }

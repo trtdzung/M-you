@@ -119,7 +119,7 @@ Dữ liệu mẫu được sinh ra bằng thuật toán giả ngẫu nhiên có 
    - `CIF_0003` - **Đào Nguyên (`wealthy`)**: Thu nhập cao 100.000.000 ₫, danh mục tài sản lớn (tiền gửi lớn, quỹ, cổ phiếu, vàng miếng, căn hộ chưa định giá), nợ thế chấp mua nhà 1.8 tỷ ₫. Hạng: `M-FIRST PRIVATE`.
 
 2. **Dữ liệu giao dịch 6 tháng (`src/providers/mock/fixtures/generate.ts`)**:
-   - Tạo ~6 tháng lịch sử giao dịch tính từ ngày neo `2026-09-15`: Lương về (`income`), chi phí cố định (nhà ở, điện nước, internet, gym, Netflix), chi tiêu sinh hoạt biến đổi (Grab, WinMart, Shopee, Highlands...), chuyển khoản nội bộ sang sổ tiết kiệm, hoàn tiền hoàn phí, giao dịch bị đảo ngược (`reversed`), và giao dịch đang xử lý (`pending`).
+   - Tạo ~6 tháng lịch sử giao dịch tính từ ngày neo `2026-10-21`: Lương về (`income`), chi phí cố định (nhà ở, điện nước, internet, gym, Netflix), chi tiêu sinh hoạt biến đổi (Grab, WinMart, Shopee, Highlands...), chuyển khoản nội bộ sang sổ tiết kiệm, hoàn tiền hoàn phí, giao dịch bị đảo ngược (`reversed`), và giao dịch đang xử lý (`pending`).
    - Cố tình để lại tỷ lệ **18% giao dịch chưa phân loại (`UNCLASSIFIED`)** trong danh mục chi tiêu tự do để thử nghiệm pipeline AI auto-categorization.
 
 3. **Cấu hình Hũ mẫu (`data/seed-jars.json`)**:

@@ -6,7 +6,7 @@
 
 import { addMonthsToKey, dateToMonthKey } from "@/domain/engine/types";
 
-export const DEMO_NOW = new Date("2026-09-15T00:00:00.000Z");
+export const DEMO_NOW = new Date("2026-10-21T00:00:00.000Z");
 
 let clientClock: { now: number; offsetMs: number; receivedAt: number } | null = null;
 

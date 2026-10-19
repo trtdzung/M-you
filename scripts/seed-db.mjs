@@ -23,7 +23,7 @@ const NOW = new Date().toISOString();
 // `jarLedgerAnchorIso()` in src/lib/db-migrate-jar-ledger.ts (DEMO_NOW from
 // src/lib/demo-clock.ts; plain .mjs, no TS loader). Wall clock would put the
 // deposit outside the displayed month.
-const DEMO_NOW = new Date("2026-09-15T00:00:00.000Z");
+const DEMO_NOW = new Date("2026-10-21T00:00:00.000Z");
 const VN_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
 const JAR_ANCHOR = (() => {
   const vn = new Date(DEMO_NOW.getTime() + VN_UTC_OFFSET_MS);
@@ -81,7 +81,7 @@ const PERSONA_ACCOUNTS = {
   CIF_0002: { personaId: "irregular", seed: 2002, tier: "M-FIRST" },
   CIF_0003: { personaId: "wealthy", seed: 3003, tier: "M-FIRST PRIVATE" },
 };
-const ACCT_SYNCED_AT = "2026-09-15T00:00:00.000Z";
+const ACCT_SYNCED_AT = "2026-10-21T00:00:00.000Z";
 
 // acctNumber(seed, salt) — mirrors fixtures/generate.ts.
 const acctNumber = (seed, salt) =>

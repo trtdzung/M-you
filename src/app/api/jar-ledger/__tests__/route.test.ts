@@ -116,12 +116,12 @@ describe("POST /api/jar-ledger — valid writes", () => {
 
   it("a deposit at a non-midnight time-of-day is visible at once (Red Team #1)", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2031-03-04T15:30:12.345Z")); // transferNow → 2026-09-15T15:30:12.345Z
+    vi.setSystemTime(new Date("2031-03-04T15:30:12.345Z")); // transferNow → 2026-10-21T15:30:12.345Z
     seed({ a: 5_000_000 });
     const res = await post([dep("a", 1_234_000)]);
     expect(res.status).toBe(201);
     const config: JarConfig = await res.json();
-    expect(config.ledger!.find((e) => !e.isOpening)!.createdAt).toBe("2026-09-15T15:30:12.345Z");
+    expect(config.ledger!.find((e) => !e.isOpening)!.createdAt).toBe("2026-10-21T15:30:12.345Z");
     expect(balanceOf(config, "a")).toBe(6_234_000);
 
     const summary = await (await jarSummary(new NextRequest(`http://localhost/api/jar-summary?cif=${CIF}`))).json();

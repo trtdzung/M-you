@@ -166,10 +166,11 @@ describe("jar balance vs monthly limit — cases A–L", () => {
 
   it("L one clock: a 1tr deposit stamped transferNow() at 10:30 shows immediately", () => {
     const now = transferNow(new Date("2026-01-01T10:30:00.000Z")); // demo day, 10:30
-    const config = cfg(food(7 * TR), [openingDeposit("food", 7 * TR, ANCHOR), entry(1 * TR, now.toISOString())]);
-    expect(compose(config, [], "2026-09", now).env.balance).toBe(8 * TR);
+    const octAnchor = monthAnchor("2026-10"); // 2026-10-01 00:00 VN — the demo month start
+    const config = cfg(food(7 * TR), [openingDeposit("food", 7 * TR, octAnchor), entry(1 * TR, now.toISOString())]);
+    expect(compose(config, [], "2026-10", now).env.balance).toBe(8 * TR);
     // The bug the one clock prevents: a 00:00 `DEMO_NOW` read would hide the row.
-    expect(compose(config, [], "2026-09", DEMO_NOW).env.balance).toBe(7 * TR);
+    expect(compose(config, [], "2026-10", DEMO_NOW).env.balance).toBe(7 * TR);
   });
 });
 

@@ -56,7 +56,7 @@ export interface PersonaMeta {
   products: MockProduct[];
 }
 
-const NOW = "2026-09-15T00:00:00.000Z";
+const NOW = "2026-10-21T00:00:00.000Z";
 
 const MSB_PRODUCTS: MockProduct[] = [
   { id: "p_savings_flex", name: "Tiết kiệm linh hoạt MSB", type: "savings", summary: "Gửi/rút linh hoạt, lãi cao hơn tài khoản thanh toán.", indicativeRate: 0.041 },
@@ -89,7 +89,7 @@ const STABLE: PersonaMeta = {
     { id: "a_stable_gold", type: "gold", name: "Vàng SJC (2 chỉ)", value: 15_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
   ],
   liabilities: [
-    { id: "l_stable_loan", type: "personal_loan", name: "Vay tiêu dùng", outstandingPrincipal: 40_000_000, interestRate: 0.14, minimumPayment: 3_500_000, dueDate: "2026-09-25", remainingTerm: 12, source: "self_reported", lastUpdatedAt: NOW },
+    { id: "l_stable_loan", type: "personal_loan", name: "Vay tiêu dùng", outstandingPrincipal: 40_000_000, interestRate: 0.14, minimumPayment: 3_500_000, dueDate: "2026-10-25", remainingTerm: 12, source: "self_reported", lastUpdatedAt: NOW },
   ],
   budgets: SEED_BUDGETS,
   goals: [{ id: "g_stable_fund", name: "Quỹ dự phòng 6 tháng", targetAmount: 90_000_000, currentAmount: 55_000_000, targetDate: "2027-06-30", source: "self_reported" }],
@@ -108,8 +108,8 @@ const IRREGULAR: PersonaMeta = {
     { id: "a_irr_fund", type: "fund", name: "Chứng chỉ quỹ", value: 18_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
   ],
   liabilities: [
-    { id: "l_irr_card", type: "credit_card", name: "Thẻ tín dụng MSB", outstandingPrincipal: 18_500_000, interestRate: 0.32, minimumPayment: 1_850_000, dueDate: "2026-09-20", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
-    { id: "l_irr_instal", type: "instalment", name: "Trả góp điện thoại", outstandingPrincipal: 9_000_000, interestRate: 0, minimumPayment: 1_500_000, dueDate: "2026-09-28", remainingTerm: 6, source: "self_reported", lastUpdatedAt: NOW },
+    { id: "l_irr_card", type: "credit_card", name: "Thẻ tín dụng MSB", outstandingPrincipal: 18_500_000, interestRate: 0.32, minimumPayment: 1_850_000, dueDate: "2026-10-20", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
+    { id: "l_irr_instal", type: "instalment", name: "Trả góp điện thoại", outstandingPrincipal: 9_000_000, interestRate: 0, minimumPayment: 1_500_000, dueDate: "2026-10-28", remainingTerm: 6, source: "self_reported", lastUpdatedAt: NOW },
   ],
   budgets: SEED_BUDGETS,
   goals: [{ id: "g_irr_buffer", name: "Đệm thu nhập 3 tháng", targetAmount: 60_000_000, currentAmount: 12_000_000, targetDate: null, source: "self_reported" }],
@@ -131,8 +131,8 @@ const WEALTHY: PersonaMeta = {
     { id: "a_w_realestate", type: "real_estate", name: "Căn hộ (chưa định giá)", value: null, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
   ],
   liabilities: [
-    { id: "l_w_mortgage", type: "mortgage", name: "Vay mua nhà", outstandingPrincipal: 1_800_000_000, interestRate: 0.095, minimumPayment: 24_000_000, dueDate: "2026-09-18", remainingTerm: 180, source: "msb", lastUpdatedAt: NOW },
-    { id: "l_w_card", type: "credit_card", name: "Thẻ tín dụng hạng vàng", outstandingPrincipal: 45_000_000, interestRate: 0.30, minimumPayment: 4_500_000, dueDate: "2026-09-22", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
+    { id: "l_w_mortgage", type: "mortgage", name: "Vay mua nhà", outstandingPrincipal: 1_800_000_000, interestRate: 0.095, minimumPayment: 24_000_000, dueDate: "2026-10-18", remainingTerm: 180, source: "msb", lastUpdatedAt: NOW },
+    { id: "l_w_card", type: "credit_card", name: "Thẻ tín dụng hạng vàng", outstandingPrincipal: 45_000_000, interestRate: 0.30, minimumPayment: 4_500_000, dueDate: "2026-10-22", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
     { id: "l_w_loan", type: "personal_loan", name: "Vay đầu tư", outstandingPrincipal: 200_000_000, interestRate: 0.12, minimumPayment: 10_000_000, dueDate: "2026-10-05", remainingTerm: 24, source: "self_reported", lastUpdatedAt: NOW },
   ],
   budgets: SEED_BUDGETS,

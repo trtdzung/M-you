@@ -10,7 +10,7 @@ const CIF = "CIF_0003";
 const VERSION = 1;
 /** Kept above the discovery threshold after the buffer and predicted bills. */
 const SURPLUS_VND = 120_000_000;
-const DEMO_MONTH = "2026-09";
+const DEMO_MONTH = "2026-10";
 /** Lifestyle categories. Full pace projects the jar empty before month end. */
 const LIFESTYLE = new Set(["entertainment", "shopping"]);
 

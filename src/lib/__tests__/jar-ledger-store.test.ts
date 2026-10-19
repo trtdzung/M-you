@@ -98,7 +98,7 @@ describe("writeJarConfig — anchor + ledger", () => {
 
   it("the 2-arg call defaults created_at to the demo transfer clock", () => {
     const out = writeJarConfig(A, config("food"));
-    expect(out.jars.find((j) => j.id === "food")?.createdAt?.startsWith("2026-09-15T")).toBe(true);
+    expect(out.jars.find((j) => j.id === "food")?.createdAt?.startsWith("2026-10-21T")).toBe(true);
   });
 
   it("drops the ledger of removed jars (a reused id starts clean) and attaches the ledger on read", () => {

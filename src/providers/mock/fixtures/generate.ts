@@ -42,9 +42,12 @@ const HISTORY_PAYEE = { name: "Phạm Thu Hà", norm: "pham thu ha", account: "0
 
 /** Anchor "today" for fixtures — keeps data stable regardless of wall clock. */
 const ANCHOR_YEAR = 2026;
-const ANCHOR_MONTH = 8; // 0-based September
-const ANCHOR_DAY = 15; // current month only has data up to here
+const ANCHOR_MONTH = 9; // 0-based October
+const ANCHOR_DAY = 21; // current month only has data up to here
 const MONTHS = 6;
+
+/** Nhãn ngắn của mốc "hôm nay" (YYMMDD), dùng làm hậu tố id cho giao dịch bổ sung khi mốc dịch tiến. */
+export const ANCHOR_TAG = `${String(ANCHOR_YEAR).slice(2)}${String(ANCHOR_MONTH + 1).padStart(2, "0")}${String(ANCHOR_DAY).padStart(2, "0")}`;
 
 /**
  * Fraction of discretionary spend the bank ships WITHOUT an enrichment label —
@@ -221,7 +224,7 @@ export function buildPersonaAccounts(meta: PersonaMeta): Account[] {
 }
 
 function buildAccounts(meta: PersonaMeta, current: string, savings: string, credit: string): Account[] {
-  const now = "2026-09-15T00:00:00.000Z";
+  const now = "2026-10-21T00:00:00.000Z";
   const scale = meta.params.salaryBase / 25_000_000;
   const seed = meta.params.seed;
   const number = (salt: number) => acctNumber(seed, salt);

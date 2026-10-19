@@ -25,7 +25,7 @@ import {
 } from "../db-migrate-jar-ledger";
 
 const SCHEMA = readFileSync(join(process.cwd(), "data", "schema.sql"), "utf8");
-const ANCHOR = "2026-08-31T17:00:00.000Z"; // 00:00 01/09/2026 VN — the demo month start
+const ANCHOR = "2026-09-30T17:00:00.000Z"; // 00:00 01/10/2026 VN — the demo month start
 
 const tempDirs: string[] = [];
 afterEach(() => {
