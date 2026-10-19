@@ -108,6 +108,13 @@ export class ActionQueue {
           if (gen !== this.generation) return;
           if (attempt === MAX_ATTEMPTS) {
             this.handlers.onError("Không lưu được thay đổi. Vui lòng thử lại.");
+            // Show what is actually saved; if this GET fails too, keep the local state.
+            try {
+              const payload = await fetchWorld(this.cif);
+              if (gen === this.generation) this.latest = payload;
+            } catch {
+              // Leave local state and the toast.
+            }
             return;
           }
           this.handlers.onInfo("Chưa lưu được, đang thử lại");
