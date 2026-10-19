@@ -2,7 +2,7 @@ import { addMonths, nextDayOfMonth } from "../engine/dates";
 import { makeAccountNumber, nextId } from "../engine/ledger";
 import { buildSchedule, annuityPayment } from "../engine/loan";
 import { refreshLoanStatuses } from "../engine/lifecycle";
-import { makeAsset, type FixedAssetSpec, type LiquidAssetSpec } from "../engine/assets";
+import { makeAsset, type DeclaredAssetSpec, type MsbAssetSpec } from "../engine/assets";
 import type { WorldState } from "../model/state";
 import {
   TXN_DIRECTION,
@@ -16,7 +16,7 @@ import {
 } from "../model/types";
 import { getLoanProduct } from "./products";
 
-export type { FixedAssetSpec, LiquidAssetSpec };
+export type { DeclaredAssetSpec, MsbAssetSpec };
 
 /**
  * Small DSL to build scenario worlds: the builder replays a goal's history
@@ -59,7 +59,7 @@ export interface GoalSpec {
   /** Standing orders stop being replayed after this date (default: today). */
   historyUntil?: ISODate;
   ratePa?: number;
-  assets?: (FixedAssetSpec | LiquidAssetSpec)[];
+  assets?: (DeclaredAssetSpec | MsbAssetSpec)[];
   extraTxns?: ExtraTxnSpec[];
   loan?: LoanSpec;
   reachedEarlyAt?: ISODate;
@@ -147,7 +147,6 @@ function addGoal(world: WorldState, spec: GoalSpec, defaultPriority: number, tod
     originalTargetDate: spec.originalTargetDate,
   };
   world.goals.push(goal);
-  if (status === "draft") return;
 
   const accountId = nextId(world, "acc");
   goal.accountId = accountId;
@@ -208,7 +207,7 @@ function addGoal(world: WorldState, spec: GoalSpec, defaultPriority: number, tod
   for (const assetSpec of spec.assets ?? []) {
     const asset = makeAsset(world, goalId, assetSpec, spec.createdAt);
     world.assets.push(asset);
-    if (assetSpec.type === "liquid") {
+    if (assetSpec.type === "msb") {
       push({ date: assetSpec.createdAt, kind: "invest", amount: assetSpec.amount, note: `Đầu tư: ${asset.name}` });
     }
   }

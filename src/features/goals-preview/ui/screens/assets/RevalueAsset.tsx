@@ -26,11 +26,11 @@ export function RevalueAsset({ params }: ScreenProps) {
   const [confirm, setConfirm] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
-  if (!asset || asset.type !== "fixed" || !goal) {
+  if (!asset || asset.type !== "declared" || !goal) {
     return (
       <div className={screenPadding}>
         <ScreenHeader title="Định giá lại" />
-        <EmptyState title="Không tìm thấy tài sản" description="Chỉ định giá lại được tài sản cố định." ctaLabel="Quay lại" onCta={() => nav.pop()} />
+        <EmptyState title="Không tìm thấy tài sản" description="Chỉ định giá lại được tài sản bạn tự khai." ctaLabel="Quay lại" onCta={() => nav.pop()} />
       </div>
     );
   }

@@ -6,7 +6,7 @@ import { formatISODate, monthsLeft } from "../../../engine/dates";
 import { idleCash } from "../../../engine/invest";
 import { requiredMonthly } from "../../../engine/feasibility";
 import { goalValue, progressPct, progressState } from "../../../engine/value";
-import { STATUS_LABEL, TEMPLATE_EMOJI } from "../../../model/labels";
+import { goalEmoji, STATUS_LABEL } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";
 import type { PreviewState } from "../../../model/state";
 import type { Goal } from "../../../model/types";
@@ -98,7 +98,7 @@ export function HomeMock({ params }: ScreenProps) {
           >
             <div className="flex items-center gap-3">
               <span aria-hidden className="text-2xl">
-                {TEMPLATE_EMOJI[top.template]}
+                {goalEmoji(top)}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-semibold text-text">{top.name}</p>

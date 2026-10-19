@@ -47,10 +47,13 @@ const INVALID = "Dữ liệu thao tác không hợp lệ.";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** Tua tối đa 10 năm một lần (engine chạy theo từng ngày). */
 const MAX_ADVANCE_DAYS = 3660;
+/** Số tài sản tối đa khách có thể gắn khi tạo một mục tiêu. */
+const MAX_NEW_GOAL_ASSETS = 20;
 
 const GOAL_TEMPLATES = new Set(["car", "house", "travel", "education", "emergency", "wedding", "retirement", "other"]);
+/** "date_fixed" là giá trị cũ: vẫn nhận để agent/client cũ không vỡ, reducer luôn đổi thành "date_flexible". */
 const FLEXIBILITIES = new Set(["date_fixed", "date_flexible", "amount_flexible"]);
-const FIXED_CATEGORIES = new Set(["house", "car", "motorbike", "other", "gold", "stock", "external_fund", "deposit", "bond"]);
+const DECLARED_CATEGORIES = new Set(["house", "car", "motorbike", "other", "gold", "stock", "external_fund", "deposit", "bond"]);
 const VALUE_SOURCES = new Set(["msb", "self_reported", "estimated"]);
 const RISK_PROFILE_VALUES = new Set(["conservative", "balanced", "growth"]);
 const SIM_EVENTS = new Set(["salary", "bigExpense", "standingOrderFail", "overdue"]);
@@ -96,19 +99,57 @@ function opt<T>(o: Obj, k: string, read: (o: Obj, k: string) => T): { [key: stri
   return o[k] === undefined ? {} : { [k]: read(o, k) };
 }
 
-/** Các trường của `CreateGoalInput`; `partial` cho `updateDraftGoal.patch` (chỉ đúng các khoá này). */
-function goalInput(o: Obj, partial: boolean): Obj {
-  const keys = ["name", "template", "targetAmount", "targetDate", "flexibility", "priority", "note"];
+/** Các trường của `CreateGoalInput` (chỉ đúng các khoá này). */
+function goalInput(o: Obj): Obj {
+  const keys = ["name", "template", "targetAmount", "targetDate", "flexibility", "priority", "note", "initialDeposit", "standingOrder", "assets", "icon"];
   if (Object.keys(o).some((k) => !keys.includes(k))) throw new InvalidAction("input");
-  const field = (k: string, read: (o: Obj, k: string) => unknown) => (partial ? opt(o, k, read) : { [k]: read(o, k) });
   return {
-    ...field("name", text),
-    ...field("template", (x, k) => oneOf(x, k, GOAL_TEMPLATES)),
-    ...field("targetAmount", (x, k) => num(x, k, positive)),
-    ...field("targetDate", date),
-    ...field("flexibility", (x, k) => oneOf(x, k, FLEXIBILITIES)),
+    name: text(o, "name"),
+    template: oneOf(o, "template", GOAL_TEMPLATES),
+    targetAmount: num(o, "targetAmount", positive),
+    targetDate: date(o, "targetDate"),
+    flexibility: oneOf(o, "flexibility", FLEXIBILITIES),
     ...opt(o, "priority", (x, k) => num(x, k, positive)),
     ...opt(o, "note", text),
+    ...opt(o, "icon", (x, k) => oneOf(x, k, GOAL_TEMPLATES)),
+    ...opt(o, "initialDeposit", (x, k) => num(x, k, nonNegative)),
+    ...opt(o, "assets", (x, k) => {
+      const list = x[k];
+      if (!Array.isArray(list) || list.length > MAX_NEW_GOAL_ASSETS || list.some((item) => !isObj(item))) throw new InvalidAction(k);
+      return list.map((item) => declaredAssetFields(item as Obj));
+    }),
+    ...opt(o, "standingOrder", (x, k) => {
+      const so = x[k];
+      if (!isObj(so)) throw new InvalidAction(k);
+      return { amount: num(so, "amount", positive), dayOfMonth: num(so, "dayOfMonth", (n) => Number.isInteger(n) && n >= 1 && n <= 31) };
+    }),
+  };
+}
+
+/** Các trường của một tài sản tự khai (dùng cho `addAsset` và `createGoal.input.assets`). */
+function declaredAssetFields(a: Obj): Obj {
+  let accrual: Obj | undefined;
+  if (a.accrual !== undefined) {
+    if (!isObj(a.accrual)) throw new InvalidAction("accrual");
+    const r = a.accrual;
+    accrual = {
+      principal: num(r, "principal", positive),
+      ratePa: num(r, "ratePa", nonNegative),
+      startDate: date(r, "startDate"),
+      ...opt(r, "maturityDate", date),
+    };
+  }
+  return {
+    name: str(a, "name"),
+    category: oneOf(a, "category", DECLARED_CATEGORIES),
+    value: num(a, "value", nonNegative),
+    countPercent: num(a, "countPercent", (n) => n >= 0 && n <= 100),
+    ...opt(a, "valuationDate", date),
+    ...opt(a, "source", (x, k) => oneOf(x, k, VALUE_SOURCES)),
+    ...opt(a, "instrumentId", str),
+    ...opt(a, "quantity", (x, k) => num(x, k, positive)),
+    ...(accrual ? { accrual } : {}),
+    ...opt(a, "institution", text),
   };
 }
 
@@ -127,11 +168,7 @@ function parseFields(type: string, a: Obj): Obj {
       return { event: oneOf(a, "event", SIM_EVENTS), ...opt(a, "goalId", str) };
     case "createGoal":
       if (!isObj(a.input)) throw new InvalidAction("input");
-      return { input: goalInput(a.input, false) };
-    case "updateDraftGoal":
-      if (!isObj(a.patch)) throw new InvalidAction("patch");
-      return { ...goalId(), patch: goalInput(a.patch, true) };
-    case "discardDraftGoal":
+      return { input: goalInput(a.input) };
     case "runStandingOrderNow":
     case "cancelReservedLoan":
     case "startRepayment":
@@ -140,8 +177,6 @@ function parseFields(type: string, a: Obj): Obj {
     case "resumeGoal":
     case "closeGoal":
       return goalId();
-    case "openAccount":
-      return { ...goalId(), initialDeposit: num(a, "initialDeposit", nonNegative) };
     case "deposit":
       return { ...goalId(), amount: num(a, "amount", positive), ...opt(a, "note", text) };
     case "withdraw":
@@ -155,32 +190,8 @@ function parseFields(type: string, a: Obj): Obj {
       };
     case "reserveLoan":
       return { ...goalId(), productId: str(a, "productId"), principal: num(a, "principal", positive), termMonths: num(a, "termMonths", positiveInt) };
-    case "addFixedAsset": {
-      let accrual: Obj | undefined;
-      if (a.accrual !== undefined) {
-        if (!isObj(a.accrual)) throw new InvalidAction("accrual");
-        const r = a.accrual;
-        accrual = {
-          principal: num(r, "principal", positive),
-          ratePa: num(r, "ratePa", nonNegative),
-          startDate: date(r, "startDate"),
-          ...opt(r, "maturityDate", date),
-        };
-      }
-      return {
-        ...goalId(),
-        name: str(a, "name"),
-        category: oneOf(a, "category", FIXED_CATEGORIES),
-        value: num(a, "value", nonNegative),
-        countPercent: num(a, "countPercent", (n) => n >= 0 && n <= 100),
-        ...opt(a, "valuationDate", date),
-        ...opt(a, "source", (x, k) => oneOf(x, k, VALUE_SOURCES)),
-        ...opt(a, "instrumentId", str),
-        ...opt(a, "quantity", (x, k) => num(x, k, positive)),
-        ...(accrual ? { accrual } : {}),
-        ...opt(a, "institution", text),
-      };
-    }
+    case "addAsset":
+      return { ...goalId(), ...declaredAssetFields(a) };
     case "revalueAsset":
       return {
         ...assetId(),
@@ -212,7 +223,13 @@ function parseFields(type: string, a: Obj): Obj {
         productId: str(a, "productId"),
         principal: num(a, "principal", positive),
         termMonths: num(a, "termMonths", positiveInt),
-        ...opt(a, "payForGoal", bool),
+        ...opt(a, "settlement", (x, k) => oneOf(x, k, new Set(["now", "next"]))),
+        ...opt(a, "purchase", (x, k) => {
+          const p = x[k];
+          if (!isObj(p)) throw new InvalidAction(k);
+          if (p.assetId !== undefined) return { assetId: str(p, "assetId") };
+          return { name: str(p, "name"), category: oneOf(p, "category", DECLARED_CATEGORIES), value: num(p, "value", nonNegative) };
+        }),
       };
     case "repay":
       return loanId();
@@ -236,7 +253,9 @@ function parseFields(type: string, a: Obj): Obj {
 export function parseGoalAction(raw: unknown): Parsed {
   if (!isObj(raw) || typeof raw.type !== "string") return { ok: false, error: INVALID };
   try {
-    return { ok: true, action: { type: raw.type, ...parseFields(raw.type, raw) } as PreviewAction };
+    // `addFixedAsset` là tên cũ của `addAsset` (agent cũ vẫn gửi).
+    const type = raw.type === "addFixedAsset" ? "addAsset" : raw.type;
+    return { ok: true, action: { type, ...parseFields(type, raw) } as PreviewAction };
   } catch (err) {
     if (err instanceof RejectedAction) return { ok: false, error: "Thao tác này không dùng được với dữ liệu thật." };
     if (err instanceof InvalidAction) return { ok: false, error: INVALID };

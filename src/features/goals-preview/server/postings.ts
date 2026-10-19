@@ -11,12 +11,14 @@ import "server-only";
  */
 
 import { randomUUID } from "node:crypto";
-import { CATEGORY, type Transaction } from "@/domain/models";
+import { CATEGORY, GOAL_CATEGORY, type Transaction } from "@/domain/models";
 import { readAccounts } from "@/lib/accounts-store";
 import { readTransactions } from "@/lib/transactions-store";
 import { getInvestProduct, getLoanProduct } from "../data/products";
 import type { WorldState } from "../model/state";
 import { addDays, dayOfMonth } from "../engine/dates";
+import { goalAccountNumber } from "../engine/ledger";
+import { PHASE_ONE_PURCHASE_NOTE } from "../engine/value";
 import type { GoalAccount, GoalTxn, ISODate } from "../model/types";
 import { goalsV2Db } from "./db";
 import { goalAccountId, readGoalMeta, soFailId } from "./world-repo";
@@ -44,15 +46,6 @@ function autoPostedAt(date: ISODate): string {
 
 function maskedOf(number: string): string {
   return `•••• ${number.slice(-4)}`;
-}
-
-/**
- * Số tài khoản mục tiêu duy nhất toàn hệ thống (D10): "88" + 4 số cuối phần số của
- * cif (đệm 0) + seq lúc mở đệm 6 số = 12 số.
- */
-function goalAccountNumber(cif: string, seq: number): string {
-  const cifDigits = cif.replace(/\D/g, "").slice(-4).padStart(4, "0");
-  return `88${cifDigits}${String(seq % 1_000_000).padStart(6, "0")}`;
 }
 
 /**
@@ -113,12 +106,12 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
   const prevLoanIds = new Set(prev.loans.map((l) => l.id));
 
   const stamp = (date: ISODate) => postedAt ?? autoPostedAt(date);
-  const base = (amount: number, at: string, type: Transaction["type"], note: string) => ({
+  const base = (amount: number, at: string, type: Transaction["type"], note: string, categoryId: string = CATEGORY.transfer) => ({
     postedAt: at,
     amount,
     currency: "VND",
     type,
-    categoryId: CATEGORY.transfer,
+    categoryId,
     status: "posted" as const,
     source: "mock" as const,
     isRecurring: false,
@@ -133,8 +126,9 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
     type: Transaction["type"],
     merchantName: string,
     note: string,
+    categoryId: string = CATEGORY.transfer,
   ): Transaction => ({
-    ...base(amount, at, type, note),
+    ...base(amount, at, type, note, categoryId),
     id: `gt-${randomUUID()}-${direction}`,
     accountId,
     direction,
@@ -148,9 +142,10 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
     amount: number,
     at: string,
     note: string,
+    categoryId: string = CATEGORY.transfer,
   ): { debit: Transaction; credit: Transaction } => {
     const id = `gt-${randomUUID()}`;
-    const shared = { ...base(amount, at, "transfer", note), transferGroupId: `gtg-${randomUUID()}` };
+    const shared = { ...base(amount, at, "transfer", note, categoryId), transferGroupId: `gtg-${randomUUID()}` };
     return {
       debit: { ...shared, id: `${id}-debit`, accountId: from.accountId, direction: "debit", merchantName: from.merchantName, merchantNormalizedName: "goal transfer" },
       credit: { ...shared, id: `${id}-credit`, accountId: to.accountId, direction: "credit", merchantName: to.merchantName, merchantNormalizedName: "goal transfer" },
@@ -175,35 +170,42 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
           amount,
           at,
           t.note,
+          GOAL_CATEGORY.deposit,
         );
         legs.push({ txn: debit }, { txn: credit, kind });
         mainDelta -= amount;
         break;
       }
       case "withdraw": {
+        // Rút tiền mặt để mua tài sản (sang giai đoạn vay): tiền ra khỏi tài khoản mục tiêu, không về tài khoản chính.
+        if (t.note.startsWith(PHASE_ONE_PURCHASE_NOTE)) {
+          legs.push({ txn: single(account.id, "debit", amount, at, "transfer", t.note, t.note, GOAL_CATEGORY.purchase), kind });
+          break;
+        }
         const { debit, credit } = pair(
           { accountId: account.id, merchantName: `Chuyển về ${MAIN_NAME.toLowerCase()}` },
           { accountId: main.id, merchantName: `Nhận từ ${account.name}` },
           amount,
           at,
           t.note,
+          GOAL_CATEGORY.withdraw,
         );
         legs.push({ txn: debit, kind }, { txn: credit });
         mainDelta += amount;
         break;
       }
       case "invest": {
-        const asset = next.assets.find((a) => a.goalId === t.goalId && a.type === "liquid" && !prevAssetIds.has(a.id));
-        const product = asset?.type === "liquid" ? getInvestProduct(asset.productId) : undefined;
-        legs.push({ txn: single(account.id, "debit", amount, at, "transfer", product?.name ?? t.note, t.note), kind });
+        const asset = next.assets.find((a) => a.goalId === t.goalId && a.type === "msb" && !prevAssetIds.has(a.id));
+        const product = asset?.type === "msb" ? getInvestProduct(asset.productId) : undefined;
+        legs.push({ txn: single(account.id, "debit", amount, at, "transfer", product?.name ?? t.note, t.note, GOAL_CATEGORY.invest), kind });
         break;
       }
       case "divest":
       case "maturity":
-        legs.push({ txn: single(account.id, "credit", amount, at, "transfer", t.note, t.note), kind });
+        legs.push({ txn: single(account.id, "credit", amount, at, "transfer", t.note, t.note, GOAL_CATEGORY.invest), kind });
         break;
       case "interest":
-        legs.push({ txn: single(account.id, "credit", amount, at, "income", t.note, t.note), kind });
+        legs.push({ txn: single(account.id, "credit", amount, at, "income", t.note, t.note, GOAL_CATEGORY.interest), kind });
         break;
       case "loan_disbursement": {
         const loan = next.loans.find((l) => l.goalId === t.goalId && !prevLoanIds.has(l.id));
@@ -212,7 +214,7 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
         break;
       }
       case "loan_repayment":
-        legs.push({ txn: single(account.id, "debit", amount, at, "transfer", t.note, t.note), kind });
+        legs.push({ txn: single(account.id, "debit", amount, at, "transfer", t.note, t.note, GOAL_CATEGORY.repay), kind });
         break;
       case "standing_order_failed":
         failures.push(t);

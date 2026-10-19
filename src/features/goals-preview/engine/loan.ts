@@ -77,7 +77,7 @@ export function affordability(input: {
       : r === 0
         ? maxMonthlyPayment * termMonths
         : Math.floor((maxMonthlyPayment * (1 - Math.pow(1 + r, -termMonths))) / r / 1_000_000) * 1_000_000;
-  return { dti, allowed: dti <= MAX_DTI, maxMonthlyPayment, maxPrincipal };
+  return { dti, allowed: true, maxMonthlyPayment, maxPrincipal };
 }
 
 /** Dư nợ gốc hiện tại = gốc còn lại trước kỳ chưa trả đầu tiên. */

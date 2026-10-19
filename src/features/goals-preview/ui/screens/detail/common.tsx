@@ -63,7 +63,7 @@ export function isStaleValuation(valuationDate: string, today: string): boolean 
   return days > 183;
 }
 
-/** Statuses that can still receive money. */
+/** Goals with an account can receive money. */
 export function canTransact(goal: Goal): boolean {
-  return goal.status !== "draft" && goal.status !== "closed" && goal.status !== "completed";
+  return goal.accountId !== undefined;
 }

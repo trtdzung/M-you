@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, PartyPopper } from "lucide-react";
-import { formatVnd } from "@/features/goals-preview/format-money";
+import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../../engine/dates";
 import { requiredMonthly } from "../../../engine/feasibility";
 import { goalValue } from "../../../engine/value";
@@ -12,7 +12,6 @@ import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions } from "../../shared/BottomActions";
 import { EmptyState } from "../../shared/EmptyState";
 import { ScreenHeader } from "../../shared/ScreenHeader";
-import { SummaryRows } from "../../shared/SummaryRows";
 import { card, ghostButton, primaryButton, ring, screenPadding, sectionTitle, emphasisTitle } from "../../shared/styles";
 import { formatAccountNumber } from "./wizard";
 
@@ -57,44 +56,52 @@ export function CreateSuccess({ params }: ScreenProps) {
     nav.push("GoalDetail", { goalId: goal.id });
   };
 
+  const autoText =
+    order && order.active ? `${formatVndCompact(order.amount)} · ngày ${order.dayOfMonth}` : "Chưa cài";
+
+  // Gọn trong một màn hình, không cần cuộn: chúc mừng, tài khoản, 4 số chính và nút hành động.
   return (
     <div className={screenPadding}>
       <ScreenHeader title="Đã tạo mục tiêu" hideBack />
 
-      <section className="flex flex-col items-center gap-2 rounded-card bg-positive-soft px-4 py-6 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface text-positive">
-          <PartyPopper size={28} aria-hidden />
+      <section className="flex items-center gap-3 rounded-card bg-positive-soft px-4 py-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface text-positive">
+          <PartyPopper size={22} aria-hidden />
         </span>
-        <h2 className={emphasisTitle}>Chúc mừng bạn!</h2>
-        <p className="text-sm text-text">
-          Mục tiêu “{goal.name}” đã sẵn sàng. Hãy bắt đầu dành dụm từng chút một.
-        </p>
+        <div className="min-w-0">
+          <h2 className={`${emphasisTitle} !text-[17px]`}>Chúc mừng bạn!</h2>
+          <p className="truncate text-[13px] text-text">“{goal.name}” đã sẵn sàng.</p>
+        </div>
       </section>
 
-      <section className={`${card} flex flex-col gap-2`}>
-        <h2 className={sectionTitle}>Tài khoản mục tiêu</h2>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[20px] font-bold tabular-nums tracking-wide text-text">{formatAccountNumber(account.number)}</p>
-          <button type="button" onClick={copy} className={`${ghostButton} ${ring}`} aria-label="Sao chép số tài khoản">
-            {copied ? <Check size={18} aria-hidden /> : <Copy size={18} aria-hidden />}
+      <section className={`${card} flex flex-col gap-1.5`}>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className={sectionTitle}>Tài khoản mục tiêu</h2>
+          <button type="button" onClick={copy} className={`${ghostButton} ${ring} !min-h-9`} aria-label="Sao chép số tài khoản">
+            {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
             {copied ? "Đã chép" : "Sao chép"}
           </button>
         </div>
-        <p className="text-[13px] text-muted">{account.name}</p>
+        <p className="text-[20px] font-bold tabular-nums tracking-wide text-text">{formatAccountNumber(account.number)}</p>
+        <p className="truncate text-[13px] text-muted">{account.name}</p>
       </section>
 
-      <section className="flex flex-col gap-2">
+      <section className={`${card} flex flex-col gap-3`} aria-label="Kế hoạch tháng đầu tiên">
         <h2 className={sectionTitle}>Kế hoạch tháng đầu tiên</h2>
-        <SummaryRows
-          rows={[
-            { label: "Số dư hiện tại", value: value.total, source: value.fixedCounted > 0 ? "self_reported" : "msb", emphasis: true },
-            { label: "Mục tiêu", value: `${formatVnd(goal.targetAmount)} · ${formatISODate(goal.targetDate)}` },
-            { label: "Cần tiết kiệm mỗi tháng", value: monthly, source: "estimated" },
-            order && order.active
-              ? { label: "Trích tự động", value: `${formatVnd(order.amount)} · ngày ${order.dayOfMonth} hằng tháng`, hint: `Lần đầu ${formatISODate(order.nextRunDate)}` }
-              : { label: "Trích tự động", value: "Chưa cài", hint: "Bạn có thể cài trong chi tiết mục tiêu" },
-          ]}
-        />
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+          {[
+            { label: "Số dư hiện tại", value: formatVndCompact(value.total) },
+            { label: "Mục tiêu", value: formatVndCompact(goal.targetAmount) },
+            { label: "Đạt vào", value: formatISODate(goal.targetDate) },
+            { label: "Cần tiết kiệm/tháng", value: typeof monthly === "number" ? formatVndCompact(monthly) : "Chưa rõ" },
+            { label: "Trích tự động", value: autoText },
+          ].map((row) => (
+            <div key={row.label}>
+              <dt className="text-[13px] text-muted">{row.label}</dt>
+              <dd className="text-[16px] font-semibold tabular-nums text-text">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <BottomActions inline>

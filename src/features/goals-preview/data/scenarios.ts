@@ -48,7 +48,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 120 * TR,
             monthly: 5 * TR,
             dayOfMonth: 12,
-            assets: [{ type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 20 * TR, termMonths: 12, createdAt: "2026-05-15" }],
+            assets: [{ type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 20 * TR, termMonths: 12, createdAt: "2026-05-15" }],
           },
           {
             name: "Quỹ dự phòng 6 tháng",
@@ -99,7 +99,7 @@ export const SCENARIOS: Scenario[] = [
     title: "Mua nhà — thiếu tiền, cần vay",
     description: "Còn 9 tháng nhưng thiếu gần 1,7 tỷ. Các phương án: tiết kiệm thêm, lùi ngày, giảm mục tiêu, vay (cuối cùng).",
     highlights: ["So sánh phương án", "Vay mua nhà trong khả năng trả (≤ 40% thu nhập)"],
-    jumpTo: { screen: "OptionsCompare", params: { goalId: "goal-1001" } },
+    jumpTo: { screen: "GoalDetail", params: { goalId: "goal-1001" } },
     build: () =>
       buildWorld({
         scenarioId: "s02-house-loan",
@@ -114,7 +114,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 600 * TR,
             monthly: 30 * TR,
             dayOfMonth: 11,
-            flexibility: "date_fixed",
+            flexibility: "date_flexible",
           },
         ],
       }),
@@ -140,7 +140,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 120 * TR,
             monthly: 5 * TR,
             dayOfMonth: 12,
-            assets: [{ type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 40 * TR, termMonths: 12, createdAt: "2026-06-15" }],
+            assets: [{ type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 40 * TR, termMonths: 12, createdAt: "2026-06-15" }],
           },
         ],
       }),
@@ -150,7 +150,7 @@ export const SCENARIOS: Scenario[] = [
     code: "4",
     title: "Học phí con — có xe cũ tính vào mục tiêu",
     description: "Xe Honda City (tự khai 420 triệu, tính 70%) định giá từ 06/2025 — đã quá 12 tháng, cần định giá lại.",
-    highlights: ["Tài sản cố định + % tính vào mục tiêu", "Nhắc định giá lại", "Nhãn nguồn: Tự khai"],
+    highlights: ["Tài sản tự khai + % tính vào mục tiêu", "Nhắc định giá lại", "Nhãn nguồn: Tự khai"],
     jumpTo: { screen: "RevalueAsset", params: { goalId: "goal-1001", assetId: "asset-1003" } },
     build: () =>
       buildWorld({
@@ -168,7 +168,7 @@ export const SCENARIOS: Scenario[] = [
             dayOfMonth: 15,
             assets: [
               {
-                type: "fixed",
+                type: "declared",
                 name: "Xe Honda City 2019 (dự định bán)",
                 category: "car",
                 value: 420 * TR,
@@ -394,8 +394,8 @@ export const SCENARIOS: Scenario[] = [
     code: "12",
     title: "Tiền gửi sắp đáo hạn",
     description: "Khoản tiền gửi 6 tháng 150 triệu đáo hạn 20/10/2026. Tua 7 ngày để chọn tái tục hay chuyển về tài khoản mục tiêu.",
-    highlights: ["Tài sản linh hoạt có ngày đáo hạn", "Tua thời gian → lựa chọn khi đáo hạn"],
-    jumpTo: { screen: "LiquidAssetDetail", params: { goalId: "goal-1001", assetId: "asset-1003" } },
+    highlights: ["Khoản đầu tư MSB có ngày đáo hạn", "Tua thời gian → lựa chọn khi đáo hạn"],
+    jumpTo: { screen: "MsbAssetDetail", params: { goalId: "goal-1001", assetId: "asset-1003" } },
     build: () =>
       buildWorld({
         scenarioId: "s12-maturity",
@@ -410,7 +410,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 100 * TR,
             monthly: 12 * TR,
             dayOfMonth: 3,
-            assets: [{ type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 150 * TR, createdAt: "2026-04-20", termMonths: 6 }],
+            assets: [{ type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 150 * TR, createdAt: "2026-04-20", termMonths: 6 }],
           },
         ],
       }),
@@ -436,7 +436,7 @@ export const SCENARIOS: Scenario[] = [
             opening: 600 * TR,
             monthly: 8 * TR,
             dayOfMonth: 10,
-            flexibility: "date_fixed",
+            flexibility: "date_flexible",
           },
         ],
       }),
@@ -472,20 +472,20 @@ export const SCENARIOS: Scenario[] = [
             flexibility: "date_flexible",
             assets: [
               // Sản phẩm MSB (tài sản linh hoạt)
-              { type: "liquid", category: "savings", productId: SAVINGS_FLEX.id, amount: 60 * TR, createdAt: "2026-03-01" },
-              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 300 * TR, termMonths: 12, createdAt: "2025-12-01" },
-              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 150 * TR, termMonths: 12, createdAt: "2025-06-15" },
-              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 100 * TR, termMonths: 12, createdAt: "2026-01-10" },
-              { type: "liquid", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 200 * TR, termMonths: 12, createdAt: "2025-09-01" },
+              { type: "msb", category: "savings", productId: SAVINGS_FLEX.id, amount: 60 * TR, createdAt: "2026-03-01" },
+              { type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 300 * TR, termMonths: 12, createdAt: "2025-12-01" },
+              { type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 150 * TR, termMonths: 12, createdAt: "2025-06-15" },
+              { type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 100 * TR, termMonths: 12, createdAt: "2026-01-10" },
+              { type: "msb", category: "term_deposit", productId: ONLINE_DEPOSIT.id, amount: 200 * TR, termMonths: 12, createdAt: "2025-09-01" },
               // Tài sản ngoài MSB: vật chất (tự khai)
-              { type: "fixed", name: "Căn hộ cũ Bình Thạnh (định bán)", category: "house", value: 2_600 * TR, costBasis: 1_900 * TR, valuationDate: "2026-08-01", countPercent: 60 },
-              { type: "fixed", name: "Xe Honda CR-V 2021", category: "car", value: 750 * TR, costBasis: 1_050 * TR, valuationDate: "2026-02-01", countPercent: 50 },
+              { type: "declared", name: "Căn hộ cũ Bình Thạnh (định bán)", category: "house", value: 2_600 * TR, costBasis: 1_900 * TR, valuationDate: "2026-08-01", countPercent: 60 },
+              { type: "declared", name: "Xe Honda CR-V 2021", category: "car", value: 750 * TR, costBasis: 1_050 * TR, valuationDate: "2026-02-01", countPercent: 50 },
               // Tài sản ngoài MSB: tài chính (tự định giá)
-              { type: "fixed", name: "Vàng miếng SJC", category: "gold", value: at(gold), valuationDate: "2026-09-01", countPercent: 80, ...gold },
-              { type: "fixed", name: "Cổ phiếu FPT", category: "stock", value: at(stock), valuationDate: "2026-09-01", countPercent: 70, institution: "Công ty chứng khoán XYZ", ...stock },
-              { type: "fixed", name: "Quỹ cổ phiếu (công ty quản lý quỹ khác)", category: "external_fund", value: at(fund), valuationDate: "2026-09-01", countPercent: 80, ...fund },
-              { type: "fixed", name: "Tiền gửi Vietcombank 12 tháng", category: "deposit", value: at(deposit), valuationDate: "2026-04-15", countPercent: 100, institution: "Vietcombank", ...deposit },
-              { type: "fixed", name: "Trái phiếu doanh nghiệp ABC", category: "bond", value: at(bond), valuationDate: "2025-11-01", countPercent: 90, institution: "Công ty ABC", ...bond },
+              { type: "declared", name: "Vàng miếng SJC", category: "gold", value: at(gold), valuationDate: "2026-09-01", countPercent: 80, ...gold },
+              { type: "declared", name: "Cổ phiếu FPT", category: "stock", value: at(stock), valuationDate: "2026-09-01", countPercent: 70, institution: "Công ty chứng khoán XYZ", ...stock },
+              { type: "declared", name: "Quỹ cổ phiếu (công ty quản lý quỹ khác)", category: "external_fund", value: at(fund), valuationDate: "2026-09-01", countPercent: 80, ...fund },
+              { type: "declared", name: "Tiền gửi Vietcombank 12 tháng", category: "deposit", value: at(deposit), valuationDate: "2026-04-15", countPercent: 100, institution: "Vietcombank", ...deposit },
+              { type: "declared", name: "Trái phiếu doanh nghiệp ABC", category: "bond", value: at(bond), valuationDate: "2025-11-01", countPercent: 90, institution: "Công ty ABC", ...bond },
             ],
           },
         ],

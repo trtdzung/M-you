@@ -6,7 +6,7 @@ import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInstrument } from "../../../data/market";
 import { assetValue, formatISODate, isAutoValued, seriesPriceAt } from "../../../engine";
 import type { ISODate, PricePoint } from "../../../model/types";
-import { FIXED_CATEGORY_LABEL } from "../../../model/labels";
+import { DECLARED_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { SourceTag } from "../../shared/SourceTag";
@@ -24,12 +24,12 @@ export function priceDateOf(series: PricePoint[], today: ISODate): ISODate | und
   return found;
 }
 
-export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; onClose: () => void }) {
+export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string; onClose: () => void }) {
   const { state, nav, dispatch, refreshPrices, pricesRefreshing } = usePreview();
   const asset = state.assets.find((item) => item.id === assetId);
   const [editQty, setEditQty] = useState(false);
   const [qty, setQty] = useState("");
-  if (!asset || asset.type !== "fixed") return null;
+  if (!asset || asset.type !== "declared") return null;
 
   const auto = isAutoValued(asset);
   const now = assetValue(asset, state);
@@ -45,7 +45,7 @@ export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; o
     <Sheet open title={asset.name} onClose={onClose} bodyClassName="flex flex-col !overflow-hidden !pb-0">
       <div className="no-scrollbar flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain pb-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted">{FIXED_CATEGORY_LABEL[asset.category]}</span>
+          <span className="text-sm text-muted">{DECLARED_CATEGORY_LABEL[asset.category]}</span>
           <SourceTag source={auto ? "estimated" : "self_reported"} />
         </div>
         <section className="rounded-2xl bg-source-self-soft p-4">

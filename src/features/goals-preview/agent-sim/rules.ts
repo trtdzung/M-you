@@ -5,7 +5,7 @@ import { idleCash, investSuggestions } from "../engine/invest";
 import { dueOutcome } from "../engine/lifecycle";
 import { goalAccount, goalAssets, goalValue, progressPct, progressState, remainingAmount } from "../engine/value";
 import type { AgentSuggestion, PreviewState, SuggestionKind } from "../model/state";
-import type { Asset, Goal, LiquidAsset, FixedAsset } from "../model/types";
+import type { Asset, Goal, MsbAsset, DeclaredAsset } from "../model/types";
 
 /**
  * Scripted "M-You gợi ý" rules — NO real AI call. Pure and deterministic:
@@ -47,11 +47,11 @@ function make(
 
 const later = (id: string, label = "Để sau") => ({ label, action: { type: "dismissSuggestion", id } as const, primary: false });
 
-function liquidAssets(s: PreviewState, goal: Goal): LiquidAsset[] {
-  return goalAssets(s, goal.id).filter((a): a is LiquidAsset => a.type === "liquid");
+function msbAssets(s: PreviewState, goal: Goal): MsbAsset[] {
+  return goalAssets(s, goal.id).filter((a): a is MsbAsset => a.type === "msb");
 }
-function fixedAssets(s: PreviewState, goal: Goal): FixedAsset[] {
-  return goalAssets(s, goal.id).filter((a): a is FixedAsset => a.type === "fixed");
+function declaredAssets(s: PreviewState, goal: Goal): DeclaredAsset[] {
+  return goalAssets(s, goal.id).filter((a): a is DeclaredAsset => a.type === "declared");
 }
 const holding = (a: Asset) => a.status === "held";
 
@@ -176,7 +176,7 @@ const maturity: SuggestionRule = {
   perGoal: true,
   build(s, goal, force) {
     if (!goal) return null;
-    const deposits = liquidAssets(s, goal).filter((a) => a.category === "term_deposit" && a.maturityDate);
+    const deposits = msbAssets(s, goal).filter((a) => a.category === "term_deposit" && a.maturityDate);
     const hit =
       deposits.find((a) => a.status === "matured") ??
       deposits.find((a) => holding(a) && daysBetween(s.clock.today, a.maturityDate!) <= 14) ??
@@ -207,8 +207,8 @@ const fundDrop: SuggestionRule = {
   perGoal: true,
   build(s, goal, force) {
     if (!goal || !isSaving(goal)) return null;
-    const funds = liquidAssets(s, goal).filter((a) => a.category === "fund" && holding(a));
-    const dropOf = (a: LiquidAsset) => (a.costBasis > 0 ? ((a.costBasis - a.value) / a.costBasis) * 100 : 0);
+    const funds = msbAssets(s, goal).filter((a) => a.category === "fund" && holding(a));
+    const dropOf = (a: MsbAsset) => (a.costBasis > 0 ? ((a.costBasis - a.value) / a.costBasis) * 100 : 0);
     const hit = funds.find((a) => dropOf(a) >= 5) ?? (force ? funds[0] : undefined);
     if (!hit) return null;
     const near = monthsLeft(s.clock.today, goal.targetDate) <= 12 || progressPct(s, goal) >= 70;
@@ -219,7 +219,7 @@ const fundDrop: SuggestionRule = {
       body: `“${hit.name}” thấp hơn giá vốn khoảng ${drop}%, trong khi “${goal.name}” còn ${monthsLeft(s.clock.today, goal.targetDate)} tháng. Bạn có thể chuyển một phần sang tiền gửi an toàn để giữ phần đã có.`,
       tone: "warning",
       actions: [
-        { label: "Xem tài sản", nav: { screen: "LiquidAssetDetail", params: { goalId: goal.id, assetId: hit.id } } },
+        { label: "Xem tài sản", nav: { screen: "MsbAssetDetail", params: { goalId: goal.id, assetId: hit.id } } },
         later(`${this.key}:${goal.id}`, "Giữ nguyên"),
       ],
     });
@@ -266,7 +266,7 @@ const behindPlan: SuggestionRule = {
       body: `Để kịp ${formatISODate(goal.targetDate)}, “${goal.name}” cần thêm khoảng ${formatVnd(required)}/tháng. Có vài cách điều chỉnh nhẹ nhàng, bạn xem thử nhé.`,
       tone: "warning",
       actions: [
-        { label: "Xem cách điều chỉnh", nav: { screen: "OptionsCompare", params: { goalId: goal.id } } },
+        { label: "Xem cách điều chỉnh", nav: { screen: "GoalDetail", params: { goalId: goal.id } } },
         { label: "Chi tiết mục tiêu", nav: { screen: "GoalDetail", params: { goalId: goal.id } } },
       ],
     });
@@ -293,7 +293,7 @@ const loanBlocked: SuggestionRule = {
       tone: "warning",
       actions: [
         { label: "Xem vì sao", nav: { screen: "LoanBlocked", params: { goalId: goal.id } } },
-        { label: "Điều chỉnh mục tiêu", nav: { screen: "OptionsCompare", params: { goalId: goal.id } } },
+        { label: "Điều chỉnh mục tiêu", nav: { screen: "GoalDetail", params: { goalId: goal.id } } },
       ],
     });
   },
@@ -392,12 +392,12 @@ const revalue: SuggestionRule = {
   key: "revalue_asset",
   kind: "revalue_asset",
   label: "Định giá tài sản đã cũ",
-  when: "Tài sản cố định được định giá cách đây hơn 6 tháng",
+  when: "Tài sản tự khai được định giá cách đây hơn 6 tháng",
   urgency: 40,
   perGoal: true,
   build(s, goal, force) {
     if (!goal || !isSaving(goal)) return null;
-    const stale = fixedAssets(s, goal).filter(holding);
+    const stale = declaredAssets(s, goal).filter(holding);
     const hit = stale.find((a) => daysBetween(a.valuationDate, s.clock.today) > 180) ?? (force ? stale[0] : undefined);
     if (!hit) return null;
     const months = Math.max(1, Math.floor(daysBetween(hit.valuationDate, s.clock.today) / 30));
@@ -517,7 +517,7 @@ export interface FiredSuggestion {
 }
 
 function candidateGoals(state: PreviewState): Goal[] {
-  return state.goals.filter((g) => g.status !== "draft");
+  return state.goals;
 }
 
 /** Every suggestion whose condition holds now, with the rule that fired, most urgent first. */

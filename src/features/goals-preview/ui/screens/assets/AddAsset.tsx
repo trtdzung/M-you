@@ -6,8 +6,8 @@ import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInstrument, hydrateMarket, instrumentsOf, MARKET_INSTRUMENTS, type MarketInstrument, type MarketKind } from "../../../data/market";
 import { addMonths, outsideValue, seriesPriceAt } from "../../../engine";
-import { paramString, type ScreenProps } from "../../../model/screens";
-import type { FixedAssetCategory } from "../../../model/types";
+import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
+import type { DeclaredAssetCategory } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { AmountCard, SuggestChip } from "../../shared/AmountCard";
 import { InfoTooltip } from "../../shared/InfoTooltip";
@@ -15,11 +15,12 @@ import { Switch } from "../../shared/Pickers";
 import { BottomActions, ConfirmSheet, EmptyState, ScreenHeader, SliderRow, SourceTag } from "../../shared";
 import { card, input, label, primaryButton, ring, screenPadding, secondaryButton, sectionTitle } from "../../shared/styles";
 import { findGoal, pct, progressAfter, dateVi } from "./helpers";
+import { countedValue as wizardCounted, wizardAssets } from "../create/wizard";
 
 type Valuation = "manual" | "market" | "accrual";
 
 interface TypeDef {
-  category: FixedAssetCategory;
+  category: DeclaredAssetCategory;
   label: string;
   Icon: LucideIcon;
   placeholder: string;
@@ -44,7 +45,7 @@ const FINANCIAL: TypeDef[] = [
 
 const TERMS: Record<"deposit" | "bond", number[]> = { deposit: [6, 12, 24, 36], bond: [12, 24, 36, 60] };
 
-function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeDef[]; value: FixedAssetCategory; onPick: (t: TypeDef) => void }) {
+function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeDef[]; value: DeclaredAssetCategory; onPick: (t: TypeDef) => void }) {
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-[13px] font-semibold text-muted">{title}</h3>
@@ -71,9 +72,15 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
 }
 
 /** Thêm tài sản ngoài MSB: tài sản vật chất (tự khai giá) hoặc tài sản tài chính ở nơi khác (tự định giá). */
-export function AddFixedAsset({ params }: ScreenProps) {
+export function AddAsset({ params }: ScreenProps) {
   const { state, dispatch, nav } = usePreview();
-  const goal = findGoal(state, paramString(params, "goalId"));
+  // Chế độ tạo mục tiêu: chưa có mục tiêu, tài sản được gom vào tham số của màn trước (popWith).
+  const wizard = paramString(params, "wizard") === "1";
+  const existingGoal = findGoal(state, paramString(params, "goalId"));
+  const wizardGoal = wizard
+    ? { name: paramString(params, "name") ?? "Mục tiêu mới", target: paramNumber(params, "targetAmount") ?? 0, deposit: paramNumber(params, "deposit") ?? 0, assets: wizardAssets(params) }
+    : undefined;
+  const goal = existingGoal ?? (wizardGoal ? { id: "wizard", name: wizardGoal.name } : undefined);
   const today = state.clock.today;
   const shift = state.market.fundPriceShiftPct;
 
@@ -158,7 +165,13 @@ export function AddFixedAsset({ params }: ScreenProps) {
 
   const effPercent = counted ? percent : 0;
   const countedValue = Math.round((assetValue * effPercent) / 100);
-  const progress = progressAfter(state, goal, countedValue);
+  const progress = wizardGoal
+    ? (() => {
+        const base = wizardGoal.deposit + wizardGoal.assets.reduce((sum, a) => sum + wizardCounted(a), 0);
+        const t = wizardGoal.target || 1;
+        return { before: (base / t) * 100, after: ((base + countedValue) / t) * 100 };
+      })()
+    : progressAfter(state, existingGoal!, countedValue);
   const finalName =
     name.trim() ||
     (type.valuation === "market" && instrument ? instrument.name : type.valuation === "accrual" && institution.trim() ? `${type.label} · ${institution.trim()}` : type.label);
@@ -345,9 +358,7 @@ export function AddFixedAsset({ params }: ScreenProps) {
         confirmLabel="Thêm tài sản"
         onClose={() => setConfirm(false)}
         onConfirm={() => {
-          dispatch({
-            type: "addFixedAsset",
-            goalId: goal.id,
+          const asset = {
             name: finalName,
             category: type.category,
             value: assetValue,
@@ -356,7 +367,12 @@ export function AddFixedAsset({ params }: ScreenProps) {
             source,
             ...(type.valuation === "market" ? { instrumentId, quantity: qty } : {}),
             ...(type.valuation === "accrual" ? { accrual, institution: institution.trim() || undefined } : {}),
-          });
+          };
+          if (wizardGoal) {
+            nav.popWith({ assets: JSON.stringify([...wizardGoal.assets, asset]) });
+            return;
+          }
+          dispatch({ type: "addAsset", goalId: goal.id, ...asset });
           nav.pop();
         }}
       />

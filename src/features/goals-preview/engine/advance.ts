@@ -3,6 +3,7 @@ import type { WorldState } from "../model/state";
 import type { ISODate } from "../model/types";
 import { addDays, dayOfMonth, formatMonths, nextDayOfMonth } from "./dates";
 import { findGoal, postTxn } from "./ledger";
+import { settleToMain } from "./settle";
 import { applyLifecycle, refreshLoanStatuses, type LifecycleEvent } from "./lifecycle";
 import { depositAccrued, fundPriceAt } from "./value";
 import { formatVnd } from "@/features/goals-preview/format-money";
@@ -124,7 +125,7 @@ export function advanceTime<S extends WorldState>(state: S, days: number): { sta
     }
 
     for (const asset of draft.assets) {
-      if (asset.type !== "liquid" || asset.status !== "held") continue;
+      if (asset.type !== "msb" || asset.status !== "held") continue;
       if (asset.category === "term_deposit" && asset.maturityDate && asset.maturityDate <= date && asset.principal !== undefined) {
         asset.status = "matured";
         asset.value = asset.principal + depositAccrued(asset.principal, asset.ratePa ?? 0, asset.createdAt, asset.maturityDate);
@@ -133,13 +134,19 @@ export function advanceTime<S extends WorldState>(state: S, days: number): { sta
       }
     }
 
+    for (const asset of draft.assets) {
+      if (asset.type !== "msb" || (asset.status !== "held" && asset.status !== "matured") || !asset.settleOn || asset.settleOn > date) continue;
+      const goal = findGoal(draft, asset.goalId);
+      if (goal) settleToMain(draft, goal, asset, date);
+    }
+
     payDueInstalments(draft, date, summary);
     summary.lifecycle.push(...applyLifecycle(draft, date));
   }
 
   // Fund prices: snapshot the latest price on each holding.
   for (const asset of draft.assets) {
-    if (asset.type !== "liquid" || asset.category !== "fund" || asset.status !== "held" || asset.units === undefined) continue;
+    if (asset.type !== "msb" || asset.category !== "fund" || asset.status !== "held" || asset.units === undefined) continue;
     const product = getInvestProduct(asset.productId);
     if (product?.kind !== "fund") continue;
     asset.price = fundPriceAt(product, date, draft.market.fundPriceShiftPct);

@@ -11,7 +11,7 @@
  */
 
 import type { Transaction } from "@/domain/models";
-import { isRebalanceCategory } from "@/domain/models";
+import { isGoalCategory, isRebalanceCategory } from "@/domain/models";
 import { coverageOf, isoInPeriod, type AggregateMeta, type Period } from "./types";
 
 export interface CategoryAmount {
@@ -60,6 +60,8 @@ export function signedExpenseContribution(txn: Transaction, period: Period): num
   // spend-by-category + jar `spent` + cashflow expense exactly like a transfer
   // (invariant #6). The engine folds them into each jar's `balance` via `rebalanceNetByJar`.
   if (isRebalanceCategory(txn.categoryId)) return null;
+  // Money moving through a goal account is the customer's own saving, not spend.
+  if (isGoalCategory(txn.categoryId)) return null;
   if (EXPENSE_TYPES.has(txn.type)) return txn.amount;
   if (txn.type === "refund") return -txn.amount;
   return null;

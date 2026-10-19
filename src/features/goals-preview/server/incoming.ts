@@ -9,7 +9,7 @@ import "server-only";
  */
 
 import { randomUUID } from "node:crypto";
-import { CATEGORY, type Account, type Transaction } from "@/domain/models";
+import { GOAL_CATEGORY, type Account, type Transaction } from "@/domain/models";
 import { AccountNotFoundError, readAccounts } from "@/lib/accounts-store";
 import { upsertManualTxn } from "@/lib/manual-txns-store";
 import { readTransactions } from "@/lib/transactions-store";
@@ -181,7 +181,7 @@ export function transferToOwnGoalAccount(cif: string, sourceAccountId: string, a
     if (source.b < amount) throw new GoalTransferRejectedError("Số dư không đủ để hoàn tất giao dịch.");
 
     const transferGroupId = `gtg-${randomUUID()}`;
-    const debit: Transaction = { ...record, type: "transfer", categoryId: CATEGORY.transfer, transferGroupId };
+    const debit: Transaction = { ...record, type: "transfer", categoryId: GOAL_CATEGORY.deposit, transferGroupId };
     const credit: Transaction = {
       id: `${txn.id}-credit`,
       accountId: target.account_id,
@@ -192,7 +192,7 @@ export function transferToOwnGoalAccount(cif: string, sourceAccountId: string, a
       type: "transfer",
       merchantName: "Nhận chuyển khoản",
       merchantNormalizedName: "goal transfer",
-      categoryId: CATEGORY.transfer,
+      categoryId: GOAL_CATEGORY.deposit,
       status: "posted",
       source: "mock",
       isRecurring: false,

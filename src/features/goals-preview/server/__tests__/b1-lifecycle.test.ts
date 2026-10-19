@@ -56,11 +56,8 @@ describe("Chuỗi B1 lifecycle + bảo toàn tiền", () => {
     const baselineCasa = casaBalance(readAccounts(CIF));
     const baselinePool = Number(casaPool(readAccounts(CIF)).amount);
 
-    act("b1-create", { type: "createGoal", input: goalInput("B1 goal") });
+    act("b1-create", { type: "createGoal", input: { ...goalInput("B1 goal"), initialDeposit: 2_000_000 } });
     const g = world.goals.at(-1)!.id;
-    expect(wealth(CIF, world)).toBe(w0);
-
-    act("b1-open", { type: "openAccount", goalId: g, initialDeposit: 2_000_000 });
     expect(wealth(CIF, world)).toBe(w0);
     expect(casaBalance(readAccounts(CIF))).toBe(baselineCasa - 2_000_000);
     expect(Number(casaPool(readAccounts(CIF)).amount)).toBe(baselinePool - 2_000_000);

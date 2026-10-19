@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
 import { assetGain, assetValue, depositAccrued, fundPriceAt, formatISOMonth } from "../../../engine";
-import { LIQUID_CATEGORY_LABEL } from "../../../model/labels";
+import { MSB_CATEGORY_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
@@ -16,12 +16,12 @@ import { InfoTooltip } from "../../shared/InfoTooltip";
 import { dateVi, findGoal } from "./helpers";
 
 /** Chi tiết tài sản linh hoạt (sản phẩm MSB). */
-export function LiquidAssetDetail({ params, embedded = false, onNavigate }: ScreenProps & { embedded?: boolean; onNavigate?: () => void }) {
+export function MsbAssetDetail({ params, embedded = false, onNavigate }: ScreenProps & { embedded?: boolean; onNavigate?: () => void }) {
   const { state, nav } = usePreview();
   const asset = selectAsset(state, paramString(params, "assetId"));
   const goal = findGoal(state, asset?.goalId);
 
-  if (!asset || asset.type !== "liquid" || !goal) {
+  if (!asset || asset.type !== "msb" || !goal) {
     return (
       <div className={screenPadding}>
         <ScreenHeader title="Chi tiết tài sản" />
@@ -58,7 +58,7 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
     asset.principal !== undefined && asset.ratePa !== undefined && asset.maturityDate ? asset.principal + depositAccrued(asset.principal, asset.ratePa, asset.createdAt, asset.maturityDate) : undefined;
 
   const rows = [
-    { label: "Loại", value: LIQUID_CATEGORY_LABEL[asset.category] },
+    { label: "Loại", value: MSB_CATEGORY_LABEL[asset.category] },
     ...(asset.units !== undefined ? [{ label: "Số lượng", value: `${asset.units.toLocaleString("vi-VN")} ${asset.category === "bond" ? "trái phiếu" : "chứng chỉ quỹ"}` }] : []),
     ...(asset.price !== undefined && asset.category === "fund"
       ? [{ label: "Giá hiện tại / đơn vị", value: <Amount amount={chart.length ? chart[chart.length - 1].price : asset.price} source="msb" /> }]
@@ -71,7 +71,7 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
   return (
     <div className={embedded ? "flex min-h-0 flex-1 flex-col" : screenPadding}>
       <div className={embedded ? "no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4" : "flex flex-col gap-4"}>
-      {!embedded && <ScreenHeader title={asset.name} subtitle={`${LIQUID_CATEGORY_LABEL[asset.category]} · ${goal.name}`} />}
+      {!embedded && <ScreenHeader title={asset.name} subtitle={`${MSB_CATEGORY_LABEL[asset.category]} · ${goal.name}`} />}
 
       {isDeposit ? (
         <>

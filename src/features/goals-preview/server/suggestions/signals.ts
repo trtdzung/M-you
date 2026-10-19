@@ -14,7 +14,7 @@ import { goalOptions, isSaving, requiredMonthly } from "../../engine/feasibility
 import { idleCash, investSuggestions } from "../../engine/invest";
 import { goalAssets, goalLoan, goalValue, progressPct, progressState, remainingAmount } from "../../engine/value";
 import type { AgentSuggestion, PreviewState, SuggestionAction, SuggestionKind, WorldState } from "../../model/state";
-import type { Goal, LiquidAsset } from "../../model/types";
+import type { Goal, MsbAsset } from "../../model/types";
 
 export type SignalFacts = Record<string, number | string>;
 
@@ -161,7 +161,7 @@ function goalFacts(s: PreviewState, goal: Goal): SignalFacts {
   return facts;
 }
 
-const fundDropPct = (a: LiquidAsset) => (a.costBasis > 0 ? ((a.costBasis - a.value) / a.costBasis) * 100 : 0);
+const fundDropPct = (a: MsbAsset) => (a.costBasis > 0 ? ((a.costBasis - a.value) / a.costBasis) * 100 : 0);
 
 /** Số riêng của từng luật (đặt tên rõ cho agent). Các số khác trong lời viết sẵn được bắt thêm ở `withTextNumbers`. */
 function ruleFacts(s: PreviewState, kind: string, goal: Goal | undefined): SignalFacts {
@@ -189,7 +189,7 @@ function ruleFacts(s: PreviewState, kind: string, goal: Goal | undefined): Signa
       break;
     case "maturity": {
       const deposits = goalAssets(s, goal.id).filter(
-        (a): a is LiquidAsset => a.type === "liquid" && a.category === "term_deposit" && !!a.maturityDate,
+        (a): a is MsbAsset => a.type === "msb" && a.category === "term_deposit" && !!a.maturityDate,
       );
       const hit = deposits.find((a) => a.status === "matured") ?? deposits.find((a) => a.status === "held" && daysBetween(today, a.maturityDate!) <= 14);
       if (hit) {
@@ -202,7 +202,7 @@ function ruleFacts(s: PreviewState, kind: string, goal: Goal | undefined): Signa
     }
     case "fund_drop": {
       const hit = goalAssets(s, goal.id).find(
-        (a): a is LiquidAsset => a.type === "liquid" && a.category === "fund" && a.status === "held" && fundDropPct(a) >= 5,
+        (a): a is MsbAsset => a.type === "msb" && a.category === "fund" && a.status === "held" && fundDropPct(a) >= 5,
       );
       if (hit) {
         facts.fund_name = hit.name;
@@ -230,7 +230,7 @@ function ruleFacts(s: PreviewState, kind: string, goal: Goal | undefined): Signa
       break;
     }
     case "revalue_asset": {
-      const hit = goalAssets(s, goal.id).find((a) => a.type === "fixed" && a.status === "held" && daysBetween(a.valuationDate, today) > 180);
+      const hit = goalAssets(s, goal.id).find((a) => a.type === "declared" && a.status === "held" && daysBetween(a.valuationDate, today) > 180);
       if (hit) {
         facts.asset_name = hit.name;
         facts.asset_value = hit.value;

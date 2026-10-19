@@ -6,7 +6,6 @@ const BADGE = "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-x
 
 /** One colour per lifecycle status, used everywhere. */
 export const STATUS_TONE: Record<GoalStatus, string> = {
-  draft: "bg-surface-muted text-muted",
   accumulating: "bg-source-msb-soft text-source-msb",
   paused: "bg-surface-muted text-muted",
   achieved: "bg-source-self-soft text-source-self",

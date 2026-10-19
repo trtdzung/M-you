@@ -68,7 +68,7 @@ export function DepositFlow({ params }: ScreenProps) {
               </span>
             </div>
             <SplitProgressBar
-              cash={stage.principalPaid + value.cash}
+              cash={stage.repaid + value.cash}
               assets={value.assets}
               pending={valid ? amount! : 0}
               target={stage.target}

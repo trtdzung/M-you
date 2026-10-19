@@ -8,13 +8,10 @@ import type { Goal } from "../model/types";
  * screen from the flow map or the test panel, based on the current state.
  */
 
-const NEEDS_FIXED_ASSET: ScreenId[] = ["RevalueAsset"];
-const NEEDS_LIQUID_ASSET: ScreenId[] = ["LiquidAssetDetail", "SellAsset", "MaturityChoice"];
+const NEEDS_DECLARED_ASSET: ScreenId[] = ["RevalueAsset"];
+const NEEDS_MSB_ASSET: ScreenId[] = ["MsbAssetDetail", "SellAsset", "MaturityChoice"];
 const NEEDS_LOAN: ScreenId[] = ["Prepay", "RepayOverview", "RepaySchedule"];
 const NEEDS_GOAL: ScreenId[] = [
-  "OpeningFunds",
-  "FeasibilityResult",
-  "OptionsCompare",
   "OpenAccountConfirm",
   "StandingOrderSetup",
   "CreateSuccess",
@@ -22,10 +19,11 @@ const NEEDS_GOAL: ScreenId[] = [
   "DepositFlow",
   "WithdrawFlow",
   "StandingOrderManage",
+  "EditTarget",
   "CloseGoalFlow",
-  "AddFixedAsset",
+  "AddAsset",
   "RevalueAsset",
-  "LiquidAssetDetail",
+  "MsbAssetDetail",
   "SellAsset",
   "InvestSuggest",
   "InvestConfirm",
@@ -52,8 +50,8 @@ function goalScore(state: PreviewState, screen: ScreenId, goal: Goal): number {
   let score = 0;
   if (goal.status === "accumulating" || goal.status === "repaying") score += 1;
   const assets = state.assets.filter((a) => a.goalId === goal.id && a.status !== "sold");
-  if (NEEDS_FIXED_ASSET.includes(screen) && assets.some((a) => a.type === "fixed")) score += 10;
-  if (NEEDS_LIQUID_ASSET.includes(screen) && assets.some((a) => a.type === "liquid")) score += 10;
+  if (NEEDS_DECLARED_ASSET.includes(screen) && assets.some((a) => a.type === "declared")) score += 10;
+  if (NEEDS_MSB_ASSET.includes(screen) && assets.some((a) => a.type === "msb")) score += 10;
   if (NEEDS_LOAN.includes(screen) && state.loans.some((l) => l.goalId === goal.id)) score += 10;
   if (screen === "StandingOrderManage" && goal.standingOrder) score += 10;
   if (screen === "MissedOptions" && goal.status === "missed") score += 10;
@@ -73,16 +71,16 @@ export function resolveJump(state: PreviewState, screen: ScreenId, preferredGoal
   const params: ScreenParams = { goalId: goal.id };
   let missing: string | undefined;
   const assets = state.assets.filter((a) => a.goalId === goal.id && a.status !== "sold");
-  if (NEEDS_FIXED_ASSET.includes(screen)) {
-    const a = assets.find((x) => x.type === "fixed");
+  if (NEEDS_DECLARED_ASSET.includes(screen)) {
+    const a = assets.find((x) => x.type === "declared");
     if (a) params.assetId = a.id;
-    else missing = "mục tiêu này chưa có tài sản cố định";
+    else missing = "mục tiêu này chưa có tài sản tự khai";
   }
-  if (NEEDS_LIQUID_ASSET.includes(screen) || screen === "InvestConfirm") {
+  if (NEEDS_MSB_ASSET.includes(screen) || screen === "InvestConfirm") {
     const a =
-      assets.find((x) => x.type === "liquid" && x.status === "matured") ?? assets.find((x) => x.type === "liquid");
+      assets.find((x) => x.type === "msb" && x.status === "matured") ?? assets.find((x) => x.type === "msb");
     if (a) params.assetId = a.id;
-    else if (screen !== "InvestConfirm") missing = "mục tiêu này chưa có tài sản linh hoạt";
+    else if (screen !== "InvestConfirm") missing = "mục tiêu này chưa có khoản đầu tư MSB";
   }
   if (NEEDS_LOAN.includes(screen)) {
     const l = state.loans.find((x) => x.goalId === goal.id) ?? state.loans[0];

@@ -18,7 +18,7 @@ export function SellAsset({ params }: ScreenProps) {
   const asset = selectAsset(state, paramString(params, "assetId"));
   const goal = findGoal(state, asset?.goalId);
   const [percent, setPercent] = useState(100);
-  const [proceedsInput, setProceedsInput] = useState<number | null>(asset?.type === "fixed" ? assetValue(asset, state) : null);
+  const [proceedsInput, setProceedsInput] = useState<number | null>(asset?.type === "declared" ? assetValue(asset, state) : null);
   const [confirm, setConfirm] = useState(false);
 
   if (!asset || !goal || asset.status === "sold") {
@@ -30,20 +30,20 @@ export function SellAsset({ params }: ScreenProps) {
     );
   }
 
-  const isLiquid = asset.type === "liquid";
-  const quote = isLiquid ? quoteSale(state, asset) : undefined;
+  const isMsb = asset.type === "msb";
+  const quote = isMsb ? quoteSale(state, asset) : undefined;
   // Only funds can be sold in part; deposits and bonds are settled in full.
-  const partial = isLiquid && asset.category === "fund";
+  const partial = isMsb && asset.category === "fund";
   const fraction = partial ? percent / 100 : 1;
 
-  const proceeds = isLiquid ? Math.round((quote?.net ?? 0) * fraction) : proceedsInput ?? 0;
-  const fee = isLiquid ? Math.round((quote?.fee ?? 0) * fraction) : 0;
+  const proceeds = isMsb ? Math.round((quote?.net ?? 0) * fraction) : proceedsInput ?? 0;
+  const fee = isMsb ? Math.round((quote?.fee ?? 0) * fraction) : 0;
   // Cash in goal account goes up by proceeds; the asset's counted value goes away.
-  const removedCounted = Math.round(((isLiquid ? assetValue(asset, state) * fraction : assetValue(asset, state)) * asset.countPercent) / 100);
+  const removedCounted = Math.round(((isMsb ? assetValue(asset, state) * fraction : assetValue(asset, state)) * asset.countPercent) / 100);
   const delta = proceeds - removedCounted;
   const progress = progressAfter(state, goal, delta);
   const valid = proceeds > 0;
-  const verb = isLiquid && asset.category === "term_deposit" ? "Tất toán" : "Bán";
+  const verb = isMsb && asset.category === "term_deposit" ? "Tất toán" : "Bán";
 
   return (
     <div className={screenPadding}>
@@ -54,7 +54,7 @@ export function SellAsset({ params }: ScreenProps) {
           <p className="text-[13px] text-muted">Giá trị hiện tại</p>
           {quote?.early && <InfoTooltip warning label="tất toán trước hạn" text={`${quote.note}. ${quote.lostInterest > 0 ? `Phần lãi bị giảm theo báo giá hiện tại: ${formatVnd(quote.lostInterest)}.` : "Kiểm tra mức lãi áp dụng khi tất toán trước hạn trước khi xác nhận."}`} />}
         </div>
-        <Amount amount={isLiquid ? quote?.gross : assetValue(asset, state)} source={asset.source} className="text-2xl font-bold" />
+        <Amount amount={isMsb ? quote?.gross : assetValue(asset, state)} source={asset.source} className="text-2xl font-bold" />
       </section>
 
       {partial && (
@@ -78,20 +78,20 @@ export function SellAsset({ params }: ScreenProps) {
         </section>
       )}
 
-      {!isLiquid && (
+      {!isMsb && (
         <section className={cn(card, "flex flex-col gap-2")}>
           <MoneyInput label="Số tiền bán được" value={proceedsInput} onChange={setProceedsInput} hint="Tiền bán sẽ ghi vào tài khoản mục tiêu. Bạn tự khai số tiền." />
         </section>
       )}
 
-      {!isLiquid && asset.countPercent > 0 && <p className={hint}>Khi bán, phần tài sản đang tính vào mục tiêu sẽ được thay bằng tiền mặt.</p>}
+      {!isMsb && asset.countPercent > 0 && <p className={hint}>Khi bán, phần tài sản đang tính vào mục tiêu sẽ được thay bằng tiền mặt.</p>}
 
       <section className={cn(card, "flex flex-col gap-2")}>
         <div className="flex items-center justify-between gap-2"><h2 className={sectionTitle}>Bạn nhận được</h2>{quote && !quote.early && quote.fee > 0 && <InfoTooltip warning label="phí bán tài sản" text={`${quote.note}.`} />}</div>
         <SummaryRows
           rows={[
             ...(fee > 0 ? [{ label: "Phí bán", value: fee, source: "msb" as const }] : []),
-            { label: "Tiền về tài khoản mục tiêu", value: proceeds, source: isLiquid ? ("msb" as const) : ("self_reported" as const), emphasis: true },
+            { label: "Tiền về tài khoản mục tiêu", value: proceeds, source: isMsb ? ("msb" as const) : ("self_reported" as const), emphasis: true },
             { label: "Tiến độ mục tiêu", value: `${pct(progress.before)} → ${pct(progress.after)}` },
           ]}
         />
@@ -111,15 +111,15 @@ export function SellAsset({ params }: ScreenProps) {
           { label: "Tài sản", value: asset.name },
           ...(partial ? [{ label: "Phần bán", value: `${percent}%` }] : []),
           ...(fee > 0 ? [{ label: "Phí bán", value: fee, source: "msb" as const }] : []),
-          { label: "Tiền về tài khoản mục tiêu", value: proceeds, source: isLiquid ? ("msb" as const) : ("self_reported" as const), emphasis: true },
+          { label: "Tiền về tài khoản mục tiêu", value: proceeds, source: isMsb ? ("msb" as const) : ("self_reported" as const), emphasis: true },
         ]}
         note={quote?.early ? `Tất toán trước hạn, mất khoảng ${formatVnd(quote.lostInterest)} tiền lãi.` : undefined}
         confirmLabel={verb}
         onClose={() => setConfirm(false)}
         onConfirm={() => {
-          dispatch(isLiquid ? { type: "sellAsset", assetId: asset.id, fraction } : { type: "sellAsset", assetId: asset.id, proceeds });
+          dispatch(isMsb ? { type: "sellAsset", assetId: asset.id, fraction } : { type: "sellAsset", assetId: asset.id, proceeds });
           const prev = nav.stack[nav.stack.length - 2];
-          nav.pop(fraction >= 1 && prev?.screen === "LiquidAssetDetail" ? 2 : 1);
+          nav.pop(fraction >= 1 && prev?.screen === "MsbAssetDetail" ? 2 : 1);
         }}
       />
     </div>

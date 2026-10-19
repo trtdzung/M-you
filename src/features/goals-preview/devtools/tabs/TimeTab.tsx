@@ -19,8 +19,8 @@ export function TimeTab({ goal }: { goal: Goal | undefined }) {
   const toDue = goal ? daysBetween(today, goal.targetDate) : 0;
 
   const deposits = state.assets
-    .filter((a) => a.type === "liquid" && a.status === "held" && a.maturityDate && (!goal || a.goalId === goal.id))
-    .map((a) => (a.type === "liquid" && a.maturityDate ? { name: a.name, days: daysBetween(today, a.maturityDate) } : null))
+    .filter((a) => a.type === "msb" && a.status === "held" && a.maturityDate && (!goal || a.goalId === goal.id))
+    .map((a) => (a.type === "msb" && a.maturityDate ? { name: a.name, days: daysBetween(today, a.maturityDate) } : null))
     .filter((x): x is { name: string; days: number } => !!x && x.days > 0)
     .sort((a, b) => a.days - b.days);
 

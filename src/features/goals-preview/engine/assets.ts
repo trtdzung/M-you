@@ -1,16 +1,16 @@
 import { getInvestProduct } from "../data/products";
 import type { WorldState } from "../model/state";
-import type { Asset, FixedAsset, FixedAssetCategory, ISODate, LiquidAssetCategory, ValueSource } from "../model/types";
+import type { Asset, DeclaredAsset, DeclaredAssetCategory, ISODate, MsbAssetCategory, ValueSource } from "../model/types";
 import { addMonths } from "./dates";
 import { nextId } from "./ledger";
 import { depositAccrued, fundPriceAt } from "./value";
 
 /** Asset factories shared by scenario fixtures and the store reducer. */
 
-export interface FixedAssetSpec {
-  type: "fixed";
+export interface DeclaredAssetSpec {
+  type: "declared";
   name: string;
-  category: FixedAssetCategory;
+  category: DeclaredAssetCategory;
   value: number;
   costBasis?: number;
   valuationDate: ISODate;
@@ -18,13 +18,13 @@ export interface FixedAssetSpec {
   source?: ValueSource;
   instrumentId?: string;
   quantity?: number;
-  accrual?: FixedAsset["accrual"];
+  accrual?: DeclaredAsset["accrual"];
   institution?: string;
 }
 
-export interface LiquidAssetSpec {
-  type: "liquid";
-  category: LiquidAssetCategory;
+export interface MsbAssetSpec {
+  type: "msb";
+  category: MsbAssetCategory;
   productId: string;
   name?: string;
   /** Cash moved out of the goal account to buy it. */
@@ -33,13 +33,13 @@ export interface LiquidAssetSpec {
   termMonths?: number;
 }
 
-export function makeAsset(world: WorldState, goalId: string, spec: FixedAssetSpec | LiquidAssetSpec, createdAt: ISODate): Asset {
+export function makeAsset(world: WorldState, goalId: string, spec: DeclaredAssetSpec | MsbAssetSpec, createdAt: ISODate): Asset {
   const id = nextId(world, "asset");
-  if (spec.type === "fixed") {
+  if (spec.type === "declared") {
     return {
       id,
       goalId,
-      type: "fixed",
+      type: "declared",
       name: spec.name,
       category: spec.category,
       costBasis: spec.costBasis ?? spec.value,
@@ -58,7 +58,7 @@ export function makeAsset(world: WorldState, goalId: string, spec: FixedAssetSpe
   const base = {
     id,
     goalId,
-    type: "liquid" as const,
+    type: "msb" as const,
     category: spec.category,
     productId: spec.productId,
     name: spec.name ?? product?.name ?? "Sản phẩm MSB",

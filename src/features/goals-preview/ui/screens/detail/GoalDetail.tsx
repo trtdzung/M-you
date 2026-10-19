@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, MoreVertical, Pause, Play, XCircle } from "lucide-react";
+import { ChevronRight, MoreVertical, Pause, Pencil, Play, XCircle } from "lucide-react";
 import { Sheet, SegmentedControl } from "@/components/primitives";
 import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { daysBetween, formatISODate, phaseOneResult } from "../../../engine";
 import { agentCardsFor } from "./agentCards";
-import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";
+import { goalEmoji, TEMPLATE_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadge";
@@ -50,12 +50,15 @@ export function GoalDetail({ params }: ScreenProps) {
   const cards = agentCardsFor(state, goalId);
   const canPause = goal.status === "accumulating" || goal.status === "repaying";
   const canClose = !history;
+  // Giá trị mục tiêu chỉnh được khi chưa kết thúc và chưa sang giai đoạn trả nợ (giai đoạn 2 mục tiêu là khoản vay).
+  const canEditTarget = !history && phase === 1;
+  const openEdit = () => nav.push("EditTarget", { goalId });
 
   return (
     <div className="flex flex-col gap-4 pb-6">
       <ScreenHeader
         title={goal.name}
-        subtitle={`${TEMPLATE_EMOJI[goal.template]} ${TEMPLATE_LABEL[goal.template]}`}
+        subtitle={`${goalEmoji(goal)} ${TEMPLATE_LABEL[goal.template]}`}
         right={
           (canPause || goal.status === "paused" || canClose) && (
             <button type="button" aria-label="Tuỳ chọn mục tiêu" onClick={() => setMenu(true)} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text hover:bg-surface/80 ${ring}`}>
@@ -65,22 +68,34 @@ export function GoalDetail({ params }: ScreenProps) {
         }
       />
 
-      <button type="button" aria-label="Xem chi tiết tiến độ mục tiêu" aria-haspopup="dialog" onClick={() => setProgressOpen(true)} className={`${card} flex w-full flex-col gap-3 text-left ${ring}`}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-muted">{history ? "Giá trị khi kết thúc" : phase === 2 ? "Giai đoạn 2 · Trả khoản vay" : "Đã tích luỹ"}</span>
-          <GoalStatusBadge status={goal.status} />
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className={heroNumber}>{formatVndCompact(shownTotal)}</span>
-          <span className="text-sm text-muted">/ {formatVndCompact(shownTarget)}{phase === 2 ? " nợ gốc" : ""}</span>
-        </div>
-        <SplitProgressBar cash={history ? shownTotal : stage.principalPaid + ctx.value.cash} assets={history ? 0 : ctx.value.assets} target={shownTarget} showLegend={false} />
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <span className="font-semibold text-text">{pct}% {phase === 2 ? "giai đoạn 2" : "mục tiêu"}</span>
-          <span className="text-muted">Hạn {formatISODate(stage.targetDate)}</span>
-        </div>
-        <span className="flex items-center justify-between text-[13px] font-semibold text-primary-strong">Xem chi tiết tiến độ <ChevronRight size={18} aria-hidden /></span>
-      </button>
+      <div className="relative">
+        <button type="button" aria-label="Xem chi tiết tiến độ mục tiêu" aria-haspopup="dialog" onClick={() => setProgressOpen(true)} className={`${card} flex w-full flex-col gap-3 text-left ${ring}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-muted">{history ? "Giá trị khi kết thúc" : phase === 2 ? "Giai đoạn 2 · Trả khoản vay" : "Đã tích luỹ"}</span>
+            <GoalStatusBadge status={goal.status} />
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className={heroNumber}>{formatVndCompact(shownTotal)}</span>
+            <span className="text-sm text-muted">/ {formatVndCompact(shownTarget)}{phase === 2 ? " nợ gốc" : ""}</span>
+          </div>
+          <SplitProgressBar cash={history ? shownTotal : stage.repaid + ctx.value.cash} assets={history ? 0 : ctx.value.assets} target={shownTarget} showLegend={false} />
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="font-semibold text-text">{pct}% {phase === 2 ? "giai đoạn 2" : "mục tiêu"}</span>
+            <span className="text-muted">Hạn {formatISODate(stage.targetDate)}</span>
+          </div>
+          <span className="flex items-center justify-between text-[13px] font-semibold text-primary-strong">Xem chi tiết tiến độ <ChevronRight size={18} aria-hidden /></span>
+        </button>
+        {canEditTarget && (
+          <button
+            type="button"
+            aria-label="Chỉnh sửa mục tiêu"
+            onClick={openEdit}
+            className={`absolute right-3 top-[50px] flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-muted ${ring}`}
+          >
+            <Pencil size={16} aria-hidden />
+          </button>
+        )}
+      </div>
 
       {phaseOne && (
         <section className={`${card} flex flex-col gap-2`} aria-label="Kết quả giai đoạn 1">
@@ -103,8 +118,7 @@ export function GoalDetail({ params }: ScreenProps) {
           ...(!history ? [
             ...(phase === 2 ? [{ label: "Gốc đã trả", value: stage.principalPaid, source: "msb" as const }] : []),
             { label: "Tiền trong tài khoản mục tiêu", value: ctx.value.cash, source: "msb" as const },
-            ...(ctx.value.liquid > 0 ? [{ label: "Tài sản linh hoạt", value: ctx.value.liquid, source: "msb" as const }] : []),
-            ...(ctx.value.fixedCounted > 0 ? [{ label: "Tài sản cố định được tính", value: ctx.value.fixedCounted, source: "self_reported" as const, hint: "Giá trị tự khai sau khi áp dụng tỷ lệ tính vào mục tiêu" }] : []),
+            ...(ctx.value.msb + ctx.value.declaredCounted > 0 ? [{ label: "Tài sản được tính", value: ctx.value.msb + ctx.value.declaredCounted, hint: "Giá trị tài sản sau khi áp dụng tỷ lệ tính vào mục tiêu" }] : []),
             { label: "Còn cần tích luỹ", value: Math.max(0, shownTarget - shownTotal) },
             ...(phase === 2 ? [{ label: "Dư nợ gốc còn lại", value: stage.outstanding, source: "msb" as const }] : []),
           ] : []),

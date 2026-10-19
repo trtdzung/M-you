@@ -45,7 +45,7 @@ export function buildAgentRequest(cif: string, world: WorldState, signals: Sugge
       risk_profile: customer.riskProfile,
     },
     goals: world.goals
-      .filter((g) => g.status !== "draft" && g.status !== "closed")
+      .filter((g) => g.status !== "closed")
       .map((g) => ({
         id: g.id,
         name: g.name,

@@ -89,6 +89,34 @@ export function isRebalanceCategory(id: string): boolean {
 }
 
 /**
+ * System categories for money moving through a goal account (Mục tiêu). Like
+ * `REBALANCE_CATEGORY` they are deliberately kept OUT of `CATEGORIES`/`CATEGORY_BY_ID`:
+ * they belong to no spending jar, are never an AI suggestion target and never count as spend.
+ */
+export const GOAL_CATEGORY = {
+  deposit: "muc-tieu-nap",
+  withdraw: "muc-tieu-rut",
+  purchase: "muc-tieu-mua-tai-san",
+  invest: "muc-tieu-dau-tu",
+  interest: "muc-tieu-lai",
+  repay: "muc-tieu-tra-no",
+} as const;
+
+export const GOAL_CATEGORY_LABEL: Record<string, string> = {
+  [GOAL_CATEGORY.deposit]: "Nạp tiền mục tiêu",
+  [GOAL_CATEGORY.withdraw]: "Rút tiền mục tiêu",
+  [GOAL_CATEGORY.purchase]: "Mua tài sản mục tiêu",
+  [GOAL_CATEGORY.invest]: "Đầu tư mục tiêu",
+  [GOAL_CATEGORY.interest]: "Lãi mục tiêu",
+  [GOAL_CATEGORY.repay]: "Trả nợ mục tiêu",
+};
+
+/** True for the goal-account system categories (not a real spend category). */
+export function isGoalCategory(id: string): boolean {
+  return id in GOAL_CATEGORY_LABEL;
+}
+
+/**
  * Human label for any category id. Resolution order, deliberately defensive:
  *   1. the sentinels ("Chưa phân loại" / "Tiền vào" / "Điều chỉnh hũ") — system
  *      concepts a stored taxonomy never owns, so they always win;
@@ -107,6 +135,7 @@ export function categoryLabel(id: string, labels?: ReadonlyMap<string, string>):
   if (id === UNCLASSIFIED) return UNCLASSIFIED_LABEL;
   if (id === INCOME) return INCOME_LABEL;
   if (id === REBALANCE_CATEGORY) return REBALANCE_CATEGORY_LABEL;
+  if (isGoalCategory(id)) return GOAL_CATEGORY_LABEL[id];
   return labels?.get(id) ?? CATEGORY_BY_ID[id]?.label ?? id;
 }
 

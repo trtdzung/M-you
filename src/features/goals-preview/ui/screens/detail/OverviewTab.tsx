@@ -6,11 +6,15 @@ import { formatVnd } from "@/features/goals-preview/format-money";
 import { addDays, daysBetween, formatISODate, assetValue, phaseOneResult } from "../../../engine";
 import { cn } from "@/lib/cn";
 import { usePreview } from "../../../store/PreviewStore";
+import { Sheet } from "@/components/primitives";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { SummaryRows } from "../../shared/SummaryRows";
 import { card, infoBox, primaryButton, ring, secondaryButton, sectionTitle, successBox, warningBox, figure } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
+
+/** Để hồ sơ vay dễ được phê duyệt, khoản tích luỹ nên đạt tỉ lệ này của giá trị mục tiêu. */
+const LOAN_MIN_SAVED_RATIO = 0.3;
 
 interface TimelineItem {
   date: string;
@@ -45,7 +49,7 @@ function buildTimeline({ state, goal, pct, stage }: GoalContext): TimelineItem[]
     milestones(items, "Mốc ", goal.createdAt, goal.targetDate, goal.targetAmount, pct);
   }
   for (const a of state.assets) {
-    if (a.goalId !== goal.id || a.type !== "liquid" || a.status !== "held" || !a.maturityDate) continue;
+    if (a.goalId !== goal.id || a.type !== "msb" || a.status !== "held" || !a.maturityDate) continue;
     items.push({
       date: a.maturityDate,
       label: `Đáo hạn: ${a.name}`,
@@ -77,22 +81,33 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
   const { goal, state, fe, required, stage } = ctx;
   const phase2 = stage.phase === 2;
   const overdue = !!stage.loan?.schedule.some((r) => r.status === "overdue");
-  // Settling needs the cash itself in the goal account (assets must be sold first).
-  const canSettle = phase2 && !overdue && stage.outstanding > 0 && ctx.value.cash >= stage.outstanding;
+  // Tất toán cần tiền mặt trong tài khoản mục tiêu đủ gốc + lãi còn lại (tài sản phải bán trước).
+  const canSettle = phase2 && !overdue && stage.outstanding > 0 && ctx.value.cash >= stage.target - stage.repaid;
   const [keepGoing, setKeepGoing] = useState(false);
   const [confirmEarly, setConfirmEarly] = useState(false);
+  const [loanWarning, setLoanWarning] = useState(false);
   const today = state.clock.today;
   const due = goal.targetDate <= today;
   const timeline = buildTimeline(ctx);
-  const active = canTransact(goal) && goal.status !== "paused";
+  const active = canTransact(goal);
   const feText = phase2 && fe.status === "reached" ? { text: "Bạn đã đủ tiền để tất toán khoản vay.", box: successBox } : FE_TEXT[fe.status];
 
+  const hasLoan = stage.loan?.status === "active";
   const quick = [
     { label: "Nạp tiền", icon: ArrowDownToLine, show: active, go: () => nav.push("DepositFlow", { goalId }) },
-    { label: "Rút tiền", icon: ArrowUpFromLine, show: canTransact(goal), go: () => nav.push("WithdrawFlow", { goalId }) },
-    { label: "Đầu tư", icon: LineChart, show: goal.status === "accumulating" || goal.status === "repaying", go: () => nav.push("InvestSuggest", { goalId }) },
-    // The loan is offered only when the plan falls short (or the goal is already due and short).
-    { label: "Vay", icon: Banknote, show: goal.status === "missed" || (goal.status === "accumulating" && (fe.status === "infeasible" || !!goal.plannedLoan)), go: () => nav.push("LoanSimulator", { goalId }) },
+    { label: "Rút tiền", icon: ArrowUpFromLine, show: active, go: () => nav.push("WithdrawFlow", { goalId }) },
+    { label: "Đầu tư", icon: LineChart, show: active, go: () => nav.push("InvestSuggest", { goalId }) },
+    // Có khoản vay đang hoạt động thì xem lịch trả nợ, chưa có thì mở mô phỏng vay.
+    {
+      label: "Vay",
+      icon: Banknote,
+      show: active,
+      go: () => {
+        if (hasLoan) nav.push("RepayOverview", { goalId });
+        else if (ctx.value.total < goal.targetAmount * LOAN_MIN_SAVED_RATIO) setLoanWarning(true);
+        else nav.push("LoanSimulator", { goalId });
+      },
+    },
   ].filter((q) => q.show);
 
   let next: { label: string; screen: "DueResult" | "RepayOverview" | "AchievedIntro" | "MissedOptions" | "CompletedCelebration" | "Prepay" } | undefined;
@@ -161,16 +176,6 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
             {typeof required === "number" && <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted">Cần góp thêm mỗi tháng</dt><dd className="font-semibold text-text">{formatVnd(Math.max(0, required - (goal.standingOrder?.active ? goal.standingOrder.amount : 0)))}</dd></div>}
           </dl>
           {canTransact(goal) && <button type="button" className={secondaryButton} onClick={() => nav.push("StandingOrderManage", { goalId })}>{goal.standingOrder?.active ? "Điều chỉnh trích tự động" : "Thiết lập trích tự động"}</button>}
-          <details className="border-t border-border pt-3">
-            <summary className="cursor-pointer text-[13px] font-semibold text-primary-strong">Chi tiết kế hoạch</summary>
-            <div className="mt-3 flex flex-col gap-3">
-              <p className="text-[12px] leading-5 text-muted">Các số dự kiến dùng mức phân bổ từ số dư hằng tháng, chưa phải khoản trích tự động đã thiết lập.</p>
-              <SummaryRows rows={[
-                { label: "Mức phân bổ dự kiến mỗi tháng", value: fe.allocatedMonthly === "unknown" ? "Chưa đủ dữ liệu" : fe.allocatedMonthly, source: "estimated" },
-                { label: "Giá trị dự kiến khi đến hạn", value: fe.projectedAtTarget === "unknown" ? "Chưa đủ dữ liệu" : fe.projectedAtTarget, source: "estimated" },
-              ]} />
-            </div>
-          </details>
         </> : <p className="text-sm text-muted">Mục tiêu không còn cần góp thêm theo kế hoạch ở trạng thái này.</p>}
         {goal.plannedLoan && goal.status === "accumulating" ? (
           <button type="button" className={`${infoBox} flex w-full items-center justify-between gap-2 text-left`} onClick={() => nav.push("LoanSimulator", { goalId })}>
@@ -208,6 +213,36 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
           ))}
         </ol>
       </section>
+
+      <Sheet open={loanWarning} title="Hồ sơ vay có thể chưa đủ điều kiện" onClose={() => setLoanWarning(false)}>
+        <div className="flex flex-col gap-4">
+          <p className="text-[14px] leading-6 text-text">
+            Để hồ sơ vay được phê duyệt, bạn nên có khoản tích luỹ từ {Math.round(LOAN_MIN_SAVED_RATIO * 100)}% giá trị mục tiêu trở lên.
+          </p>
+          <SummaryRows
+            rows={[
+              { label: "Giá trị mục tiêu", value: goal.targetAmount },
+              { label: `Mức nên có (${Math.round(LOAN_MIN_SAVED_RATIO * 100)}%)`, value: Math.round(goal.targetAmount * LOAN_MIN_SAVED_RATIO) },
+              { label: "Bạn đã tích luỹ", value: ctx.value.total, emphasis: true },
+            ]}
+          />
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className={primaryButton}
+              onClick={() => {
+                setLoanWarning(false);
+                nav.push("LoanSimulator", { goalId });
+              }}
+            >
+              Tiếp tục
+            </button>
+            <button type="button" className={secondaryButton} onClick={() => setLoanWarning(false)}>
+              Quay lại
+            </button>
+          </div>
+        </div>
+      </Sheet>
 
       <ConfirmSheet
         open={confirmEarly}

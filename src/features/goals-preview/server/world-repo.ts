@@ -111,6 +111,14 @@ function parseSoFail(txnId: string): { date: ISODate; amount: number } | null {
   return match ? { date: match[1], amount: Number(match[2]) } : null;
 }
 
+/** Bản ghi cũ lưu loại tài sản là "liquid" / "fixed"; nay là "msb" / "declared". */
+function normalizeLegacyAsset(asset: Asset): Asset {
+  const legacy = (asset as { type: string }).type;
+  if (legacy === "liquid") return { ...asset, type: "msb" } as Asset;
+  if (legacy === "fixed") return { ...asset, type: "declared" } as Asset;
+  return asset;
+}
+
 function parseJson<T>(payload: string): T | null {
   try {
     return JSON.parse(payload) as T;
@@ -219,10 +227,15 @@ export function loadWorld(cif: string, options: { profileAsOf?: ISODate } = {}):
 
   const goals = (db.prepare("SELECT payload FROM gv2_goals WHERE cif = ? ORDER BY sort_order ASC, id ASC").all(cif) as { payload: string }[])
     .map((r) => parseJson<Goal>(r.payload))
-    .filter((g): g is Goal => g !== null);
+    .filter((g): g is Goal => g !== null)
+    // Không còn bản nháp: bỏ mục tiêu nháp cũ (xoá hẳn khi ghi lần sau).
+    .filter((g) => (g.status as string) !== "draft")
+    // Mọi mục tiêu đều linh hoạt: đồng bộ lại mục tiêu cũ còn "date_fixed".
+    .map((g) => ((g.flexibility as string) === "date_fixed" ? { ...g, flexibility: "date_flexible" as const } : g));
   const assets = (db.prepare("SELECT payload FROM gv2_assets WHERE cif = ? ORDER BY rowid ASC").all(cif) as { payload: string }[])
     .map((r) => parseJson<Asset>(r.payload))
-    .filter((a): a is Asset => a !== null);
+    .filter((a): a is Asset => a !== null)
+    .map(normalizeLegacyAsset);
   const loans = (db.prepare("SELECT payload FROM gv2_loans WHERE cif = ? ORDER BY rowid ASC").all(cif) as { payload: string }[])
     .map((r) => parseJson<Loan>(r.payload))
     .filter((l): l is Loan => l !== null);
