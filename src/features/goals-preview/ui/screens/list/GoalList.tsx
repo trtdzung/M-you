@@ -1,10 +1,11 @@
 "use client";
 
+import { useRouter, usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Plus } from "lucide-react";
 import { SegmentedControl } from "@/components/primitives";
-import { formatVnd } from "@/lib/format";
-import { allocateSurplus, daysToTarget, formatISODate, goalValue, progressPct, progressState } from "../../../engine";
+
+import { allocateSurplus, formatISODate, goalValue, progressPct, progressState } from "../../../engine";
 import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";
 import type { ScreenProps } from "../../../model/screens";
 import type { PreviewState } from "../../../model/state";
@@ -18,45 +19,18 @@ import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
 import { card, chip, chipSelected, infoBox, primaryButton, ring, secondaryButton } from "../../shared/styles";
 
+function compactGoalAmount(value: number): string {
+  if (Math.abs(value) < 1_000_000) return `${new Intl.NumberFormat("vi-VN").format(value)} đ`;
+  const unit = Math.abs(value) >= 1_000_000_000 ? 1_000_000_000 : 1_000_000;
+  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(value / unit)} ${unit === 1_000_000 ? "triệu" : "tỷ"}`;
+}
+
 type Tab = "active" | "history";
-
-function milestoneHint(pct: number, goal: Goal): string {
-  const next = [25, 50, 75, 100].find((m) => pct < m);
-  if (next === undefined) return "Đã đủ tiền cho mục tiêu";
-  const need = Math.max(0, (goal.targetAmount * next) / 100);
-  return `Mốc kế tiếp ${next}% (${formatVnd(need)})`;
-}
-
-function cardHint(state: PreviewState, goal: Goal, pct: number): string {
-  const today = state.clock.today;
-  switch (goal.status) {
-    case "paused":
-      return "Đang tạm dừng — bấm để tiếp tục.";
-    case "missed":
-      return "Đến hạn nhưng chưa đủ tiền — chọn cách đi tiếp.";
-    case "achieved":
-      return "Đã đạt mục tiêu bằng khoản vay — bắt đầu trả nợ.";
-    case "repaying": {
-      const loan = state.loans.find((l) => l.id === goal.loanId);
-      const next = loan?.schedule.find((r) => r.status !== "paid");
-      return next ? `Kỳ trả nợ kế tiếp ${formatISODate(next.dueDate)}: ${formatVnd(next.payment)}` : "Đang trả nợ khoản vay mục tiêu.";
-    }
-    case "completed":
-      return goal.completedEarly ? `Hoàn thành sớm ngày ${formatISODate(goal.completedAt)}` : `Hoàn thành ngày ${formatISODate(goal.completedAt)}`;
-    case "closed":
-      return `Đã đóng ngày ${formatISODate(goal.closedAt)}`;
-    default: {
-      if (goal.reachedEarlyAt) return "Đã đủ tiền trước hạn — bạn có thể hoàn thành sớm.";
-      const days = daysToTarget(goal, today);
-      return `${milestoneHint(pct, goal)} · ${days > 0 ? `còn ${days} ngày` : "đã đến hạn"}`;
-    }
-  }
-}
 
 function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; onOpen: () => void }) {
   const history = goal.status === "completed" || goal.status === "closed";
   const v = goalValue(state, goal);
-  const pct = progressPct(state, goal);
+  const pct = Math.round(progressPct(state, goal));
   const finished = history && goal.finalValue !== undefined;
   const cash = finished ? goal.finalValue! : v.cash;
   const assets = finished ? 0 : v.assets;
@@ -68,22 +42,23 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
           {TEMPLATE_EMOJI[goal.template]}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-text">{goal.name}</p>
+          <p className="text-[16px] font-semibold text-text">{goal.name}</p>
           <p className="text-[12px] text-muted">
             {TEMPLATE_LABEL[goal.template]} · hạn {formatISODate(goal.targetDate)}
           </p>
         </div>
-        <GoalStatusBadge status={goal.status} />
+
       </div>
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <Amount amount={finished ? goal.finalValue : v.total} source={v.source} className="font-semibold text-text" />
-        <span className="text-muted">/ {formatVnd(goal.targetAmount)}</span>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[22px] font-bold tabular-nums text-text">{compactGoalAmount(finished ? goal.finalValue! : v.total)}</span>
+        <span className="text-sm text-muted">/ {compactGoalAmount(goal.targetAmount)}</span>
       </div>
-      <SplitProgressBar cash={cash} assets={assets} target={goal.targetAmount} showLegend={!history} />
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] leading-5 text-muted">{cardHint(state, goal, pct)}</p>
-        {showProgress && <ProgressStateBadge state={progressState(state, goal)} />}
+      <SplitProgressBar cash={cash} assets={assets} target={goal.targetAmount} showLegend={false} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-text">{pct}% đã tích luỹ</span>
+        {showProgress ? <ProgressStateBadge state={progressState(state, goal)} /> : <GoalStatusBadge status={goal.status} />}
       </div>
+      {v.source === "self_reported" && <p className="text-[12px] text-muted">Bao gồm tài sản tự khai</p>}
     </button>
   );
 }
@@ -92,6 +67,8 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
 export function GoalList({ params }: ScreenProps) {
   void params;
   const { state, dispatch, nav } = usePreview();
+  const router = useRouter();
+  const pathname = usePathname();
   const [tab, setTab] = useState<Tab>("active");
   const [sorting, setSorting] = useState(false);
 
@@ -127,6 +104,7 @@ export function GoalList({ params }: ScreenProps) {
     <div className="flex flex-col gap-4 pb-6">
       <ScreenHeader
         title="Mục tiêu của tôi"
+        onBack={pathname === "/pfm" ? () => router.replace("/") : undefined}
         right={
           <button
             type="button"
@@ -143,8 +121,9 @@ export function GoalList({ params }: ScreenProps) {
         <section className={`${card} flex flex-col gap-3`} aria-label="Tổng quan mục tiêu">
           <div>
             <p className="text-[13px] text-muted">Tổng giá trị đang tích luỹ</p>
-            <Amount amount={summary.totalValue} source="msb" className="text-[24px] font-bold text-text" />
+            <Amount amount={summary.totalValue} source={active.some((g) => goalValue(state, g).source === "self_reported") ? "self_reported" : "msb"} className="text-[24px] font-bold text-text" />
           </div>
+          {active.some((g) => goalValue(state, g).source === "self_reported") && <p className="text-[12px] text-muted">Tổng gồm tiền tại MSB và tài sản tự khai.</p>}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-[12px] text-muted">Góp mỗi tháng</p>

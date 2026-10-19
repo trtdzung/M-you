@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, CalendarCheck, LineChart, PartyPopper } from "lucide-react";
 import { formatVnd } from "@/lib/format";
 import { addDays, daysBetween, formatISODate, assetValue } from "../../../engine";
@@ -30,7 +30,7 @@ function buildTimeline({ state, goal, pct }: GoalContext): TimelineItem[] {
       date: planned,
       label: `Mốc ${m}% (${formatVnd((goal.targetAmount * m) / 100)})`,
       done: reached,
-      note: reached ? "Đã đạt" : "Theo kế hoạch",
+      note: reached ? "Đã đạt · chưa có ngày ghi nhận" : "Chưa đạt",
     });
   }
   for (const a of state.assets) {
@@ -61,7 +61,7 @@ const FE_TEXT: Record<string, { text: string; box: string }> = {
   not_applicable: { text: "", box: infoBox },
 };
 
-export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
+export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; goalId: string; suggestions?: ReactNode }) {
   const { dispatch, nav } = usePreview();
   const { goal, state, fe, required } = ctx;
   const [keepGoing, setKeepGoing] = useState(false);
@@ -73,8 +73,8 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
   const feText = FE_TEXT[fe.status];
 
   const quick = [
-    { label: "Nạp", icon: ArrowDownToLine, show: active, go: () => nav.push("DepositFlow", { goalId }) },
-    { label: "Rút", icon: ArrowUpFromLine, show: canTransact(goal), go: () => nav.push("WithdrawFlow", { goalId }) },
+    { label: "Nạp tiền", icon: ArrowDownToLine, show: active, go: () => nav.push("DepositFlow", { goalId }) },
+    { label: "Rút tiền", icon: ArrowUpFromLine, show: canTransact(goal), go: () => nav.push("WithdrawFlow", { goalId }) },
     { label: "Đầu tư", icon: LineChart, show: goal.status === "accumulating", go: () => nav.push("InvestSuggest", { goalId }) },
     { label: "Vay", icon: Banknote, show: goal.status === "accumulating" || goal.status === "missed", go: () => nav.push("LoanSimulator", { goalId }) },
   ].filter((q) => q.show);
@@ -115,9 +115,9 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
               key={q.label}
               type="button"
               onClick={q.go}
-              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-surface text-[13px] font-semibold text-text shadow-card ${ring}`}
+              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl text-[13px] font-semibold shadow-card ${q.label === "Nạp tiền" ? "bg-primary text-primary-fg" : "bg-surface text-text"} ${ring}`}
             >
-              <q.icon size={20} aria-hidden className="text-primary-strong" />
+              <q.icon size={20} aria-hidden className={q.label === "Nạp tiền" ? "text-primary-fg" : "text-primary-strong"} />
               {q.label}
             </button>
           ))}
@@ -148,12 +148,21 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
           <p className="text-sm text-muted">Mục tiêu không còn cần góp thêm theo kế hoạch ở trạng thái này.</p>
         )}
         {feText.text && <p className={feText.box}>{feText.text}</p>}
+        {typeof required === "number" && goal.status === "accumulating" && (
+          <p className="text-sm leading-5 text-muted">
+            {(goal.standingOrder?.active ? goal.standingOrder.amount : 0) < required
+              ? `Để theo kế hoạch, cần góp thêm ${formatVnd(required - (goal.standingOrder?.active ? goal.standingOrder.amount : 0))}/tháng ngoài khoản trích tự động.`
+              : "Khoản trích tự động hiện đủ mức cần góp mỗi tháng."}
+          </p>
+        )}
         {fe.status === "infeasible" && goal.status === "accumulating" && (
           <button type="button" className={secondaryButton} onClick={() => nav.push("LoanSimulator", { goalId })}>
             Xem các cách bù phần thiếu
           </button>
         )}
       </section>
+
+      {suggestions}
 
       <section className={`${card} flex flex-col gap-3`}>
         <h2 className={sectionTitle}>Lộ trình</h2>
@@ -167,7 +176,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
               <div className="pb-4">
                 <p className={cn("text-sm", t.done ? "font-semibold text-text" : "text-muted")}>{t.label}</p>
                 <p className="text-[12px] text-muted">
-                  {formatISODate(t.date)}
+                  {t.label.startsWith("Mốc ") ? "Kế hoạch: " : ""}{formatISODate(t.date)}
                   {t.note ? ` · ${t.note}` : ""}
                 </p>
               </div>

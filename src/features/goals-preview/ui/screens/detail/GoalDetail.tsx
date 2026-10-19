@@ -61,8 +61,6 @@ export function GoalDetail({ params }: ScreenProps) {
         }
       />
 
-      {cards}
-
       <section className={`${card} flex flex-col gap-3`} aria-label="Tiến độ mục tiêu">
         <div className="flex flex-wrap items-center gap-2">
           <GoalStatusBadge status={goal.status} />
@@ -71,9 +69,9 @@ export function GoalDetail({ params }: ScreenProps) {
             {history ? `Hạn ${formatISODate(goal.targetDate)}` : days > 0 ? `Còn ${days} ngày` : days === 0 ? "Đến hạn hôm nay" : `Quá hạn ${-days} ngày`}
           </span>
         </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <Amount amount={shownTotal} source={ctx.value.source} className="text-[24px] font-bold text-text" />
-          <span className="text-sm text-muted">/ {formatVnd(goal.targetAmount)}</span>
+        <div className="flex flex-col gap-1">
+          <Amount amount={shownTotal} source={ctx.value.source} className="text-[28px] font-bold text-text" />
+          <span className="text-sm text-muted">Mục tiêu {formatVnd(goal.targetAmount)}</span>
         </div>
         <SplitProgressBar cash={history ? shownTotal : ctx.value.cash} assets={history ? 0 : ctx.value.assets} target={goal.targetAmount} />
         <p className="text-[12px] text-muted">
@@ -92,7 +90,7 @@ export function GoalDetail({ params }: ScreenProps) {
         ]}
       />
 
-      {tab === "overview" && <OverviewTab ctx={ctx} goalId={goalId} />}
+      {tab === "overview" && <OverviewTab ctx={ctx} goalId={goalId} suggestions={cards} />}
       {tab === "cash" && <CashTab ctx={ctx} goalId={goalId} />}
       {tab === "assets" && <AssetsTab ctx={ctx} goalId={goalId} />}
 
