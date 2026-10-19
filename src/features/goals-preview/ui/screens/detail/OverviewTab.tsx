@@ -7,6 +7,7 @@ import { addDays, daysBetween, formatISODate, assetValue } from "../../../engine
 import { cn } from "@/lib/cn";
 import { usePreview } from "../../../store/PreviewStore";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { SummaryRows } from "../../shared/SummaryRows";
 import { card, infoBox, primaryButton, ring, secondaryButton, sectionTitle, successBox, warningBox } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
@@ -129,31 +130,31 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
       )}
 
       <section className={`${card} flex flex-col gap-3`}>
-        <h2 className={sectionTitle}>Kế hoạch góp</h2>
-        {goal.status === "accumulating" || goal.status === "paused" || goal.status === "missed" ? (
-          <SummaryRows
-            rows={[
-              { label: "Cần góp mỗi tháng", value: required, source: "estimated", hint: `${fe.monthsLeft} tháng còn lại` },
-              { label: "M-You chia cho mục tiêu này", value: fe.allocatedMonthly === "unknown" ? "chưa đủ dữ liệu" : fe.allocatedMonthly, source: "estimated" },
-              {
-                label: "Trích tự động",
-                value: goal.standingOrder?.active ? goal.standingOrder.amount : "Chưa bật",
-                source: goal.standingOrder?.active ? "msb" : undefined,
-              },
-              { label: "Dự kiến tại ngày đến hạn", value: fe.projectedAtTarget === "unknown" ? "chưa rõ" : fe.projectedAtTarget, source: "estimated" },
-            ]}
-          />
-        ) : (
-          <p className="text-sm text-muted">Mục tiêu không còn cần góp thêm theo kế hoạch ở trạng thái này.</p>
-        )}
-        {feText.text && <p className={feText.box}>{feText.text}</p>}
-        {typeof required === "number" && goal.status === "accumulating" && (
-          <p className="text-sm leading-5 text-muted">
-            {(goal.standingOrder?.active ? goal.standingOrder.amount : 0) < required
-              ? `Để theo kế hoạch, cần góp thêm ${formatVnd(required - (goal.standingOrder?.active ? goal.standingOrder.amount : 0))}/tháng ngoài khoản trích tự động.`
-              : "Khoản trích tự động hiện đủ mức cần góp mỗi tháng."}
-          </p>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          <h2 className={sectionTitle}>Kế hoạch góp</h2>
+          {feText.text && <InfoTooltip warning={fe.status === "tight" || fe.status === "infeasible"} label="đánh giá kế hoạch góp" text={feText.text} />}
+        </div>
+        {goal.status === "accumulating" || goal.status === "paused" || goal.status === "missed" ? <>
+          <div>
+            <p className="text-[13px] text-muted">Cần góp mỗi tháng · còn {fe.monthsLeft} tháng</p>
+            <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{typeof required === "number" ? formatVnd(required) : "Chưa đủ dữ liệu"}</p>
+          </div>
+          <dl className="flex flex-col gap-3 border-t border-border pt-3 text-sm">
+            <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted">Đã đặt trích tự động</dt><dd className="font-semibold text-text">{goal.standingOrder?.active ? `${formatVnd(goal.standingOrder.amount)}/tháng` : "Chưa bật"}</dd></div>
+            {typeof required === "number" && <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted">Cần góp thêm mỗi tháng</dt><dd className="font-semibold text-text">{formatVnd(Math.max(0, required - (goal.standingOrder?.active ? goal.standingOrder.amount : 0)))}</dd></div>}
+          </dl>
+          {canTransact(goal) && <button type="button" className={secondaryButton} onClick={() => nav.push("StandingOrderManage", { goalId })}>{goal.standingOrder?.active ? "Điều chỉnh trích tự động" : "Thiết lập trích tự động"}</button>}
+          <details className="border-t border-border pt-3">
+            <summary className="cursor-pointer text-[13px] font-semibold text-primary-strong">Chi tiết kế hoạch</summary>
+            <div className="mt-3 flex flex-col gap-3">
+              <p className="text-[12px] leading-5 text-muted">Các số dự kiến dùng mức phân bổ từ số dư hằng tháng, chưa phải khoản trích tự động đã thiết lập.</p>
+              <SummaryRows rows={[
+                { label: "Mức phân bổ dự kiến mỗi tháng", value: fe.allocatedMonthly === "unknown" ? "Chưa đủ dữ liệu" : fe.allocatedMonthly, source: "estimated" },
+                { label: "Giá trị dự kiến khi đến hạn", value: fe.projectedAtTarget === "unknown" ? "Chưa đủ dữ liệu" : fe.projectedAtTarget, source: "estimated" },
+              ]} />
+            </div>
+          </details>
+        </> : <p className="text-sm text-muted">Mục tiêu không còn cần góp thêm theo kế hoạch ở trạng thái này.</p>}
         {fe.status === "infeasible" && goal.status === "accumulating" && (
           <button type="button" className={secondaryButton} onClick={() => nav.push("LoanSimulator", { goalId })}>
             Xem các cách bù phần thiếu
