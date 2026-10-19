@@ -52,7 +52,7 @@ describe("snapshot and insight cache integration", () => {
     expect((await generateHomeInsight("CIF_0001", input)).insight?.source).toBe("fallback");
   });
 
-  it("returns carousel with healthScore, up to 2 distinct candidates and handles upstream assessment", async () => {
+  it("returns carousel with healthScore, up to 3 distinct candidates and handles upstream assessment", async () => {
     const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
       const body = JSON.parse(init?.body as string);
       return {
@@ -85,7 +85,7 @@ describe("snapshot and insight cache integration", () => {
     expect(typeof res.healthScore.overallScore).toBe("number");
     expect(res.healthScore.policyVersion).toBe("pfm-health-v0");
     expect(res.insights.length).toBeGreaterThanOrEqual(1);
-    expect(res.insights.length).toBeLessThanOrEqual(2);
+    expect(res.insights.length).toBeLessThanOrEqual(3);
     expect(res.insights[0].source).toBe("agent");
     if (res.insights.length > 1) {
       expect(res.insights[1].source).toBe("fallback");

@@ -9,7 +9,7 @@ import {
   type HomeInsightCarouselResult,
   type HealthScoreAssessment,
 } from "@/insights/proactive/home-contract";
-import type { SnapshotCandidate } from "@/insights/proactive/snapshot";
+import { selectTop3DiverseCandidates, type SnapshotCandidate } from "@/insights/proactive/snapshot";
 
 const inFlight = new Map<string, Promise<HomeInsightCarouselResult>>();
 
@@ -59,7 +59,7 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
   if (existing) return existing;
 
   const task = (async (): Promise<HomeInsightCarouselResult> => {
-    // Extract up to 2 distinct candidates preserving deterministic priority order
+    // Extract up to 2 diverse candidates preserving deterministic priority order & diversity
     const distinctCandidates: SnapshotCandidate[] = [];
     const seenIds = new Set<string>();
     for (const c of snapshot.candidates) {
@@ -68,9 +68,9 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
         distinctCandidates.push(c);
       }
     }
-    const topTwo = distinctCandidates.slice(0, 2);
+    const topCandidates = selectTop3DiverseCandidates(distinctCandidates);
 
-    if (topTwo.length === 0) {
+    if (topCandidates.length === 0) {
       const emptyResult: HomeInsightCarouselResult = {
         snapshotId,
         asOf: snapshot.asOf,
@@ -87,25 +87,25 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
       return emptyResult;
     }
 
-    let primaryInsight: HomeInsight = {
+    const insights: HomeInsight[] = topCandidates.map((cand) => ({
       snapshotId,
-      candidate: topTwo[0],
-      title: topTwo[0].title,
-      body: topTwo[0].body,
+      candidate: cand,
+      title: cand.title,
+      body: cand.body,
       asOf: snapshot.asOf,
       source: "fallback",
-    };
-
-    const secondaryInsight: HomeInsight | null = topTwo[1]
-      ? {
-          snapshotId,
-          candidate: topTwo[1],
-          title: topTwo[1].title,
-          body: topTwo[1].body,
-          asOf: snapshot.asOf,
-          source: "fallback",
-        }
-      : null;
+      category: cand.category,
+      categoryLabel: cand.categoryLabel,
+      slotGroup: cand.slotGroup,
+      tone: cand.tone,
+      impactLine: cand.impactLine,
+      badgeText: cand.badgeText,
+      progressPct: cand.progressPct,
+      primaryAction: cand.primaryAction,
+      actionType: cand.actionType,
+      actionHref: cand.actionHref,
+      actionLabel: cand.actionLabel ?? cand.primaryAction?.label,
+    }));
 
     let assessment: HealthScoreAssessment | null = null;
     let hasAgentSuccess = false;
@@ -121,7 +121,15 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
           {
             method: "POST",
             headers,
-            body: JSON.stringify({ snapshot_id: snapshotId, snapshot }),
+            body: JSON.stringify({
+              snapshot_id: snapshotId,
+              snapshot,
+              prompt_guidelines: {
+                title: "Ngắn gọn, đi thẳng vào con số + sự kiện (<= 70 ký tự)",
+                summary: "Nêu rõ hệ quả và hướng xử lý trong 1-2 câu ngắn, tự nhiên, thân thiện (<= 240 ký tự)",
+                zero_hallucination: "Không thay đổi hoặc sáng tạo bất kỳ con số nào ngoài candidate gốc",
+              },
+            }),
             cache: "no-store",
             signal,
           }
@@ -145,8 +153,8 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
             signal.addEventListener("abort", onAbort, { once: true });
           }),
         ]);
-        if (agentResult.selection) {
-          primaryInsight = { ...primaryInsight, ...agentResult.selection, source: "agent" };
+        if (agentResult.selection && insights.length > 0) {
+          insights[0] = { ...insights[0], ...agentResult.selection, source: "agent" };
           hasAgentSuccess = true;
         }
         if (agentResult.assessment) {
@@ -160,15 +168,13 @@ export async function generateHomeInsight(cif: string, input: unknown): Promise<
       /* Deterministic fallback cards remain available */
     }
 
-    const insights: HomeInsight[] = [primaryInsight, ...(secondaryInsight ? [secondaryInsight] : [])];
-
     const carouselResult: HomeInsightCarouselResult = {
       snapshotId,
       asOf: snapshot.asOf,
       healthScore: snapshot.healthScore,
       healthAssessment: assessment,
       insights,
-      insight: primaryInsight,
+      insight: insights[0] ?? null,
       cached: false,
     };
 

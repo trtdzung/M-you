@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { buildCustomerSnapshot, type SnapshotOverlay } from "@/insights/proactive/snapshot";
+import { buildCustomerSnapshot, type SnapshotOverlay, type SecuritySummaryInput } from "@/insights/proactive/snapshot";
 import { PERSONA_LIST } from "@/providers/mock/personas";
 import { generateDataset } from "@/providers/mock/fixtures/generate";
 import { readAccounts } from "./accounts-store";
@@ -14,6 +14,9 @@ import { isValidAssetRecord, isValidLiabilityRecord } from "@/domain/models/asse
 import { isValidGoalRecord } from "@/domain/models/goal-input";
 import { appNow } from "./app-clock";
 import { REBALANCE_CATEGORY, type Transaction } from "@/domain/models";
+import { readProfile } from "./security/profile-store";
+import { securityScore } from "@/components/settings/security/security-score";
+import { getDb } from "./db";
 
 function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
@@ -61,7 +64,47 @@ export function customerSnapshot(cif: string, input: unknown = {}) {
   const corrections = readCorrections(cif);
   const transactions = applyCorrections([...readManualTxns(cif), ...readTransactions(cif)], corrections)
     .filter((t) => !isHidden(corrections, t.id));
+
+  let securitySummary: SecuritySummaryInput | undefined;
+  try {
+    const profileState = readProfile(cif);
+    const activeEmergencies = (profileState.emergencyContacts ?? []).filter((c) => c.status === "active").length;
+    const demoInput = body.demo && typeof body.demo === "object" ? body.demo as Record<string, unknown> : {};
+    const passwordUpdated = demoInput.passwordUpdated === true;
+    const faceId = demoInput.faceId !== false;
+    const advanced = demoInput.advanced === true;
+    const devicesCleared = demoInput.devicesCleared === true;
+
+    const secScore = securityScore({
+      passwordUpdated,
+      faceId,
+      advanced,
+      devicesCleared,
+      aiProtect: Boolean(profileState.aiProtect),
+      antiPhishing: profileState.antiPhishingCode !== null,
+      activeEmergencyContacts: activeEmergencies,
+      trustedContacts: (profileState.trustedContacts ?? []).length,
+    });
+    let hasActiveHold = false;
+    try {
+      const db = getDb();
+      const holdRow = db.prepare("SELECT 1 FROM transfer_holds WHERE cif = ? AND status = 'holding' LIMIT 1").get(cif);
+      hasActiveHold = Boolean(holdRow);
+    } catch {
+      // transfer_holds might not be loaded in isolated tests
+    }
+    const hasPendingOff = Object.keys(profileState.pendingOff || {}).length > 0;
+    securitySummary = {
+      score: secScore.total,
+      hasEmergencyContact: activeEmergencies > 0,
+      hasActiveHold: hasActiveHold || hasPendingOff,
+      hasPendingOff,
+    };
+  } catch {
+    // Graceful fallback
+  }
+
   const snapshot = buildCustomerSnapshot({ ...dataset, accounts: readAccounts(cif), transactions }, jarConfig,
-    readCategories(cif, { includeArchived: true }), profile, sessionTopups, appNow(cif));
+    readCategories(cif, { includeArchived: true }), profile, sessionTopups, appNow(cif), securitySummary);
   return { snapshot, snapshotId: snapshotHash(cif, snapshot) };
 }

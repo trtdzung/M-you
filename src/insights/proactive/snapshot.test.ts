@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCustomerSnapshot, type SnapshotOverlay } from "./snapshot";
+import { buildCustomerSnapshot, selectDiverseTopCandidates, selectTop3DiverseCandidates, type SnapshotOverlay } from "./snapshot";
 import type { RawData } from "@/domain/engine/finance-compose";
 import { generateDataset } from "@/providers/mock/fixtures/generate";
 import { PERSONA_LIST } from "@/providers/mock/personas";
@@ -161,5 +161,144 @@ describe("financial snapshot", () => {
     expect(validAgentSelection(value, "stale", s.candidates)).toBeNull();
     expect(validAgentSelection({ ...value, candidate_id: "madeup" }, "hash", s.candidates)).toBeNull();
     expect(validAgentSelection(value, "hash", [...s.candidates, { ...candidate, id: "urgent", priority: 0 }])).toBeNull();
+  });
+
+  it("generates UPCOMING_OBLIGATION with deterministic impactLine matching CASA balance sufficiency", () => {
+    const base = PERSONA_LIST.flatMap((p) => p.liabilities)[0];
+    const rSufficient = raw();
+    rSufficient.accounts = [{ id: "acc-1", type: "current", institution: "MSB", maskedNumber: "•••• 1234", accountNumber: "0123456789", currency: "VND", balance: 5000000, availableBalance: 5000000, source: "mock", lastSyncedAt: "2026-09-15T00:00:00Z" }];
+    const s1 = make({ ...rSufficient, liabilities: [{ ...base, id: "loan-1", dueDate: "2026-09-18", minimumPayment: 2000000 }] });
+    const c1 = s1.candidates.find((c) => c.id === "payment:next7");
+    expect(c1).toBeDefined();
+    expect(c1?.category).toBe("UPCOMING_OBLIGATION");
+    expect(c1?.categoryLabel).toBe("Nghĩa vụ sắp đến hạn");
+    expect(c1?.impactLine).toBe("Số dư hiện đủ trả.");
+    expect(c1?.badgeText).toBe("Còn 3 ngày");
+    expect(c1?.primaryAction?.type).toBe("navigate_transfer");
+
+    // Case B: CASA shortfall
+    const rShortfall = raw();
+    rShortfall.accounts = [{ id: "acc-2", type: "current", institution: "MSB", maskedNumber: "•••• 5678", accountNumber: "9876543210", currency: "VND", balance: 500000, availableBalance: 500000, source: "mock", lastSyncedAt: "2026-09-15T00:00:00Z" }];
+    const s2 = make({ ...rShortfall, liabilities: [{ ...base, id: "loan-2", dueDate: "2026-09-18", minimumPayment: 2000000 }] });
+    const c2 = s2.candidates.find((c) => c.id === "payment:next7");
+    expect(c2).toBeDefined();
+    expect(c2?.impactLine).toContain("Số dư hiện thiếu khoảng 1,5 triệu để tất toán.");
+  });
+
+  it("generates PERIODIC_PULSE and DISCOVERY_GUIDE with Security Hub", () => {
+    const s = buildCustomerSnapshot(
+      raw(),
+      noJars,
+      [],
+      profile,
+      [],
+      now,
+      { score: 70, hasEmergencyContact: false, hasActiveHold: true }
+    );
+
+    // Periodic pulse
+    const pulse = s.candidates.find((c) => c.id === "pulse:weekly_brief");
+    expect(pulse).toBeDefined();
+    expect(pulse?.category).toBe("PERIODIC_PULSE");
+    expect(pulse?.categoryLabel).toBe("Nhịp tiền định kỳ");
+    expect(pulse?.slotGroup).toBe("GROW_AND_GUIDE");
+    expect(pulse?.primaryAction?.href).toBe("/pfm");
+
+    // Security hold alert (High priority)
+    const hold = s.candidates.find((c) => c.id === "security:hold_alert");
+    expect(hold).toBeDefined();
+    expect(hold?.category).toBe("DISCOVERY_GUIDE");
+    expect(hold?.slotGroup).toBe("PROTECT");
+    expect(hold?.tone).toBe("urgent");
+    expect(hold?.primaryAction?.type).toBe("navigate_security_hub");
+    expect(hold?.primaryAction?.href).toBe("/settings");
+    expect(hold?.metric.unit).toBe("count");
+
+    // Security guide with score
+    const sGuide = buildCustomerSnapshot(
+      raw(),
+      noJars,
+      [],
+      profile,
+      [],
+      now,
+      { score: 45, hasEmergencyContact: false, hasActiveHold: false }
+    );
+    const guide = sGuide.candidates.find((c) => c.id === "security:guide");
+    expect(guide).toBeDefined();
+    expect(guide?.category).toBe("DISCOVERY_GUIDE");
+    expect(guide?.metric.unit).toBe("points");
+    expect(guide?.metric.value).toBe(45);
+    expect(guide?.badgeText).toBe("Điểm 45/100");
+  });
+
+  it("slot diversity algorithm selects distinct categories for Slide 2 and Slide 3", () => {
+    const dummyCandidate = (id: string, priority: number, category: any, slotGroup: any): any => ({
+      id,
+      priority,
+      category,
+      slotGroup,
+      metric: { label: "Test", value: 100, unit: "VND" },
+      facts: {},
+    });
+
+    const candidates = [
+      dummyCandidate("risk-1", 1, "CASHFLOW_RISK", "PROTECT"),
+      dummyCandidate("risk-2", 1, "CASHFLOW_RISK", "PROTECT"),
+      dummyCandidate("goal-1", 2, "GOAL_PROGRESS", "GROW_AND_GUIDE"),
+      dummyCandidate("opt-1", 3, "OPTIMIZATION", "GROW_AND_GUIDE"),
+    ];
+
+    const chosen = selectDiverseTopCandidates(candidates);
+    expect(chosen).toHaveLength(2);
+    expect(chosen[0].id).toBe("risk-1");
+    // Slide 3 should select GOAL_PROGRESS instead of second CASHFLOW_RISK
+    expect(chosen[1].id).toBe("goal-1");
+    expect(chosen[0].category).not.toBe(chosen[1].category);
+
+    // Exception: 2 priority 0 candidates both stay
+    const twoUrgent = [
+      dummyCandidate("urgent-1", 0, "UPCOMING_OBLIGATION", "PROTECT"),
+      dummyCandidate("urgent-2", 0, "UPCOMING_OBLIGATION", "PROTECT"),
+      dummyCandidate("goal-2", 2, "GOAL_PROGRESS", "GROW_AND_GUIDE"),
+    ];
+    const chosenUrgent = selectDiverseTopCandidates(twoUrgent);
+    expect(chosenUrgent[0].id).toBe("urgent-1");
+    expect(chosenUrgent[1].id).toBe("urgent-2");
+  });
+
+  it("selectTop3DiverseCandidates selects 3 diverse candidates across 3 slides and fills fallback if < 3", () => {
+    const dummyCandidate = (id: string, priority: number, category: any, slotGroup: any): any => ({
+      id,
+      priority,
+      category,
+      categoryLabel: category,
+      slotGroup,
+      metric: { label: "Test", value: 100, unit: "VND" },
+      facts: {},
+    });
+
+    // Case 1: Rich candidate list
+    const candidates = [
+      dummyCandidate("obligation-1", 1, "UPCOMING_OBLIGATION", "PROTECT"),
+      dummyCandidate("risk-1", 1, "CASHFLOW_RISK", "PROTECT"),
+      dummyCandidate("pulse-1", 2, "PERIODIC_PULSE", "GROW_AND_GUIDE"),
+      dummyCandidate("opt-1", 3, "OPTIMIZATION", "GROW_AND_GUIDE"),
+    ];
+
+    const top3 = selectTop3DiverseCandidates(candidates);
+    expect(top3).toHaveLength(3);
+    expect(top3[0].category).toBe("UPCOMING_OBLIGATION");
+    expect(top3[1].category).toBe("PERIODIC_PULSE");
+    expect(top3[2].category).toBe("OPTIMIZATION");
+
+    // Case 2: Sparse candidate list (< 3 items) fills fallback to guarantee 3 slides
+    const sparse = [dummyCandidate("single-risk", 1, "CASHFLOW_RISK", "PROTECT")];
+    const filled = selectTop3DiverseCandidates(sparse);
+    expect(filled).toHaveLength(3);
+    expect(filled[0].id).toBe("single-risk");
+    expect(filled[1].category).not.toBe("CASHFLOW_RISK");
+    expect(filled[2].category).not.toBe("CASHFLOW_RISK");
+    expect(filled[1].category).not.toBe(filled[2].category);
   });
 });

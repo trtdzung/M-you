@@ -5,7 +5,15 @@ const key = (cif: string) => `pfm.insight-draft:${cif}`;
 export function saveInsightDraft(cif: string, insight: HomeInsight): boolean {
   const c = insight.candidate;
   const visibleText = c.question;
-  const hiddenSeed = `\n\nBối cảnh từ Home ngày ${insight.asOf}: ${c.metric.label}: ${c.metric.value.toLocaleString("en-US")} VND (${c.confidence === "estimated" ? "ước tính" : "theo dữ liệu đã ghi nhận"}). Các dữ kiện: ${JSON.stringify(c.facts)}. Hãy kiểm tra dữ liệu hiện tại trước khi tư vấn; đây chưa phải yêu cầu thực hiện giao dịch.`;
+  const metricDisplay =
+    c.metric.unit === "points" || c.metric.label.toLowerCase().includes("điểm")
+      ? `${c.metric.value}/100 điểm`
+      : c.metric.unit === "percent"
+        ? `${c.metric.value}%`
+        : c.metric.unit === "count"
+          ? `${c.metric.value}`
+          : `${c.metric.value.toLocaleString("en-US")} VND`;
+  const hiddenSeed = `\n\nBối cảnh từ Home ngày ${insight.asOf}: ${c.metric.label}: ${metricDisplay} (${c.confidence === "estimated" ? "ước tính" : "theo dữ liệu đã ghi nhận"}). Các dữ kiện: ${JSON.stringify(c.facts)}. Hãy kiểm tra dữ liệu hiện tại trước khi tư vấn; đây chưa phải yêu cầu thực hiện giao dịch.`;
   const draft = visibleText + hiddenSeed;
   try {
     sessionStorage.setItem(key(cif), JSON.stringify({ draft, visibleText, expires: Date.now() + 15 * 60_000 }));
