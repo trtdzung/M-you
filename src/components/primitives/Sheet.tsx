@@ -225,7 +225,7 @@ export function Sheet({
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
-          className="flex shrink-0 cursor-grab touch-none items-start justify-between gap-3 px-4 pb-3 pt-4"
+          className="flex shrink-0 cursor-grab touch-none items-start justify-between gap-3 border-b border-border px-4 pb-3 pt-4"
         >
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-text">
@@ -247,7 +247,7 @@ export function Sheet({
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        <div className={cn("no-scrollbar min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-[calc(24px+var(--safe-area-bottom))]", frame.bodyClassName)}>{frame.children}</div>
+        <div className={cn("no-scrollbar min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain px-4 pt-4 pb-[calc(24px+var(--safe-area-bottom))]", frame.bodyClassName)}>{frame.children}</div>
       </div>
     </div>,
     container,
