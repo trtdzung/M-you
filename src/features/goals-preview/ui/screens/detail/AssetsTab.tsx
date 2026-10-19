@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/primitives";
+import { FixedAssetDetailSheet } from "../assets/FixedAssetDetailSheet";
 import { LiquidAssetDetail } from "../assets/LiquidAssetDetail";
 import { ChevronRight, Plus, Landmark, Car, Package } from "lucide-react";
 import { formatVnd, formatVndCompact } from "@/lib/format";
@@ -15,6 +16,7 @@ import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav } = usePreview();
+  const [fixedDetailId, setFixedDetailId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const { state, goal } = ctx;
   const assets = goalAssets(state, goalId);
@@ -23,6 +25,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
 
   return (
     <div className="flex flex-col gap-4">
+      {fixedDetailId && <FixedAssetDetailSheet assetId={fixedDetailId} onClose={() => setFixedDetailId(null)} />}
       <Sheet bodyClassName="flex flex-col !overflow-hidden !pb-0" open={detailId !== null} title={liquid.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
         {detailId && <LiquidAssetDetail params={{ goalId, assetId: detailId }} embedded onNavigate={() => setDetailId(null)} />}
       </Sheet>
@@ -82,7 +85,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
               const stale = isStaleValuation(a.valuationDate, state.clock.today);
               return (
                 <li key={a.id} className="relative">
-                  <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => nav.push("RevalueAsset", { goalId, assetId: a.id })}>
+                  <button type="button" className={`${card} flex w-full min-w-0 flex-col gap-3 text-left ${ring}`} onClick={() => setFixedDetailId(a.id)}>
                     <div className={`flex items-start gap-3 ${stale ? "pr-9" : ""}`}>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-source-self-soft text-source-self">{a.category === "car" ? <Car size={20} aria-hidden /> : <Package size={20} aria-hidden />}</span>
                       <div className="min-w-0"><p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p><p className="mt-1 text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]}</p></div>
@@ -94,7 +97,7 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="text-[12px] text-muted">Định giá {formatISODate(a.valuationDate)}</p>
-                      <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary-strong">Cập nhật giá <ChevronRight size={16} aria-hidden /></span>
+                      <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary-strong">Chi tiết <ChevronRight size={16} aria-hidden /></span>
                     </div>
                   </button>
                   {stale && <div className="absolute right-2 top-2"><InfoTooltip warning label={`giá trị đã cũ của ${a.name}`} text={`Tài sản này được định giá ngày ${formatISODate(a.valuationDate)}, đã hơn 6 tháng. Hãy cập nhật giá trị để tiến độ mục tiêu sát thực tế.`} /></div>}
