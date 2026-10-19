@@ -19,20 +19,22 @@ export function LoanSimulator({ params }: ScreenProps) {
   if (!goal) return <NotFoundScreen title="Mô phỏng khoản vay" onCta={() => nav.push("GoalList")} />;
 
   const product = resolveProduct(goal, productId);
-  const gap = loanGap(state, goal);
+  const deposit = paramNumber(params, "deposit") ?? 0;
+  const isDraft = goal.status === "draft";
+  const gap = loanGap(state, goal, deposit);
   const defaultTerm = Math.min(product.maxTermMonths, product.purpose === "house" ? 240 : product.purpose === "car" ? 60 : 36);
   const step = product.maxAmount >= 2_000_000_000 ? 10_000_000 : 1_000_000;
   const sliderMax = Math.min(product.maxAmount, Math.max(product.minAmount, roundUp(Math.max(gap * 1.5, gap + step), step)));
   const principal = Math.min(sliderMax, Math.max(product.minAmount, amount ?? roundUp(gap, step)));
   const termMonths = Math.min(product.maxTermMonths, Math.max(12, term ?? defaultTerm));
 
-  const isDue = goal.status === "missed" || today >= goal.targetDate;
+  const isDue = goal.status === "missed" || (!isDraft && today >= goal.targetDate);
   const startDate = isDue ? today : goal.targetDate;
   const quote = quoteLoan(state, { productId: product.id, principal, ratePa: product.ratePa, termMonths, startDate });
   const totalInt = totalInterest(buildSchedule(principal, product.ratePa, termMonths, startDate));
   const blocked = !quote.affordability.allowed;
   const covers = principal >= gap;
-  const lenderParams = { goalId: goal.id, productId: product.id, amount: principal, termMonths };
+  const lenderParams = { goalId: goal.id, productId: product.id, amount: principal, termMonths, deposit: isDraft ? deposit : undefined };
 
   const pickProduct = (id: string) => {
     setProductId(id);
@@ -43,6 +45,10 @@ export function LoanSimulator({ params }: ScreenProps) {
   const primary = blocked ? (
     <button type="button" className={primaryButton} onClick={() => nav.push("LoanBlocked", lenderParams)}>
       Xem vì sao chưa vay được
+    </button>
+  ) : isDraft ? (
+    <button type="button" className={primaryButton} onClick={() => nav.push("OpenAccountConfirm", lenderParams)}>
+      Đưa vào kế hoạch
     </button>
   ) : isDue ? (
     <button type="button" className={primaryButton} onClick={() => nav.push("LoanApply", lenderParams)}>

@@ -34,7 +34,9 @@ export function NotFoundScreen({ title, onCta }: { title: string; onCta: () => v
 }
 
 /** Amount still missing: at the target date when planning ahead, today once due. */
-export function loanGap(state: PreviewState, goal: Goal): number {
+export function loanGap(state: PreviewState, goal: Goal, deposit = 0): number {
+  // Draft goal: no account yet, the opening deposit comes from the wizard.
+  if (goal.status === "draft") return Math.max(0, goal.targetAmount - deposit);
   const remaining = Math.max(0, goal.targetAmount - goalValue(state, goal).total);
   if (goal.status === "missed" || state.clock.today >= goal.targetDate) return remaining;
   const f = feasibility(state, goal);
@@ -82,11 +84,12 @@ export function probeLoan(state: PreviewState, goal: Goal, termOverride?: number
 
 export function loanParamsFrom(params: ScreenParams, goal: Goal, state: PreviewState) {
   const product = resolveProduct(goal, paramString(params, "productId"));
-  const gap = loanGap(state, goal);
+  const deposit = paramNumber(params, "deposit") ?? 0;
+  const gap = loanGap(state, goal, deposit);
   const principal = paramNumber(params, "amount") ?? Math.max(product.minAmount, roundUp(gap, 1_000_000));
   const wanted = product.purpose === "house" ? 240 : product.purpose === "car" ? 60 : 36;
   const termMonths = Math.min(product.maxTermMonths, paramNumber(params, "termMonths") ?? wanted);
-  return { product, gap, principal, termMonths };
+  return { product, gap, principal, termMonths, deposit };
 }
 
 export function pct(value: number): string {

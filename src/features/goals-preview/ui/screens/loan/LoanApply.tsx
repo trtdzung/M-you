@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatVnd, maskAccountNumber } from "@/lib/format";
 import { TEMPLATE_LABEL } from "../../../model/labels";
 import { addMonths, buildSchedule, formatISODate, formatMonths, quoteLoan, totalInterest } from "../../../engine";
-import type { ScreenProps } from "../../../model/screens";
+import { paramNumber, type ScreenProps } from "../../../model/screens";
 import { BottomActions, ConfirmSheet, ScreenHeader, SummaryRows } from "../../shared";
 import { errorBox, infoBox, primaryButton, ring, screenPadding } from "../../shared/styles";
 import { INDICATIVE_NOTE, NotFoundScreen, Section, loanParamsFrom, useLoanScreen } from "./shared";
@@ -22,6 +22,7 @@ export function LoanApply({ params }: ScreenProps) {
   const allowed = quote.affordability.allowed;
   const accountText = account ? `${account.name} · ${maskAccountNumber(account.number)}` : "Tài khoản mục tiêu";
 
+  const isDraft = goal.status === "draft";
   const confirm = () => {
     dispatch({ type: "takeLoan", goalId: goal.id, productId: product.id, principal, termMonths });
     nav.replace("AchievedIntro", { goalId: goal.id });
@@ -80,7 +81,11 @@ export function LoanApply({ params }: ScreenProps) {
       <p className="text-[12px] leading-4 text-muted">{INDICATIVE_NOTE}</p>
 
       <BottomActions>
-        {allowed ? (
+        {isDraft ? (
+          <button type="button" className={primaryButton} onClick={() => nav.push("OpenAccountConfirm", { goalId: goal.id, productId: product.id, amount: principal, termMonths, deposit: paramNumber(params, "deposit") })}>
+            Đưa vào kế hoạch
+          </button>
+        ) : allowed ? (
           <button type="button" className={primaryButton} disabled={!agreed} onClick={() => setConfirming(true)}>
             Gửi đăng ký vay
           </button>

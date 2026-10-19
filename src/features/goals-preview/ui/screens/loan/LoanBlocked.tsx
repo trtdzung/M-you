@@ -23,7 +23,7 @@ export function LoanBlocked({ params }: ScreenProps) {
   const [sheet, setSheet] = useState<"extend" | "reduce" | null>(null);
   if (!goal) return <NotFoundScreen title="Chưa thể vay" onCta={() => nav.push("GoalList")} />;
 
-  const { product, principal, termMonths } = loanParamsFrom(params, goal, state);
+  const { product, principal, termMonths, deposit } = loanParamsFrom(params, goal, state);
   const { monthlyIncome, existingDebtPayment } = state.customer;
   const payment = annuityPayment(principal, product.ratePa, termMonths);
   const check = affordability({ monthlyPayment: payment, monthlyIncome, existingDebtPayment, ratePa: product.ratePa, termMonths });
@@ -41,6 +41,7 @@ export function LoanBlocked({ params }: ScreenProps) {
   const maxAtTerm = Math.min(product.maxAmount, check.maxPrincipal);
   const canTrySmaller = maxAtTerm >= product.minAmount;
 
+  const isDraft = goal.status === "draft";
   const opts = goalOptions(state, goal);
   const value = goalValue(state, goal).total;
   const base = goal.targetDate > today ? goal.targetDate : today;
@@ -55,7 +56,7 @@ export function LoanBlocked({ params }: ScreenProps) {
     <button
       type="button"
       className={primaryButton}
-      onClick={() => nav.replace("LoanSimulator", { goalId: goal.id, productId: product.id, amount: Math.floor(maxAtTerm / 1_000_000) * 1_000_000, termMonths })}
+      onClick={() => nav.replace("LoanSimulator", { goalId: goal.id, productId: product.id, amount: Math.floor(maxAtTerm / 1_000_000) * 1_000_000, termMonths, deposit: isDraft ? deposit : undefined })}
     >
       Thử vay {formatVnd(Math.floor(maxAtTerm / 1_000_000) * 1_000_000)}
     </button>
@@ -107,13 +108,15 @@ export function LoanBlocked({ params }: ScreenProps) {
               <span className="block text-[13px] leading-5 text-muted">So sánh các cách bù phần thiếu mà không cần vay.</span>
             </span>
           </button>
+          {!isDraft && (
           <button type="button" className={listRow} onClick={() => setSheet("extend")}>
             <span className="flex-1">
               <span className="block text-[15px] font-semibold text-text">Lùi ngày thêm 12 tháng</span>
               <span className="block text-[13px] leading-5 text-muted">Ngày mới {formatISODate(extendDate)}, có thêm thời gian tích luỹ.</span>
             </span>
           </button>
-          {reduceAmount !== null && (
+          )}
+          {!isDraft && reduceAmount !== null && (
             <button type="button" className={listRow} onClick={() => setSheet("reduce")}>
               <span className="flex-1">
                 <span className="block text-[15px] font-semibold text-text">Giảm mục tiêu xuống {formatVnd(reduceAmount)}</span>
