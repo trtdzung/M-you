@@ -33,6 +33,27 @@ export const SO_FAIL_PREFIX = "sofail-";
 const GOAL_TXN_KINDS: ReadonlySet<string> = new Set(Object.keys(TXN_DIRECTION));
 const RISK_PROFILES: ReadonlySet<string> = new Set(["conservative", "balanced", "growth"]);
 
+export interface SimProfile {
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  salaryDay: number;
+  asOf: ISODate;
+}
+
+export function readSimProfile(cif: string): SimProfile | null {
+  const row = goalsV2Db().prepare("SELECT sim_profile FROM gv2_meta WHERE cif = ?").get(cif) as { sim_profile: string | null } | undefined;
+  const value = row?.sim_profile ? parseJson<SimProfile>(row.sim_profile) : null;
+  if (!value || !Number.isFinite(value.monthlyIncome) || value.monthlyIncome < 0 ||
+      !Number.isFinite(value.monthlyExpenses) || value.monthlyExpenses < 0 ||
+      !Number.isInteger(value.salaryDay) || value.salaryDay < 1 || value.salaryDay > 28 ||
+      typeof value.asOf !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value.asOf)) return null;
+  return value;
+}
+
+export function writeSimProfile(cif: string, profile: SimProfile): void {
+  goalsV2Db().prepare("UPDATE gv2_meta SET sim_profile = ? WHERE cif = ?").run(JSON.stringify(profile), cif);
+}
+
 export interface GoalMeta {
   seq: number;
   processedThrough: ISODate | null;

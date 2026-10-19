@@ -18,7 +18,7 @@ import { goalsV2Db } from "./db";
 import { applyPostings, GoalInsufficientFundsError } from "./postings";
 import { readMarketInstruments, readPriceStatus } from "./prices/repo";
 import { ensurePricesFresh } from "./prices/sync";
-import { loadWorld, readGoalMeta } from "./world-repo";
+import { loadWorld, readGoalMeta, readSimProfile, writeSimProfile } from "./world-repo";
 
 export interface GoalsV2Market {
   instruments: MarketInstrument[];
@@ -271,9 +271,23 @@ function loadAndCatchUp(cif: string, strict = false): WorldState {
     clock: { today: processedThrough },
     customer: loadWorld(cif, { profileAsOf: processedThrough }).customer,
   };
+  const customer = start.customer;
+  const complete = customer.monthlySurplus !== "unknown";
+  const saved = complete ? null : readSimProfile(cif);
+  if (saved) {
+    start.customer = { ...customer, monthlyIncome: saved.monthlyIncome, monthlyExpenses: saved.monthlyExpenses, salaryDay: saved.salaryDay };
+  }
   const { state: next } = advanceTime(start, days);
   try {
-    applyPostings(cif, start, next, null);
+    goalsV2Db().transaction(() => {
+      applyPostings(cif, start, next, null);
+      if (complete) writeSimProfile(cif, {
+        monthlyIncome: customer.monthlyIncome,
+        monthlyExpenses: customer.monthlyExpenses,
+        salaryDay: customer.salaryDay,
+        asOf: processedThrough,
+      });
+    })();
   } catch (err) {
     if (strict) throw err;
     console.error("[goals-v2] catch-up postings failed", err);
