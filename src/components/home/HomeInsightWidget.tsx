@@ -80,6 +80,13 @@ function getCategoryVisuals(
     iconText: string;
     cardBorder: string;
   }> = {
+    critical: {
+      pill: "bg-rose-50 text-rose-700 border-rose-200/80",
+      dot: "bg-rose-600",
+      iconBg: "bg-rose-50",
+      iconText: "text-rose-600",
+      cardBorder: "border-rose-200",
+    },
     urgent: {
       pill: "bg-red-50 text-red-700 border-red-200/80",
       dot: "bg-red-500",
