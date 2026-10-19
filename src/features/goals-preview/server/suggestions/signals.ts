@@ -52,7 +52,7 @@ export const MAX_SIGNALS = 3;
 export const MAX_DTI_PCT = 40;
 const MILESTONES = [25, 50, 75] as const;
 
-/** Thứ tự ưu tiên (TASKS T7.2); số nhỏ = gấp hơn. Khoá không có trong danh sách xếp cuối. */
+/** Thứ tự ưu tiên (TASKS T7.2 + D16); số nhỏ = gấp hơn. Khoá không có trong danh sách xếp cuối. */
 const TIER: Record<string, number> = {
   overdue: 0,
   standing_order_failed: 1,
@@ -61,7 +61,10 @@ const TIER: Record<string, number> = {
   behind_plan: 3,
   priority_conflict: 4,
   idle_cash: 5,
+  salary: 5,
+  prepay: 5,
   loan_blocked: 6,
+  insufficient_data: 6,
   revalue_asset: 6,
   maturity: 6,
   fund_drop: 6,
