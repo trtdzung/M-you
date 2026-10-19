@@ -1,3 +1,4 @@
+import { refreshAppClock } from "@/lib/demo-clock";
 import type { WorldState } from "../model/state";
 import { hydrateMarket, type MarketInstrument } from "../data/market";
 import type { PreviewAction } from "./actions";
@@ -60,6 +61,7 @@ async function postAction(cif: string, requestId: string, action: PreviewAction)
   });
   if (res.ok) {
     const body = (await res.json()) as WorldPayload & { createdGoalId?: unknown };
+    if (action.type === "advanceTime") refreshAppClock(cif);
     const payload: WorldPayload = { world: body.world, market: body.market };
     return typeof body.createdGoalId === "string" && body.createdGoalId !== ""
       ? { ok: true, payload, createdGoalId: body.createdGoalId }

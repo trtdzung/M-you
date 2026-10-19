@@ -8,6 +8,19 @@ import { addMonthsToKey, dateToMonthKey } from "@/domain/engine/types";
 
 export const DEMO_NOW = new Date("2026-09-15T00:00:00.000Z");
 
+let clientClock: { now: number; offsetMs: number; receivedAt: number } | null = null;
+
+/** Installed by AppClockProvider before business screens render. */
+export function setClientAppClock(now: string | null, offsetMs = 0): void {
+  clientClock = now === null ? null : { now: new Date(now).getTime(), offsetMs, receivedAt: Date.now() };
+}
+
+export const APP_CLOCK_REFRESH_EVENT = "app-clock:refresh";
+
+export function refreshAppClock(cif: string): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(APP_CLOCK_REFRESH_EVENT, { detail: cif }));
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -19,6 +32,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * the app is anchored to. `realNow` is injectable for tests.
  */
 export function transferNow(realNow: Date = new Date()): Date {
+  if (typeof window !== "undefined" && clientClock) {
+    const elapsed = realNow.getTime() - clientClock.receivedAt;
+    const sampledTimeOfDay = clientClock.now - DEMO_NOW.getTime() - clientClock.offsetMs;
+    const timeOfDay = ((sampledTimeOfDay + elapsed) % DAY_MS + DAY_MS) % DAY_MS;
+    return new Date(DEMO_NOW.getTime() + timeOfDay + clientClock.offsetMs);
+  }
   const timeOfDay = ((realNow.getTime() % DAY_MS) + DAY_MS) % DAY_MS;
   return new Date(DEMO_NOW.getTime() + timeOfDay);
 }
@@ -38,7 +57,7 @@ function labelOf(year: number, month0: number): string {
 
 /** The current demo month key ("YYYY-MM") — the VN (UTC+7) month, like the engine. */
 export function currentMonthKey(): string {
-  return dateToMonthKey(DEMO_NOW);
+  return dateToMonthKey(typeof window !== "undefined" && clientClock ? transferNow() : DEMO_NOW);
 }
 
 /** Available months, newest first, matching the fixture span. */

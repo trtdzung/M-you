@@ -12,6 +12,7 @@
  * the persona's stored categories, so a custom one is remembered too.
  */
 
+import { AppClockProvider, AppClockPeriodSync } from "@/state/app-clock";
 import { PersonaProvider } from "@/providers/context";
 import { SecurityPersonaSync } from "@/state/security/SecurityPersonaSync";
 import { AssetLiabilityProvider } from "@/state/assets";
@@ -32,6 +33,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <PersonaProvider>
       <SecurityPersonaSync />
       <LoginGate>
+        <AppClockProvider>
         <CorrectionsProvider>
           <ManualTxnsProvider>
             <JarConfigProvider>
@@ -40,6 +42,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
                   <AssetLiabilityProvider>
                     <GoalProvider>
                       <PeriodProvider>
+                        <AppClockPeriodSync />
                         <ConsentGate>
                           <AutoCategorizeProvider>
                           <AppChrome>{children}</AppChrome>
@@ -53,6 +56,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
             </JarConfigProvider>
           </ManualTxnsProvider>
         </CorrectionsProvider>
+        </AppClockProvider>
       </LoginGate>
     </PersonaProvider>
   );
