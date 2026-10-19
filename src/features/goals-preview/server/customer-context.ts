@@ -7,9 +7,10 @@ import "server-only";
  * thanh toán thẻ khỏi chi tiêu.
  */
 
-import { FIXED_CATEGORY_IDS, type Transaction } from "@/domain/models";
+import type { Transaction } from "@/domain/models";
 import { aggregateCashflow, isoInPeriod, monthPeriod, VN_UTC_OFFSET_MS } from "@/domain/engine";
 import { readAccounts } from "@/lib/accounts-store";
+import { readCategories } from "@/lib/categories-store";
 import { readCorrections } from "@/lib/corrections-store";
 import { readManualTxns } from "@/lib/manual-txns-store";
 import { readTransactions } from "@/lib/transactions-store";
@@ -30,6 +31,8 @@ export function buildCustomerProfile(cif: string, today: ISODate, riskProfile: R
   const main = readAccounts(cif).find((a) => a.type === "current");
   if (!main) throw new RangeError("Unknown customer");
 
+  // "Cố định" là dữ liệu theo cif; chỉ chia fixed/discretionary, không đổi thu/chi tổng.
+  const fixedCategoryIds = new Set(readCategories(cif).filter((c) => c.fixed).map((c) => c.id));
   const corrections = readCorrections(cif);
   const endOfToday = new Date(`${today}T23:59:59.999+07:00`).getTime();
   const txns: Transaction[] = applyCorrections([...readManualTxns(cif), ...readTransactions(cif)], corrections).filter(
@@ -45,19 +48,15 @@ export function buildCustomerProfile(cif: string, today: ISODate, riskProfile: R
   // 3 tháng trọn vẹn trước tháng của today.
   const [y, m] = today.split("-").map(Number);
   const periods = Array.from({ length: WINDOW_MONTHS }, (_, i) => monthPeriod(y, m - 1 - (i + 1)));
-  const cash = periods.map((p) => aggregateCashflow(txns, p, FIXED_CATEGORY_IDS));
-  const debtPerMonth = periods.map((p) =>
-    txns
-      .filter((t) => t.type === "card_payment" && t.status === "posted" && isoInPeriod(t.postedAt, p))
-      .reduce((s, t) => s + t.amount, 0),
-  );
+  const cash = periods.map((p) => aggregateCashflow(txns, p, fixedCategoryIds));
   // Chia cho số tháng trong kỳ thực sự có dữ liệu (tối thiểu 1), không chia cho tháng trống.
   const monthsWithData = cash.filter((c) => c.meta.sourceCoverage.knownCount > 0).length || 1;
   const avg = (sum: number) => Math.round(sum / monthsWithData);
 
   const monthlyIncome = avg(cash.reduce((s, c) => s + c.income, 0));
   const monthlyExpenses = avg(cash.reduce((s, c) => s + c.expense, 0));
-  const existingDebtPayment = avg(debtPerMonth.reduce((s, d) => s + d, 0));
+  // Trả nợ hiện có = tổng minimumPayment các khoản nợ của persona (bỏ null); thanh toán thẻ đã nằm trong chi tiêu.
+  const existingDebtPayment = persona.liabilities.reduce((sum, l) => sum + (l.minimumPayment ?? 0), 0);
   const monthlySurplus = dataMonths < WINDOW_MONTHS ? "unknown" : monthlyIncome - monthlyExpenses - existingDebtPayment;
 
   // Ngày nhận lương: ngày hay gặp nhất của khoản thu ≥ 50% thu nhập TB; không có → khoản thu lớn nhất.
