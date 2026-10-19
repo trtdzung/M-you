@@ -44,6 +44,7 @@ export type InsightChipActionType =
 export type InsightPrimaryActionType = InsightChipActionType;
 
 export interface InsightActionChip {
+  id?: string;
   label: string;
   actionType: InsightPrimaryActionType;
   href?: string;

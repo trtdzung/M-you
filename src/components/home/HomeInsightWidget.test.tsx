@@ -392,6 +392,7 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
         confidence: "recorded",
         title: "Cảnh báo OTP liên tục",
         body: "Phát hiện nhiều yêu cầu OTP bất thường.",
+        metric: { label: "Mức độ rủi ro", value: 100, unit: "points" },
         facts: {},
         action: "overview",
         question: "Bảo vệ tài khoản ngay",
