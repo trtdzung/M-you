@@ -8,7 +8,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { Amount } from "../../shared/Amount";
 import { SourceTag } from "../../shared/SourceTag";
 import { InfoTooltip } from "../../shared/InfoTooltip";
-import { card, listRow, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
+import { card, listRow, secondaryButton, sectionTitle } from "../../shared/styles";
 import { canTransact, isStaleValuation, type GoalContext } from "./common";
 
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
@@ -72,33 +72,28 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
         {fixed.length === 0 ? (
           <p className={`${card} text-center text-sm text-muted`}>Chưa có tài sản cố định nào được khai báo.</p>
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-card bg-surface shadow-card">
+          <ul className="divide-y divide-border rounded-card bg-surface shadow-card">
             {fixed.map((a) => {
               const stale = isStaleValuation(a.valuationDate, state.clock.today);
               return (
-                <li key={a.id}>
-                  <button type="button" className={listRow} onClick={() => nav.push("RevalueAsset", { goalId, assetId: a.id })}>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-text">{a.name}</p>
-                      <p className="text-[12px] text-muted">
-                        {FIXED_CATEGORY_LABEL[a.category]} · định giá {formatISODate(a.valuationDate)}
-                      </p>
-                      {stale && <p className="text-[12px] font-semibold text-warning">Cần định giá lại</p>}
+                <li key={a.id} className="relative">
+                  <button type="button" className={`${listRow} flex-col !items-stretch rounded-card`} onClick={() => nav.push("RevalueAsset", { goalId, assetId: a.id })}>
+                    <p className={`truncate text-sm font-semibold text-text ${stale ? "pr-10" : ""}`}>{a.name}</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[12px] text-muted">{FIXED_CATEGORY_LABEL[a.category]} · {formatISODate(a.valuationDate)}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right"><Amount amount={a.value} source={a.source} className="whitespace-nowrap text-sm font-semibold text-text" /><p className="text-[12px] text-muted">Tính {a.countPercent}% vào mục tiêu</p></div>
+                        <ChevronRight size={18} className="text-muted" aria-hidden />
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Amount amount={a.value} source={a.source} className="text-sm font-semibold text-text" />
-                      <p className="text-[12px] text-muted">tính {a.countPercent}%</p>
-                    </div>
-                    <ChevronRight size={18} className="text-muted" aria-hidden />
                   </button>
+                  {stale && <div className="absolute right-1 top-1"><InfoTooltip warning label={`giá trị đã cũ của ${a.name}`} text={`Tài sản này được định giá ngày ${formatISODate(a.valuationDate)}, đã hơn 6 tháng. Hãy cập nhật giá trị để tiến độ mục tiêu sát thực tế.`} /></div>}
                 </li>
               );
             })}
           </ul>
         )}
-        {fixed.some((a) => isStaleValuation(a.valuationDate, state.clock.today)) && (
-          <p className={warningBox}>Có tài sản đã định giá hơn 6 tháng. Giá cũ có thể làm tiến độ lệch so với thực tế.</p>
-        )}
+
         {canTransact(goal) && (
           <button type="button" className={secondaryButton} onClick={() => nav.push("AddFixedAsset", { goalId })}>
             <Plus size={18} aria-hidden /> Thêm tài sản cố định
