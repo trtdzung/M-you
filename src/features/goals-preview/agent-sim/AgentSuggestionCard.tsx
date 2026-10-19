@@ -1,6 +1,8 @@
 "use client";
 
-import { Sparkles, X } from "lucide-react";
+import { useState } from "react";
+import { Sheet } from "@/components/primitives";
+import { ChevronRight, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { AgentSuggestion, SuggestionAction } from "../model/state";
 import { usePreview } from "../store/PreviewStore";
@@ -18,8 +20,10 @@ const TONE: Record<NonNullable<AgentSuggestion["tone"]>, string> = {
  */
 export function AgentSuggestionCard({ suggestion, className }: { suggestion: AgentSuggestion; className?: string }) {
   const { dispatch, nav } = usePreview();
+  const [open, setOpen] = useState(false);
 
   function run(action: SuggestionAction) {
+    setOpen(false);
     if (action.action) dispatch(action.action);
     if (action.nav) nav.push(action.nav.screen, action.nav.params);
   }
@@ -47,7 +51,15 @@ export function AgentSuggestionCard({ suggestion, className }: { suggestion: Age
           <X size={18} aria-hidden />
         </button>
       </div>
-      <h3 className="mt-1 text-[15px] font-semibold leading-6 text-text">{suggestion.title}</h3>
+      <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={`mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl text-left ${ring}`}>
+        <span className="flex flex-col gap-1">
+          <span className="text-[15px] font-semibold leading-6 text-text">{suggestion.title}</span>
+          <span className="text-[13px] font-semibold text-primary-strong">Xem chi tiết</span>
+        </span>
+        <ChevronRight size={20} aria-hidden className="shrink-0 text-muted" />
+      </button>
+      <Sheet open={open} title={suggestion.title} onClose={() => setOpen(false)}>
+      <p className="mb-3 text-[12px] text-source-mock">M-You gợi ý · Dữ liệu mô phỏng</p>
       <p className="mt-1 text-sm leading-5 text-muted">{suggestion.body}</p>
       {actions.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -70,6 +82,7 @@ export function AgentSuggestionCard({ suggestion, className }: { suggestion: Age
           })}
         </div>
       )}
+      </Sheet>
     </section>
   );
 }

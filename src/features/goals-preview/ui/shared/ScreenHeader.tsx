@@ -25,13 +25,13 @@ export function ScreenHeader({
   const nav = useNav();
   const showBack = !hideBack && (onBack !== undefined || nav.canGoBack);
   return (
-    <header className="sticky top-0 z-20 -mx-1 flex items-center gap-2 rounded-b-2xl bg-[#f8e2d8] px-1 py-3">
+    <header className="sticky top-0 z-20 flex items-center gap-2 rounded-b-2xl bg-[#f8e2d8] px-1 py-3">
       {showBack && (
         <button
           type="button"
           onClick={onBack ?? (() => nav.pop())}
           aria-label="Quay lại"
-          className={`-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80 ${ring}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text transition-colors hover:bg-surface/80 ${ring}`}
         >
           <ArrowLeft size={22} strokeWidth={2} />
         </button>
