@@ -30,6 +30,7 @@ import { useCallback, useMemo } from "react";
 import type { Transaction } from "@/domain/models";
 import { evaluateFunding, type DonorProposal, type FundingAssessment } from "@/domain/engine";
 import { transferNow } from "@/lib/demo-clock";
+import { useAppNow } from "./app-clock";
 import { jarIdForCategory, rebalanceInputsFor, snapshotForDate, type AutoFundDeps, type JarSnapshot } from "@/lib/auto-fund-core";
 import type { RawData } from "@/domain/engine/finance-compose";
 import { planCover, triggerContribution, type SnapshotOpts } from "./auto-fund-plan";
@@ -65,14 +66,15 @@ type Origin = "auto" | "manual";
  *  `useFinancials` — e.g. auto-categorize — doesn't start a second data fetch). */
 export function useAutoFundWith(fin: { transactions: Transaction[]; raw: RawData | null }) {
   const { transactions, raw } = fin;
+  const now = useAppNow();
   const { config: jarConfig } = useJarConfig();
   const { add, remove, removeByTrigger, addPersisted } = useManualTxns();
 
   // One clock (Red Team #1): the same `transferNow()` that stamps ledger rows and
   // drives `useFinancials`, read at recompute time (config/txn change).
   const deps: AutoFundDeps = useMemo(
-    () => ({ transactions, accounts: raw?.accounts ?? [], jarConfig, now: transferNow() }),
-    [transactions, raw, jarConfig],
+    () => ({ transactions, accounts: raw?.accounts ?? [], jarConfig, now: new Date(Math.max(now.getTime(), transferNow().getTime())) }),
+    [transactions, raw, jarConfig, now],
   );
 
   const snapshotAt = useCallback((postedAt: string, opts?: SnapshotOpts): JarSnapshot => snapshotForDate(deps, postedAt, opts), [deps]);

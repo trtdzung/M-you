@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePersonaCif } from "@/providers/context";
 import { APP_CLOCK_REFRESH_EVENT, setClientAppClock, transferNow } from "@/lib/demo-clock";
 import { dateToMonthKey } from "@/domain/engine/types";
@@ -74,7 +74,10 @@ function useClock(): ClockView {
   return clock;
 }
 
-export function useAppNow(): Date { useClock(); return transferNow(); }
+export function useAppNow(): Date {
+  const clock = useContext(ClockContext);
+  return useMemo(() => clock ? new Date(clock.now) : transferNow(), [clock]);
+}
 export function useAppToday(): string { return useClock().today; }
 export function useAppMonthKey(): string { return useClock().monthKey; }
 

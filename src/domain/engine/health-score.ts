@@ -1,3 +1,4 @@
+import { transferNow } from "@/lib/demo-clock";
 /**
  * Pure Financial Health Score (Bảng 2) calculation engine.
  *
@@ -188,7 +189,7 @@ export function deriveHealthMetricFacts(
   input: HealthScoreInput,
   policy: HealthScorePolicy = HEALTH_SCORE_POLICY_V0,
 ): HealthMetricFact[] {
-  const asOf = input.asOf ?? (input.now ?? new Date()).toISOString();
+  const asOf = input.asOf ?? (input.now ?? transferNow()).toISOString();
   const currentMonth = asOf.slice(0, 7);
 
   // 1. SPEND: SPENDING_TO_INCOME
@@ -450,7 +451,7 @@ export function deriveHealthMetricFacts(
 export function scoreFinancialHealth(
   metrics: HealthMetricFact[],
   policy: HealthScorePolicy = HEALTH_SCORE_POLICY_V0,
-  computedAt: string = new Date().toISOString(),
+  computedAt: string = transferNow().toISOString(),
 ): FinancialHealthScoreResult {
   const metricMap = new Map(metrics.map((m) => [m.id, m]));
 
@@ -536,5 +537,5 @@ export function computeFinancialHealthScore(
   policy: HealthScorePolicy = HEALTH_SCORE_POLICY_V0,
 ): FinancialHealthScoreResult {
   const facts = deriveHealthMetricFacts(input, policy);
-  return scoreFinancialHealth(facts, policy, input.asOf ?? (input.now ?? new Date()).toISOString());
+  return scoreFinancialHealth(facts, policy, input.asOf ?? (input.now ?? transferNow()).toISOString());
 }

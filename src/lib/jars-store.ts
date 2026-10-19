@@ -15,7 +15,7 @@ import "server-only";
 import type { Jar, JarConfig } from "@/domain/models";
 import { dedupeCategories, isJarAmount } from "@/domain/jar-rules";
 import { getDb } from "./db";
-import { transferNow } from "./demo-clock";
+import { appNow } from "./app-clock";
 import { deleteLedgerExcept, readJarLedger } from "./jar-ledger-store";
 
 interface JarRow {
@@ -190,7 +190,7 @@ export function readJarConfig(cif: string): JarConfig {
 export function writeJarConfig(
   cif: string,
   config: JarConfig,
-  nowIso: string = transferNow().toISOString(),
+  nowIso: string = appNow(cif).toISOString(),
 ): JarConfig {
   const db = getDb();
   const readAnchors = db.prepare("SELECT id, created_at FROM jars WHERE cif = ?");

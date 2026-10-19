@@ -50,7 +50,7 @@ export function TransferCompose() {
   const autoFund = useAutoFundWith({ transactions: fin.transactions, raw: fin.raw });
   // S10/U7: the SAME clock Confirm assesses with and posts the txn at, so the
   // funding verdict here is always for the posted txn's month (not the viewed one).
-  const postedAt = useMemo(() => transferNow().toISOString(), []);
+  const postedAt = transferNow().toISOString();
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);

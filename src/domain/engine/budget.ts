@@ -1,3 +1,4 @@
+import { transferNow } from "@/lib/demo-clock";
 /**
  * Budget evaluation. Used amount comes from posted net expense per category
  * (same rule as cash flow). Exposes pressure facts consumed by insights.
@@ -31,7 +32,7 @@ export function evaluateBudget(
   budgets: Budget[],
   txns: Transaction[],
   period: Period,
-  now: Date = new Date(),
+  now: Date = transferNow(),
   labels?: ReadonlyMap<string, string>,
 ): BudgetLine[] {
   const byCat = netExpenseByCategory(txns, period);

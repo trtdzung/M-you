@@ -45,7 +45,7 @@ export function AgentRebalanceCard({ form, fullWidth = false }: { form: Rebalanc
   const fin = useFinancials();
   const autoFund = useAutoFundWith({ transactions: fin.transactions, raw: fin.raw });
   const key = proposalKey(persona.cif, form);
-  const postedAt = useMemo(() => transferNow().toISOString(), []);
+  const postedAt = transferNow().toISOString();
   const [status, setStatus] = useState<"idle" | "saving" | "done">(() => (wasApplied(key) ? "done" : "idle"));
   const [problem, setProblem] = useState<string | null>(null);
   const [fromId, setFromId] = useState(form.from_jar_id);

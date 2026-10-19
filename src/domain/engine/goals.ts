@@ -1,3 +1,4 @@
+import { transferNow } from "@/lib/demo-clock";
 /**
  * Goal projection — a deterministic what-if for "if I save X per month, when do I
  * reach this goal?". The engine owns the number; the AI only narrates it. Simple
@@ -37,7 +38,7 @@ export interface GoalSimInput {
 }
 
 export function simulateGoal(goal: Goal, input: GoalSimInput = {}): GoalProjection {
-  const asOf = input.asOf ?? new Date();
+  const asOf = input.asOf ?? transferNow();
   const startKey = dateToMonthKey(asOf);
   const contribution = input.monthlyContribution ?? null;
   const base = {

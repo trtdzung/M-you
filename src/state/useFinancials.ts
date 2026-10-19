@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { transferNow } from "@/lib/demo-clock";
+import { useAppNow } from "./app-clock";
 import { useProviders } from "@/providers/context";
 import { useAssetLiabilities } from "./assets";
 import { useCategories } from "./categories";
@@ -52,6 +53,7 @@ export interface UseFinancialsResult {
  */
 export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const providers = useProviders();
+  const now = useAppNow();
   const { corrections } = useCorrections();
   const { manualTxns } = useManualTxns();
   const { config: jarConfig } = useJarConfig();
@@ -129,7 +131,7 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
     () =>
       raw
         ? computeFinancials(raw, month, {
-            now: transferNow(),
+            now: new Date(Math.max(now.getTime(), transferNow().getTime())),
             transactions,
             jarConfig,
             userAssets,
@@ -138,7 +140,7 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
             categories,
           })
         : null,
-    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals, categories],
+    [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals, categories, now],
   );
 
   return { loading, error, retry, raw, transactions, allTransactions, financials };

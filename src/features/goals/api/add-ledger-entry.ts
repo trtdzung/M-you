@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { validateLedgerEntry } from "../model/validate-ledger";
 import { goalCashflowInput } from "../server/cashflow-input";
 import { loadGoalView } from "../server/goal-view";
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   if (!result.ok) return invalid(result.errors);
   if (!getGoal(cif, id)) return notFound();
   try {
-    const now = transferNow();
+    const now = appNow(cif);
     const entry = appendLedger(cif, id, result.value, now);
     const goal = loadGoalView(cif, getGoal(cif, id)!, now, goalCashflowInput(cif, now));
     return NextResponse.json({ entry, goal }, { status: 201 });

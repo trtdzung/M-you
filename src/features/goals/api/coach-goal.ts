@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { forwardToAgent } from "@/lib/agent-proxy-auth";
-import { transferNow } from "@/lib/demo-clock";
+import { appNow } from "@/lib/app-clock";
 import { agentAlias, agentContext } from "../advisor/agent-identity";
 import {
   COACH_ANSWERS_MAX,
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   }
   // Chips are shaped by the customer's real figures; only for a fresh goal (an edit of a draft needs none).
   if (!payload.current_draft) {
-    const context = agentContext(cif, transferNow());
+    const context = agentContext(cif, appNow(cif));
     if (context) payload.context = context;
   }
   const started = Date.now();

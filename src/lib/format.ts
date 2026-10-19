@@ -1,3 +1,4 @@
+import { transferNow } from "@/lib/demo-clock";
 /**
  * Formatting helpers for VND currency and relative dates (Vietnamese).
  * Keep pure and framework-agnostic so both UI and tests can use them.
@@ -107,7 +108,7 @@ export function formatDateTime(date: Date | string | number): string {
  */
 export function formatRelativeDate(
   date: Date | string | number,
-  now: Date = new Date(),
+  now: Date = transferNow(),
 ): string {
   const d = toDate(date);
   if (!d) return "—";

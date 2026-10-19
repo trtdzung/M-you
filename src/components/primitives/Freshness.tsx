@@ -1,5 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/cn";
-import { DEMO_NOW } from "@/lib/demo-clock";
+import { useAppNow } from "@/state/app-clock";
 
 /** Relative-time freshness label, e.g. "Cập nhật 3 giờ trước". */
 export function Freshness({
@@ -11,11 +13,12 @@ export function Freshness({
   prefix?: string;
   className?: string;
 }) {
-  const label = at ? relative(at) : "chưa rõ";
+  const now = useAppNow();
+  const label = at ? relative(at, now) : "chưa rõ";
   return <span className={cn("text-xs text-muted", className)}>{prefix} {label}</span>;
 }
 
-function relative(iso: string, now: Date = DEMO_NOW): string {
+function relative(iso: string, now: Date): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "chưa rõ";
   const diffMs = now.getTime() - then;

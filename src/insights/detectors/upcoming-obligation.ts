@@ -1,4 +1,4 @@
-import { DEMO_NOW } from "@/lib/demo-clock";
+import { transferNow } from "@/lib/demo-clock";
 import type { Detector } from "../types";
 import { buildInsight, fact, money } from "../narrate";
 
@@ -9,7 +9,7 @@ export const upcomingObligation: Detector = (f) => {
 
   const top = known.reduce((m, o) => ((o.amount as number) > (m.amount as number) ? o : m));
   const amount = top.amount as number;
-  const days = Math.max(0, Math.ceil((new Date(top.dueDate).getTime() - DEMO_NOW.getTime()) / 86_400_000));
+  const days = Math.max(0, Math.ceil((new Date(top.dueDate).getTime() - transferNow().getTime()) / 86_400_000));
 
   return buildInsight({
     id: `upcomingObligation:${top.id}`,

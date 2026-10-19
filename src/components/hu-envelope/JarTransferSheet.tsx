@@ -57,7 +57,7 @@ export function JarTransferSheet({
 }) {
   const { config } = useJarConfig();
   const autoFund = useAutoFundWith({ transactions, raw });
-  const postedAt = useMemo(() => transferNow().toISOString(), []);
+  const postedAt = transferNow().toISOString();
   const ready = raw !== null;
   const snapshot = useMemo(() => (ready ? autoFund.snapshotAt(postedAt) : null), [ready, autoFund, postedAt]);
   const endpoints = useMemo(() => (snapshot ? transferEndpoints(snapshot) : []), [snapshot]);

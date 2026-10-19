@@ -12,7 +12,7 @@ import { readManualTxns } from "./manual-txns-store";
 import { applyCorrections, isHidden } from "@/state/corrections-core";
 import { isValidAssetRecord, isValidLiabilityRecord } from "@/domain/models/asset-liability-input";
 import { isValidGoalRecord } from "@/domain/models/goal-input";
-import { DEMO_NOW } from "./demo-clock";
+import { appNow } from "./app-clock";
 import { REBALANCE_CATEGORY, type Transaction } from "@/domain/models";
 
 function canonical(value: unknown): unknown {
@@ -52,7 +52,7 @@ export function customerSnapshot(cif: string, input: unknown = {}) {
     const t = value as { jarId?: unknown; amount?: unknown };
     if (!t || typeof t.jarId !== "string" || !jarConfig.jars.some((j) => j.id === t.jarId) ||
       typeof t.amount !== "number" || !Number.isSafeInteger(t.amount) || t.amount <= 0 || t.amount > 1e12) throw new RangeError("Invalid topup");
-    return { id: `session-topup-${i}`, accountId: "self-reported", postedAt: DEMO_NOW.toISOString(), amount: t.amount,
+    return { id: `session-topup-${i}`, accountId: "self-reported", postedAt: appNow(cif).toISOString(), amount: t.amount,
       currency: "VND", direction: "debit", type: "transfer", categoryId: REBALANCE_CATEGORY,
       merchantName: "Phân bổ trong phiên", merchantNormalizedName: "session allocation", status: "posted", source: "self_reported",
       isRecurring: false, userEdited: true,
@@ -62,6 +62,6 @@ export function customerSnapshot(cif: string, input: unknown = {}) {
   const transactions = applyCorrections([...readManualTxns(cif), ...readTransactions(cif)], corrections)
     .filter((t) => !isHidden(corrections, t.id));
   const snapshot = buildCustomerSnapshot({ ...dataset, accounts: readAccounts(cif), transactions }, jarConfig,
-    readCategories(cif, { includeArchived: true }), profile, sessionTopups, DEMO_NOW);
+    readCategories(cif, { includeArchived: true }), profile, sessionTopups, appNow(cif));
   return { snapshot, snapshotId: snapshotHash(cif, snapshot) };
 }

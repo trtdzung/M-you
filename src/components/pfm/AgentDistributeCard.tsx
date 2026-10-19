@@ -43,7 +43,7 @@ export function AgentDistributeCard({ form, fullWidth = false }: { form: Distrib
   const autoFund = useAutoFundWith({ transactions: fin.transactions, raw: fin.raw });
   const { postLedger, mutationError } = useJarConfig();
   const key = proposalKey(persona.cif, form);
-  const postedAt = useMemo(() => transferNow().toISOString(), []);
+  const postedAt = transferNow().toISOString();
   const [status, setStatus] = useState<"idle" | "saving" | "done">(() => (wasApplied(key) ? "done" : "idle"));
   const [refused, setRefused] = useState(false);
   const [rows, setRows] = useState<Row[]>(() => form.allocations.map((a, i) => ({ key: i, jarId: a.to_jar_id, amount: a.amount })));

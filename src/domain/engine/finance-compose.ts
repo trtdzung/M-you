@@ -57,7 +57,7 @@ import {
   type UnallocatedPoolResult,
   type UnlabeledSpend,
 } from "./index";
-import { DEMO_NOW, prevMonthKey } from "@/lib/demo-clock";
+import { transferNow, prevMonthKey } from "@/lib/demo-clock";
 
 /** Everything a provider bundle yields for one persona (loaded once). */
 export interface RawData {
@@ -168,7 +168,7 @@ export interface ComposeOptions {
   /**
    * Reference "now" — the ONE clock (Red Team #1). Real callers pass
    * `transferNow()`, the same clock that stamps ledger rows, so a deposit made a
-   * moment ago is ≤ the balance `asOf`. Defaults to `DEMO_NOW` for pure tests.
+   * moment ago is ≤ the balance `asOf`. Defaults to the anchor for pure tests.
    */
   now?: Date;
   /**
@@ -228,7 +228,7 @@ export function computeFinancials(
   month: string,
   options: ComposeOptions = {},
 ): Financials {
-  const now = options.now ?? DEMO_NOW;
+  const now = options.now ?? transferNow(new Date(0));
   const txns = options.transactions ?? raw.transactions;
   // Seed (provider) records + user-authored records — the single merged view the
   // engine sees. The provider reads stay seed-only, so nothing is double-counted.
