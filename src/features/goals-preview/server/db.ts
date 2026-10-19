@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS gv2_suggestion_events (
 /** Idempotent: creates every Goals v2 table when missing. */
 export function ensureGoalV2Tables(db: Database.Database): void {
   db.exec(GOAL_V2_TABLES_SQL);
+  const cols = db.prepare("PRAGMA table_info(gv2_meta)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "risk_profile_asked_at")) db.exec("ALTER TABLE gv2_meta ADD COLUMN risk_profile_asked_at TEXT");
 }
 
 const ready = new WeakSet<Database.Database>();

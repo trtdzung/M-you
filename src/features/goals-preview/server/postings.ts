@@ -299,10 +299,11 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
     const insertLoan = db.prepare("INSERT INTO gv2_loans (cif, id, goal_id, payload) VALUES (?, ?, ?, ?)");
     for (const l of next.loans) insertLoan.run(cif, l.id, l.goalId, JSON.stringify(l));
     db.prepare(
-      `INSERT INTO gv2_meta (cif, seq, processed_through, fund_price_shift_pct, risk_profile, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO gv2_meta (cif, seq, processed_through, fund_price_shift_pct, risk_profile, risk_profile_asked_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(cif) DO UPDATE SET seq = excluded.seq, processed_through = excluded.processed_through,
-         fund_price_shift_pct = excluded.fund_price_shift_pct, risk_profile = excluded.risk_profile, updated_at = excluded.updated_at`,
-    ).run(cif, next.seq, processedThrough, next.market.fundPriceShiftPct, next.customer.riskProfileAsked === true ? next.customer.riskProfile : null, new Date().toISOString());
+         fund_price_shift_pct = excluded.fund_price_shift_pct, risk_profile = excluded.risk_profile,
+         risk_profile_asked_at = COALESCE(gv2_meta.risk_profile_asked_at, excluded.risk_profile_asked_at), updated_at = excluded.updated_at`,
+    ).run(cif, next.seq, processedThrough, next.market.fundPriceShiftPct, next.customer.riskProfile, next.customer.riskProfileAsked === true ? new Date().toISOString() : null, new Date().toISOString());
 
     // 5. Đọc lại số dư thật và so với kết quả reducer.
     const mainNow = readBalance.get(cif, main.id) as { b: number } | undefined;

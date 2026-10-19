@@ -38,6 +38,8 @@ export interface GoalMeta {
   processedThrough: ISODate | null;
   fundPriceShiftPct: number;
   riskProfile: RiskProfile | null;
+  /** Khách đã trả lời bộ câu hỏi khẩu vị (`risk_profile_asked_at` có giá trị). */
+  riskProfileAsked: boolean;
 }
 
 interface MetaRow {
@@ -45,6 +47,7 @@ interface MetaRow {
   processed_through: string | null;
   fund_price_shift_pct: number;
   risk_profile: string | null;
+  risk_profile_asked_at: string | null;
 }
 
 interface GoalAccountRow {
@@ -97,13 +100,14 @@ function parseJson<T>(payload: string): T | null {
 
 export function readGoalMeta(cif: string): GoalMeta {
   const row = goalsV2Db()
-    .prepare("SELECT seq, processed_through, fund_price_shift_pct, risk_profile FROM gv2_meta WHERE cif = ?")
+    .prepare("SELECT seq, processed_through, fund_price_shift_pct, risk_profile, risk_profile_asked_at FROM gv2_meta WHERE cif = ?")
     .get(cif) as MetaRow | undefined;
   return {
     seq: row?.seq ?? 0,
     processedThrough: row?.processed_through ?? null,
     fundPriceShiftPct: row?.fund_price_shift_pct ?? 0,
     riskProfile: row?.risk_profile && RISK_PROFILES.has(row.risk_profile) ? (row.risk_profile as RiskProfile) : null,
+    riskProfileAsked: row?.risk_profile_asked_at != null,
   };
 }
 
@@ -190,7 +194,7 @@ export function loadWorld(cif: string): WorldState {
   const today = goalToday(cif);
   const meta = readGoalMeta(cif);
   // Hồ sơ khách đọc `accounts` / `transactions` (tự seed persona lần đầu) — gọi trước khi đọc số dư.
-  const customer = { ...buildCustomerProfile(cif, today, meta.riskProfile ?? "conservative"), riskProfileAsked: meta.riskProfile !== null };
+  const customer = { ...buildCustomerProfile(cif, today, meta.riskProfile ?? "conservative"), riskProfileAsked: meta.riskProfileAsked };
 
   const goals = (db.prepare("SELECT payload FROM gv2_goals WHERE cif = ? ORDER BY sort_order ASC, id ASC").all(cif) as { payload: string }[])
     .map((r) => parseJson<Goal>(r.payload))
