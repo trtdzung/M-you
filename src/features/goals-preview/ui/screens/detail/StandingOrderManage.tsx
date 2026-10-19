@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/features/goals-preview/format-money";
+import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { formatISODate } from "../../../engine";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectGoalTxns } from "../../../store/selectors";
 import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { MoneyInput } from "../../shared/MoneyInput";
+import { DayOfMonthPicker, Switch } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
-import { SummaryRows } from "../../shared/SummaryRows";
-import { card, dangerButton, errorBox, infoBox, input, label, primaryButton, secondaryButton, sectionTitle } from "../../shared/styles";
+import { card, chip, chipSelected, errorBox, ghostButton, infoBox, primaryButton, secondaryButton, sectionTitle } from "../../shared/styles";
 import { canTransact, GoalNotFound, useGoalContext } from "./common";
 
 type Pending = "save" | "cancel" | null;
@@ -35,43 +36,44 @@ export function StandingOrderManage({ params }: ScreenProps) {
   const changed = !exists || amount !== so!.amount || day !== so!.dayOfMonth;
   const balance = state.customer.mainCasaBalance;
 
+  const active = exists && so!.active;
+  const lastLine = so?.lastRunDate
+    ? `Lần trước ${formatISODate(so.lastRunDate)} ${so.lastResult === "failed" ? "· không thành công" : "✓"}`
+    : "Chưa trích lần nào";
+
   return (
     <div className="flex flex-col gap-4 pb-6">
       <ScreenHeader title="Trích tiền tự động" subtitle={goal.name} />
 
       {exists && (
-        <section className={`${card} flex flex-col gap-3`}>
-          <div className="flex items-center justify-between">
-            <h2 className={sectionTitle}>Hiện tại</h2>
-            <span className={so!.active ? "text-sm font-semibold text-positive" : "text-sm font-semibold text-muted"}>
-              {so!.active ? "Đang bật" : "Đang tắt"}
-            </span>
+        <section className={`${card} flex flex-col gap-1`} aria-label="Trạng thái trích tự động">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className={sectionTitle}>{active ? "Đang bật" : "Đang tạm dừng"}</h2>
+            {!blocked && (
+              <Switch
+                checked={active}
+                label="Bật trích tự động"
+                onChange={(next) => dispatch({ type: "setStandingOrder", goalId, amount: so!.amount, dayOfMonth: so!.dayOfMonth, active: next })}
+              />
+            )}
           </div>
-          <SummaryRows
-            rows={[
-              { label: "Số tiền mỗi tháng", value: so!.amount, source: "msb" },
-              { label: "Ngày trích", value: `Ngày ${so!.dayOfMonth} hằng tháng` },
-              { label: "Lần trích kế tiếp", value: so!.active ? formatISODate(so!.nextRunDate) : "—" },
-              {
-                label: "Lần gần nhất",
-                value: so!.lastRunDate ? `${formatISODate(so!.lastRunDate)} · ${so!.lastResult === "failed" ? "Không thành công" : "Thành công"}` : "Chưa chạy",
-              },
-            ]}
-          />
+          <p className="text-[13px] text-muted">
+            {active ? `${formatVnd(so!.amount)} · ngày ${so!.dayOfMonth} · lần tới ${formatISODate(so!.nextRunDate)}` : "Bật lại để tiếp tục trích hằng tháng."}
+          </p>
+          <p className="text-[13px] text-muted">{lastLine}</p>
         </section>
       )}
 
       {exists && (so!.failedCount > 0 || so!.lastResult === "failed") && (
         <section className={`${errorBox} flex flex-col gap-2`}>
-          <p className="font-semibold">Lần trích gần nhất không thành công</p>
-          <p className="text-[13px] text-muted">
-            Tài khoản chính không đủ {formatVnd(so!.amount)} (hiện có {formatVnd(balance)}). Đã lỗi {so!.failedCount} lần liên tiếp. Bạn có thể nạp bù để không lệch kế hoạch.
-          </p>
-          {failures.slice(0, 3).map((t) => (
-            <p key={t.id} className="text-[12px] text-muted">
-              {formatISODate(t.date)} · {t.note || "Không đủ số dư"}
-            </p>
-          ))}
+          <div className="flex items-center gap-1">
+            <p className="font-semibold">Lần trích gần nhất không thành công</p>
+            <InfoTooltip
+              warning
+              label="lý do trích không thành công"
+              text={`Tài khoản chính không đủ ${formatVnd(so!.amount)} (hiện có ${formatVnd(balance)}). Đã lỗi ${so!.failedCount} lần liên tiếp.${failures[0] ? ` Gần nhất: ${formatISODate(failures[0].date)}.` : ""}`}
+            />
+          </div>
           <button type="button" className={secondaryButton} onClick={() => nav.push("DepositFlow", { goalId, amount: so!.amount })}>
             Nạp bù {formatVnd(so!.amount)}
           </button>
@@ -80,63 +82,39 @@ export function StandingOrderManage({ params }: ScreenProps) {
 
       {blocked ? (
         <p className={infoBox}>Mục tiêu này không còn dùng trích tự động.</p>
-      ) : (
-        <section className="flex flex-col gap-4">
-          <h2 className={sectionTitle}>{exists ? "Chỉnh sửa" : "Thiết lập mới"}</h2>
-          <MoneyInput
-            label="Số tiền trích mỗi tháng"
-            value={amount}
-            onChange={setAmount}
-            quickAmounts={Array.from(new Set([ctx.required, 1_000_000, 5_000_000].filter((n) => n > 0)))}
-            hint={ctx.required > 0 ? `Mức cần góp để kịp hạn: ${formatVnd(ctx.required)}/tháng` : undefined}
-          />
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="so-day" className={label}>
-              Ngày trích trong tháng
-            </label>
-            <select id="so-day" value={day} onChange={(e) => setDay(Number(e.target.value))} className={input}>
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
-                  Ngày {d}
-                </option>
-              ))}
-            </select>
-            <p className="text-[13px] text-muted">Nên chọn ngày sau ngày nhận lương ({state.customer.salaryDay}) để đủ số dư.</p>
-          </div>
+      ) : (!exists || active) && (
+        <>
+          <section className={`${card} flex flex-col gap-3`} aria-label="Số tiền mỗi tháng">
+            <MoneyInput label="Số tiền mỗi tháng" value={amount} onChange={setAmount} />
+            {ctx.required > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={amount === ctx.required ? chipSelected : chip} onClick={() => setAmount(ctx.required)}>
+                  Đủ kịp hạn · {formatVndCompact(ctx.required)}
+                </button>
+              </div>
+            )}
+          </section>
 
-          {exists && (
-            <div className="flex flex-col gap-2">
-              {so!.active ? (
-                <button
-                  type="button"
-                  className={secondaryButton}
-                  onClick={() => dispatch({ type: "setStandingOrder", goalId, amount: so!.amount, dayOfMonth: so!.dayOfMonth, active: false })}
-                >
-                  Tạm dừng trích
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={secondaryButton}
-                  onClick={() => dispatch({ type: "setStandingOrder", goalId, amount: so!.amount, dayOfMonth: so!.dayOfMonth, active: true })}
-                >
-                  Bật lại trích tự động
-                </button>
-              )}
-              <button type="button" className={dangerButton} onClick={() => setPending("cancel")}>
-                Huỷ lệnh trích
-              </button>
+          <section className={`${card} flex flex-col gap-3`} aria-label="Ngày trích">
+            <div className="flex items-center gap-1">
+              <h2 className={sectionTitle}>Ngày trích hằng tháng</h2>
+              <InfoTooltip label="chọn ngày trích" text={`Nên chọn sau ngày nhận lương (ngày ${state.customer.salaryDay}) để tài khoản chính đủ tiền.`} />
             </div>
-          )}
-        </section>
+            <DayOfMonthPicker value={day} onChange={setDay} />
+          </section>
+
+          <BottomActions inline>
+            <button type="button" className={primaryButton} disabled={!valid || !changed} onClick={() => setPending("save")}>
+              {exists ? "Lưu thay đổi" : "Bật trích tự động"}
+            </button>
+          </BottomActions>
+        </>
       )}
 
-      {!blocked && (
-        <BottomActions>
-          <button type="button" className={primaryButton} disabled={!valid || !changed} onClick={() => setPending("save")}>
-            {exists ? "Lưu thay đổi" : "Bật trích tự động"}
-          </button>
-        </BottomActions>
+      {exists && !blocked && (
+        <button type="button" className={`${ghostButton} self-center !text-negative`} onClick={() => setPending("cancel")}>
+          Huỷ lệnh trích
+        </button>
       )}
 
       <ConfirmSheet

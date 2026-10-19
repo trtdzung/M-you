@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Landmark } from "lucide-react";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
-import { cn } from "@/lib/cn";
 import { formatISODate, monthsLeft, nextDayOfMonth } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
 import type { Goal } from "../../../model/types";
@@ -12,13 +11,13 @@ import { BottomActions } from "../../shared/BottomActions";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { MoneyInput } from "../../shared/MoneyInput";
+import { DayOfMonthPicker, Switch } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
-import { card, chip, chipSelected, errorBox, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
+import { card, errorBox, primaryButton, screenPadding, sectionTitle } from "../../shared/styles";
 import { DraftGuard, WIZARD_STEPS, formatAccountNumber, previewAccountNumber, wizardDeposit } from "./wizard";
 
 const INTEREST_RATE_PA = 0.5;
-const QUICK_DAYS = [1, 5, 10, 15, 20, 25];
 const WITHDRAW_RULES =
   "Rút về tài khoản chính bất cứ lúc nào, không mất phí. Rút trước khi đạt mục tiêu sẽ làm kế hoạch chậm lại, ứng dụng báo rõ mức ảnh hưởng. Tiền nhàn rỗi có thể được gợi ý chuyển sang sản phẩm sinh lời, bạn luôn là người quyết định.";
 
@@ -81,30 +80,14 @@ function Body({ goal, deposit }: { goal: Goal; deposit: number }) {
             <h2 className={sectionTitle}>Trích tự động hằng tháng</h2>
             <InfoTooltip label="trích tự động" text="Tự chuyển từ tài khoản chính vào tài khoản mục tiêu mỗi tháng. Đổi hoặc tạm dừng bất cứ lúc nào trong chi tiết mục tiêu." />
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoOn}
-            aria-label="Bật trích tự động"
-            onClick={() => setAutoOn((v) => !v)}
-            className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors", autoOn ? "bg-primary" : "bg-surface-muted", ring)}
-          >
-            <span className={cn("absolute top-0.5 h-6 w-6 rounded-full bg-surface shadow-card transition-all", autoOn ? "left-[22px]" : "left-0.5")} />
-          </button>
+          <Switch checked={autoOn} onChange={setAutoOn} label="Bật trích tự động" />
         </div>
         {autoOn && (
           <>
             <MoneyInput label="Số tiền mỗi tháng" value={autoAmount} onChange={setAutoAmount} error={autoValid ? undefined : "Hãy nhập số tiền trích mỗi tháng."} />
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-text">Vào ngày</span>
-              <div className="flex flex-wrap gap-2">
-                {QUICK_DAYS.map((d) => (
-                  <button key={d} type="button" className={d === day ? chipSelected : chip} onClick={() => setDay(d)}>
-                    Ngày {d}
-                  </button>
-                ))}
-                {!QUICK_DAYS.includes(day) && <span className={chipSelected}>Ngày {day}</span>}
-              </div>
+              <DayOfMonthPicker value={day} onChange={setDay} />
               <p className="text-[13px] text-muted">Lần đầu: {formatISODate(nextDayOfMonth(state.clock.today, day))}</p>
             </div>
           </>

@@ -14,6 +14,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { BottomActions } from "../../shared/BottomActions";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { parseVndInput } from "../../shared/MoneyInput";
+import { MonthYearSheet } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, sectionTitle, figure } from "../../shared/styles";
@@ -27,7 +28,6 @@ const QUICK_MONTHS = [
   { months: 36, label: "3 năm" },
   { months: 60, label: "5 năm" },
 ];
-const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`);
 const MIN_AMOUNT = 1_000_000;
 
 /** Bước 2 · Lập kế hoạch: tên, số tiền, ngày, mức linh hoạt, nạp ban đầu. Tạo (hoặc cập nhật) bản nháp rồi sang mở tài khoản. */
@@ -102,6 +102,7 @@ export function GoalInfo({ params }: ScreenProps) {
   const quickDates = QUICK_MONTHS.map((q) => ({ ...q, date: targetDateFromNow(today, q.months) }));
   const customDate = !quickDates.some((q) => q.date === date);
   const [pickDate, setPickDate] = useState(customDate);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const Icon = config.icon;
   const quickAmounts = quickAmountsFor(config, state.customer);
 
@@ -203,28 +204,22 @@ export function GoalInfo({ params }: ScreenProps) {
               {q.label}
             </button>
           ))}
-          <button type="button" className={pickDate ? chipSelected : chip} onClick={() => setPickDate(true)} aria-expanded={pickDate}>
+          <button type="button" className={pickDate ? chipSelected : chip} onClick={() => setPickerOpen(true)} aria-haspopup="dialog">
             <CalendarDays size={16} aria-hidden className="mr-1.5" /> {pickDate ? `T${month}/${year}` : "Chọn ngày khác"}
           </button>
         </div>
-        {pickDate && (
-          <div className="grid grid-cols-2 gap-2">
-            <select aria-label="Tháng" className={input} value={month} onChange={(e) => setMonthYear(year, Number(e.target.value))}>
-              {MONTH_NAMES.map((n, i) => (
-                <option key={n} value={i + 1}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Năm" className={input} value={year} onChange={(e) => setMonthYear(Number(e.target.value), month)}>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <MonthYearSheet
+          key={`${year}-${month}-${pickerOpen}`}
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          years={years}
+          year={year}
+          month={month}
+          onPick={(y, m) => {
+            setMonthYear(y, m);
+            setPickDate(true);
+          }}
+        />
         {errors.date && <p className={fieldError}>{errors.date}</p>}
       </section>
 
