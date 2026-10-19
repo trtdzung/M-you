@@ -1,17 +1,17 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CalendarDays, Target } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { getInvestProduct } from "../../../data/products";
-import { assetGain, assetValue, daysBetween, depositAccrued, fundPriceAt, formatISOMonth } from "../../../engine";
+import { assetGain, assetValue, depositAccrued, fundPriceAt, formatISOMonth } from "../../../engine";
 import { LIQUID_CATEGORY_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectAsset } from "../../../store/selectors";
 import { Amount, EmptyState, ScreenHeader, SourceTag, SummaryRows } from "../../shared";
-import { card, hint, primaryButton, progressTrack, screenPadding, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
+import { card, hint, primaryButton, screenPadding, secondaryButton, sectionTitle, warningBox } from "../../shared/styles";
 import { dateVi, findGoal } from "./helpers";
 
 /** Chi tiết tài sản linh hoạt (sản phẩm MSB). */
@@ -53,10 +53,8 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
     if (chart.length < 2) chart = [{ label: formatISOMonth(asset.createdAt), price: asset.price ?? chart[0]?.price ?? 0 }, ...chart];
   }
 
-  const termTotal = asset.maturityDate ? Math.max(1, daysBetween(asset.createdAt, asset.maturityDate)) : 0;
-  const termDone = asset.maturityDate ? Math.min(1, Math.max(0, daysBetween(asset.createdAt, today) / termTotal)) : 0;
   const atMaturity =
-    asset.principal !== undefined && asset.maturityDate ? asset.principal + depositAccrued(asset.principal, asset.ratePa ?? 0, asset.createdAt, asset.maturityDate) : undefined;
+    asset.principal !== undefined && asset.ratePa !== undefined && asset.maturityDate ? asset.principal + depositAccrued(asset.principal, asset.ratePa, asset.createdAt, asset.maturityDate) : undefined;
 
   const rows = [
     { label: "Loại", value: LIQUID_CATEGORY_LABEL[asset.category] },
@@ -74,19 +72,46 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
       <div className={embedded ? "no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-4" : "flex flex-col gap-4"}>
       {!embedded && <ScreenHeader title={asset.name} subtitle={`${LIQUID_CATEGORY_LABEL[asset.category]} · ${goal.name}`} />}
 
-      <section className={cn(card, "flex flex-col gap-1")}>
-        <p className="text-[13px] text-muted">Giá trị hiện tại</p>
-        <Amount amount={value} source="msb" className="text-3xl font-bold" />
-        <p className={cn("text-sm font-semibold tabular-nums", gainTone)}>
-          {gain > 0 ? "+" : ""}
-          {formatVnd(gain)} ({gain > 0 ? "+" : ""}
-          {(Math.round(gainPct * 100) / 100).toString().replace(".", ",")}%){" "}
-          <span className="font-normal text-muted">{gain >= 0 ? "lãi" : "lỗ"} so với giá vốn</span>
-        </p>
-        {asset.category === "fund" && <p className={hint}>Giá chứng chỉ quỹ thay đổi hằng ngày, không cam kết lợi nhuận.</p>}
-      </section>
-
-      <SummaryRows rows={rows} />
+      {isDeposit ? (
+        <>
+          <section className="flex flex-col gap-1 py-1">
+            <p className="text-[13px] text-muted">Tiền đang gửi</p>
+            <Amount amount={asset.principal} unknownLabel="Chưa rõ tiền gốc" className="text-[26px] font-bold text-text" />
+            <p className="text-sm text-muted">{asset.ratePa !== undefined ? `Lãi suất ${String(asset.ratePa).replace(".", ",")}%/năm` : "Chưa rõ lãi suất"}</p>
+          </section>
+          <section className="flex flex-col gap-3 rounded-2xl bg-primary-soft p-4">
+            <p className="text-[13px] font-medium text-primary-strong">{matured ? "Giá trị tại ngày đáo hạn (dự kiến)" : "Dự kiến nhận khi đáo hạn"}</p>
+            <Amount amount={atMaturity} unknownLabel="Chưa đủ dữ liệu" source="estimated" className="text-[26px] font-bold text-text" />
+            {asset.maturityDate && <p className="flex items-center gap-2 text-sm text-text"><CalendarDays size={16} aria-hidden />Ngày {dateVi(asset.maturityDate)}</p>}
+            {asset.principal !== undefined && atMaturity !== undefined && <div className="flex flex-wrap justify-between gap-2 border-t border-primary/15 pt-3 text-[13px]"><span className="text-muted">Gốc {formatVnd(asset.principal)}</span><span className="font-semibold text-positive">Lãi dự kiến +{formatVnd(atMaturity - asset.principal)}</span></div>}
+            <p className="text-[12px] leading-5 text-muted">Ước tính nếu giữ đến đáo hạn, không phải số tiền nhận khi tất toán hôm nay.</p>
+          </section>
+          <section className="flex items-start gap-3 rounded-2xl border border-border p-4">
+            <Target size={20} aria-hidden className="mt-0.5 shrink-0 text-primary-strong" />
+            <div className="min-w-0"><h2 className="text-sm font-semibold text-text">Góp vào {goal.name}</h2><p className="mt-1 text-sm leading-5 text-muted">{asset.countPercent}% giá trị hiện tại được tính vào mục tiêu: <span className="font-semibold text-text">{formatVnd(Math.round(value * asset.countPercent / 100))}</span>.</p>
+            {asset.maturityDate && <p className={`mt-2 text-[13px] leading-5 ${afterTarget ? "text-warning" : "text-positive"}`}>{afterTarget ? "Đáo hạn sau ngày mục tiêu. Tất toán sớm có thể làm giảm lãi." : "Đáo hạn trước hoặc đúng ngày mục tiêu."}</p>}</div>
+          </section>
+          <details className="rounded-2xl border border-border p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-text">Thông tin khoản gửi</summary>
+            <div className="mt-3"><SummaryRows rows={[
+              { label: "Ngày gửi", value: dateVi(asset.createdAt) },
+              { label: "Lãi tạm tính đến hôm nay", value: asset.principal === undefined ? "Chưa đủ dữ liệu" : value - asset.principal },
+              { label: "Gốc và lãi tạm tính", value },
+              { label: "Ngày cần tiền cho mục tiêu", value: dateVi(goal.targetDate) },
+            ]} /></div>
+          </details>
+        </>
+      ) : (
+        <>
+          <section className={cn(card, "flex flex-col gap-1")}>
+            <p className="text-[13px] text-muted">Giá trị hiện tại</p>
+            <Amount amount={value} source="msb" className="text-3xl font-bold" />
+            <p className={cn("text-sm font-semibold tabular-nums", gainTone)}>{gain > 0 ? "+" : ""}{formatVnd(gain)} ({gain > 0 ? "+" : ""}{(Math.round(gainPct * 100) / 100).toString().replace(".", ",")}%) <span className="font-normal text-muted">{gain >= 0 ? "lãi" : "lỗ"} so với giá vốn</span></p>
+            {asset.category === "fund" && <p className={hint}>Giá chứng chỉ quỹ thay đổi hằng ngày, không cam kết lợi nhuận.</p>}
+          </section>
+          <SummaryRows rows={rows} />
+        </>
+      )}
 
       {chart.length > 1 && (
         <section className={cn(card, "flex flex-col gap-2")}>
@@ -107,34 +132,7 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
         </section>
       )}
 
-      {isDeposit && asset.principal !== undefined && (
-        <section className={cn(card, "flex flex-col gap-2")}>
-          <h2 className={sectionTitle}>Lãi tích luỹ</h2>
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="text-muted">Lãi đến hôm nay</span>
-            <Amount amount={value - asset.principal} source="msb" className="font-semibold text-positive" />
-          </div>
-          {asset.maturityDate && (
-            <>
-              <div className={progressTrack} aria-hidden>
-                <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round(termDone * 100)}%` }} />
-              </div>
-              <div className="flex justify-between text-[12px] text-muted">
-                <span>Gửi {dateVi(asset.createdAt)}</span>
-                <span>Đáo hạn {dateVi(asset.maturityDate)}</span>
-              </div>
-              {atMaturity !== undefined && (
-                <div className="flex items-baseline justify-between text-sm">
-                  <span className="text-muted">Nhận khi đáo hạn (dự kiến)</span>
-                  <Amount amount={atMaturity} source="estimated" className="font-semibold" />
-                </div>
-              )}
-            </>
-          )}
-        </section>
-      )}
-
-      {asset.maturityDate && (
+      {!isDeposit && asset.maturityDate && (
         <section className={cn(card, "flex flex-col gap-1.5")}>
           <h2 className={sectionTitle}>Đáo hạn và ngày mục tiêu</h2>
           <p className="text-sm text-text">
@@ -153,6 +151,7 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
 
       </div>
       <div className={embedded ? "flex shrink-0 flex-col gap-2 border-t border-border bg-surface pb-[calc(16px+var(--safe-area-bottom,0px))] pt-3" : "flex flex-col gap-2 pt-2"}>
+        {isDeposit && !matured && <p className="text-center text-[12px] leading-4 text-muted">Xem số tiền nhận và ảnh hưởng đến lãi trước khi xác nhận.</p>}
         {matured && asset.category === "term_deposit" ? (
           <>
             <button type="button" className={primaryButton} onClick={() => go("MaturityChoice")}>
@@ -164,7 +163,7 @@ export function LiquidAssetDetail({ params, embedded = false, onNavigate }: Scre
           </>
         ) : (
           <button type="button" className={primaryButton} onClick={() => go("SellAsset")}>
-            {asset.category === "fund" || asset.category === "bond" ? "Bán" : "Tất toán"}
+            {asset.category === "fund" || asset.category === "bond" ? "Bán" : isDeposit && asset.maturityDate && asset.maturityDate > today ? "Tất toán trước hạn" : "Tất toán"}
           </button>
         )}
       </div>
