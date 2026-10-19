@@ -38,6 +38,7 @@ export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; o
   const instrument = getInstrument(asset.instrumentId);
   const unitPrice = instrument ? seriesPriceAt(instrument.priceSeries, state.clock.today, state.market.fundPriceShiftPct) : 0;
   const priceDate = instrument ? priceDateOf(instrument.priceSeries, state.clock.today) : undefined;
+  const earliestDate = instrument && !priceDate ? instrument.priceSeries[0]?.date : undefined;
   const newQty = Number(qty.replace(",", "."));
 
   return (
@@ -71,19 +72,19 @@ export function FixedAssetDetailSheet({ assetId, onClose }: { assetId: string; o
             <p className="text-sm tabular-nums text-text">
               {asset.quantity.toLocaleString("vi-VN")} {instrument.unit} × {formatVnd(unitPrice)} = <b>{formatVnd(now)}</b>
             </p>
-            {priceDate && (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[12px] text-muted">Giá ngày {formatISODate(priceDate)}</p>
-                <button
-                  type="button"
-                  disabled={pricesRefreshing}
-                  onClick={refreshPrices}
-                  className="text-[13px] font-semibold text-primary-strong disabled:opacity-60"
-                >
-                  {pricesRefreshing ? "Đang cập nhật…" : "Cập nhật lại"}
-                </button>
-              </div>
-            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] text-muted">
+                {priceDate ? `Giá ngày ${formatISODate(priceDate)}` : earliestDate ? `Giá sớm nhất có: ${dateVi(earliestDate)}` : ""}
+              </p>
+              <button
+                type="button"
+                disabled={pricesRefreshing}
+                onClick={refreshPrices}
+                className="text-[13px] font-semibold text-primary-strong disabled:opacity-60"
+              >
+                {pricesRefreshing ? "Đang cập nhật…" : "Cập nhật lại"}
+              </button>
+            </div>
             <p className="text-[12px] text-muted">Giá {instrument.name} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}</p>
             {editQty && (
               <div className="flex items-baseline gap-2 border-b-2 border-border pb-1 focus-within:border-primary">

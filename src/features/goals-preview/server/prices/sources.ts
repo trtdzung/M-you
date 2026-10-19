@@ -138,30 +138,75 @@ export async function fetchGold(now: Date): Promise<SourceResult> {
 
 // --- Cổ phiếu VN30 --------------------------------------------------------
 
-async function stockHistory(symbol: string, since: string, now: Date): Promise<SourcePoint[]> {
+function stockUrl(symbol: string, since: string, now: Date): string {
   const from = Math.floor(new Date(`${since}T00:00:00+07:00`).getTime() / 1000);
   const to = Math.floor(now.getTime() / 1000);
-  const url = `https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${from}&to=${to}`;
-  const json = await fetchJson(url);
-  if (!isRecord(json) || !Array.isArray(json.t) || !Array.isArray(json.c)) throw new Error("phản hồi không có t/c");
+  return `https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${from}&to=${to}`;
+}
+
+function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint[] {
+  const t = json.t as unknown[];
+  const c = json.c as unknown[];
   const points: SourcePoint[] = [];
-  for (let i = 0; i < json.t.length; i++) {
-    const t = Number(json.t[i]);
-    const c = Number(json.c[i]);
-    if (!Number.isFinite(t) || !(c > 0)) continue;
+  for (let i = 0; i < t.length; i++) {
+    const ts = Number(t[i]);
+    const close = Number(c[i]);
+    if (!Number.isFinite(ts) || !(close > 0)) continue;
     points.push({
       instrumentId: `stock-${symbol.toLowerCase()}`,
-      priceDate: vnDate(new Date(t * 1000)),
-      price: Math.round(c * 1000),
-      rawPrice: c,
+      priceDate: vnDate(new Date(ts * 1000)),
+      price: Math.round(close * 1000),
+      rawPrice: close,
       source: "vndirect",
     });
   }
   return points;
 }
 
-export async function fetchStocks(now: Date, since: SinceFn): Promise<SourceResult> {
-  const results = await mapLimit(VN30, 6, async (symbol) => {
+async function stockHistory(symbol: string, since: string, now: Date): Promise<SourcePoint[]> {
+  const json = await fetchJson(stockUrl(symbol, since, now));
+  if (!isRecord(json) || !Array.isArray(json.t) || !Array.isArray(json.c)) throw new Error("phản hồi không có t/c");
+  return stockPoints(symbol, json);
+}
+
+export type StockLookup =
+  | { status: "ok"; symbol: string; points: SourcePoint[] }
+  | { status: "not_found" }
+  | { status: "error"; message: string };
+
+/**
+ * Kiểm một mã cổ phiếu bất kỳ qua VNDirect và lấy lịch sử từ `FETCH_FROM_FIRST`.
+ * Mã không có thật: VNDirect trả 200 với thân rỗng (hoặc `no_data`/mảng rỗng) → `not_found`.
+ * Lỗi mạng / HTTP / JSON hỏng → `error` (không kết luận mã không tồn tại).
+ */
+export async function lookupStock(symbolRaw: string, now: Date): Promise<StockLookup> {
+  const symbol = symbolRaw.trim().toUpperCase();
+  if (!/^[A-Z0-9]{1,10}$/.test(symbol)) return { status: "not_found" };
+  try {
+    const res = await fetch(stockUrl(symbol, FETCH_FROM_FIRST, now), { signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
+    if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
+    const text = (await res.text()).trim();
+    if (text === "") return { status: "not_found" };
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return { status: "error", message: "phản hồi không phải JSON" };
+    }
+    if (!isRecord(json)) return { status: "error", message: "phản hồi không hợp lệ" };
+    if (json.s === "no_data") return { status: "not_found" };
+    if (!Array.isArray(json.t) || !Array.isArray(json.c)) return { status: "error", message: "phản hồi không có t/c" };
+    const points = stockPoints(symbol, json);
+    return points.length === 0 ? { status: "not_found" } : { status: "ok", symbol, points };
+  } catch (e) {
+    return { status: "error", message: errMsg(e) };
+  }
+}
+
+/** VN30 cùng các mã khách đã đăng ký thêm (`extraSymbols`). */
+export async function fetchStocks(now: Date, since: SinceFn, extraSymbols: readonly string[] = []): Promise<SourceResult> {
+  const symbols = [...new Set<string>([...VN30, ...extraSymbols])];
+  const results = await mapLimit(symbols, 6, async (symbol) => {
     try {
       return { symbol, points: await stockHistory(symbol, since(`stock-${symbol.toLowerCase()}`), now), error: null as string | null };
     } catch (e) {

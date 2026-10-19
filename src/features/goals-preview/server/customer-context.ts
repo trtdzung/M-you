@@ -23,7 +23,6 @@ const WINDOW_MONTHS = 3;
 const GOAL_ACCOUNT_PREFIX = "goalacc-";
 
 const vnShifted = (iso: string): Date => new Date(new Date(iso).getTime() + VN_UTC_OFFSET_MS);
-const vnMonthKey = (iso: string): string => vnShifted(iso).toISOString().slice(0, 7);
 
 export function buildCustomerProfile(cif: string, today: ISODate, riskProfile: RiskProfile): CustomerProfile {
   const persona = PERSONA_LIST.find((p) => p.cif === cif);
@@ -42,16 +41,15 @@ export function buildCustomerProfile(cif: string, today: ISODate, riskProfile: R
       new Date(t.postedAt).getTime() <= endOfToday,
   );
 
-  // dataMonths: số tháng (lịch VN) có giao dịch tính tới today.
-  const dataMonths = new Set(txns.map((t) => vnMonthKey(t.postedAt))).size;
-
   // 3 tháng trọn vẹn trước tháng của today.
   const [y, m] = today.split("-").map(Number);
   const periods = Array.from({ length: WINDOW_MONTHS }, (_, i) => monthPeriod(y, m - 1 - (i + 1)));
   const cash = periods.map((p) => aggregateCashflow(txns, p, fixedCategoryIds));
+  // Tháng "có dữ liệu" = tháng trong kỳ có thu hoặc chi thật (engine đã loại chuyển khoản, nên
+  // tháng chỉ có chuyển khoản không tính). dataMonths đếm trong kỳ này, không đếm toàn lịch sử.
+  const dataMonths = cash.filter((c) => c.income > 0 || c.expense > 0).length;
   // Chia cho số tháng trong kỳ thực sự có dữ liệu (tối thiểu 1), không chia cho tháng trống.
-  const monthsWithData = cash.filter((c) => c.meta.sourceCoverage.knownCount > 0).length || 1;
-  const avg = (sum: number) => Math.round(sum / monthsWithData);
+  const avg = (sum: number) => Math.round(sum / (dataMonths || 1));
 
   const monthlyIncome = avg(cash.reduce((s, c) => s + c.income, 0));
   const monthlyExpenses = avg(cash.reduce((s, c) => s + c.expense, 0));

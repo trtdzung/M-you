@@ -6,22 +6,41 @@ import {
   fetchFunds,
   fetchGold,
   fetchStocks,
+  lookupStock,
   vnDate,
   type SinceFn,
   type SourcePoint,
   type SourceResult,
 } from "./sources";
-import { readPriceStatus, SYNC_LOCK_MS } from "./repo";
+import type { MarketInstrument } from "../../data/market";
+import { readMarketInstruments, readPriceStatus, SYNC_LOCK_MS } from "./repo";
 
 /** Lệch quá ngưỡng này so với giá gần nhất đã lưu → bỏ điểm. */
 const MAX_JUMP = 0.3;
 const RECENT_DAYS = 10;
 
-function startRun(db: ReturnType<typeof goalsV2Db>, syncDate: string): number {
-  const info = db
-    .prepare("INSERT INTO gv2_price_sync (sync_date, started_at, status) VALUES (?, ?, 'running')")
-    .run(syncDate, new Date().toISOString());
-  return Number(info.lastInsertRowid);
+/**
+ * Giành khoá đồng bộ: kiểm (đang chạy? đã có hôm nay?) và ghi dòng `running` trong cùng 1 transaction
+ * IMMEDIATE, nên hai process không thể cùng giành. Trả id lượt chạy, hoặc null nếu không cần / bị chặn.
+ */
+function claimRun(db: ReturnType<typeof goalsV2Db>, force: boolean, syncDate: string): number | null {
+  const claim = db.transaction((): number | null => {
+    const locked = db
+      .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE status = 'running' AND started_at > ? LIMIT 1")
+      .get(new Date(Date.now() - SYNC_LOCK_MS).toISOString());
+    if (locked) return null;
+    if (!force) {
+      const fresh = db
+        .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE sync_date = ? AND status IN ('ok','partial') LIMIT 1")
+        .get(syncDate);
+      if (fresh) return null;
+    }
+    const info = db
+      .prepare("INSERT INTO gv2_price_sync (sync_date, started_at, status) VALUES (?, ?, 'running')")
+      .run(syncDate, new Date().toISOString());
+    return Number(info.lastInsertRowid);
+  });
+  return claim.immediate();
 }
 
 /**
@@ -31,21 +50,8 @@ function startRun(db: ReturnType<typeof goalsV2Db>, syncDate: string): number {
 function trigger(force: boolean): { refreshing: boolean; asOf: string | null } {
   try {
     const db = goalsV2Db();
-    const today = vnDate(new Date());
-    const locked = db
-      .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE status = 'running' AND started_at > ? LIMIT 1")
-      .get(new Date(Date.now() - SYNC_LOCK_MS).toISOString());
-    if (!locked) {
-      const fresh = force
-        ? undefined
-        : db
-            .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE sync_date = ? AND status IN ('ok','partial') LIMIT 1")
-            .get(today);
-      if (!fresh) {
-        const runId = startRun(db, today);
-        void runSync(runId).catch((e) => console.error("[goals-v2] price sync failed", e));
-      }
-    }
+    const runId = claimRun(db, force, vnDate(new Date()));
+    if (runId !== null) void runSync(runId).catch((e) => console.error("[goals-v2] price sync failed", e));
   } catch (e) {
     console.error("[goals-v2] ensurePricesFresh failed", e);
   }
@@ -83,7 +89,13 @@ async function runSync(runId: number): Promise<void> {
     const recentFrom = addDays(vnDate(now), -RECENT_DAYS);
     const since: SinceFn = (id) => (known.has(id) ? recentFrom : FETCH_FROM_FIRST);
 
-    const settled = await Promise.allSettled([fetchGold(now), fetchStocks(now, since), fetchFunds(now, since)]);
+    // Mã cổ phiếu khách đã đăng ký thêm (ngoài VN30) cũng được đồng bộ hằng ngày.
+    const extraSymbols = (
+      db
+        .prepare("SELECT external_ref AS ref FROM gv2_instruments WHERE kind = 'stock' AND active = 1 AND external_ref IS NOT NULL")
+        .all() as { ref: string }[]
+    ).map((r) => r.ref);
+    const settled = await Promise.allSettled([fetchGold(now), fetchStocks(now, since, extraSymbols), fetchFunds(now, since)]);
     const names = ["gold", "stocks", "funds"];
     const results: SourceResult[] = [];
     settled.forEach((s, i) => {
@@ -162,4 +174,41 @@ async function runSync(runId: number): Promise<void> {
       console.error("[goals-v2] cannot close price sync row", e);
     }
   }
+}
+
+export type RegisterStockResult =
+  | { ok: true; instrument: MarketInstrument }
+  | { ok: false; reason: "not_found" | "unavailable" };
+
+/**
+ * Đăng ký thêm một mã cổ phiếu bất kỳ: kiểm qua VNDirect, lấy lịch sử từ 2025-09-01,
+ * ghi `gv2_instruments` + `gv2_prices`. Mã không có dữ liệu → `not_found`; không kiểm được → `unavailable`.
+ */
+export async function registerStockSymbol(symbol: string): Promise<RegisterStockResult> {
+  const now = new Date();
+  const found = await lookupStock(symbol, now);
+  if (found.status === "not_found") return { ok: false, reason: "not_found" };
+  if (found.status === "error") {
+    console.error("[goals-v2] stock lookup failed", found.message);
+    return { ok: false, reason: "unavailable" };
+  }
+  const db = goalsV2Db();
+  const id = `stock-${found.symbol.toLowerCase()}`;
+  const fetchedAt = now.toISOString();
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO gv2_instruments (id, kind, name, unit, fractional, source, external_ref, active)
+       VALUES (?, 'stock', ?, 'cổ phiếu', 0, 'vndirect', ?, 1)
+       ON CONFLICT(id) DO UPDATE SET active = 1`,
+    ).run(id, found.symbol, found.symbol);
+    const upsert = db.prepare(
+      `INSERT INTO gv2_prices (instrument_id, price_date, price, raw_price, source, fetched_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(instrument_id, price_date) DO UPDATE SET price = excluded.price, raw_price = excluded.raw_price,
+         source = excluded.source, fetched_at = excluded.fetched_at`,
+    );
+    for (const p of found.points) upsert.run(id, p.priceDate, p.price, p.rawPrice, p.source, fetchedAt);
+  })();
+  const instrument = readMarketInstruments().find((m) => m.id === id);
+  return instrument ? { ok: true, instrument } : { ok: false, reason: "unavailable" };
 }

@@ -7,27 +7,18 @@ import { outstandingPrincipal } from "./loan";
 
 // ---------------------------------------------------------------- prices
 
-/** Daily fund price: linear interpolation of monthly anchors, then the manual shift. */
+/** Fund price on `date` (last stored point on or before it), then the manual shift. */
 export function fundPriceAt(fund: FundProduct, date: ISODate, shiftPct = 0): number {
   return seriesPriceAt(fund.priceSeries, date, shiftPct);
 }
 
-/** Price on `date` from monthly anchors (linear interpolation), then the manual market shift. */
+/** Price on `date`: the last stored point on or before it (no interpolation, never a future price); before the first point → the first price. Then the manual market shift. */
 export function seriesPriceAt(series: PricePoint[], date: ISODate, shiftPct = 0): number {
   if (series.length === 0) return 0;
-  let price = series[series.length - 1].price;
-  if (date <= series[0].date) price = series[0].price;
-  else {
-    for (let i = 1; i < series.length; i++) {
-      if (date <= series[i].date) {
-        const a = series[i - 1];
-        const b = series[i];
-        const span = daysBetween(a.date, b.date) || 1;
-        const t = daysBetween(a.date, date) / span;
-        price = a.price + (b.price - a.price) * t;
-        break;
-      }
-    }
+  let price = series[0].price;
+  for (const point of series) {
+    if (point.date > date) break;
+    price = point.price;
   }
   return Math.round(price * (1 + shiftPct / 100));
 }
