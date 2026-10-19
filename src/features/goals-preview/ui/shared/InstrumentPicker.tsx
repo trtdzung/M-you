@@ -60,8 +60,16 @@ export function InstrumentPicker({
     if (!open) return;
     setQuery("");
     setAddError(undefined);
-    const t = window.setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 60);
-    return () => window.clearTimeout(t);
+    // Sheet đưa focus vào nút đóng trong requestAnimationFrame; hiệu ứng của Sheet (con) chạy trước,
+    // nên khung hình đăng ký ở đây chạy sau và ô tìm kiếm luôn giữ focus khi sheet mở.
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      window.cancelAnimationFrame(inner);
+    };
   }, [open]);
 
   const all = sortedInstruments(kind);
@@ -254,7 +262,8 @@ function InstrumentSheet({
   const showManualFund = kind === "external_fund" && !checking && filtered.length === 0;
 
   return (
-    <Sheet open={open} title={title} onClose={onClose} bodyClassName="flex flex-col !overflow-hidden !pb-0 !pt-3">
+    // Chiều cao cố định: sheet không co giãn theo số kết quả khi khách gõ.
+    <Sheet open={open} title={title} onClose={onClose} className="h-[88dvh]" bodyClassName="flex flex-1 flex-col !overflow-hidden !pb-0 !pt-3">
       <div className="flex shrink-0 flex-col gap-2 pb-3">
         <label htmlFor={searchId} className={label}>
           {kind === "stock" ? "Tìm cổ phiếu" : "Tìm quỹ"}
