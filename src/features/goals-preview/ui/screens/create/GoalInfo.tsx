@@ -12,7 +12,7 @@ import { MoneyInput } from "../../shared/MoneyInput";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { chip, chipSelected, fieldError, hint, input, label, primaryButton, screenPadding } from "../../shared/styles";
-import { FLEX_INFO, WIZARD_STEPS, isFlexible, targetDateFromNow, templateConfig } from "./wizard";
+import { FLEX_INFO, WIZARD_STEPS, isFlexible, suggestedTarget, targetDateFromNow, templateConfig } from "./wizard";
 
 const QUICK_MONTHS = [
   { months: 6, label: "6 tháng" },
@@ -33,7 +33,7 @@ export function GoalInfo({ params }: ScreenProps) {
   const config = templateConfig(templateId);
 
   const suggestedAmount =
-    config.id === "emergency" ? Math.max(config.amount, Math.round((state.customer.monthlyExpenses * 6) / 1_000_000) * 1_000_000) : config.amount;
+    suggestedTarget(config, state.customer).amount;
 
   const [name, setName] = useState(existing?.name ?? config.defaultName);
   const [amount, setAmount] = useState<number | null>(existing?.targetAmount ?? suggestedAmount);

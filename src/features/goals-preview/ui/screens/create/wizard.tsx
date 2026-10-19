@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Car, GraduationCap, House, LifeBuoy, Plane, Target, TreePalm, type LucideIcon } from "lucide-react";
+import { Car, GraduationCap, Heart, House, LifeBuoy, Plane, Target, TreePalm, type LucideIcon } from "lucide-react";
 import { addMonths, dayOfMonth, formatISODate } from "../../../engine/dates";
 import { allocateSurplus, feasibility, goalOptions, type Feasibility, type GoalOptions } from "../../../engine/feasibility";
 import { goalValue } from "../../../engine/value";
@@ -36,8 +36,16 @@ export const TEMPLATES: TemplateConfig[] = [
   { id: "travel", title: "Du lịch", icon: Plane, defaultName: "Chuyến du lịch", amount: 50 * TR, months: 12, flexibility: "amount_flexible", hint: "Thường 20–100 triệu · 6–18 tháng" },
   { id: "emergency", title: "Quỹ dự phòng", icon: LifeBuoy, defaultName: "Quỹ dự phòng", amount: 120 * TR, months: 12, flexibility: "date_flexible", hint: "Nên bằng 3–6 tháng chi tiêu" },
   { id: "retirement", title: "Hưu trí", icon: TreePalm, defaultName: "Quỹ hưu trí", amount: 2_000 * TR, months: 120, flexibility: "date_flexible", hint: "Dài hạn · 10 năm trở lên" },
+  { id: "wedding", title: "Đám cưới", icon: Heart, defaultName: "Đám cưới", amount: 250 * TR, months: 18, flexibility: "date_fixed", hint: "Thường 150–400 triệu · 1–2 năm" },
   { id: "other", title: "Tự tạo", icon: Target, defaultName: "", amount: 100 * TR, months: 24, flexibility: "date_flexible", hint: "Đặt tên và số tiền theo ý bạn" },
 ];
+
+/** Quỹ dự phòng = 6 tháng chi tiêu của khách (không thấp hơn mức mặc định). */
+export function suggestedTarget(config: TemplateConfig, customer: PreviewState["customer"]): { amount: number; fromExpenses: boolean } {
+  if (config.id !== "emergency") return { amount: config.amount, fromExpenses: false };
+  const sixMonths = Math.round((customer.monthlyExpenses * 6) / 1_000_000) * 1_000_000;
+  return sixMonths > config.amount ? { amount: sixMonths, fromExpenses: true } : { amount: config.amount, fromExpenses: false };
+}
 
 export function templateConfig(id: GoalTemplate | string | undefined): TemplateConfig {
   return TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[TEMPLATES.length - 1];

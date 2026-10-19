@@ -9,7 +9,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { card, ghostButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
-import { TEMPLATES, WIZARD_STEPS, templateConfig } from "./wizard";
+import { TEMPLATES, WIZARD_STEPS, suggestedTarget } from "./wizard";
 
 /** Bước 1: chọn loại mục tiêu. */
 export function TemplatePick(_props: ScreenProps) {
@@ -20,6 +20,7 @@ export function TemplatePick(_props: ScreenProps) {
     <div className={screenPadding}>
       <ScreenHeader title="Tạo mục tiêu" subtitle="Bạn muốn tiết kiệm cho điều gì?" />
       <StepProgress steps={WIZARD_STEPS} current={0} />
+      <p className="text-[13px] leading-5 text-muted">Mỗi mục tiêu có một tài khoản riêng để tiền không bị lẫn.</p>
 
       {drafts.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Bản nháp đang dở">
@@ -52,29 +53,30 @@ export function TemplatePick(_props: ScreenProps) {
       <div className="grid grid-cols-2 gap-3">
         {TEMPLATES.map((t) => {
           const Icon = t.icon;
-          const amount = t.id === "emergency" ? Math.max(t.amount, Math.round((state.customer.monthlyExpenses * 6) / 1_000_000) * 1_000_000) : t.amount;
+          const suggested = suggestedTarget(t, state.customer);
           return (
             <button
               key={t.id}
               type="button"
               onClick={() => nav.push("GoalInfo", { template: t.id })}
-              className={`${card} flex min-h-[148px] flex-col items-start gap-2 text-left transition-colors hover:bg-surface-muted ${ring} ${t.id === "other" ? "col-span-2 min-h-[96px]" : ""}`}
+              className={`${card} flex min-h-[112px] flex-col items-start gap-2 text-left transition-colors hover:bg-surface-muted ${ring}`}
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
                 <Icon size={24} strokeWidth={1.8} aria-hidden />
               </span>
               <span className="text-[16px] font-bold text-text">{t.title}</span>
-              <span className="text-[12px] leading-4 text-muted">{t.hint}</span>
-              {t.id !== "other" && (
-                <span className="mt-auto text-[12px] font-semibold text-primary-strong">
-                  Gợi ý {formatVndCompact(amount)} · {formatMonths(t.months)}
+              {t.id === "other" ? (
+                <span className="text-[12px] leading-4 text-muted">{t.hint}</span>
+              ) : (
+                <span className="mt-auto text-[12px] leading-4 text-muted">
+                  Gợi ý <span className="whitespace-nowrap font-semibold text-primary-strong">{formatVndCompact(suggested.amount)}</span>
+                  {suggested.fromExpenses ? " = 6 tháng chi tiêu" : <> · <span className="whitespace-nowrap">{formatMonths(t.months)}</span></>}
                 </span>
               )}
             </button>
           );
         })}
       </div>
-      <p className="text-center text-[12px] text-muted">{templateConfig("other").hint}. Mỗi mục tiêu có một tài khoản riêng để tiền không bị lẫn.</p>
     </div>
   );
 }
