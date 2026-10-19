@@ -10,6 +10,7 @@ import { paramNumber, paramString, type ScreenParams } from "../../../model/scre
 import type { Goal, GoalAccount, Loan, LoanProduct } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { EmptyState, ScreenHeader } from "../../shared";
+import { InfoTooltip } from "../../shared/InfoTooltip";
 import { sectionTitle } from "../../shared/styles";
 
 /** Resolves goal / account / loan from screen params (goalId, loanId). */
@@ -114,12 +115,16 @@ export function DtiGauge({
   newPayment,
   existingDebt,
   income,
+  compact = false,
 }: {
   dti: number;
   newPayment: number;
   existingDebt: number;
   income: number;
+  /** Put the explanation in a tooltip instead of a paragraph. */
+  compact?: boolean;
 }) {
+  const detail = `Khoản trả mới ${formatVnd(newPayment)} + nợ đang trả ${formatVnd(existingDebt)} trên thu nhập ${formatVnd(income)}/tháng. Giới hạn của MSB là 40%.`;
   const tone = dtiTone(dti);
   const scale = 0.6;
   const fill = Math.min(100, (dti / scale) * 100);
@@ -128,7 +133,10 @@ export function DtiGauge({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-text">Nghĩa vụ trả nợ / thu nhập</span>
+        <span className="flex items-center gap-1 text-sm font-medium text-text">
+          Trả nợ / thu nhập
+          {compact && <InfoTooltip label="nghĩa vụ trả nợ" text={detail} />}
+        </span>
         <span className={cn("text-sm font-bold tabular-nums", DTI_TEXT[tone])}>
           {pct(dti)} · {label}
         </span>
@@ -144,9 +152,7 @@ export function DtiGauge({
         <div className={cn("absolute inset-y-0 left-0 transition-all", DTI_BAR[tone])} style={{ width: `${fill}%` }} />
         <div aria-hidden className="absolute inset-y-0 w-0.5 bg-text/70" style={{ left: `${limit}%` }} />
       </div>
-      <p className="text-[12px] leading-4 text-muted">
-        Khoản trả mới {formatVnd(newPayment)} + nợ đang trả {formatVnd(existingDebt)} trên thu nhập {formatVnd(income)}/tháng. Giới hạn của MSB là 40%.
-      </p>
+      {!compact && <p className="text-[12px] leading-4 text-muted">{detail}</p>}
     </div>
   );
 }

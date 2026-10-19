@@ -1,48 +1,64 @@
 "use client";
 
 import { useState } from "react";
-import { formatVnd } from "@/features/goals-preview/format-money";
-import { LOAN_PRODUCTS } from "../../../data/products";
+import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { buildSchedule, formatMonths, quoteLoan, totalInterest } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
-import { Amount, BottomActions, GoalStatusBadge, ScreenHeader, SliderRow, SummaryRows } from "../../shared";
-import { card, chip, chipSelected, ghostButton, infoBox, primaryButton, screenPadding, warningBox, figure } from "../../shared/styles";
-import { DtiGauge, INDICATIVE_NOTE, NotFoundScreen, Section, loanGap, productForGoal, resolveProduct, roundUp, useLoanScreen } from "./shared";
+import { AmountCard, SuggestChip } from "../../shared/AmountCard";
+import { BottomActions, ScreenHeader } from "../../shared";
+import { InfoTooltip } from "../../shared/InfoTooltip";
+import { card, figure, ghostButton, heroNumber, primaryButton, screenPadding, sectionTitle, warningBox } from "../../shared/styles";
+import { DtiGauge, INDICATIVE_NOTE, NotFoundScreen, loanGap, productForGoal, roundUp, useLoanScreen } from "./shared";
 
-/** Mô phỏng khoản vay: gap → chọn sản phẩm, số tiền, kỳ hạn → khoản trả & DTI. */
+const TERM_CHOICES: Record<"house" | "car" | "consumer", number[]> = {
+  house: [60, 120, 180, 240],
+  car: [12, 24, 36, 60],
+  consumer: [12, 24, 36, 60],
+};
+
+const rateText = (ratePa: number) => `${String(ratePa).replace(".", ",")}%/năm`;
+
+/**
+ * Mô phỏng khoản vay: phần còn thiếu → số tiền, kỳ hạn → khoản trả & DTI.
+ * The loan product always matches the goal's purpose (nhà → vay mua nhà, xe → vay mua xe, còn lại → tiêu dùng).
+ */
 export function LoanSimulator({ params }: ScreenProps) {
-  const { state, goal, nav, today, toast } = useLoanScreen(params);
-  const [productId, setProductId] = useState<string | undefined>(paramString(params, "productId"));
-  const [amount, setAmount] = useState<number | undefined>(paramNumber(params, "amount"));
+  const { state, goal, nav, today } = useLoanScreen(params);
+  const [amount, setAmount] = useState<number | null>(paramNumber(params, "amount") ?? null);
   const [term, setTerm] = useState<number | undefined>(paramNumber(params, "termMonths"));
 
   if (!goal) return <NotFoundScreen title="Mô phỏng khoản vay" onCta={() => nav.push("GoalList")} />;
 
-  const product = resolveProduct(goal, productId);
+  const product = productForGoal(goal);
   const deposit = paramNumber(params, "deposit") ?? 0;
   const isDraft = goal.status === "draft";
   const gap = loanGap(state, goal, deposit);
-  const defaultTerm = Math.min(product.maxTermMonths, product.purpose === "house" ? 240 : product.purpose === "car" ? 60 : 36);
   const step = product.maxAmount >= 2_000_000_000 ? 10_000_000 : 1_000_000;
-  const sliderMax = Math.min(product.maxAmount, Math.max(product.minAmount, roundUp(Math.max(gap * 1.5, gap + step), step)));
-  const principal = Math.min(sliderMax, Math.max(product.minAmount, amount ?? roundUp(gap, step)));
-  const termMonths = Math.min(product.maxTermMonths, Math.max(12, term ?? defaultTerm));
+  const gapRounded = Math.min(product.maxAmount, Math.max(product.minAmount, roundUp(gap, step)));
+  const principal = amount ?? gapRounded;
+  const amountError =
+    principal < product.minAmount
+      ? `Tối thiểu ${formatVnd(product.minAmount)}.`
+      : principal > product.maxAmount
+        ? `Tối đa ${formatVnd(product.maxAmount)}.`
+        : undefined;
+  const terms = TERM_CHOICES[product.purpose].filter((m) => m <= product.maxTermMonths);
+  const defaultTerm = terms.includes(36) ? 36 : terms[terms.length - 1];
+  const termMonths = term && terms.includes(term) ? term : defaultTerm;
 
   const isDue = goal.status === "missed" || (!isDraft && today >= goal.targetDate);
   const startDate = isDue ? today : goal.targetDate;
   const quote = quoteLoan(state, { productId: product.id, principal, ratePa: product.ratePa, termMonths, startDate });
   const totalInt = totalInterest(buildSchedule(principal, product.ratePa, termMonths, startDate));
   const blocked = !quote.affordability.allowed;
-  const covers = principal >= gap;
   const lenderParams = { goalId: goal.id, productId: product.id, amount: principal, termMonths, deposit: isDraft ? deposit : undefined };
 
-  const pickProduct = (id: string) => {
-    setProductId(id);
-    setAmount(undefined);
-    setTerm(undefined);
-  };
-
-  const primary = blocked ? (
+  // Only draft and due goals act on the loan; before the due date the simulation is information only.
+  const primary = amountError ? (
+    <button type="button" className={primaryButton} disabled>
+      Kiểm tra lại số tiền vay
+    </button>
+  ) : blocked ? (
     <button type="button" className={primaryButton} onClick={() => nav.push("LoanBlocked", lenderParams)}>
       Xem vì sao chưa vay được
     </button>
@@ -55,15 +71,8 @@ export function LoanSimulator({ params }: ScreenProps) {
       Đăng ký vay
     </button>
   ) : (
-    <button
-      type="button"
-      className={primaryButton}
-      onClick={() => {
-        toast("Đã ghi nhận phương án vay dự phòng. Bạn chỉ phải quyết định khi đến hạn.", "success");
-        nav.pop();
-      }}
-    >
-      Đưa vào kế hoạch
+    <button type="button" className={primaryButton} onClick={() => nav.pop()}>
+      Quay lại mục tiêu
     </button>
   );
 
@@ -71,97 +80,77 @@ export function LoanSimulator({ params }: ScreenProps) {
     <div className={screenPadding}>
       <ScreenHeader title="Mô phỏng khoản vay" subtitle={goal.name} />
 
-      <div className={infoBox}>
-        <p className="font-semibold text-text">Vay là phương án cuối cùng</p>
-        <p className="mt-1 text-muted">
-          Hãy cân nhắc tiết kiệm thêm, lùi ngày hoặc giảm số tiền mục tiêu trước. Vay chỉ để lấp phần còn thiếu.
-        </p>
-        <button type="button" className={`${ghostButton} -ml-3 mt-1`} onClick={() => nav.push("OptionsCompare", { goalId: goal.id })}>
-          So sánh các phương án khác
+      <section className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1" aria-label="Lưu ý về vay">
+        <span className="text-[13px] text-muted">Vay là phương án cuối cùng.</span>
+        <button type="button" className={`${ghostButton} -ml-2 !min-h-9`} onClick={() => nav.push("OptionsCompare", { goalId: goal.id })}>
+          Xem phương án khác
         </button>
-      </div>
-
-      <section className={card}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted">{isDue ? "Còn thiếu hôm nay" : "Dự kiến còn thiếu khi đến hạn"}</p>
-            <Amount amount={gap} source="estimated" className={figure} />
-          </div>
-          <GoalStatusBadge status={goal.status} />
-        </div>
-        <p className="mt-2 text-[13px] leading-5 text-muted">
-          Mục tiêu {formatVnd(goal.targetAmount)} trừ phần bạn đã có và sẽ tích luỹ thêm. Khoản vay sẽ bù đúng phần thiếu này.
-        </p>
       </section>
 
-      <Section title="Sản phẩm vay">
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Sản phẩm vay">
-          {LOAN_PRODUCTS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={p.id === product.id}
-              className={p.id === product.id ? chipSelected : chip}
-              onClick={() => pickProduct(p.id)}
-            >
-              {p.name.replace(" MSB", "")} · {p.ratePa}%/năm
-            </button>
-          ))}
+      <section className={`${card} flex flex-col gap-1`} aria-label="Phần còn thiếu">
+        <div className="flex items-center gap-1">
+          <p className="text-[13px] text-muted">{isDue ? "Còn thiếu hôm nay" : "Dự kiến còn thiếu khi đến hạn"}</p>
+          <InfoTooltip
+            label="cách tính phần còn thiếu"
+            text={`Mục tiêu ${formatVnd(goal.targetAmount)} trừ phần bạn đã có và sẽ tích luỹ thêm: còn thiếu ${formatVnd(gap)}.`}
+          />
         </div>
-        {product.id !== productForGoal(goal).id && (
-          <p className="text-[12px] leading-4 text-muted">Sản phẩm gợi ý theo loại mục tiêu là {productForGoal(goal).name}.</p>
-        )}
-      </Section>
+        <p className={figure}>{formatVndCompact(gap)}</p>
+      </section>
 
-      <Section>
-        <SliderRow
-          label="Số tiền vay"
+      <section className={`${card} flex flex-col gap-4`} aria-label="Khoản vay">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className={sectionTitle}>{product.name.replace(" MSB", "")}</h2>
+          <span className="text-[13px] font-semibold text-text">{rateText(product.ratePa)}</span>
+        </div>
+        <AmountCard
+          bare
+          title="Số tiền vay"
           value={principal}
-          min={product.minAmount}
-          max={sliderMax}
-          step={step}
           onChange={setAmount}
-          format={formatVnd}
-          hint={covers ? "Đủ để bù khoản còn thiếu." : `Thấp hơn khoản thiếu, bạn cần tự bù ${formatVnd(gap - principal)}.`}
+          error={amountError}
+          chips={[{ label: `Đủ bù phần thiếu ${formatVndCompact(gapRounded)}`, amount: gapRounded }]}
         />
-        <SliderRow
-          label="Kỳ hạn vay"
-          value={termMonths}
-          min={12}
-          max={product.maxTermMonths}
-          step={12}
-          onChange={setTerm}
-          format={formatMonths}
-          hint={`Tối đa ${formatMonths(product.maxTermMonths)}. Kỳ hạn dài thì trả mỗi tháng ít hơn nhưng tổng lãi cao hơn.`}
-        />
-      </Section>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1">
+            <h3 className={sectionTitle}>Kỳ hạn</h3>
+            <InfoTooltip label="chọn kỳ hạn" text={`Tối đa ${formatMonths(product.maxTermMonths)}. Kỳ hạn dài thì trả mỗi tháng ít hơn nhưng tổng lãi cao hơn.`} />
+          </div>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Kỳ hạn vay">
+            {terms.map((m) => (
+              <SuggestChip key={m} label={formatMonths(m)} selected={m === termMonths} onClick={() => setTerm(m)} />
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <Section title="Kết quả mô phỏng">
-        <SummaryRows
-          rows={[
-            { label: "Lãi suất tham khảo", value: `${product.ratePa}%/năm` },
-            { label: "Trả mỗi tháng", value: quote.monthlyPayment, source: "estimated", emphasis: true },
-            { label: "Tổng lãi phải trả", value: totalInt, source: "estimated" },
-            { label: "Tổng số tiền trả", value: principal + totalInt, source: "estimated" },
-          ]}
-        />
-        <div className={card}>
+      {!amountError && (
+        <section className={`${card} flex flex-col gap-3`} aria-label="Kết quả mô phỏng">
+          <div className="flex items-center gap-1">
+            <p className="text-[13px] text-muted">Trả mỗi tháng khoảng</p>
+            <InfoTooltip label="lưu ý về lãi suất" text={INDICATIVE_NOTE} />
+          </div>
+          <p className={heroNumber}>{formatVndCompact(quote.monthlyPayment)}</p>
+          <dl className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-surface-muted/70 p-3">
+              <dt className="text-[12px] text-muted">Tổng lãi</dt>
+              <dd className="text-[16px] font-semibold tabular-nums text-text">{formatVndCompact(totalInt)}</dd>
+            </div>
+            <div className="rounded-2xl bg-surface-muted/70 p-3">
+              <dt className="text-[12px] text-muted">Tổng phải trả</dt>
+              <dd className="text-[16px] font-semibold tabular-nums text-text">{formatVndCompact(principal + totalInt)}</dd>
+            </div>
+          </dl>
           <DtiGauge
+            compact
             dti={quote.affordability.dti}
             newPayment={quote.monthlyPayment}
             existingDebt={state.customer.existingDebtPayment}
             income={state.customer.monthlyIncome}
           />
-        </div>
-        {blocked && (
-          <div className={warningBox}>
-            Khoản trả này vượt 40% thu nhập nên MSB chưa thể cho vay. Giảm số tiền, kéo dài kỳ hạn hoặc chọn phương án khác.
-          </div>
-        )}
-      </Section>
-
-      <p className="text-[12px] leading-4 text-muted">{INDICATIVE_NOTE}</p>
+          {blocked && <p className={warningBox}>Khoản trả vượt 40% thu nhập nên MSB chưa thể cho vay. Thử giảm số tiền hoặc kéo dài kỳ hạn.</p>}
+        </section>
+      )}
 
       <BottomActions>{primary}</BottomActions>
     </div>
