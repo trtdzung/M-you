@@ -1,0 +1,296 @@
+{
+  "asOf": "2026-09-15",
+  "promotions": [
+    {
+      "id": "promo-card-dining-2026q3",
+      "name": "Hoàn tiền thẻ tín dụng MSB cho chi tiêu ăn uống",
+      "summary": "Hoàn tiền 5% cho giao dịch ăn uống bằng thẻ tín dụng MSB, tối đa 300.000đ mỗi tháng.",
+      "eligibility": "Chủ thẻ tín dụng MSB; giao dịch thành công tại nhà hàng, quán ăn.",
+      "startDate": "2026-09-01",
+      "endDate": "2026-10-31",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/hoan-tien-an-uong",
+      "source": "mock"
+    },
+    {
+      "id": "promo-mortgage-rate-2026",
+      "name": "Ưu đãi lãi suất vay thế chấp năm 2026",
+      "summary": "Lãi suất ưu đãi cố định trong giai đoạn đầu cho khách hàng cá nhân vay thế chấp.",
+      "eligibility": "Khách hàng cá nhân đủ điều kiện vay thế chấp; MSB xét duyệt khi đăng ký.",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/uu-dai-lai-suat-vay-the-chap-2026",
+      "source": "mock"
+    },
+    {
+      "id": "promo-saving-open-2026q4",
+      "name": "Tặng lãi suất khi mở tiền gửi online",
+      "summary": "Cộng thêm lãi suất cho khoản tiền gửi có kỳ hạn mở trên ứng dụng MSB.",
+      "eligibility": "Khách hàng mở tiền gửi có kỳ hạn online từ 10.000.000đ.",
+      "startDate": "2026-10-01",
+      "endDate": "2026-12-15",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/tien-gui-online",
+      "source": "mock"
+    },
+    {
+      "id": "promo-summer-travel-2026",
+      "name": "Ưu đãi du lịch hè",
+      "summary": "Giảm giá vé máy bay và khách sạn khi thanh toán bằng thẻ MSB.",
+      "eligibility": "Chủ thẻ MSB; áp dụng tại đối tác du lịch của MSB.",
+      "startDate": "2026-06-01",
+      "endDate": "2026-08-31",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/du-lich-he",
+      "source": "mock"
+    },
+    {
+      "id": "promo-new-card-fee-2026",
+      "name": "Miễn phí thường niên năm đầu cho thẻ mở mới",
+      "summary": "Miễn phí thường niên năm đầu khi mở thẻ tín dụng MSB trên ứng dụng và phát sinh giao dịch đầu tiên trong 30 ngày.",
+      "eligibility": "Khách hàng cá nhân mở thẻ mới; MSB xét duyệt khi đăng ký.",
+      "startDate": "2026-09-01",
+      "endDate": "2026-12-31",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/mien-phi-thuong-nien",
+      "source": "mock"
+    },
+    {
+      "id": "promo-transfer-free-2026",
+      "name": "Miễn phí chuyển khoản nhanh trên ứng dụng",
+      "summary": "Miễn phí chuyển khoản nhanh 24/7 trong nước cho giao dịch thực hiện trên ứng dụng MSB.",
+      "eligibility": "Khách hàng cá nhân dùng ứng dụng MSB; áp dụng theo hạn mức giao dịch.",
+      "startDate": "2026-07-01",
+      "endDate": "2026-12-31",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/mien-phi-chuyen-khoan",
+      "source": "mock"
+    },
+    {
+      "id": "promo-insurance-bundle-2026",
+      "name": "Ưu đãi phí khi mua bảo hiểm qua MSB",
+      "summary": "Giảm phí cho khách hàng mua bảo hiểm sức khỏe qua kênh MSB trong thời gian chương trình.",
+      "eligibility": "Khách hàng cá nhân đủ điều kiện tham gia bảo hiểm theo quy định của đơn vị bảo hiểm.",
+      "startDate": "2026-08-15",
+      "endDate": "2026-11-15",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/uu-dai-bao-hiem",
+      "source": "mock"
+    },
+    {
+      "id": "promo-spring-saving-2026",
+      "name": "Ưu đãi gửi tiết kiệm đầu năm",
+      "summary": "Cộng lãi suất cho tiền gửi tiết kiệm có kỳ hạn mở đầu năm.",
+      "eligibility": "Khách hàng cá nhân gửi tiết kiệm có kỳ hạn tại quầy hoặc trực tuyến.",
+      "startDate": "2026-01-05",
+      "endDate": "2026-03-31",
+      "officialUrl": "https://www.msb.com.vn/khuyen-mai/tiet-kiem-dau-nam",
+      "source": "mock"
+    }
+  ],
+  "officialChannels": [
+    {
+      "id": "ch-web",
+      "type": "domain",
+      "value": "msb.com.vn",
+      "label": "Website chính thức của MSB (gồm các tên miền con)",
+      "source": "mock"
+    },
+    {
+      "id": "ch-hotline-1",
+      "type": "hotline",
+      "value": "1900 1234",
+      "label": "Tổng đài chăm sóc khách hàng (số giả lập)",
+      "source": "mock"
+    },
+    {
+      "id": "ch-hotline-2",
+      "type": "hotline",
+      "value": "1800 1234",
+      "label": "Tổng đài báo mất thẻ 24/7 (số giả lập)",
+      "source": "mock"
+    },
+    {
+      "id": "ch-sms",
+      "type": "sms_sender",
+      "value": "MSB",
+      "label": "Tên người gửi SMS brandname của MSB",
+      "source": "mock"
+    },
+    {
+      "id": "ch-app",
+      "type": "app",
+      "value": "MSB mBank",
+      "label": "Ứng dụng ngân hàng số của MSB",
+      "source": "mock"
+    },
+    {
+      "id": "ch-hotline-3",
+      "type": "hotline",
+      "value": "1900 5678",
+      "label": "Tổng đài hỗ trợ thẻ (số giả lập)",
+      "source": "mock"
+    },
+    {
+      "id": "ch-sms-2",
+      "type": "sms_sender",
+      "value": "MSBCARD",
+      "label": "Tên người gửi SMS thông báo giao dịch thẻ (giả lập)",
+      "source": "mock"
+    },
+    {
+      "id": "ch-sms-3",
+      "type": "sms_sender",
+      "value": "MSBOTP",
+      "label": "Tên người gửi SMS mã xác thực giao dịch (giả lập)",
+      "source": "mock"
+    },
+    {
+      "id": "ch-web-2",
+      "type": "domain",
+      "value": "msbinsurance.com.vn",
+      "label": "Website bảo hiểm của MSB (giả lập)",
+      "source": "mock"
+    }
+  ],
+  "fraudWatchlist": [
+    {
+      "id": "fr-phone-1",
+      "type": "phone",
+      "value": "0900000001",
+      "reason": "Giả danh nhân viên ngân hàng, đòi mã OTP",
+      "reports": 41,
+      "firstReportedAt": "2026-07-12",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-2",
+      "type": "phone",
+      "value": "0900000002",
+      "reason": "Giả danh cơ quan công an, yêu cầu chuyển tiền",
+      "reports": 23,
+      "firstReportedAt": "2026-08-03",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-3",
+      "type": "phone",
+      "value": "0900000003",
+      "reason": "Tin nhắn thông báo trúng thưởng giả mạo",
+      "reports": 17,
+      "firstReportedAt": "2026-08-21",
+      "source": "mock"
+    },
+    {
+      "id": "fr-account-1",
+      "type": "account",
+      "value": "9999888877776666",
+      "reason": "Tài khoản nhận tiền của đường dây lừa đảo đầu tư",
+      "reports": 58,
+      "firstReportedAt": "2026-06-30",
+      "source": "mock"
+    },
+    {
+      "id": "fr-domain-1",
+      "type": "domain",
+      "value": "msb-hoantien.com",
+      "reason": "Trang giả mạo MSB, thu thập thông tin đăng nhập",
+      "reports": 36,
+      "firstReportedAt": "2026-09-02",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-4",
+      "type": "phone",
+      "value": "0900000004",
+      "reason": "Giả danh nhân viên MSB, báo thẻ bị khóa và yêu cầu cung cấp mã OTP",
+      "reports": 29,
+      "firstReportedAt": "2026-08-14",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-5",
+      "type": "phone",
+      "value": "0900000005",
+      "reason": "Giả danh cơ quan thuế, dọa truy thu và yêu cầu chuyển tiền",
+      "reports": 19,
+      "firstReportedAt": "2026-08-28",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-6",
+      "type": "phone",
+      "value": "0900000006",
+      "reason": "Mời làm nhiệm vụ online nhận hoa hồng, yêu cầu nạp tiền cọc",
+      "reports": 52,
+      "firstReportedAt": "2026-07-30",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-7",
+      "type": "phone",
+      "value": "0900000007",
+      "reason": "Giả danh người quen nhờ chuyển tiền gấp qua tin nhắn",
+      "reports": 14,
+      "firstReportedAt": "2026-09-05",
+      "source": "mock"
+    },
+    {
+      "id": "fr-phone-8",
+      "type": "phone",
+      "value": "0900000008",
+      "reason": "Gọi tự xưng công an, yêu cầu chuyển tiền vào tài khoản an toàn",
+      "reports": 33,
+      "firstReportedAt": "2026-08-09",
+      "source": "mock"
+    },
+    {
+      "id": "fr-account-2",
+      "type": "account",
+      "value": "8888777766665555",
+      "reason": "Tài khoản nhận tiền cọc của đường dây việc nhẹ lương cao",
+      "reports": 44,
+      "firstReportedAt": "2026-07-18",
+      "source": "mock"
+    },
+    {
+      "id": "fr-account-3",
+      "type": "account",
+      "value": "7777666655554444",
+      "reason": "Tài khoản nhận tiền chuyển để xác minh của đối tượng giả danh cơ quan chức năng",
+      "reports": 27,
+      "firstReportedAt": "2026-08-25",
+      "source": "mock"
+    },
+    {
+      "id": "fr-domain-2",
+      "type": "domain",
+      "value": "msb-uudai.com",
+      "reason": "Trang giả mạo chương trình ưu đãi MSB, thu thập mã OTP",
+      "reports": 31,
+      "firstReportedAt": "2026-08-19",
+      "source": "mock"
+    },
+    {
+      "id": "fr-domain-3",
+      "type": "domain",
+      "value": "msbbank-vay.net",
+      "reason": "Trang vay tiền giả mạo, thu phí hồ sơ trước khi giải ngân",
+      "reports": 22,
+      "firstReportedAt": "2026-09-08",
+      "source": "mock"
+    },
+    {
+      "id": "fr-domain-4",
+      "type": "domain",
+      "value": "mbank-msb-login.com",
+      "reason": "Trang đăng nhập ngân hàng giả mạo MSB, đánh cắp tài khoản",
+      "reports": 47,
+      "firstReportedAt": "2026-07-22",
+      "source": "mock"
+    },
+    {
+      "id": "fr-domain-5",
+      "type": "domain",
+      "value": "nhanqua-msb.top",
+      "reason": "Link nhận quà giả mạo MSB, yêu cầu cài ứng dụng ngoài kho chính thức",
+      "reports": 18,
+      "firstReportedAt": "2026-09-11",
+      "source": "mock"
+    }
+  ]
+}

@@ -29,6 +29,7 @@ export * from "./obligations";
 export * from "./projection";
 export * from "./cashflow-trend";
 export * from "./health";
+export * from "./health-score";
 export * from "./goals";
 export * from "./surplus";
 export * from "./debt";

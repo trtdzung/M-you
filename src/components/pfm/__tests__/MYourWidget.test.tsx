@@ -5,6 +5,7 @@ import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
+import { savePendingChatMessage } from "@/insights/proactive/chat-handoff";
 
 
 /**
@@ -65,6 +66,24 @@ afterEach(() => {
 });
 
 describe("MYourWidget", () => {
+  it("sends a queued question once, in the current thread, after history has loaded", async () => {
+    sessionStorage.clear();
+    savePendingChatMessage("CIF_0001", "Kiểm tra bảo mật cho số điện thoại sau: 0912345678");
+    vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({
+      thread_id: "CIF_0001",
+      messages: [{ role: "assistant", content: "Chào bạn", ui: null }],
+    });
+    renderWidget();
+
+    await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(agentApi.sendChatMessage).mock.calls[0][0]).toContain("Kiểm tra bảo mật cho số điện thoại sau: 0912345678");
+    expect(vi.mocked(agentApi.sendChatMessage).mock.calls[0][1]).toBe("CIF_0001");
+    expect(await screen.findByText("Chào bạn")).toBeInTheDocument();
+    expect(await screen.findByText("Kiểm tra bảo mật cho số điện thoại sau: 0912345678")).toBeInTheDocument();
+    expect(await screen.findByText("Trả lời từ M-You")).toBeInTheDocument();
+    expect(agentApi.sendChatMessage).toHaveBeenCalledTimes(1);
+  });
+
   it("hides the chat overlay until ?assistant=1 is set", async () => {
     nav.search = "";
     const view = renderWidget();

@@ -13,6 +13,26 @@ export function saveInsightDraft(cif: string, insight: HomeInsight): boolean {
   } catch { return false; }
 }
 
+const pendingKey = (cif: string) => `pfm.chat-pending:${cif}`;
+
+/** Queues one question for the M-You chat to send as soon as it has opened and loaded its history. */
+export function savePendingChatMessage(cif: string, text: string): boolean {
+  try {
+    sessionStorage.setItem(pendingKey(cif), JSON.stringify({ text, expires: Date.now() + 15 * 60_000 }));
+    return true;
+  } catch { return false; }
+}
+
+export function takePendingChatMessage(cif: string): string | null {
+  try {
+    const raw = sessionStorage.getItem(pendingKey(cif));
+    sessionStorage.removeItem(pendingKey(cif));
+    if (!raw) return null;
+    const value = JSON.parse(raw);
+    return value && typeof value.text === "string" && value.text && value.expires > Date.now() ? value.text : null;
+  } catch { return null; }
+}
+
 export interface InsightDraftPayload {
   draft: string;      // full message to send to agent (includes hidden context)
   visibleText: string; // text to show in UI bubble

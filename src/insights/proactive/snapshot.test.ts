@@ -73,6 +73,85 @@ describe("financial snapshot", () => {
     expect(make(r, { ...profile, goals: [{ id: "goal", name: "House", targetAmount: 100000000,
       currentAmount: 0, targetDate: null, source: "self_reported" }] }).candidates.some((c) => c.topic === "investment")).toBe(false);
   });
+  it("differentiates jar pressure states: needs_cover (urgent), over_limit_covered, and near_limit", () => {
+    const anchor = "2026-09-01T00:00:00Z";
+    // 1. Jar with negative balance -> needs_cover (urgent)
+    const j1: JarConfig = {
+      version: 3,
+      jars: [{ id: "dining_jar", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 1000000, createdAt: anchor }],
+      ledger: [{ id: "open-1", jarId: "dining_jar", kind: "deposit", amount: 500000, isOpening: true, createdAt: anchor, source: "self_reported" }],
+    };
+    // Spent 700k against 500k deposit -> balance = -200k
+    const s1 = make({ ...raw(), transactions: [txn("t1", 700000)] }, profile, j1);
+    const c1 = s1.candidates.find((c) => c.id === "spending:jar:dining_jar");
+    expect(c1).toBeDefined();
+    expect(c1?.severity).toBe("urgent");
+    expect(c1?.facts.semantic_state).toBe("needs_cover");
+    expect(c1?.metric.label).toBe("Cần bù · Ăn uống");
+    expect(c1?.metric.value).toBe(200000);
+    expect(c1?.title).toContain("cần bù");
+
+    // 2. Over limit with positive balance -> over_limit_covered (attention)
+    const j2: JarConfig = {
+      version: 3,
+      jars: [{ id: "dining_jar", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 500000, createdAt: anchor }],
+      ledger: [{ id: "open-2", jarId: "dining_jar", kind: "deposit", amount: 1000000, isOpening: true, createdAt: anchor, source: "self_reported" }],
+    };
+    // Spent 600k (exceeds 500k limit), but balance is 400k (> 0)
+    const s2 = make({ ...raw(), transactions: [txn("t2", 600000)] }, profile, j2);
+    const c2 = s2.candidates.find((c) => c.id === "spending:jar:dining_jar");
+    expect(c2).toBeDefined();
+    expect(c2?.severity).toBe("attention");
+    expect(c2?.facts.semantic_state).toBe("over_limit_covered");
+    expect(c2?.metric.label).toBe("Còn lại · Ăn uống");
+    expect(c2?.metric.value).toBe(400000);
+    expect(c2?.title).toContain("vượt hạn mức");
+
+    // 3. Near limit: spent 85% of limit, positive balance -> near_limit (attention)
+    const j3: JarConfig = {
+      version: 3,
+      jars: [{ id: "dining_jar", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: 1000000, createdAt: anchor }],
+      ledger: [{ id: "open-3", jarId: "dining_jar", kind: "deposit", amount: 1000000, isOpening: true, createdAt: anchor, source: "self_reported" }],
+    };
+    const s3 = make({ ...raw(), transactions: [txn("t3", 850000)] }, profile, j3);
+    const c3 = s3.candidates.find((c) => c.id === "spending:jar:dining_jar");
+    expect(c3).toBeDefined();
+    expect(c3?.severity).toBe("attention");
+    expect(c3?.facts.semantic_state).toBe("near_limit");
+    expect(c3?.title).toContain("gần hạn mức");
+
+    // 4. Jar without limit and positive balance -> does NOT trigger pressure
+    const j4: JarConfig = {
+      version: 3,
+      jars: [{ id: "dining_jar", label: "Ăn uống", categoryIds: ["dining"], budgetLimit: undefined, createdAt: anchor }],
+      ledger: [{ id: "open-4", jarId: "dining_jar", kind: "deposit", amount: 1000000, isOpening: true, createdAt: anchor, source: "self_reported" }],
+    };
+    const s4 = make({ ...raw(), transactions: [txn("t4", 300000)] }, profile, j4);
+    const c4 = s4.candidates.find((c) => c.id === "spending:jar:dining_jar");
+    expect(c4).toBeUndefined();
+  });
+  it("generates a refund_received candidate when a posted refund occurs within recent window", () => {
+    const s = make({
+      ...raw(),
+      transactions: [
+        txn("ref-1", 150000, "2026-09-14T10:00:00Z", {
+          type: "refund",
+          direction: "credit",
+          status: "posted",
+          merchantName: "Shopee Refund",
+          relatedTransactionId: "orig-1",
+        }),
+      ],
+    });
+    const refundCandidate = s.candidates.find((c) => c.id === "refund:ref-1");
+    expect(refundCandidate).toBeDefined();
+    expect(refundCandidate?.priority).toBe(3);
+    expect(refundCandidate?.severity).toBe("info");
+    expect(refundCandidate?.action).toBe("overview");
+    expect(refundCandidate?.metric.value).toBe(150000);
+    expect(refundCandidate?.facts.rule_id).toBe("refund_received");
+    expect(refundCandidate?.facts.related_transaction_id).toBe("orig-1");
+  });
   it("rejects unknown candidate, downgraded priority, invented numbers and stale snapshot", () => {
     const s = make();
     const candidate = s.candidates[0];

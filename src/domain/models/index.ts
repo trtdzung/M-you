@@ -31,6 +31,17 @@ export {
 } from "./agent-preferences";
 export type { AgentPreferences, AgentTone, ResponseLength, RiskAppetite } from "./agent-preferences";
 
+export { HEALTH_SCORE_POLICY_V0 } from "./health-score";
+export type {
+  HealthPillar,
+  HealthMetricId,
+  HealthMetricUnit,
+  HealthTier,
+  HealthMetricFact,
+  FinancialHealthScoreResult,
+  HealthScorePolicy,
+} from "./health-score";
+
 /** Provenance of a record or value. Never present non-`msb` as bank-verified. */
 export type DataSource = "msb" | "self_reported" | "estimated" | "mock";
 

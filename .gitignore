@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+*.zip
 
 # local design reference (MSB app screenshots — not part of the codebase)
 /ref-ui-msb/
