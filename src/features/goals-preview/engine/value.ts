@@ -172,7 +172,8 @@ export function progressState(world: ValueWorld, goal: Goal): ProgressState {
   let expected: number;
   if (stage.phase === 2 && stage.loan) {
     const today = world.clock.today;
-    if (stage.loan.schedule.some((r) => r.status === "overdue")) return "off_track";
+    // An overdue instalment is a payment issue (shown on its own), not a progress issue:
+    // progress counts cash already in the goal account.
     expected = stage.loan.prepaid + stage.loan.schedule.filter((r) => r.dueDate <= today).reduce((sum, r) => sum + r.principal, 0);
   } else {
     const total = daysBetween(stage.startDate, stage.targetDate);
