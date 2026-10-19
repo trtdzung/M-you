@@ -266,7 +266,11 @@ function loadAndCatchUp(cif: string, strict = false): WorldState {
   }
   const days = daysBetween(processedThrough, world.clock.today);
   if (days <= 0) return world;
-  const start: WorldState = { ...world, clock: { today: processedThrough } };
+  const start: WorldState = {
+    ...world,
+    clock: { today: processedThrough },
+    customer: loadWorld(cif, { profileAsOf: processedThrough }).customer,
+  };
   const { state: next } = advanceTime(start, days);
   try {
     applyPostings(cif, start, next, null);

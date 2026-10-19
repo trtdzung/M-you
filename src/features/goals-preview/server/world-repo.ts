@@ -189,12 +189,12 @@ function readGoalTxns(cif: string, accountGoal: Map<string, string>): GoalTxn[] 
 }
 
 /** World của khách từ DB. `clock.today` = `goalToday(cif)`. */
-export function loadWorld(cif: string): WorldState {
+export function loadWorld(cif: string, options: { profileAsOf?: ISODate } = {}): WorldState {
   const db = goalsV2Db();
   const today = goalToday(cif);
   const meta = readGoalMeta(cif);
   // Hồ sơ khách đọc `accounts` / `transactions` (tự seed persona lần đầu) — gọi trước khi đọc số dư.
-  const customer = { ...buildCustomerProfile(cif, today, meta.riskProfile ?? "conservative"), riskProfileAsked: meta.riskProfileAsked };
+  const customer = { ...buildCustomerProfile(cif, options.profileAsOf ?? today, meta.riskProfile ?? "conservative"), riskProfileAsked: meta.riskProfileAsked };
 
   const goals = (db.prepare("SELECT payload FROM gv2_goals WHERE cif = ? ORDER BY sort_order ASC, id ASC").all(cif) as { payload: string }[])
     .map((r) => parseJson<Goal>(r.payload))
