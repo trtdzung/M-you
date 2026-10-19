@@ -1,6 +1,6 @@
 import { isUnknownAmount, type MaybeAmount } from "@/lib/format";
 
-const exact = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+const exact = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 
 export function formatVnd(amount: MaybeAmount): string {
