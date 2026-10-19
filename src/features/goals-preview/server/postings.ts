@@ -16,6 +16,7 @@ import { readAccounts } from "@/lib/accounts-store";
 import { readTransactions } from "@/lib/transactions-store";
 import { getInvestProduct, getLoanProduct } from "../data/products";
 import type { WorldState } from "../model/state";
+import { addDays, dayOfMonth } from "../engine/dates";
 import type { GoalAccount, GoalTxn, ISODate } from "../model/types";
 import { goalsV2Db } from "./db";
 import { goalAccountId, readGoalMeta, soFailId } from "./world-repo";
@@ -46,13 +47,25 @@ function maskedOf(number: string): string {
 }
 
 /**
- * Tài khoản do reducer mở có id `acc-<seq>`; tài khoản thật dùng `goalacc-<goalId>`
- * (STANDARD 4.1). Đổi id trong `next` (tài khoản, mục tiêu, giao dịch) trước khi ghi.
+ * Số tài khoản mục tiêu duy nhất toàn hệ thống (D10): "88" + 4 số cuối phần số của
+ * cif (đệm 0) + seq lúc mở đệm 6 số = 12 số.
  */
-function normalizeAccountIds(prev: WorldState, next: WorldState): void {
+function goalAccountNumber(cif: string, seq: number): string {
+  const cifDigits = cif.replace(/\D/g, "").slice(-4).padStart(4, "0");
+  return `88${cifDigits}${String(seq % 1_000_000).padStart(6, "0")}`;
+}
+
+/**
+ * Tài khoản do reducer mở có id `acc-<seq>` và số giả lập; tài khoản thật dùng
+ * `goalacc-<goalId>` (STANDARD 4.1) và số theo D10. Đổi trong `next` (tài khoản,
+ * mục tiêu, giao dịch) trước khi ghi.
+ */
+function normalizeOpenedAccounts(cif: string, prev: WorldState, next: WorldState): void {
   const known = new Set(prev.accounts.map((a) => a.id));
   for (const account of next.accounts) {
     if (known.has(account.id)) continue;
+    const seq = Number(/^acc-(\d+)$/.exec(account.id)?.[1] ?? next.seq);
+    account.number = goalAccountNumber(cif, seq);
     const realId = goalAccountId(account.goalId);
     if (account.id === realId) continue;
     const oldId = account.id;
@@ -65,7 +78,7 @@ function normalizeAccountIds(prev: WorldState, next: WorldState): void {
 /**
  * Ghi `next` xuống DB. `postedAt` = thời điểm thao tác của khách
  * (`engineNow(cif).toISOString()`); `null` = việc tự chạy theo ngày → `${date}T02:00:00.000Z`.
- * MUTATES `next` (chỉ đổi id tài khoản mới mở sang `goalacc-<goalId>`).
+ * MUTATES `next` (chỉ đổi id / số của tài khoản mới mở).
  */
 export function applyPostings(cif: string, prev: WorldState, next: WorldState, postedAt: string | null): void {
   // Seed lịch sử persona trước khi chèn dòng của mình (seed chỉ chạy khi bảng trống, như fd-store).
@@ -73,7 +86,7 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
   const main = readAccounts(cif).find((a) => a.type === "current");
   if (!main) throw new RangeError("Unknown customer");
 
-  normalizeAccountIds(prev, next);
+  normalizeOpenedAccounts(cif, prev, next);
 
   const prevAccountIds = new Set(prev.accounts.map((a) => a.id));
   const accountById = new Map<string, GoalAccount>(next.accounts.map((a) => [a.id, a]));
@@ -195,13 +208,30 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
   }
 
   // Phần chênh TK chính không do giao dịch Mục tiêu (lương / chi tiêu mô phỏng của công cụ test).
-  const adjust = Math.round(next.customer.mainCasaBalance - prev.customer.mainCasaBalance - mainDelta);
-  const adjustAt = stamp(next.clock.today);
-  const adjustLeg = (direction: Direction): Leg => ({
-    txn: single(main.id, direction, Math.abs(adjust), adjustAt, "transfer", ADJUST_NOTE, ADJUST_NOTE),
+  let adjust = Math.round(next.customer.mainCasaBalance - prev.customer.mainCasaBalance - mainDelta);
+  const adjustLeg = (amount: number, at: string): Leg => ({
+    txn: single(main.id, amount > 0 ? "credit" : "debit", Math.abs(amount), at, "transfer", ADJUST_NOTE, ADJUST_NOTE),
   });
-  // Tiền vào trước, tiền ra sau: kiểm tra số dư theo đúng thứ tự ghi.
-  const ordered: Leg[] = [...(adjust > 0 ? [adjustLeg("credit")] : []), ...legs, ...(adjust < 0 ? [adjustLeg("debit")] : [])];
+  /** Chân lương mô phỏng (D11): mỗi ngày lương trong khoảng tua 1 chân, ghi trước việc khác cùng ngày như engine. */
+  const salaryLegs: Leg[] = [];
+  if (postedAt === null) {
+    const c = prev.customer;
+    const net = Math.round(c.monthlyIncome - c.monthlyExpenses - c.existingDebtPayment);
+    for (let d = addDays(prev.clock.today, 1); d <= next.clock.today && net !== 0; d = addDays(d, 1)) {
+      if (dayOfMonth(d) !== c.salaryDay) continue;
+      salaryLegs.push(adjustLeg(net, autoPostedAt(d)));
+      adjust -= net;
+    }
+  }
+  const timed: Leg[] = [...salaryLegs, ...legs];
+  // Phần còn lại (sự kiện công cụ test): tiền vào ghi trước, tiền ra ghi sau các chân cùng thời điểm.
+  if (adjust > 0) timed.unshift(adjustLeg(adjust, stamp(next.clock.today)));
+  if (adjust < 0) timed.push(adjustLeg(adjust, stamp(next.clock.today)));
+  // Theo thời gian; cùng thời điểm thì giữ thứ tự ở trên (lương trước việc khác trong ngày).
+  const ordered: Leg[] = timed
+    .map((leg, i) => ({ leg, i }))
+    .sort((a, b) => (a.leg.txn.postedAt < b.leg.txn.postedAt ? -1 : a.leg.txn.postedAt > b.leg.txn.postedAt ? 1 : a.i - b.i))
+    .map((x) => x.leg);
 
   const db = goalsV2Db();
   const meta = readGoalMeta(cif);
