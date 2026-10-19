@@ -294,12 +294,32 @@ A small data-quality prompt layered on the Hũ chi tiêu row, independent of the
 - Run deterministic completion scenarios.
 - **CRUD (engine + provider implemented; the Kế hoạch tab UI was removed):** mirrors the asset/liability pattern exactly. `GoalDataProvider` (`listGoals` seed-only + `getUserGoals` + `create/update/deleteGoal`) is backed by the same `userRecordStore<GoalRecord>()`; `GoalProvider` (`src/state/goals.tsx`) is the context, `ComposeOptions.userGoals` is the single merge point (`Financials.goals = [...raw.goals, ...userGoals]`), and `useFinancials` threads it into the `useMemo` deps for live recompute. `simulateGoal` remains the engine what-if the chat tool calls (invariant #1).
 
-### Insight module
+### Insight module & Proactive Insights Reframe
 
-- Run rule-based insight detectors.
-- Persist insight facts and comparison period.
-- Ask AI to produce a human-readable explanation.
-- Support dismiss, snooze, and helpfulness feedback.
+- **Dispatcher & Persistence Pipeline (Single Path):**
+  - The live Home insight widget (`src/components/home/HomeInsightWidget.tsx`) communicates via `POST /api/proactive-insights/current` backed by `src/lib/home-insight-service.ts` and SQLite table `home_insight_cache`.
+  - An alternate pipeline (`src/lib/proactive-insights-service.ts` using `proactive_insights`) is preserved as an uncalled parallel subsystem to maintain wire contract stability.
+- **Rule Engine & Semantic States:**
+  - Evaluates deterministic proactive candidates from snapshot facts (`src/insights/proactive/snapshot.ts`).
+  - Active rules include `jar_plan_pressure` (evaluates exact semantic states: `needs_cover` for urgent unfunded overspends, `over_limit_covered` for attention funded overspends, `near_limit` for jars near 80% threshold, and `burn_risk` for pace warnings), `spending_spike` (comparable elapsed-day window detection), `known_payment_due_reminder` (next 7-day obligations), and `refund_received` (recent 3-day credits).
+  - Blocked rules (`deposit_maturity`, `idle_cash_90d`, `cash_liquidity_risk`) remain strictly disabled until prerequisite MSB core banking, deposit maturity, and card/statement streams are available.
+- **Explainability & Grounding:**
+  - Insight facts are strictly grounded in deterministic calculation aggregates. Metrics display whole positive VND magnitudes (`amount_needed` / `amount_remaining`), with honest provenance, freshness, and observation window tracking.
+
+### Financial Health Index module (Bảng 2)
+
+- **Pure, Deterministic Policy (`src/domain/engine/health-score.ts`, `src/domain/models/health-score.ts`):**
+  - Implements the 4-pillar, 8-metric health scoring specification (`SPEND`, `SAVE`, `BORROW`, `PLAN_PROTECT`).
+  - Strict Data Integrity & Gating: Requires at least 3 of 4 pillars and at least 5 of 8 metrics to have computable facts. If gating is not met, `overallScore: null` and `tier: null` are returned. Missing metrics are never silently coerced to 0.
+  - Piecewise Linear Thresholds:
+    - `spend_to_income`: 100 at ≤0.70, 50 at 1.00, 0 at ≥1.30.
+    - `liquid_runway_months`: 0 at 0m, 30 at 1m, 75 at 3m, 100 at ≥6m.
+    - `savings_rate`: 0 at ≤0, 70 at 0.10, 100 at ≥0.20.
+    - `debt_service_ratio`: 100 at 0, 70 at 0.30, 0 at ≥0.45.
+    - `goal_plan_progress`: Average completion percentage bounded in [0, 100].
+    - `protection_insurance`: Binary/boolean check (100 if confirmed active, 0 if confirmed absent, null if unknown/unconfirmed).
+  - Versioned Policy: Governed by `HEALTH_SCORE_POLICY_V0` (`pfm-health-v0`).
+  - Metric coverage tracks the sum of baseline weights (0.125 per metric), and final scoring dynamically normalizes across available metrics while reporting raw coverage.
 
 ### Recommendation module
 

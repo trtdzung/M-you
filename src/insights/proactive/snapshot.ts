@@ -1,6 +1,7 @@
 /** Financial snapshot v2. Pure: financial facts and hypotheses stay separate. */
 import type { Asset, Goal, JarConfig, Liability, StoredCategory, Transaction } from "@/domain/models";
 import { computeFinancials, type RawData } from "@/domain/engine/finance-compose";
+import { computeFinancialHealthScore } from "@/domain/engine/health-score";
 import { aggregateCashflow, netExpenseByCategory } from "@/domain/engine/cashflow";
 import { addMonthsToKey, dateToMonthKey, monthPeriodFromKey, VN_UTC_OFFSET_MS, type Period } from "@/domain/engine/types";
 
@@ -81,7 +82,7 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     severity: "urgent", confidence: "recorded", title: "Sắp đến hạn thanh toán tối thiểu",
     body: "Kiểm tra lịch trả và số tiền tối thiểu đã ghi nhận trước ngày đến hạn.",
     metric: { label: "Thanh toán tối thiểu trong bảy ngày", value: dueAmount, unit: "VND" },
-    facts: { minimum_due: dueAmount, count: dueSoon.length, nearest_due: dueSoon[0].dueDate,
+    facts: { rule_id: "known_payment_due_reminder", minimum_due: dueAmount, count: dueSoon.length, nearest_due: dueSoon[0].dueDate,
       items: dueSoon.map(p => ({ id: p.id, label: p.label, amount: p.amount, due: p.dueDate, days_until_due: p.daysUntilDue })) },
     action: "overview", question: "Giúp tôi xem các khoản sắp phải trả: từng khoản vay/thẻ nào, số tiền tối thiểu bao nhiêu, ngày đến hạn, và phân biệt trả tối thiểu với trả toàn bộ." });
   const predictedSoon = bills.filter((b) => Date.parse(b.dueDate) >= dayStart && Date.parse(b.dueDate) <= dayEnd + 7 * DAY && typeof b.amount === "number");
@@ -103,25 +104,81 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
       0.6 * line.categoryIds.reduce((s, id) => s + (last7.get(id) ?? 0), 0) / 7 +
       0.4 * line.categoryIds.reduce((s, id) => s + (last30.get(id) ?? 0), 0) / 30) : null;
     const remaining = line.balance;
+    const limit = line.limit;
+    const hasLimit = typeof limit === "number" && limit > 0;
+    const isOverLimit = hasLimit && line.spent > limit;
+    const isNearLimit = hasLimit && !isOverLimit && line.spent >= limit * 0.8;
+    const isNeedsCover = remaining !== null && remaining < 0;
     const burnRisk = remaining !== null && remaining > 0 && burn !== null && burn * fin.jarBudget.summary.daysLeft > remaining;
-    const pressure = remaining !== null && (remaining < 0 || (line.limit !== null && line.limit > 0 && line.spent >= line.limit * 0.8));
+    const pressure = isNeedsCover || isOverLimit || isNearLimit;
+
     // Prior month spend for this jar's categories
     const priorMonthTxns = txns.filter(t => Date.parse(t.postedAt) >= Date.parse(priorPeriod.from) && Date.parse(t.postedAt) <= Date.parse(priorPeriod.to));
     const priorMonthByCategory = netExpenseByCategory(priorMonthTxns, { from: priorPeriod.from, to: priorPeriod.to, label: "prior" });
     const priorMonthSpend = line.categoryIds.reduce((s, id) => s + (priorMonthByCategory.get(id) ?? 0), 0);
-    if (pressure || burnRisk) candidates.push({ id: `spending:jar:${line.huId}`, topic: "spending", priority: 1,
-      severity: remaining !== null && remaining < 0 ? "urgent" : "attention", confidence: burnRisk ? "estimated" : "recorded",
-      title: remaining !== null && remaining < 0 ? "Hũ chi tiêu đang cần bù" : burnRisk ? "Hũ có thể cạn trước cuối tháng" : "Hũ đang gần hoặc vượt hạn mức",
-      body: burnRisk ? "Nhịp chi gần đây có thể khiến hũ hết sớm. Cùng M-Your xem khoản nào có thể điều chỉnh." :
-        "Xem lại chi tiêu trong hũ và trao đổi với M-Your về cách điều chỉnh phù hợp.",
-      metric: { label: `Còn lại · ${line.label}`, value: round(remaining ?? 0), unit: "VND" },
-      facts: { jar_label: line.label, remaining, spent: line.spent, limit: line.limit,
-        daily_burn: burn === null ? null : round(burn), days_left: fin.jarBudget.summary.daysLeft,
-        days_to_empty: burn && remaining !== null && remaining > 0 ? Math.floor(remaining / burn) : null,
-        prior_month_spend: round(priorMonthSpend),
-        mom_delta: line.spent !== null && priorMonthSpend > 0 ? round(line.spent - priorMonthSpend) : null,
-        active_days_last30: activeDays },
-      action: "chat", question: `Phân tích hũ ${line.label} cho tôi: đã chi bao nhiêu, trung bình mỗi ngày bao nhiêu, so với tháng trước thế nào, còn lại bao nhiêu và dự báo có hết trước cuối tháng không. Các khoản chi nổi bật là gì? Gợi ý cách điều chỉnh nhưng hỏi tôi trước khi đề xuất chuyển tiền giữa các hũ.` });
+
+    if (pressure || burnRisk) {
+      let semanticState: "needs_cover" | "over_limit_covered" | "near_limit" | "burn_risk" = "near_limit";
+      let title = `Hũ "${line.label}" đang gần hạn mức`;
+      let body = "Xem lại chi tiêu trong hũ và trao đổi với M-Your về cách điều chỉnh phù hợp.";
+      let severity: "urgent" | "attention" = "attention";
+
+      if (isNeedsCover) {
+        semanticState = "needs_cover";
+        severity = "urgent";
+        title = `Hũ "${line.label}" đang cần bù`;
+        body = "Hũ này đã chi quá số dư hiện có và cần được bù từ các nguồn khác.";
+      } else if (isOverLimit) {
+        semanticState = "over_limit_covered";
+        severity = "attention";
+        title = `Hũ "${line.label}" vượt hạn mức tháng`;
+        body = "Chi tiêu trong tháng đã vượt hạn mức kế hoạch nhưng số dư hũ vẫn được duy trì.";
+      } else if (isNearLimit) {
+        semanticState = "near_limit";
+        severity = "attention";
+        title = `Hũ "${line.label}" đang gần hạn mức`;
+        body = "Xem lại chi tiêu trong hũ và trao đổi với M-Your về cách điều chỉnh phù hợp.";
+      } else if (burnRisk) {
+        semanticState = "burn_risk";
+        severity = "attention";
+        title = `Hũ "${line.label}" có thể cạn trước cuối tháng`;
+        body = "Nhịp chi gần đây có thể khiến hũ hết sớm. Cùng M-Your xem khoản nào có thể điều chỉnh.";
+      }
+
+      candidates.push({
+        id: `spending:jar:${line.huId}`,
+        topic: "spending",
+        priority: 1,
+        severity,
+        confidence: burnRisk && !pressure ? "estimated" : "recorded",
+        title,
+        body,
+        metric: {
+          label: isNeedsCover ? `Cần bù · ${line.label}` : `Còn lại · ${line.label}`,
+          value: round(isNeedsCover ? -remaining : (remaining ?? 0)),
+          unit: "VND",
+        },
+        facts: {
+          rule_id: "jar_plan_pressure",
+          semantic_state: semanticState,
+          jar_id: line.huId,
+          jar_label: line.label,
+          remaining,
+          spent: line.spent,
+          limit: line.limit,
+          daily_burn: burn === null ? null : round(burn),
+          days_left: fin.jarBudget.summary.daysLeft,
+          days_to_empty: burn && remaining !== null && remaining > 0 ? Math.floor(remaining / burn) : null,
+          prior_month_spend: round(priorMonthSpend),
+          mom_delta: line.spent !== null && priorMonthSpend > 0 ? round(line.spent - priorMonthSpend) : null,
+          active_days_last30: activeDays,
+          source: line.source,
+          freshness: line.freshness,
+        },
+        action: "chat",
+        question: `Phân tích hũ ${line.label} cho tôi: đã chi bao nhiêu, trung bình mỗi ngày bao nhiêu, so với tháng trước thế nào, còn lại bao nhiêu và dự báo có hết trước cuối tháng không. Các khoản chi nổi bật là gì? Gợi ý cách điều chỉnh nhưng hỏi tôi trước khi đề xuất chuyển tiền giữa các hũ.`,
+      });
+    }
     return { ...line, estimatedDailyBurn: burn === null ? null : round(burn), activeDays,
       burnRisk, forecastCoverage: variable ? activeDays >= 3 ? "sufficient" : "sparse" : "fixed_or_empty_categories" };
   });
@@ -138,11 +195,46 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     priority: 2, severity: "attention", confidence: "recorded", title: "Chi tháng này đang tăng",
     body: "Chi tiêu từ đầu tháng cao hơn cùng kỳ tháng trước. Cùng xem các danh mục đóng góp nhiều nhất.",
     metric: { label: "Đã chi từ đầu tháng", value: fin.cashflow.expense, unit: "VND" },
-    facts: { current_spend: fin.cashflow.expense, previous_comparable_spend: priorComparable.expense,
+    facts: { rule_id: "spending_spike", current_spend: fin.cashflow.expense, previous_comparable_spend: priorComparable.expense,
       mom_delta: round(fin.cashflow.expense - priorComparable.expense),
       mom_pct: round((fin.cashflow.expense / priorComparable.expense - 1) * 100) },
     action: "chat",
     question: "So sánh chi tiêu tháng này với cùng kỳ tháng trước: tổng đã chi bao nhiêu, tăng bao nhiêu (cả số tiền lẫn %), danh mục nào tăng nhiều nhất, và gợi ý các khoản tôi có thể điều chỉnh." });
+
+  // Refund received: posted refund within recent 3-day window
+  const recentRefunds = txns
+    .filter((t) => t.status === "posted" && t.type === "refund" &&
+      Date.parse(t.postedAt) >= dayStart - 2 * DAY && Date.parse(t.postedAt) <= dayEnd)
+    .sort((a, b) => b.postedAt.localeCompare(a.postedAt));
+
+  if (recentRefunds.length > 0) {
+    const latestRefund = recentRefunds[0];
+    candidates.push({
+      id: `refund:${latestRefund.id}`,
+      topic: "spending",
+      priority: 3,
+      severity: "info",
+      confidence: "recorded",
+      title: "Đã nhận khoản hoàn tiền",
+      body: "Khoản hoàn tiền đã được ghi nhận và tự động cấn trừ vào danh mục chi tiêu tương ứng.",
+      metric: {
+        label: "Tiền hoàn lại",
+        value: round(latestRefund.amount),
+        unit: "VND",
+      },
+      facts: {
+        rule_id: "refund_received",
+        transaction_id: latestRefund.id,
+        related_transaction_id: latestRefund.relatedTransactionId ?? null,
+        amount: latestRefund.amount,
+        posted_at: latestRefund.postedAt,
+        merchant: latestRefund.merchantName,
+        source: latestRefund.source,
+      },
+      action: "overview",
+      question: "Chi tiết khoản hoàn tiền này thế nào? Đã trừ vào danh mục chi tiêu nào?",
+    });
+  }
 
   const pool = fin.unallocatedPool.amount === "unknown" ? null : fin.unallocatedPool.amount;
   const dueReserve = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
@@ -178,6 +270,19 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     return { date: vnDate(new Date(from).toISOString()), income: value.income, expense: value.expense };
   });
   const sorted = txns.slice().sort((a, b) => b.postedAt.localeCompare(a.postedAt) || a.id.localeCompare(b.id));
+
+  const healthScore = computeFinancialHealthScore({
+    cashflow: fin.cashflow,
+    monthlyCashflows: history,
+    accounts: raw.accounts,
+    networth: fin.networth,
+    liabilities,
+    liabilitiesConfirmedComplete: overlay.complete,
+    goals: fin.goals,
+    now,
+    asOf: today,
+  });
+
   return {
     schemaVersion: "2.0", asOf: today, timezone: "Asia/Ho_Chi_Minh", currency: "VND", period: month,
     dataQuality: { mode: "demo", profileComplete: overlay.complete, transactionCount: txns.length,
@@ -189,7 +294,7 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
     assets, liabilities, goals, categories, budgets: raw.budgets, spendingByCategory: fin.categorySpend,
     cashflow: { today: todayCash, monthToDate: fin.cashflow, previousComparable: priorComparable, monthly: history, daily },
     jars, unallocated: fin.unallocatedPool, payments, predictedBills: bills, recurring: fin.recurring,
-    networth: fin.networth, health: fin.health, endOfMonth: fin.endOfMonth, runway: fin.runway, unlabeled: fin.unlabeled,
+    networth: fin.networth, health: fin.health, healthScore, endOfMonth: fin.endOfMonth, runway: fin.runway, unlabeled: fin.unlabeled,
     opportunity: { estimatedSurplus, buffer, dueReserve, estimatedBillReserve, goalReserve, eligible },
     historicalNetworth: raw.snapshots,
     transactions: sorted.slice(0, 500).map((t) => ({ id: t.id, postedAt: t.postedAt, amount: t.amount, currency: t.currency,
