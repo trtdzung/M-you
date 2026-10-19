@@ -1,5 +1,5 @@
 import { getInvestProduct, getLoanProduct } from "../data/products";
-import { DEFAULT_SCENARIO_ID, getScenario } from "../data/scenarios";
+import { getScenario } from "../data/scenarios";
 import { makeAsset } from "../engine/assets";
 import { advanceTime, applySalary, describeAdvance, payDueInstalments, runStandingOrder } from "../engine/advance";
 import { addMonths, daysBetween, formatISODate, monthsBetween, nextDayOfMonth } from "../engine/dates";
@@ -7,13 +7,14 @@ import { findGoal, goalBalance, makeAccountNumber, nextId, postTxn } from "../en
 import { applyLifecycle, refreshLoanStatuses } from "../engine/lifecycle";
 import { affordability, annuityPayment, buildSchedule, outstandingPrincipal } from "../engine/loan";
 import { assetValue, depositAccrued, fundPriceAt, goalValue } from "../engine/value";
-import type { PreviewState } from "../model/state";
+import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { Goal, LiquidAsset, ToastTone } from "../model/types";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import type { PreviewAction, SimEvent } from "./actions";
 
 export const STORAGE_KEY = "goals-preview:v1";
+const EMPTY_SCENARIO_ID = "empty";
 const MAX_TOASTS = 4;
 
 // ---------------------------------------------------------------- init
@@ -29,17 +30,19 @@ export function stateFromScenario(scenarioId: string, jump = false): PreviewStat
   const target = jump ? scenario.jumpTo : undefined;
   const stack: ScreenEntry[] = [entry(1, "GoalList", target?.screen === "GoalList" ? target.params : undefined)];
   if (target && target.screen !== "GoalList") stack.push(entry(2, target.screen, target.params));
-  return { ...world, dismissedSuggestionIds: [], nav: { stack }, toasts: [] };
+  return { ...world, dismissedSuggestionIds: [], nav: { stack }, navSeq: stack.length, toasts: [] };
 }
 
+/** Customer's empty world: the state before the first server world arrives (never demo data). */
 export function initialPreviewState(): PreviewState {
-  return stateFromScenario(DEFAULT_SCENARIO_ID);
+  return stateFromScenario(EMPTY_SCENARIO_ID);
 }
 
 // ---------------------------------------------------------------- helpers
 
 function toast(draft: PreviewState, message: string, tone: ToastTone = "success"): void {
-  draft.toasts = [...draft.toasts, { id: nextId(draft, "toast"), message, tone }].slice(-MAX_TOASTS);
+  draft.navSeq = (draft.navSeq ?? 0) + 1;
+  draft.toasts = [...draft.toasts, { id: `toast-${draft.navSeq}`, message, tone }].slice(-MAX_TOASTS);
 }
 
 /** Returns the original state with only an error toast added (no world change). */
@@ -108,21 +111,21 @@ function refreshFundSnapshots(draft: PreviewState): void {
 
 function navReducer(state: PreviewState, action: PreviewAction): PreviewState | null {
   const stack = state.nav.stack;
-  const seq = state.seq + 1;
+  const seq = (state.navSeq ?? 0) + 1;
   switch (action.type) {
     case "nav/params":
       return { ...state, nav: { stack: stack.map((item, index) => index === stack.length - 1 ? { ...item, params: { ...item.params, ...action.params } } : item) } };
     case "nav/push":
-      return { ...state, seq, nav: { stack: [...stack, entry(seq, action.screen, action.params)] } };
+      return { ...state, navSeq: seq, nav: { stack: [...stack, entry(seq, action.screen, action.params)] } };
     case "nav/replace":
-      return { ...state, seq, nav: { stack: [...stack.slice(0, -1), entry(seq, action.screen, action.params)] } };
+      return { ...state, navSeq: seq, nav: { stack: [...stack.slice(0, -1), entry(seq, action.screen, action.params)] } };
     case "nav/pop": {
       const count = Math.max(1, action.count ?? 1);
       if (stack.length <= 1) return state;
       return { ...state, nav: { stack: stack.slice(0, Math.max(1, stack.length - count)) } };
     }
     case "nav/reset":
-      return { ...state, seq, nav: { stack: [entry(seq, action.screen ?? "GoalList", action.params)] } };
+      return { ...state, navSeq: seq, nav: { stack: [entry(seq, action.screen ?? "GoalList", action.params)] } };
     case "nav/popTo": {
       const index = stack.map((e) => e.screen).lastIndexOf(action.screen);
       if (index === -1) return state;
@@ -131,6 +134,36 @@ function navReducer(state: PreviewState, action: PreviewAction): PreviewState | 
     default:
       return null;
   }
+}
+
+/** Replaces the data part with the server world; if the local draft id is unknown there, follows the server's newest draft. */
+function syncWorld(state: PreviewState, world: WorldState): PreviewState {
+  let nav = state.nav;
+  let lastCreatedGoalId = state.lastCreatedGoalId;
+  if (lastCreatedGoalId && !world.goals.some((g) => g.id === lastCreatedGoalId)) {
+    const oldId = lastCreatedGoalId;
+    const drafts = world.goals.filter((g) => g.status === "draft");
+    const newId = drafts.length > 0 ? drafts[drafts.length - 1].id : undefined;
+    if (newId) {
+      nav = {
+        stack: state.nav.stack.map((item) => {
+          if (!Object.values(item.params).includes(oldId)) return item;
+          const params: ScreenParams = {};
+          for (const [key, value] of Object.entries(item.params)) params[key] = value === oldId ? newId : value;
+          return { ...item, params };
+        }),
+      };
+    }
+    lastCreatedGoalId = newId;
+  }
+  return {
+    ...world,
+    nav,
+    navSeq: state.navSeq,
+    toasts: state.toasts,
+    dismissedSuggestionIds: state.dismissedSuggestionIds,
+    lastCreatedGoalId,
+  };
 }
 
 // ---------------------------------------------------------------- reducer
@@ -144,13 +177,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       return action.state;
 
     case "world/sync":
-      return {
-        ...action.world,
-        nav: state.nav,
-        toasts: state.toasts,
-        dismissedSuggestionIds: state.dismissedSuggestionIds,
-        lastCreatedGoalId: state.lastCreatedGoalId,
-      };
+      return syncWorld(state, action.world);
 
     case "reset": {
       const next = stateFromScenario(state.scenarioId);

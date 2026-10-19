@@ -55,8 +55,12 @@ interface PreviewContextValue {
   dispatch: (action: PreviewAction) => void;
   nav: PreviewNav;
   toast: (message: string, tone?: ToastTone) => void;
-  /** False until the first server world has loaded (avoid flashing default data). */
+  /** True once the server world of the active customer has loaded. */
   hydrated: boolean;
+  /** "loading" until the first server world arrives; "error" when that GET failed. */
+  loadStatus: LoadStatus;
+  /** Retries the world GET after an error. */
+  reload: () => void;
   /** Server suggestions ("M-You gợi ý"); null until the first load (or when it failed). */
   suggestions: AgentSuggestion[] | null;
   /** Records a click on a suggestion button ("clicked" for navigation, "acted" for a store action). */
@@ -66,6 +70,8 @@ interface PreviewContextValue {
   /** True while a price refresh started by `refreshPrices` is still running. */
   pricesRefreshing: boolean;
 }
+
+export type LoadStatus = "loading" | "ready" | "error";
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
 
@@ -80,14 +86,16 @@ function useServerWorld(
   cif: string | null,
   entryScreen?: ScreenId,
 ): {
-  hydrated: boolean;
+  loadStatus: LoadStatus;
+  reload: () => void;
   dispatch: (a: PreviewAction) => void;
   suggestions: AgentSuggestion[] | null;
   recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
   refreshPrices: () => void;
   pricesRefreshing: boolean;
 } {
-  const [hydrated, setHydrated] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
+  const [reloadKey, setReloadKey] = useState(0);
   const [pricesRefreshing, setPricesRefreshing] = useState(false);
   const [suggestions, setSuggestions] = useState<AgentSuggestion[] | null>(null);
   const suggestionRunRef = useRef(0);
@@ -121,7 +129,7 @@ function useServerWorld(
       if (payload.market.refreshing && !cancelPollRef.current) {
         cancelPollRef.current = pollMarket(
           () => {
-            const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, ...world } = stateRef.current;
+            const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, navSeq: _n, ...world } = stateRef.current;
             rawDispatch({ type: "world/sync", world });
           },
           () => {
@@ -142,15 +150,16 @@ function useServerWorld(
     cancelPollRef.current?.();
     cancelPollRef.current = null;
     setPricesRefreshing(false);
+    // New customer (or retry): drop the previous world/nav and wait for the server world.
+    setLoadStatus("loading");
+    rawDispatch({ type: "hydrate", state: initialPreviewState() });
     if (entryScreen) rawDispatch({ type: "nav/reset", screen: entryScreen });
-    if (!cif) {
-      setHydrated(true);
-      return;
-    }
+    if (!cif) return;
     fetchWorld(cif)
       .then((payload) => {
         if (!alive) return;
         applyPayload(payload);
+        setLoadStatus("ready");
         queueRef.current = new ActionQueue(cif, {
           onWorld: applyPayload,
           onError: (message) => {
@@ -161,10 +170,7 @@ function useServerWorld(
         });
       })
       .catch(() => {
-        if (alive) rawDispatch({ type: "toast/push", message: "Không tải được dữ liệu mục tiêu.", tone: "error" });
-      })
-      .finally(() => {
-        if (alive) setHydrated(true);
+        if (alive) setLoadStatus("error");
       });
     return () => {
       alive = false;
@@ -173,12 +179,17 @@ function useServerWorld(
       cancelPollRef.current?.();
       suggestionRunRef.current += 1;
     };
-  }, [cif, entryScreen, rawDispatch, applyPayload, stateRef]);
+  }, [cif, entryScreen, reloadKey, rawDispatch, applyPayload, stateRef]);
+
+  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
   const dispatch = useCallback(
     (action: PreviewAction) => {
+      const local = isLocalOnlyAction(action);
+      // No server world yet (loading / failed): business actions are locked, nothing runs locally or is queued.
+      if (!local && !queueRef.current) return;
       rawDispatch(action);
-      if (!isLocalOnlyAction(action)) queueRef.current?.enqueue(action);
+      if (!local) queueRef.current?.enqueue(action);
       // "Để sau" / "Ẩn gợi ý": the server hides the suggestion for 7 days.
       if (action.type === "dismissSuggestion" && cif) postSuggestionEvent(cif, action.id, "dismissed");
     },
@@ -197,7 +208,7 @@ function useServerWorld(
     if (!cif || pricesRefreshing) return;
     setPricesRefreshing(true);
     const resync = () => {
-      const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, ...world } = stateRef.current;
+      const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, navSeq: _n, ...world } = stateRef.current;
       rawDispatch({ type: "world/sync", world });
     };
     void requestMarketRefresh()
@@ -217,7 +228,7 @@ function useServerWorld(
       .catch(() => setPricesRefreshing(false));
   }, [cif, pricesRefreshing, rawDispatch, stateRef]);
 
-  return { hydrated, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing };
+  return { loadStatus, reload, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing };
 }
 
 export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
@@ -226,7 +237,7 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   const [state, rawDispatch] = useReducer(previewReducer, undefined, initialPreviewState);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const { hydrated, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
+  const { loadStatus, reload, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
 
   useEffect(() => {
     const onBack = (event: Event) => {
@@ -253,8 +264,8 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing }),
-    [state, dispatch, nav, toast, hydrated, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing],
+    () => ({ state, dispatch, nav, toast, hydrated: loadStatus === "ready", loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing }),
+    [state, dispatch, nav, toast, loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }
