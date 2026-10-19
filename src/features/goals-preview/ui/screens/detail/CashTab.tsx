@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CircleAlert, Copy } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/lib/format";
 import { formatISODate } from "../../../engine";
@@ -11,7 +11,7 @@ import { usePreview } from "../../../store/PreviewStore";
 import { selectGoalTxns } from "../../../store/selectors";
 import { Amount } from "../../shared/Amount";
 import { SourceTag } from "../../shared/SourceTag";
-import { card, chip, chipSelected, ring, sectionTitle, secondaryButton } from "../../shared/styles";
+import { card, input, ring, sectionTitle, secondaryButton } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
 
 type Filter = "all" | "deposit" | "withdraw" | "interest" | "invest" | "maturity" | "loan_disbursement" | "loan_repayment" | "failed";
@@ -32,9 +32,15 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav, toast } = usePreview();
   const { goal, account, state } = ctx;
   const [filter, setFilter] = useState<Filter>("all");
+  const [limit, setLimit] = useState(10);
   const txns = selectGoalTxns(state, goalId);
   const kinds = FILTERS.find((f) => f.value === filter)?.kinds;
   const shown = kinds ? txns.filter((t) => kinds.includes(t.kind)) : txns;
+  const groups = shown.slice(0, limit).reduce<Record<string, typeof shown>>((all, txn) => {
+    const day = txn.date.slice(0, 10);
+    (all[day] ??= []).push(txn);
+    return all;
+  }, {});
   const interestEarned = txns.filter((t) => t.kind === "interest").reduce((s, t) => s + t.amount, 0);
   const so = goal.standingOrder;
 
@@ -64,7 +70,7 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
           </div>
           <div>
             <p className="text-[12px] text-muted">Số dư</p>
-            <Amount amount={account.balance} source="msb" className="text-[22px] font-bold text-text" />
+            <Amount amount={account.balance} className="text-[22px] font-bold text-text" />
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
@@ -73,7 +79,7 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
             </div>
             <div>
               <p className="text-[12px] text-muted">Lãi đã nhận</p>
-              <Amount amount={interestEarned} source="msb" className="font-semibold text-text" />
+              <Amount amount={interestEarned} className="font-semibold text-text" />
             </div>
           </div>
           {account.status === "closed" && <p className="text-[13px] text-muted">Tài khoản đã đóng ngày {formatISODate(goal.closedAt)}.</p>}
@@ -101,40 +107,43 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className={sectionTitle}>Lịch sử giao dịch</h2>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          {FILTERS.map((f) => (
-            <button key={f.value} type="button" className={cn("shrink-0", filter === f.value ? chipSelected : chip)} onClick={() => setFilter(f.value)}>
-              {f.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className={sectionTitle}>Lịch sử giao dịch</h2>
+          <select aria-label="Lọc loại giao dịch" value={filter} onChange={(event) => { setFilter(event.target.value as Filter); setLimit(10); }} className={`${input} !w-auto max-w-full !py-2 !text-[13px]`}>
+            {FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
         </div>
+        <p className="text-[12px] text-muted">{shown.length} giao dịch{filter !== "all" ? ` · ${FILTERS.find((f) => f.value === filter)?.label}` : ""}</p>
         {shown.length === 0 ? (
           <p className="rounded-card bg-surface-muted p-4 text-center text-sm text-muted">Chưa có giao dịch nào.</p>
         ) : (
-          <ul className="divide-y divide-border rounded-card bg-surface shadow-card">
-            {shown.map((t) => {
-              const dir = TXN_DIRECTION[t.kind];
-              return (
-                <li key={t.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className={cn("text-sm font-medium", t.kind === "standing_order_failed" ? "text-negative" : "text-text")}>{TXN_LABEL[t.kind]}</p>
-                    <p className="truncate text-[12px] text-muted">
-                      {formatISODate(t.date)}
-                      {t.note ? ` · ${t.note}` : ""}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <span className={cn("text-sm font-semibold tabular-nums", dir > 0 ? "text-positive" : dir < 0 ? "text-text" : "text-muted")}>
-                      {dir > 0 ? "+" : dir < 0 ? "-" : ""}
-                      {formatVnd(t.amount)}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="flex min-w-0 flex-col gap-4">
+            {Object.entries(groups).map(([day, entries]) => (
+              <div key={day} className="min-w-0">
+                <h3 className="mb-2 text-[12px] font-medium text-muted">{formatISODate(day)}</h3>
+                <ul className="divide-y divide-border rounded-card bg-surface shadow-card">
+                  {entries.map((t) => {
+                    const dir = TXN_DIRECTION[t.kind];
+                    const Icon = t.kind === "standing_order_failed" ? CircleAlert : dir > 0 ? ArrowDownLeft : ArrowUpRight;
+                    return (
+                      <li key={t.id} className="flex min-w-0 gap-3 p-4">
+                        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", t.kind === "standing_order_failed" ? "bg-warning-soft text-warning" : dir > 0 ? "bg-positive-soft text-positive" : "bg-surface-muted text-text")}><Icon size={18} aria-hidden /></span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                            <p className={cn("text-sm font-semibold", t.kind === "standing_order_failed" ? "text-negative" : "text-text")}>{TXN_LABEL[t.kind]}</p>
+                            <span className={cn("whitespace-nowrap text-sm font-semibold tabular-nums", dir > 0 ? "text-positive" : "text-text")}>{dir > 0 ? "+" : dir < 0 ? "−" : ""}{formatVnd(t.amount)}</span>
+                          </div>
+                          {t.note && <p className="mt-1 break-words text-[12px] leading-5 text-muted">{t.note}</p>}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
+        {shown.length > limit && <button type="button" className={secondaryButton} onClick={() => setLimit((current) => current + 10)}>Xem thêm giao dịch ({shown.length - limit})</button>}
       </section>
     </div>
   );
