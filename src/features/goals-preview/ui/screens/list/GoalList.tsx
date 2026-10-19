@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Plus } from "lucide-react";
 import { SegmentedControl } from "@/components/primitives";
 
-import { allocateSurplus, formatISODate, goalValue, progressPct, progressState } from "../../../engine";
+import { allocateSurplus, formatISODate, goalStage, goalValue, progressPct, progressState } from "../../../engine";
 import { TEMPLATE_EMOJI, TEMPLATE_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import type { PreviewState } from "../../../model/state";
@@ -25,9 +25,12 @@ type Tab = "active" | "history";
 function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; onOpen: () => void }) {
   const history = goal.status === "completed" || goal.status === "closed";
   const v = goalValue(state, goal);
+  const stage = goalStage(state, goal);
+  const phase2 = !history && stage.phase === 2;
+  const target = history ? goal.targetAmount : stage.target;
   const pct = Math.round(progressPct(state, goal));
   const finished = history && goal.finalValue !== undefined;
-  const cash = finished ? goal.finalValue! : v.cash;
+  const cash = finished ? goal.finalValue! : stage.principalPaid + v.cash;
   const assets = finished ? 0 : v.assets;
   const showProgress = goal.status === "accumulating" || goal.status === "repaying";
   return (
@@ -39,18 +42,18 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
         <div className="min-w-0 flex-1">
           <p className="text-[16px] font-semibold text-text">{goal.name}</p>
           <p className="text-[12px] text-muted">
-            {TEMPLATE_LABEL[goal.template]} · hạn {formatISODate(goal.targetDate)}
+            {TEMPLATE_LABEL[goal.template]}{phase2 ? " · giai đoạn 2 trả vay" : ""} · hạn {formatISODate(history ? goal.targetDate : stage.targetDate)}
           </p>
         </div>
 
       </div>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[22px] font-bold tabular-nums text-text">{formatVndCompact(finished ? goal.finalValue! : v.total)}</span>
-        <span className="text-sm text-muted">/ {formatVndCompact(goal.targetAmount)}</span>
+        <span className="text-[22px] font-bold tabular-nums text-text">{formatVndCompact(finished ? goal.finalValue! : stage.value)}</span>
+        <span className="text-sm text-muted">/ {formatVndCompact(target)}{phase2 ? " nợ gốc" : ""}</span>
       </div>
-      <SplitProgressBar cash={cash} assets={assets} target={goal.targetAmount} showLegend={false} />
+      <SplitProgressBar cash={cash} assets={assets} target={target} showLegend={false} />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-text">{pct}% đã tích luỹ</span>
+        <span className="text-sm font-semibold text-text">{pct}% {phase2 ? "giai đoạn 2" : "đã tích luỹ"}</span>
         {showProgress ? <ProgressStateBadge state={progressState(state, goal)} /> : <GoalStatusBadge status={goal.status} />}
       </div>
       {v.source === "self_reported" && <p className="text-[12px] text-muted">Bao gồm tài sản tự khai</p>}

@@ -3,7 +3,7 @@ import type { WorldState } from "../model/state";
 import type { Goal, GoalTemplate, ISODate, LoanPurpose } from "../model/types";
 import { addMonths, monthsLeft } from "./dates";
 import { affordability, annuityPayment, buildSchedule, totalInterest, type Affordability } from "./loan";
-import { goalValue } from "./value";
+import { goalStage, goalValue } from "./value";
 
 type World = Pick<WorldState, "accounts" | "assets" | "clock" | "market" | "customer" | "goals" | "loans">;
 
@@ -12,13 +12,18 @@ export function isSaving(goal: Goal): boolean {
   return goal.status === "accumulating" || goal.status === "repaying";
 }
 
-/** Tiền cần để thêm mỗi tháng để đạt đúng hạn (không tính lãi cho đơn giản). */
+/**
+ * Tiền cần để thêm mỗi tháng để đạt đúng hạn (không tính lãi cho đơn giản).
+ * Phase 2: the instalment (gốc + lãi) — paying it every month reaches the stage target on time.
+ */
 export function requiredMonthly(world: World, goal: Goal): number {
-  // Phase 2 / finished goals no longer save toward the target.
-  if (goal.status === "achieved" || goal.status === "repaying" || goal.status === "completed" || goal.status === "closed") return 0;
-  const gap = Math.max(0, goal.targetAmount - goalValue(world, goal).total);
+  if (goal.status === "completed" || goal.status === "closed") return 0;
+  const stage = goalStage(world, goal);
+  const gap = Math.max(0, stage.target - stage.value);
   if (gap === 0) return 0;
-  const months = monthsLeft(world.clock.today, goal.targetDate);
+  if (stage.phase === 2) return stage.loan?.monthlyPayment ?? 0;
+  if (goal.status === "achieved") return 0;
+  const months = monthsLeft(world.clock.today, stage.targetDate);
   return months === 0 ? gap : Math.ceil(gap / months / 1000) * 1000;
 }
 
@@ -42,6 +47,11 @@ export function allocateSurplus(world: World, extra?: Goal): Record<string, numb
   let left = Math.max(0, surplus - loanPayments);
   for (const g of goals) {
     const need = requiredMonthly(world, g);
+    // A phase-2 goal's need is its instalment, already reserved above.
+    if (goalStage(world, g).phase === 2) {
+      result[g.id] = 0;
+      continue;
+    }
     const take = Math.min(need, left);
     result[g.id] = take;
     left -= take;
@@ -66,12 +76,15 @@ export interface Feasibility {
 }
 
 export function feasibility(world: World, goal: Goal, extra?: Goal): Feasibility {
-  const value = goalValue(world, goal).total;
-  const months = monthsLeft(world.clock.today, goal.targetDate);
+  const stage = goalStage(world, goal);
+  const value = stage.value;
+  const target = stage.target;
+  const months = monthsLeft(world.clock.today, stage.targetDate);
   const required = requiredMonthly(world, goal);
-  const allocation = allocateSurplus(world, extra)[goal.id] ?? 0;
+  // Phase 2: the instalment is reserved off the top of the surplus, not split with other goals.
+  const allocation = stage.phase === 2 ? required : (allocateSurplus(world, extra)[goal.id] ?? 0);
   const surplus = world.customer.monthlySurplus;
-  if (goal.status === "achieved" || goal.status === "repaying" || goal.status === "completed" || goal.status === "closed") {
+  if (goal.status === "completed" || goal.status === "closed" || (goal.status === "achieved" && stage.phase === 1)) {
     return {
       status: "not_applicable",
       monthsLeft: months,
@@ -82,7 +95,7 @@ export function feasibility(world: World, goal: Goal, extra?: Goal): Feasibility
       surplusShare: 0,
     };
   }
-  if (value >= goal.targetAmount) {
+  if (value >= target) {
     return {
       status: "reached",
       monthsLeft: months,
@@ -104,8 +117,8 @@ export function feasibility(world: World, goal: Goal, extra?: Goal): Feasibility
       surplusShare: "unknown",
     };
   }
-  const projected = value + allocation * months;
-  const gap = Math.max(0, goal.targetAmount - projected);
+  const projected = Math.min(stage.phase === 2 ? target : Infinity, value + allocation * months);
+  const gap = Math.max(0, target - projected);
   const share = surplus > 0 ? required / surplus : 1;
   const status: FeasibilityStatus = gap > 0 ? "infeasible" : share > 0.7 ? "tight" : "feasible";
   return {

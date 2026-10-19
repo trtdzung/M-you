@@ -1,7 +1,8 @@
 import { getInvestProduct } from "../data/products";
 import type { WorldState } from "../model/state";
-import type { Asset, FundProduct, Goal, GoalAccount, ISODate, LiquidAsset, ProgressState, ValueSource } from "../model/types";
+import type { Asset, FundProduct, Goal, GoalAccount, ISODate, LiquidAsset, Loan, ProgressState, ValueSource } from "../model/types";
 import { daysBetween, isBefore } from "./dates";
+import { outstandingPrincipal } from "./loan";
 
 // ---------------------------------------------------------------- prices
 
@@ -107,34 +108,107 @@ export function goalValue(world: Pick<WorldState, "accounts" | "assets" | "clock
   return { cash, liquid, fixedCounted, fixedTotal, assets, total: cash + assets, source };
 }
 
-/** 0–100+ (not clamped above, so early achievement can show 103%). */
-export function progressPct(world: Pick<WorldState, "accounts" | "assets" | "clock" | "market">, goal: Goal): number {
-  if (goal.targetAmount <= 0) return 0;
-  return (goalValue(world, goal).total / goal.targetAmount) * 100;
+type ValueWorld = Pick<WorldState, "accounts" | "assets" | "clock" | "market" | "loans">;
+
+/**
+ * The target the goal is currently working toward.
+ * Phase 1: targetAmount by targetDate, value = cash + assets.
+ * Phase 2 (vay để đạt mục tiêu): the loan principal by the last instalment date,
+ * value = gốc đã trả + cash + assets — enough value means the loan can be settled.
+ */
+export interface GoalStage {
+  phase: 1 | 2;
+  target: number;
+  startDate: ISODate;
+  targetDate: ISODate;
+  /** Gốc đã trả (phase 2 only, else 0). */
+  principalPaid: number;
+  /** Dư nợ gốc còn lại (phase 2 only, else 0). */
+  outstanding: number;
+  value: number;
+  loan?: Loan;
+}
+
+export function goalLoan(world: Pick<WorldState, "loans">, goal: Goal): Loan | undefined {
+  return goal.loanId ? world.loans.find((l) => l.id === goal.loanId) : undefined;
+}
+
+export function goalStage(world: ValueWorld, goal: Goal): GoalStage {
+  const total = goalValue(world, goal).total;
+  const loan = goalLoan(world, goal);
+  if (loan && (goal.status === "achieved" || goal.status === "repaying")) {
+    const outstanding = loan.status === "paid_off" ? 0 : outstandingPrincipal(loan.schedule);
+    const principalPaid = Math.max(0, loan.principal - outstanding);
+    const last = loan.schedule[loan.schedule.length - 1];
+    return {
+      phase: 2,
+      target: loan.principal,
+      startDate: loan.disbursedAt,
+      targetDate: last?.dueDate ?? loan.disbursedAt,
+      principalPaid,
+      outstanding,
+      value: principalPaid + total,
+      loan,
+    };
+  }
+  return { phase: 1, target: goal.targetAmount, startDate: goal.createdAt, targetDate: goal.targetDate, principalPaid: 0, outstanding: 0, value: total };
+}
+
+/** 0–100+ of the current stage (not clamped above, so early achievement can show 103%). */
+export function progressPct(world: ValueWorld, goal: Goal): number {
+  const stage = goalStage(world, goal);
+  if (stage.target <= 0) return 0;
+  return (stage.value / stage.target) * 100;
 }
 
 /**
- * Compares actual value with the straight-line plan from createdAt → targetDate.
+ * Compares actual value with the plan of the current stage: phase 1 the straight
+ * line createdAt → targetDate, phase 2 the principal the schedule has due by today.
  * ratio ≥ 1.1 ahead · ≥ 0.95 on track · ≥ 0.8 slightly behind · else off track.
  */
-export function progressState(world: Pick<WorldState, "accounts" | "assets" | "clock" | "market">, goal: Goal): ProgressState {
-  const total = daysBetween(goal.createdAt, goal.targetDate);
-  const elapsed = Math.min(total, Math.max(0, daysBetween(goal.createdAt, world.clock.today)));
-  const value = goalValue(world, goal).total;
-  if (value >= goal.targetAmount) return "ahead";
-  if (total <= 0 || elapsed <= 0) return "on_track";
-  const expected = goal.targetAmount * (elapsed / total);
+export function progressState(world: ValueWorld, goal: Goal): ProgressState {
+  const stage = goalStage(world, goal);
+  if (stage.value >= stage.target) return "ahead";
+  let expected: number;
+  if (stage.phase === 2 && stage.loan) {
+    const today = world.clock.today;
+    if (stage.loan.schedule.some((r) => r.status === "overdue")) return "off_track";
+    expected = stage.loan.prepaid + stage.loan.schedule.filter((r) => r.dueDate <= today).reduce((sum, r) => sum + r.principal, 0);
+  } else {
+    const total = daysBetween(stage.startDate, stage.targetDate);
+    const elapsed = Math.min(total, Math.max(0, daysBetween(stage.startDate, world.clock.today)));
+    if (total <= 0 || elapsed <= 0) return "on_track";
+    expected = stage.target * (elapsed / total);
+  }
   if (expected <= 0) return "on_track";
-  const ratio = value / expected;
+  const ratio = stage.value / expected;
   if (ratio >= 1.1) return "ahead";
   if (ratio >= 0.95) return "on_track";
   if (ratio >= 0.8) return "slightly_behind";
   return "off_track";
 }
 
-/** Amount still missing today (≥ 0). */
-export function remainingAmount(world: Pick<WorldState, "accounts" | "assets" | "clock" | "market">, goal: Goal): number {
-  return Math.max(0, goal.targetAmount - goalValue(world, goal).total);
+/** Amount of the current stage still missing today (≥ 0). */
+export function remainingAmount(world: ValueWorld, goal: Goal): number {
+  const stage = goalStage(world, goal);
+  return Math.max(0, stage.target - stage.value);
+}
+
+/**
+ * Phase-1 result for a goal that borrowed: what the customer saved on their own
+ * (goal balance right before the disbursement) and the loan that closed the gap.
+ */
+export function phaseOneResult(world: Pick<WorldState, "txns" | "loans">, goal: Goal): { saved: number; borrowed: number; achievedAt: ISODate } | undefined {
+  const loan = goalLoan(world, goal);
+  if (!loan) return undefined;
+  const txns = world.txns.filter((t) => t.goalId === goal.id);
+  const idx = txns.findIndex((t) => t.kind === "loan_disbursement");
+  const before = idx > 0 ? txns[idx - 1].balanceAfter : undefined;
+  return {
+    saved: before ?? Math.max(0, goal.targetAmount - loan.principal),
+    borrowed: loan.principal,
+    achievedAt: goal.achievedAt ?? loan.disbursedAt,
+  };
 }
 
 /** Fixed asset valuation older than 12 months needs a refresh. */

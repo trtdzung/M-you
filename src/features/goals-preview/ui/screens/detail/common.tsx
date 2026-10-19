@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { feasibility, goalValue, progressPct, progressState, requiredMonthly } from "../../../engine";
+import { feasibility, goalStage, goalValue, progressPct, progressState, requiredMonthly } from "../../../engine";
 import type { PreviewState } from "../../../model/state";
 import type { Goal, GoalAccount } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
@@ -14,6 +14,8 @@ export interface GoalContext {
   goal: Goal;
   account: GoalAccount | undefined;
   value: ReturnType<typeof goalValue>;
+  /** Target, deadline and value of the current phase. */
+  stage: ReturnType<typeof goalStage>;
   pct: number;
   progress: ReturnType<typeof progressState>;
   required: number;
@@ -31,6 +33,7 @@ export function useGoalContext(goalId: string | undefined): GoalContext | undefi
       goal,
       account: selectAccount(state, goal),
       value: goalValue(state, goal),
+      stage: goalStage(state, goal),
       pct: progressPct(state, goal),
       progress: progressState(state, goal),
       required: requiredMonthly(state, goal),

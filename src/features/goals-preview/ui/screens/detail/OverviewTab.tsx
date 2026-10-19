@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, CalendarCheck, LineChart, PartyPopper } from "lucide-react";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import { addDays, daysBetween, formatISODate, assetValue } from "../../../engine";
+import { addDays, daysBetween, formatISODate, assetValue, phaseOneResult } from "../../../engine";
 import { cn } from "@/lib/cn";
 import { usePreview } from "../../../store/PreviewStore";
 import { ConfirmSheet } from "../../shared/ConfirmSheet";
@@ -19,19 +19,30 @@ interface TimelineItem {
   note?: string;
 }
 
-function buildTimeline({ state, goal, pct }: GoalContext): TimelineItem[] {
-  const today = state.clock.today;
-  const items: TimelineItem[] = [{ date: goal.createdAt, label: "Tạo mục tiêu", done: true }];
-  const span = daysBetween(goal.createdAt, goal.targetDate);
+function milestones(items: TimelineItem[], prefix: string, start: string, end: string, target: number, pct: number): void {
+  const span = daysBetween(start, end);
   for (const m of [25, 50, 75]) {
-    const planned = addDays(goal.createdAt, Math.round((span * m) / 100));
     const reached = pct >= m;
     items.push({
-      date: planned,
-      label: `Mốc ${m}% (${formatVnd((goal.targetAmount * m) / 100)})`,
+      date: addDays(start, Math.round((span * m) / 100)),
+      label: `${prefix}${m}% (${formatVnd((target * m) / 100)})`,
       done: reached,
       note: reached ? "Đã đạt · chưa có ngày ghi nhận" : "Chưa đạt",
     });
+  }
+}
+
+function buildTimeline({ state, goal, pct, stage }: GoalContext): TimelineItem[] {
+  const today = state.clock.today;
+  const items: TimelineItem[] = [{ date: goal.createdAt, label: "Tạo mục tiêu", done: true }];
+  if (stage.phase === 2) {
+    // Phase 1 is closed: its milestones are judged by what was saved before borrowing.
+    const one = phaseOneResult(state, goal);
+    const savedPct = one ? (one.saved / Math.max(1, goal.targetAmount)) * 100 : 0;
+    milestones(items, "Mốc ", goal.createdAt, goal.targetDate, goal.targetAmount, savedPct);
+    milestones(items, "Trả nợ mốc ", stage.startDate, stage.targetDate, stage.target, pct);
+  } else {
+    milestones(items, "Mốc ", goal.createdAt, goal.targetDate, goal.targetAmount, pct);
   }
   for (const a of state.assets) {
     if (a.goalId !== goal.id || a.type !== "liquid" || a.status !== "held" || !a.maturityDate) continue;
@@ -48,7 +59,7 @@ function buildTimeline({ state, goal, pct }: GoalContext): TimelineItem[] {
     const last = loan.schedule[loan.schedule.length - 1];
     if (last) items.push({ date: last.dueDate, label: "Dự kiến trả hết nợ", done: loan.status === "paid_off" });
   }
-  items.push({ date: goal.targetDate, label: "Ngày đến hạn mục tiêu", done: goal.targetDate <= today });
+  items.push({ date: goal.targetDate, label: stage.phase === 2 ? "Hạn giai đoạn 1" : "Ngày đến hạn mục tiêu", done: goal.targetDate <= today });
   return items.sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -63,28 +74,33 @@ const FE_TEXT: Record<string, { text: string; box: string }> = {
 
 export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; goalId: string; suggestions?: ReactNode }) {
   const { dispatch, nav } = usePreview();
-  const { goal, state, fe, required } = ctx;
+  const { goal, state, fe, required, stage } = ctx;
+  const phase2 = stage.phase === 2;
+  const overdue = !!stage.loan?.schedule.some((r) => r.status === "overdue");
+  // Settling needs the cash itself in the goal account (assets must be sold first).
+  const canSettle = phase2 && !overdue && stage.outstanding > 0 && ctx.value.cash >= stage.outstanding;
   const [keepGoing, setKeepGoing] = useState(false);
   const [confirmEarly, setConfirmEarly] = useState(false);
   const today = state.clock.today;
   const due = goal.targetDate <= today;
   const timeline = buildTimeline(ctx);
   const active = canTransact(goal) && goal.status !== "paused";
-  const feText = FE_TEXT[fe.status];
+  const feText = phase2 && fe.status === "reached" ? { text: "Bạn đã đủ tiền để tất toán khoản vay.", box: successBox } : FE_TEXT[fe.status];
 
   const quick = [
     { label: "Nạp tiền", icon: ArrowDownToLine, show: active, go: () => nav.push("DepositFlow", { goalId }) },
     { label: "Rút tiền", icon: ArrowUpFromLine, show: canTransact(goal), go: () => nav.push("WithdrawFlow", { goalId }) },
-    { label: "Đầu tư", icon: LineChart, show: goal.status === "accumulating", go: () => nav.push("InvestSuggest", { goalId }) },
+    { label: "Đầu tư", icon: LineChart, show: goal.status === "accumulating" || goal.status === "repaying", go: () => nav.push("InvestSuggest", { goalId }) },
     { label: "Vay", icon: Banknote, show: goal.status === "accumulating" || goal.status === "missed", go: () => nav.push("LoanSimulator", { goalId }) },
   ].filter((q) => q.show);
 
-  let stage: { label: string; screen: "DueResult" | "RepayOverview" | "AchievedIntro" | "MissedOptions" | "CompletedCelebration" } | undefined;
-  if (goal.status === "repaying") stage = { label: "Xem khoản vay đang trả", screen: "RepayOverview" };
-  else if (goal.status === "achieved") stage = { label: "Bắt đầu giai đoạn trả nợ", screen: "AchievedIntro" };
-  else if (goal.status === "missed") stage = { label: "Chọn cách đi tiếp", screen: "MissedOptions" };
-  else if (goal.status === "completed") stage = { label: "Xem chúc mừng", screen: "CompletedCelebration" };
-  else if (due && goal.status === "accumulating") stage = { label: "Xem kết quả đến hạn", screen: "DueResult" };
+  let next: { label: string; screen: "DueResult" | "RepayOverview" | "AchievedIntro" | "MissedOptions" | "CompletedCelebration" | "Prepay" } | undefined;
+  if (canSettle) next = { label: "Tất toán khoản vay & hoàn thành", screen: "Prepay" };
+  else if (goal.status === "repaying") next = { label: "Xem lịch trả nợ", screen: "RepayOverview" };
+  else if (goal.status === "achieved") next = { label: "Bắt đầu giai đoạn trả nợ", screen: "AchievedIntro" };
+  else if (goal.status === "missed") next = { label: "Chọn cách đi tiếp", screen: "MissedOptions" };
+  else if (goal.status === "completed") next = { label: "Xem chúc mừng", screen: "CompletedCelebration" };
+  else if (due && goal.status === "accumulating") next = { label: "Xem kết quả đến hạn", screen: "DueResult" };
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,9 +139,9 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
           ))}
         </div>
       )}
-      {stage && (
-        <button type="button" className={primaryButton} onClick={() => nav.push(stage.screen, { goalId })}>
-          <CalendarCheck size={18} aria-hidden /> {stage.label}
+      {next && (
+        <button type="button" className={primaryButton} onClick={() => nav.push(next.screen, { goalId })}>
+          <CalendarCheck size={18} aria-hidden /> {next.label}
         </button>
       )}
 
@@ -134,9 +150,9 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
           <h2 className={sectionTitle}>Kế hoạch góp</h2>
           {feText.text && <InfoTooltip warning={fe.status === "tight" || fe.status === "infeasible"} label="đánh giá kế hoạch góp" text={feText.text} />}
         </div>
-        {goal.status === "accumulating" || goal.status === "paused" || goal.status === "missed" ? <>
+        {goal.status === "accumulating" || goal.status === "paused" || goal.status === "missed" || goal.status === "repaying" ? <>
           <div>
-            <p className="text-[13px] text-muted">Cần góp mỗi tháng · còn {fe.monthsLeft} tháng</p>
+            <p className="text-[13px] text-muted">{phase2 ? "Cần góp mỗi tháng để đủ trả góp" : "Cần góp mỗi tháng"} · còn {fe.monthsLeft} tháng</p>
             <p className="mt-1 text-[24px] font-bold tabular-nums text-text">{typeof required === "number" ? formatVnd(required) : "Chưa đủ dữ liệu"}</p>
           </div>
           <dl className="flex flex-col gap-3 border-t border-border pt-3 text-sm">
@@ -176,7 +192,7 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
               <div className="pb-4">
                 <p className={cn("text-sm", t.done ? "font-semibold text-text" : "text-muted")}>{t.label}</p>
                 <p className="text-[12px] text-muted">
-                  {t.label.startsWith("Mốc ") ? "Kế hoạch: " : ""}{formatISODate(t.date)}
+                  {t.label.includes("Mốc ") || t.label.includes("mốc ") ? "Kế hoạch: " : ""}{formatISODate(t.date)}
                   {t.note ? ` · ${t.note}` : ""}
                 </p>
               </div>
