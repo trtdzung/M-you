@@ -143,6 +143,15 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
     case "hydrate":
       return action.state;
 
+    case "world/sync":
+      return {
+        ...action.world,
+        nav: state.nav,
+        toasts: state.toasts,
+        dismissedSuggestionIds: state.dismissedSuggestionIds,
+        lastCreatedGoalId: state.lastCreatedGoalId,
+      };
+
     case "reset": {
       const next = stateFromScenario(state.scenarioId);
       toast(next, `Đã đặt lại kịch bản “${getScenario(state.scenarioId).title}”.`, "info");

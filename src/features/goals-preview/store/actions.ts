@@ -1,4 +1,4 @@
-import type { PreviewState } from "../model/state";
+import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenId, ScreenParams } from "../model/screens";
 import type {
   CustomerProfile,
@@ -38,6 +38,8 @@ export type PreviewAction =
   | { type: "loadScenario"; scenarioId: string; jump?: boolean }
   | { type: "reset" }
   | { type: "hydrate"; state: PreviewState }
+  /** Server world replaces the data part; nav, toasts, dismissals and lastCreatedGoalId are kept. */
+  | { type: "world/sync"; world: WorldState }
   | { type: "advanceTime"; days: number }
   | { type: "setFundPriceShift"; pct: number }
   | { type: "setCustomer"; patch: Partial<CustomerProfile> }

@@ -1,11 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import type { PreviewState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
-import { STORAGE_KEY, initialPreviewState, previewReducer } from "./reducer";
+import { initialPreviewState, previewReducer } from "./reducer";
+import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, type WorldPayload } from "./server-sync";
+import { hydrateMarket } from "../data/market";
+import { usePersonaCif } from "@/providers/context";
 import { usePanelActive } from "@/components/shell/PanelActive";
 
 /** Window event the shell's edge-swipe back fires on /goals-preview (see AppChrome). */
@@ -28,49 +31,102 @@ interface PreviewContextValue {
   dispatch: (action: PreviewAction) => void;
   nav: PreviewNav;
   toast: (message: string, tone?: ToastTone) => void;
-  /** False until localStorage has been read (avoid flashing default data). */
+  /** False until the first server world has loaded (avoid flashing default data). */
   hydrated: boolean;
 }
 
 const PreviewContext = createContext<PreviewContextValue | null>(null);
 
-function isPreviewState(value: unknown): value is PreviewState {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Partial<PreviewState>;
-  return v.version === 1 && Array.isArray(v.goals) && Array.isArray(v.nav?.stack) && v.nav.stack.length > 0 && !!v.clock?.today;
-}
-
-function useHydrated(dispatch: (a: PreviewAction) => void, entryScreen?: ScreenId): boolean {
+/**
+ * Loads the server world for the active persona, then keeps every business action in sync:
+ * the local reducer runs first (the UI never waits) and the action is queued to the server.
+ * The old `goals-preview:v1` localStorage key is no longer read or written (and not deleted).
+ */
+function useServerWorld(
+  rawDispatch: (a: PreviewAction) => void,
+  stateRef: MutableRefObject<PreviewState>,
+  cif: string | null,
+  entryScreen?: ScreenId,
+): { hydrated: boolean; dispatch: (a: PreviewAction) => void } {
   const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        if (isPreviewState(parsed)) dispatch({ type: "hydrate", state: { ...parsed, toasts: [] } });
+  const queueRef = useRef<ActionQueue | null>(null);
+  const cancelPollRef = useRef<(() => void) | null>(null);
+
+  const applyPayload = useCallback(
+    (payload: WorldPayload) => {
+      hydrateMarket(payload.market.instruments);
+      rawDispatch({ type: "world/sync", world: payload.world });
+      if (payload.market.refreshing && !cancelPollRef.current) {
+        cancelPollRef.current = pollMarket(
+          () => {
+            const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, ...world } = stateRef.current;
+            rawDispatch({ type: "world/sync", world });
+          },
+          () => {
+            cancelPollRef.current = null;
+          },
+        );
       }
-    } catch {
-      // Corrupt or blocked storage: keep the default scenario.
+    },
+    [rawDispatch, stateRef],
+  );
+
+  useEffect(() => {
+    let alive = true;
+    queueRef.current?.dispose();
+    queueRef.current = null;
+    cancelPollRef.current?.();
+    cancelPollRef.current = null;
+    if (entryScreen) rawDispatch({ type: "nav/reset", screen: entryScreen });
+    if (!cif) {
+      setHydrated(true);
+      return;
     }
-    if (entryScreen) dispatch({ type: "nav/reset", screen: entryScreen });
-    setHydrated(true);
-  }, [dispatch, entryScreen]);
-  return hydrated;
+    fetchWorld(cif)
+      .then((payload) => {
+        if (!alive) return;
+        applyPayload(payload);
+        queueRef.current = new ActionQueue(cif, {
+          onWorld: applyPayload,
+          onError: (message) => {
+            const last = stateRef.current.toasts[stateRef.current.toasts.length - 1];
+            if (last?.message !== message) rawDispatch({ type: "toast/push", message, tone: "error" });
+          },
+          onInfo: (message) => rawDispatch({ type: "toast/push", message, tone: "warning" }),
+        });
+      })
+      .catch(() => {
+        if (alive) rawDispatch({ type: "toast/push", message: "Không tải được dữ liệu mục tiêu.", tone: "error" });
+      })
+      .finally(() => {
+        if (alive) setHydrated(true);
+      });
+    return () => {
+      alive = false;
+      queueRef.current?.dispose();
+      queueRef.current = null;
+      cancelPollRef.current?.();
+    };
+  }, [cif, entryScreen, rawDispatch, applyPayload, stateRef]);
+
+  const dispatch = useCallback(
+    (action: PreviewAction) => {
+      rawDispatch(action);
+      if (!isLocalOnlyAction(action)) queueRef.current?.enqueue(action);
+    },
+    [rawDispatch],
+  );
+
+  return { hydrated, dispatch };
 }
 
 export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
   const active = usePanelActive();
-  const [state, dispatch] = useReducer(previewReducer, undefined, initialPreviewState);
-  const hydrated = useHydrated(dispatch, entryScreen);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, toasts: [] }));
-    } catch {
-      // Storage full / disabled: the prototype still works in memory.
-    }
-  }, [state, hydrated]);
+  const cif = usePersonaCif();
+  const [state, rawDispatch] = useReducer(previewReducer, undefined, initialPreviewState);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const { hydrated, dispatch } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
 
   useEffect(() => {
     const onBack = (event: Event) => {
@@ -80,23 +136,23 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
     };
     window.addEventListener(PREVIEW_BACK_EVENT, onBack);
     return () => window.removeEventListener(PREVIEW_BACK_EVENT, onBack);
-  }, [active, state.nav.stack.length]);
+  }, [active, state.nav.stack.length, dispatch]);
 
   const stack = state.nav.stack;
-  const updateParams = useCallback((params: ScreenParams) => dispatch({ type: "nav/params", params }), []);
-  const push = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/push", screen, params }), []);
-  const replace = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/replace", screen, params }), []);
-  const pop = useCallback((count?: number) => dispatch({ type: "nav/pop", count }), []);
-  const popTo = useCallback((screen: ScreenId) => dispatch({ type: "nav/popTo", screen }), []);
-  const reset = useCallback((screen?: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/reset", screen, params }), []);
-  const toast = useCallback((message: string, tone?: ToastTone) => dispatch({ type: "toast/push", message, tone }), []);
+  const updateParams = useCallback((params: ScreenParams) => dispatch({ type: "nav/params", params }), [dispatch]);
+  const push = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/push", screen, params }), [dispatch]);
+  const replace = useCallback((screen: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/replace", screen, params }), [dispatch]);
+  const pop = useCallback((count?: number) => dispatch({ type: "nav/pop", count }), [dispatch]);
+  const popTo = useCallback((screen: ScreenId) => dispatch({ type: "nav/popTo", screen }), [dispatch]);
+  const reset = useCallback((screen?: ScreenId, params?: ScreenParams) => dispatch({ type: "nav/reset", screen, params }), [dispatch]);
+  const toast = useCallback((message: string, tone?: ToastTone) => dispatch({ type: "toast/push", message, tone }), [dispatch]);
 
   const nav = useMemo<PreviewNav>(
     () => ({ stack, current: stack[stack.length - 1], canGoBack: stack.length > 1, updateParams, push, replace, pop, popTo, reset }),
     [stack, updateParams, push, replace, pop, popTo, reset],
   );
 
-  const value = useMemo(() => ({ state, dispatch, nav, toast, hydrated }), [state, nav, toast, hydrated]);
+  const value = useMemo(() => ({ state, dispatch, nav, toast, hydrated }), [state, dispatch, nav, toast, hydrated]);
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }
 
