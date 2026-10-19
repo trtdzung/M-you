@@ -6,7 +6,7 @@ import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
 import { initialPreviewState, previewReducer } from "./reducer";
-import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, requestMarketRefresh, type WorldPayload } from "./server-sync";
+import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, requestMarketRefresh, type GoalIdResolution, type WorldPayload } from "./server-sync";
 import { hydrateMarket } from "../data/market";
 import { usePersonaCif } from "@/providers/context";
 import { usePanelActive } from "@/components/shell/PanelActive";
@@ -122,9 +122,9 @@ function useServerWorld(
   }, []);
 
   const applyPayload = useCallback(
-    (payload: WorldPayload) => {
+    (payload: WorldPayload, ids?: GoalIdResolution) => {
       hydrateMarket(payload.market.instruments);
-      rawDispatch({ type: "world/sync", world: payload.world });
+      rawDispatch({ type: "world/sync", world: payload.world, goalIdMap: ids?.goalIdMap, unsavedGoalIds: ids?.unsavedGoalIds });
       if (cif) loadSuggestions(cif);
       if (payload.market.refreshing && !cancelPollRef.current) {
         cancelPollRef.current = pollMarket(
@@ -188,12 +188,14 @@ function useServerWorld(
       const local = isLocalOnlyAction(action);
       // No server world yet (loading / failed): business actions are locked, nothing runs locally or is queued.
       if (!local && !queueRef.current) return;
+      // The temporary id the reducer gives a new goal (pure reducer: same result as the dispatch below).
+      const localGoalId = action.type === "createGoal" ? previewReducer(stateRef.current, action).lastCreatedGoalId : undefined;
       rawDispatch(action);
-      if (!local) queueRef.current?.enqueue(action);
+      if (!local) queueRef.current?.enqueue(action, localGoalId);
       // "Để sau" / "Ẩn gợi ý": the server hides the suggestion for 7 days.
       if (action.type === "dismissSuggestion" && cif) postSuggestionEvent(cif, action.id, "dismissed");
     },
-    [rawDispatch, cif],
+    [rawDispatch, stateRef, cif],
   );
 
   const recordSuggestionEvent = useCallback(

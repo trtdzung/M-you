@@ -31,7 +31,8 @@ export interface GoalsV2Snapshot {
   market: GoalsV2Market;
 }
 
-export type GoalsV2ActionResult = ({ ok: true } & GoalsV2Snapshot) | ({ ok: false; error: string } & GoalsV2Snapshot);
+/** `createdGoalId`: id mục tiêu server tạo cho `createGoal` (cả khi gửi lại cùng `requestId`). */
+export type GoalsV2ActionResult = ({ ok: true; createdGoalId?: string } & GoalsV2Snapshot) | ({ ok: false; error: string } & GoalsV2Snapshot);
 
 // --- Danh sách cho phép (F1) ------------------------------------------------
 // Server chỉ nhận thao tác nghiệp vụ liệt kê tường minh dưới đây; `world/sync`, `hydrate`,
@@ -311,14 +312,14 @@ function worldUnchanged(prev: PreviewState, next: PreviewState): boolean {
   );
 }
 
-function logAction(cif: string, requestId: string, actionType: string): void {
+function logAction(cif: string, requestId: string, actionType: string, createdGoalId: string | null = null): void {
   goalsV2Db()
-    .prepare("INSERT OR IGNORE INTO gv2_action_log (cif, request_id, action_type, created_at) VALUES (?, ?, ?, ?)")
-    .run(cif, requestId, actionType, new Date().toISOString());
+    .prepare("INSERT OR IGNORE INTO gv2_action_log (cif, request_id, action_type, created_at, created_goal_id) VALUES (?, ?, ?, ?, ?)")
+    .run(cif, requestId, actionType, new Date().toISOString(), createdGoalId);
 }
 
 /** Kết quả trong transaction: ghi xong, hoặc reducer / kiểm số dư từ chối (không ghi gì). */
-type Outcome = { ok: true } | { ok: false; error: string };
+type Outcome = { ok: true; createdGoalId?: string } | { ok: false; error: string };
 
 /**
  * Áp một thao tác của khách. `action` từ client được kiểm bằng `parseGoalAction` (F1).
@@ -335,8 +336,13 @@ export function applyAction(cif: string, requestId: string, rawAction: unknown):
 
   const outcome = db
     .transaction((): Outcome => {
-      const seen = db.prepare("SELECT 1 AS x FROM gv2_action_log WHERE cif = ? AND request_id = ?").get(cif, requestId);
-      if (seen) return { ok: true };
+      const seen = db
+        .prepare("SELECT created_goal_id FROM gv2_action_log WHERE cif = ? AND request_id = ?")
+        .get(cif, requestId) as { created_goal_id: string | null } | undefined;
+      if (seen) {
+        // Gửi lại cùng `requestId`: trả lại id mục tiêu đã tạo lần đầu (N2).
+        return action.type === "createGoal" && seen.created_goal_id ? { ok: true, createdGoalId: seen.created_goal_id } : { ok: true };
+      }
 
       if (action.type === "advanceTime") {
         advanceGoalClock(cif, action.days);
@@ -361,11 +367,13 @@ export function applyAction(cif: string, requestId: string, rawAction: unknown):
         if (err instanceof GoalInsufficientFundsError) return { ok: false, error: err.message };
         throw err;
       }
-      logAction(cif, requestId, action.type);
-      return { ok: true };
+      const createdGoalId = action.type === "createGoal" ? next.lastCreatedGoalId : undefined;
+      logAction(cif, requestId, action.type, createdGoalId ?? null);
+      return createdGoalId ? { ok: true, createdGoalId } : { ok: true };
     })
     .immediate();
 
   const world = db.transaction(() => loadAndCatchUp(cif)).immediate();
-  return outcome.ok ? { ok: true, world, market } : { ok: false, error: outcome.error, world, market };
+  if (!outcome.ok) return { ok: false, error: outcome.error, world, market };
+  return outcome.createdGoalId ? { ok: true, createdGoalId: outcome.createdGoalId, world, market } : { ok: true, world, market };
 }

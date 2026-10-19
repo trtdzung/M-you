@@ -134,6 +134,8 @@ export function ensureGoalV2Tables(db: Database.Database): void {
   db.exec(GOAL_V2_TABLES_SQL);
   const cols = db.prepare("PRAGMA table_info(gv2_meta)").all() as { name: string }[];
   if (!cols.some((c) => c.name === "risk_profile_asked_at")) db.exec("ALTER TABLE gv2_meta ADD COLUMN risk_profile_asked_at TEXT");
+  const logCols = db.prepare("PRAGMA table_info(gv2_action_log)").all() as { name: string }[];
+  if (!logCols.some((c) => c.name === "created_goal_id")) db.exec("ALTER TABLE gv2_action_log ADD COLUMN created_goal_id TEXT");
 }
 
 const ready = new WeakSet<Database.Database>();

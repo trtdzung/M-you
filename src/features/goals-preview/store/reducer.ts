@@ -136,33 +136,43 @@ function navReducer(state: PreviewState, action: PreviewAction): PreviewState | 
   }
 }
 
-/** Replaces the data part with the server world; if the local draft id is unknown there, follows the server's newest draft. */
-function syncWorld(state: PreviewState, world: WorldState): PreviewState {
+/**
+ * Replaces the data part with the server world. Temporary goal ids follow `goalIdMap` (from the createGoal
+ * responses, never guessed). A screen whose param is an unsaved goal id — or a lastCreatedGoalId the server world
+ * does not have and the map does not resolve — is dropped with every screen above it.
+ */
+function syncWorld(state: PreviewState, world: WorldState, goalIdMap: Record<string, string> = {}, unsavedGoalIds: readonly string[] = []): PreviewState {
+  const mapId = (value: string) => (Object.hasOwn(goalIdMap, value) ? goalIdMap[value] : value);
+  const last = state.lastCreatedGoalId;
+  const lastLost = last !== undefined && (unsavedGoalIds.includes(last) || (!Object.hasOwn(goalIdMap, last) && !world.goals.some((g) => g.id === last)));
+  const lost = (value: unknown) => typeof value === "string" && (unsavedGoalIds.includes(value) || (lastLost && value === last));
+
+  const cut = state.nav.stack.findIndex((item) => Object.values(item.params).some(lost));
+  const mapped = (value: unknown) => typeof value === "string" && Object.hasOwn(goalIdMap, value);
+  let navSeq = state.navSeq;
   let nav = state.nav;
-  let lastCreatedGoalId = state.lastCreatedGoalId;
-  if (lastCreatedGoalId && !world.goals.some((g) => g.id === lastCreatedGoalId)) {
-    const oldId = lastCreatedGoalId;
-    const drafts = world.goals.filter((g) => g.status === "draft");
-    const newId = drafts.length > 0 ? drafts[drafts.length - 1].id : undefined;
-    if (newId) {
-      nav = {
-        stack: state.nav.stack.map((item) => {
-          if (!Object.values(item.params).includes(oldId)) return item;
-          const params: ScreenParams = {};
-          for (const [key, value] of Object.entries(item.params)) params[key] = value === oldId ? newId : value;
-          return { ...item, params };
-        }),
-      };
-    }
-    lastCreatedGoalId = newId;
+  if (cut === 0) {
+    // Nothing left below the dropped screen: back to the goal list.
+    navSeq = (navSeq ?? 0) + 1;
+    nav = { stack: [entry(navSeq, "GoalList")] };
+  } else if (cut > 0 || state.nav.stack.some((item) => Object.values(item.params).some(mapped))) {
+    const kept = cut > 0 ? state.nav.stack.slice(0, cut) : state.nav.stack;
+    nav = {
+      stack: kept.map((item) => {
+        if (!Object.values(item.params).some(mapped)) return item;
+        const params: ScreenParams = {};
+        for (const [key, value] of Object.entries(item.params)) params[key] = typeof value === "string" ? mapId(value) : value;
+        return { ...item, params };
+      }),
+    };
   }
   return {
     ...world,
     nav,
-    navSeq: state.navSeq,
+    navSeq,
     toasts: state.toasts,
     dismissedSuggestionIds: state.dismissedSuggestionIds,
-    lastCreatedGoalId,
+    lastCreatedGoalId: last === undefined || lastLost ? undefined : mapId(last),
   };
 }
 
@@ -177,7 +187,7 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       return action.state;
 
     case "world/sync":
-      return syncWorld(state, action.world);
+      return syncWorld(state, action.world, action.goalIdMap, action.unsavedGoalIds);
 
     case "reset": {
       const next = stateFromScenario(state.scenarioId);

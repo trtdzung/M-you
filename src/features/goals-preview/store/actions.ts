@@ -39,8 +39,12 @@ export type PreviewAction =
   | { type: "loadScenario"; scenarioId: string; jump?: boolean }
   | { type: "reset" }
   | { type: "hydrate"; state: PreviewState }
-  /** Server world replaces the data part; nav, toasts, dismissals and lastCreatedGoalId are kept. */
-  | { type: "world/sync"; world: WorldState }
+  /**
+   * Server world replaces the data part; nav, toasts and dismissals are kept. `goalIdMap` (temporary → server
+   * goal id) and `unsavedGoalIds` come from the createGoal responses: nav params and lastCreatedGoalId follow the
+   * map, screens pointing at an unsaved goal are dropped.
+   */
+  | { type: "world/sync"; world: WorldState; goalIdMap?: Record<string, string>; unsavedGoalIds?: string[] }
   | { type: "advanceTime"; days: number }
   | { type: "setFundPriceShift"; pct: number }
   | { type: "setRiskProfile"; profile: RiskProfile }

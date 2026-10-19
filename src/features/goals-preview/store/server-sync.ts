@@ -48,7 +48,9 @@ export async function requestMarketRefresh(): Promise<MarketPayload> {
   return (await res.json()) as MarketPayload;
 }
 
-type ActionResult = { ok: true; payload: WorldPayload } | { ok: false; error: string; payload: WorldPayload | null };
+type ActionResult =
+  | { ok: true; payload: WorldPayload; createdGoalId?: string }
+  | { ok: false; error: string; payload: WorldPayload | null };
 
 async function postAction(cif: string, requestId: string, action: PreviewAction): Promise<ActionResult> {
   const res = await fetch(`${BASE}/actions`, {
@@ -56,7 +58,13 @@ async function postAction(cif: string, requestId: string, action: PreviewAction)
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cif, requestId, action }),
   });
-  if (res.ok) return { ok: true, payload: (await res.json()) as WorldPayload };
+  if (res.ok) {
+    const body = (await res.json()) as WorldPayload & { createdGoalId?: unknown };
+    const payload: WorldPayload = { world: body.world, market: body.market };
+    return typeof body.createdGoalId === "string" && body.createdGoalId !== ""
+      ? { ok: true, payload, createdGoalId: body.createdGoalId }
+      : { ok: true, payload };
+  }
   if (res.status === 422) {
     const body = (await res.json().catch(() => null)) as (Partial<WorldPayload> & { error?: string }) | null;
     const payload = body?.world && body.market ? ({ world: body.world, market: body.market } as WorldPayload) : null;
@@ -67,9 +75,38 @@ async function postAction(cif: string, requestId: string, action: PreviewAction)
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** How the client's temporary goal ids resolved: created on the server (local → server id), or not saved. */
+export interface GoalIdResolution {
+  goalIdMap: Record<string, string>;
+  unsavedGoalIds: string[];
+}
+
+type IdCheck = (value: string) => boolean;
+
+/** True when a string value at level 1 of the action (or level 2 inside an object/array field) matches. */
+function referencesId(action: PreviewAction, match: IdCheck): boolean {
+  for (const value of Object.values(action)) {
+    if (typeof value === "string" && match(value)) return true;
+    if (value && typeof value === "object" && Object.values(value).some((inner) => typeof inner === "string" && match(inner))) return true;
+  }
+  return false;
+}
+
+/** Replaces temporary goal ids (level 1, and level 2 inside an object/array field) with the server ids. */
+function mapGoalIds(action: PreviewAction, map: Record<string, string>): PreviewAction {
+  const swap = (value: unknown) => (typeof value === "string" && Object.hasOwn(map, value) ? map[value] : value);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(action)) {
+    if (Array.isArray(value)) out[key] = value.map(swap);
+    else if (value && typeof value === "object") out[key] = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, swap(v)]));
+    else out[key] = swap(value);
+  }
+  return out as unknown as PreviewAction;
+}
+
 export interface SyncHandlers {
-  /** Replace the data part of the store with the server world (also rehydrates the market list). */
-  onWorld: (payload: WorldPayload) => void;
+  /** Replace the data part of the store with the server world (also rehydrates the market list) and resolve temporary goal ids. */
+  onWorld: (payload: WorldPayload, ids: GoalIdResolution) => void;
   onError: (message: string) => void;
   onInfo: (message: string) => void;
 }
@@ -84,6 +121,10 @@ export class ActionQueue {
   private pending = 0;
   private latest: WorldPayload | null = null;
   private generation = 0;
+  /** Temporary goal id → server id, from each accepted `createGoal` response (never guessed). */
+  private goalIdMap: Record<string, string> = {};
+  /** Temporary goal ids whose `createGoal` was rejected or never got through. */
+  private unsavedGoalIds = new Set<string>();
 
   constructor(private cif: string, private handlers: SyncHandlers) {}
 
@@ -91,28 +132,44 @@ export class ActionQueue {
   dispose(): void {
     this.generation += 1;
     this.latest = null;
+    this.goalIdMap = {};
+    this.unsavedGoalIds.clear();
   }
 
-  enqueue(action: PreviewAction): void {
+  /** `localGoalId`: the temporary id the client reducer gave the goal of a `createGoal`. */
+  enqueue(action: PreviewAction, localGoalId?: string): void {
     const gen = this.generation;
     const requestId = crypto.randomUUID();
     this.pending += 1;
-    this.tail = this.tail.then(() => this.run(gen, requestId, action)).catch(() => undefined);
+    this.tail = this.tail.then(() => this.run(gen, requestId, action, localGoalId)).catch(() => undefined);
   }
 
-  private async run(gen: number, requestId: string, action: PreviewAction): Promise<void> {
+  /** Records the outcome of a `createGoal`: server id when accepted with one, otherwise "not saved". */
+  private resolveCreate(localGoalId: string | undefined, createdGoalId: string | undefined): void {
+    if (!localGoalId) return;
+    if (createdGoalId) this.goalIdMap[localGoalId] = createdGoalId;
+    else this.unsavedGoalIds.add(localGoalId);
+  }
+
+  private async run(gen: number, requestId: string, queued: PreviewAction, localGoalId?: string): Promise<void> {
     try {
       if (gen !== this.generation) return;
+      // A later action that points at a goal that was never saved is not sent.
+      if (referencesId(queued, (id) => this.unsavedGoalIds.has(id))) return;
+      const action = mapGoalIds(queued, this.goalIdMap);
+      const isCreate = action.type === "createGoal";
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
         try {
           const result = await postAction(this.cif, requestId, action);
           if (gen !== this.generation) return;
           if (result.payload) this.latest = result.payload;
+          if (isCreate) this.resolveCreate(localGoalId, result.ok ? result.createdGoalId : undefined);
           if (!result.ok) this.handlers.onError(result.error);
           return;
         } catch {
           if (gen !== this.generation) return;
           if (attempt === MAX_ATTEMPTS) {
+            if (isCreate) this.resolveCreate(localGoalId, undefined);
             this.handlers.onError("Không lưu được thay đổi. Vui lòng thử lại.");
             // Show what is actually saved; if this GET fails too, keep the local state.
             try {
@@ -131,8 +188,12 @@ export class ActionQueue {
       this.pending -= 1;
       if (this.pending === 0 && this.latest && gen === this.generation) {
         const payload = this.latest;
+        const ids: GoalIdResolution = { goalIdMap: this.goalIdMap, unsavedGoalIds: [...this.unsavedGoalIds] };
+        // The store switches to server ids on this sync; later actions already carry them.
         this.latest = null;
-        this.handlers.onWorld(payload);
+        this.goalIdMap = {};
+        this.unsavedGoalIds.clear();
+        this.handlers.onWorld(payload, ids);
       }
     }
   }
