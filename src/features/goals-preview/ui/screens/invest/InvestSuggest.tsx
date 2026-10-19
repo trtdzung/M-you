@@ -3,14 +3,15 @@
 import { useState } from "react";
 import { PiggyBank, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatVnd } from "@/features/goals-preview/format-money";
+import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
 import { cashBuffer, daysBetween, fundPriceAt, goalAccount, idleCash, investSuggestions, monthsLeft, addMonths, type InvestSuggestion } from "../../../engine";
 import { RISK_LEVEL_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
-import { Amount, BottomActions, EmptyState, ScreenHeader, SourceTag } from "../../shared";
-import { card, hint, infoBox, primaryButton, ring, screenPadding, sectionTitle, warningBox } from "../../shared/styles";
+import { BottomActions, EmptyState, ScreenHeader } from "../../shared";
+import { InfoTooltip } from "../../shared/InfoTooltip";
+import { card, heroNumber, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { dateVi, findGoal } from "../assets/helpers";
 
 interface Projection {
@@ -29,7 +30,7 @@ function project(s: InvestSuggestion, amount: number, today: string, targetDate:
     const past = fundPriceAt(product, addMonths(today, -12), 0);
     const r = past > 0 ? Math.max(-20, Math.min(30, ((now / past - 1) * 100))) : 0;
     const days = Math.max(0, daysBetween(today, targetDate));
-    return { returnPa: r, returnLabel: `${(Math.round(r * 10) / 10).toString().replace(".", ",")}%/năm (theo 12 tháng gần nhất)`, endDate: targetDate, invested: Math.round(amount * (1 + (r / 100) * (days / 365))) };
+    return { returnPa: r, returnLabel: `≈ ${(Math.round(r * 10) / 10).toString().replace(".", ",")}%/năm`, endDate: targetDate, invested: Math.round(amount * (1 + (r / 100) * (days / 365))) };
   }
   const rate = s.ratePa ?? 0;
   const end = s.maturityDate ?? targetDate;
@@ -74,85 +75,96 @@ export function InvestSuggest({ params }: ScreenProps) {
     );
   }
 
-  const current = suggestions[Math.min(selected, suggestions.length - 1)];
-  const amount = current.suggestedAmount;
-  const proj = project(current, amount, today, goal.targetDate, state.market.fundPriceShiftPct);
   const holdRate = account?.interestRatePa ?? 0;
-  const holdDays = Math.max(0, daysBetween(today, proj.endDate));
-  const hold = Math.round(amount * (1 + (holdRate / 100) * (holdDays / 365)));
+  const view = suggestions.map((s) => {
+    const p = project(s, s.suggestedAmount, today, goal.targetDate, state.market.fundPriceShiftPct);
+    const hold = Math.round(s.suggestedAmount * (1 + (holdRate / 100) * (Math.max(0, daysBetween(today, p.endDate)) / 365)));
+    const fund = getInvestProduct(s.productId)?.kind === "fund";
+    const partial = s.suggestedAmount < idle;
+    const tip = [
+      s.reason,
+      partial ? `Chỉ nên đưa một phần (${formatVnd(s.suggestedAmount)}) vào quỹ để hạn chế biến động.` : "",
+      s.caution ?? "",
+      `So với để trong tài khoản (${String(holdRate).replace(".", ",")}%/năm) đến ${dateVi(p.endDate)}: ${formatVnd(hold)} → ${formatVnd(p.invested)}.`,
+    ].filter(Boolean).join(" ");
+    return { s, p, gain: p.invested - hold, fund, tip };
+  });
+  const index = Math.min(selected, suggestions.length - 1);
+  const current = suggestions[index];
 
   return (
     <div className={screenPadding}>
       <ScreenHeader title="Gợi ý đầu tư" subtitle={goal.name} />
 
-      <section className={cn(card, "flex flex-col gap-2")}>
-        <p className="text-[13px] text-muted">Tiền nhàn rỗi có thể đầu tư</p>
-        <Amount amount={idle} source="msb" className="text-3xl font-bold" />
-        <p className={hint}>
-          Số dư tài khoản mục tiêu là {formatVnd(account?.balance ?? 0)}, trừ khoản cần giữ lại {formatVnd(buffer)} cho các kỳ tích luỹ sắp tới. Còn {months} tháng đến ngày mục tiêu ({dateVi(goal.targetDate)}).
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-3" aria-label="Sản phẩm gợi ý">
-        <h2 className={sectionTitle}>Phù hợp với thời gian còn lại</h2>
-        {suggestions.map((s, i) => {
-          const p = project(s, s.suggestedAmount, today, goal.targetDate, state.market.fundPriceShiftPct);
-          const active = i === Math.min(selected, suggestions.length - 1);
-          const Icon = getInvestProduct(s.productId)?.kind === "fund" ? TrendingUp : PiggyBank;
-          return (
-            <button
-              key={`${s.productId}-${s.termMonths ?? 0}`}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => setSelected(i)}
-              className={cn("flex min-h-14 w-full flex-col gap-2 rounded-card border-2 bg-surface p-4 text-left shadow-card", ring, active ? "border-primary" : "border-transparent")}
-            >
-              <span className="flex items-center gap-2">
-                <Icon size={20} className="text-primary-strong" aria-hidden />
-                <span className="flex-1 text-[15px] font-semibold text-text">{s.title}</span>
-                <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-muted">{RISK_LEVEL_LABEL[s.riskLevel]}</span>
-              </span>
-              <span className="flex items-center gap-1.5 text-sm text-text">
-                Lợi suất dự kiến: <b>{p.returnLabel}</b> <SourceTag source={s.estimatedAtMaturity ? "msb" : "estimated"} />
-              </span>
-              {s.maturityDate && <span className="text-[13px] text-muted">Đáo hạn {dateVi(s.maturityDate)}, trước ngày mục tiêu {dateVi(goal.targetDate)}</span>}
-              <span className="text-[13px] leading-5 text-muted">
-                <b className="text-text">Vì sao phù hợp:</b> {s.reason}
-              </span>
-              <span className="text-[13px] text-muted">Gợi ý đầu tư: {formatVnd(s.suggestedAmount)}</span>
-              {s.caution && <span className="text-[12px] leading-4 text-muted">{s.caution}</span>}
-            </button>
-          );
-        })}
-      </section>
-
-      <section className={cn(card, "flex flex-col gap-2")}>
-        <h2 className={sectionTitle}>Giữ tiền hay đầu tư?</h2>
-        <p className={hint}>
-          Với {formatVnd(amount)}, tính đến {dateVi(proj.endDate)}:
-        </p>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-2xl bg-surface-muted/70 p-3">
-            <p className="text-[12px] text-muted">Giữ trong tài khoản ({String(holdRate).replace(".", ",")}%/năm)</p>
-            <Amount amount={hold} source="estimated" className="mt-1 flex-wrap font-semibold" />
-          </div>
-          <div className="rounded-2xl bg-primary-soft p-3">
-            <p className="text-[12px] text-primary-strong">Đầu tư {current.title}</p>
-            <Amount amount={proj.invested} source="estimated" className="mt-1 flex-wrap font-semibold" />
-          </div>
+      <section className={cn(card, "flex flex-col gap-1")}>
+        <div className="flex items-center gap-1">
+          <p className="text-[13px] text-muted">Tiền nhàn rỗi có thể đầu tư</p>
+          <InfoTooltip
+            label="cách tính tiền nhàn rỗi"
+            text={`Số dư tài khoản mục tiêu ${formatVnd(account?.balance ?? 0)}, giữ lại ${formatVnd(buffer)} cho các kỳ tích luỹ sắp tới. Còn ${months} tháng đến ngày mục tiêu (${dateVi(goal.targetDate)}).`}
+          />
         </div>
-        <p className="text-sm text-text">
-          Chênh lệch dự kiến:{" "}
-          <b className={proj.invested - hold >= 0 ? "text-positive" : "text-negative"}>
-            {proj.invested - hold >= 0 ? "+" : ""}
-            {formatVnd(proj.invested - hold)}
-          </b>
-        </p>
+        <p className={heroNumber}>{formatVndCompact(idle)}</p>
       </section>
 
-      <p className={warningBox}>Lợi suất là dự kiến, không cam kết. Giá trị đầu tư có thể thay đổi, riêng quỹ có thể giảm giá.</p>
-      <p className={infoBox}>Đầu tư xong, tiền chuyển từ tài khoản mục tiêu sang tài sản của cùng mục tiêu. Giá trị mục tiêu của bạn không đổi.</p>
+      <section className="flex flex-col gap-3" aria-label="Chọn sản phẩm">
+        <h2 className={sectionTitle}>Chọn một sản phẩm</h2>
+        <div role="radiogroup" aria-label="Sản phẩm gợi ý" className="flex flex-col gap-3">
+          {view.map(({ s, p, gain, fund, tip }, i) => {
+            const active = i === index;
+            const Icon = fund ? TrendingUp : PiggyBank;
+            return (
+              <section key={`${s.productId}-${s.termMonths ?? 0}`} className="relative">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setSelected(i)}
+                  className={cn(
+                    "flex w-full flex-col gap-1.5 rounded-card border-2 bg-surface p-4 pr-12 text-left shadow-card transition-colors",
+                    ring,
+                    active ? "border-primary" : "border-transparent",
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2", active ? "border-primary" : "border-border")}
+                    >
+                      {active && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
+                    </span>
+                    <Icon size={18} className="shrink-0 text-primary-strong" aria-hidden />
+                    <span className="text-[16px] font-semibold text-text">{s.title}</span>
+                  </span>
+                  <span className="pl-7 text-[13px] text-muted">
+                    {p.returnLabel} · {s.maturityDate ? `đáo hạn ${dateVi(s.maturityDate).slice(3)}` : fund ? "giá thay đổi hằng ngày" : "rút được mọi lúc"} · {RISK_LEVEL_LABEL[s.riskLevel].toLowerCase()}
+                  </span>
+                  <span className="pl-7 text-sm text-text">Đầu tư {formatVndCompact(s.suggestedAmount)}</span>
+                  <span className="pl-7 text-sm text-text">
+                    Dự kiến{" "}
+                    <b className={gain >= 0 ? "text-positive" : "text-negative"}>
+                      {gain >= 0 ? "+" : ""}
+                      {formatVndCompact(gain)}
+                    </b>{" "}
+                    sau {s.termMonths ?? monthsLeft(today, p.endDate)} tháng
+                  </span>
+                </button>
+                <span className="absolute right-3 top-3">
+                  <InfoTooltip label={`chi tiết ${s.title}`} text={tip} warning={fund} />
+                </span>
+              </section>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="flex items-center gap-1 px-1" aria-label="Lưu ý">
+        <p className="text-[13px] text-muted">Lợi suất là dự kiến, không cam kết.</p>
+        <InfoTooltip
+          label="lưu ý khi đầu tư"
+          text="Giá trị đầu tư có thể thay đổi, riêng quỹ có thể giảm giá. Đầu tư xong, tiền chuyển từ tài khoản mục tiêu sang tài sản của cùng mục tiêu, giá trị mục tiêu không đổi."
+        />
+      </section>
 
       <BottomActions>
         <button
@@ -160,7 +172,7 @@ export function InvestSuggest({ params }: ScreenProps) {
           className={primaryButton}
           onClick={() => nav.push("InvestConfirm", { goalId: goal.id, productId: current.productId, amount: current.suggestedAmount, termMonths: current.termMonths })}
         >
-          Chọn {current.title}
+          Đầu tư {formatVndCompact(current.suggestedAmount)}
         </button>
       </BottomActions>
     </div>
