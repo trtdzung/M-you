@@ -287,7 +287,6 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
         const goal = stateRef.current.goals.find((item) => item.id === record.goalId);
         if (!goal) continue;
         const product = loanProductFor(loanPurposeFor(goal.template));
-        dispatch({ type: "toast/push", message: "Hồ sơ được phê duyệt thành công", tone: "success" });
         dispatch({ type: "takeLoan", goalId: record.goalId, productId: product.id, principal: record.principal, termMonths: record.termMonths });
       }
       savePendingLoans(records.filter((record) => !due.includes(record)));
