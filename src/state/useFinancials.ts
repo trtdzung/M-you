@@ -7,7 +7,7 @@
  * loaded once per persona; derived figures recompute on period/correction change.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Transaction } from "@/domain/models";
 import { computeFinancials, type Financials, type RawData } from "@/domain/engine/finance-compose";
 import { transferNow } from "@/lib/demo-clock";
@@ -26,6 +26,8 @@ export type { Financials, RawData } from "@/domain/engine/finance-compose";
 export interface UseFinancialsResult {
   loading: boolean;
   error: boolean;
+  /** Re-run the provider load (clears `error`, sets `loading` again). */
+  retry: () => void;
   raw: RawData | null;
   /**
    * The spend-truth view: provider + manual txns, category
@@ -68,6 +70,8 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
   const [raw, setRaw] = useState<RawData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
     let active = true;
@@ -98,7 +102,7 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
     return () => {
       active = false;
     };
-  }, [providers]);
+  }, [providers, reloadKey]);
 
   // List view: provider + manual txns, category overrides applied, hidden kept.
   const allTransactions = useMemo(
@@ -137,5 +141,5 @@ export function useFinancials(monthOverride?: string): UseFinancialsResult {
     [raw, transactions, month, jarConfig, userAssets, userLiabilities, userGoals, categories],
   );
 
-  return { loading, error, raw, transactions, allTransactions, financials };
+  return { loading, error, retry, raw, transactions, allTransactions, financials };
 }

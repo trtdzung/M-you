@@ -43,6 +43,10 @@ interface CorrectionsContextValue {
   corrections: Corrections;
   /** True once the persona's stored overlay has loaded from the server. */
   loaded: boolean;
+  /** True when the stored overlay could not be read; cleared by `retry` / persona switch. */
+  error: boolean;
+  /** Re-run the overlay load for the current persona. */
+  retry: () => void;
   setCategory: (txnId: string, categoryId: string) => void;
   setHidden: (txnId: string, hidden: boolean) => void;
   clearCategory: (txnId: string) => void;
@@ -113,6 +117,8 @@ export function CorrectionsProvider({ children }: { children: React.ReactNode })
   const cif = persona.cif;
   const [corrections, setCorrections] = useState<Corrections>({});
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [unsaved, setUnsaved] = useState(false);
   const stateRef = useRef<Corrections>({});
   const cifRef = useRef(cif);
@@ -129,23 +135,32 @@ export function CorrectionsProvider({ children }: { children: React.ReactNode })
     });
   }, []);
 
-  // Load on mount and on persona switch. Reset FIRST so the previous persona's
-  // overlay never lingers while the new one loads.
+  // Load on mount, persona switch and retry. A persona switch resets FIRST so the
+  // previous persona's overlay never lingers while the new one loads. A retry (same
+  // persona) keeps the local overlay and `unsaved`: edits made while the load had
+  // failed must survive it (they are merged OVER the server data below).
+  const loadedCifRef = useRef<string | null>(null);
   useEffect(() => {
     let active = true;
-    stateRef.current = {};
-    setCorrections({});
+    if (loadedCifRef.current !== cif) {
+      loadedCifRef.current = cif;
+      stateRef.current = {};
+      setCorrections({});
+      setUnsaved(false);
+    }
     setLoaded(false);
-    setUnsaved(false);
+    setError(false);
     fetchCorrections(cif)
       .then((stored) => {
         if (!active) return;
         // One-time migration: local labels the server doesn't have yet go up;
-        // a record already on the server wins on a clash.
+        // a record already on the server wins on a clash. Edits made in this
+        // session (`edits`) win over both — and are never overwritten by a legacy copy.
+        const edits = stateRef.current;
         const local = readLocal(cif);
         const missing: Changes = {};
-        for (const [id, rec] of Object.entries(local)) if (!(id in stored)) missing[id] = rec;
-        const merged = { ...missing, ...stored } as Corrections;
+        for (const [id, rec] of Object.entries(local)) if (!(id in stored) && !(id in edits)) missing[id] = rec;
+        const merged = { ...missing, ...stored, ...edits } as Corrections;
         stateRef.current = merged;
         setCorrections(merged);
         setLoaded(true);
@@ -156,17 +171,22 @@ export function CorrectionsProvider({ children }: { children: React.ReactNode })
         queue.current = queue.current.then(async () => {
           const ok = await sendChanges(cif, missing);
           if (ok) clearLocal(cif); // keep the local copy until the server has it
-          if (active) setUnsaved(!ok);
+          // Only a failure raises the flag: success must not clear an earlier failed edit's.
+          if (active && !ok) setUnsaved(true);
         });
       })
       .catch(() => {
-        // Load failed: stay not-`loaded` (auto-categorize waits); user edits still
-        // go out as per-txn diffs, so nothing stored on the server is overwritten.
+        // Load failed: stay not-`loaded` (auto-categorize waits) and surface `error`
+        // so a consumer can offer `retry`; user edits still go out as per-txn diffs,
+        // so nothing stored on the server is overwritten.
+        if (active) setError(true);
       });
     return () => {
       active = false;
     };
-  }, [cif]);
+  }, [cif, reloadKey]);
+
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
   /** Apply a change optimistically, then persist exactly what changed. */
   const commit = useCallback(
@@ -207,8 +227,8 @@ export function CorrectionsProvider({ children }: { children: React.ReactNode })
   );
 
   const value = useMemo(
-    () => ({ corrections, loaded, setCategory, setHidden, clearCategory, reset, upsertAssignments, promoteToUser, unsaved }),
-    [corrections, loaded, setCategory, setHidden, clearCategory, reset, upsertAssignments, promoteToUser, unsaved],
+    () => ({ corrections, loaded, error, retry, setCategory, setHidden, clearCategory, reset, upsertAssignments, promoteToUser, unsaved }),
+    [corrections, loaded, error, retry, setCategory, setHidden, clearCategory, reset, upsertAssignments, promoteToUser, unsaved],
   );
   return <CorrectionsContext.Provider value={value}>{children}</CorrectionsContext.Provider>;
 }

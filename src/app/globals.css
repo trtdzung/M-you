@@ -157,6 +157,16 @@ body {
   background-image: linear-gradient(135deg, #e2301c 0%, #f2621f 100%);
 }
 
+/* Field of the brand Wrapped slides (opening, archetype, closing) only. Chỉ chữ
+   large (tiêu đề, hero, caption 19px bold) đặt trên nền này: trắng ≥3:1 dọc toàn
+   dải (đã test). Quầng sáng neo ở góc tối (0% 0%), alpha ≤ 0.25. */
+.wrapped-brand-field {
+  background-color: #e2301c;
+  background-image:
+    radial-gradient(70% 45% at 0% 0%, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(135deg, #e2301c 0%, #f2621f 100%);
+}
+
 /* Hero Home MSB — cam ấm fade xuống peach/cream, GẦN DỌC (≈180°) khớp ref
    `1.1`/`1.2`. Quầng sáng mờ phía trên-giữa. Đáy trùng --color-background (blush)
    để card trắng đè lên liền mạch. Chỉ mang logo/watermark/icon trắng — không chữ

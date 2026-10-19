@@ -48,6 +48,8 @@ export interface ManualTxnInput {
    * passthrough the client would silently drop the meta before it ever reached the API.
    */
   rebalance?: Transaction["rebalance"];
+  /** Origin marker; set ONLY by the confirmed-transfer flow (see `Transaction.createdVia`). */
+  createdVia?: Transaction["createdVia"];
 }
 
 /**
@@ -60,6 +62,12 @@ type ManualTxnPatch = Partial<Pick<Transaction, "categoryId" | "type" | "note" |
 
 interface ManualTxnsContextValue {
   manualTxns: Transaction[];
+  /**
+   * False until the persona's records have been read (from the API, or from the
+   * legacy localStorage fallback when the API is unreachable). Consumers that
+   * build a whole-history view must wait for it rather than treat `[]` as truth.
+   */
+  loaded: boolean;
   /** Record a self-reported txn; returns the new txn id (for later `update`). */
   add: (input: ManualTxnInput) => string;
   /**
@@ -146,6 +154,7 @@ export function buildManualTxn(input: ManualTxnInput): Transaction {
     userEdited: true,
     ...(input.note ? { note: input.note } : {}),
     ...(input.rebalance ? { rebalance: input.rebalance } : {}),
+    ...(input.createdVia ? { createdVia: input.createdVia } : {}),
   };
 }
 
@@ -216,6 +225,7 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   const { persona } = usePersona();
   const cif = persona.cif;
   const [manualTxns, setManualTxns] = useState<Transaction[]>([]);
+  const [loaded, setLoaded] = useState(false);
   // Mirror of the current array so `add`/`update` can compute their return value
   // synchronously (a setState updater's run timing is not guaranteed).
   const txnsRef = useRef<Transaction[]>([]);
@@ -231,6 +241,7 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     let active = true;
     apply([]);
+    setLoaded(false);
     const legacyKey = `${STORAGE_PREFIX}.${cif}`;
     (async () => {
       try {
@@ -251,11 +262,17 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
           const persisted = new Set(rows.map((t) => t.id));
           if (legacy.every((t) => persisted.has(t.id))) clearLegacy(legacyKey);
         }
-        if (active) apply(mergeLocalExtras(rows, txnsRef.current));
+        if (active) {
+          apply(mergeLocalExtras(rows, txnsRef.current));
+          setLoaded(true);
+        }
       } catch (err) {
         // API unreachable → fall back to legacy localStorage so the app still works.
         console.error("Failed to load manual txns", err);
-        if (active) apply(mergeLocalExtras(readLegacy(legacyKey), txnsRef.current));
+        if (active) {
+          apply(mergeLocalExtras(readLegacy(legacyKey), txnsRef.current));
+          setLoaded(true);
+        }
       }
     })();
     return () => {
@@ -326,8 +343,8 @@ export function ManualTxnsProvider({ children }: { children: React.ReactNode }) 
   );
 
   const value = useMemo(
-    () => ({ manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger }),
-    [manualTxns, add, addPersisted, adopt, update, remove, removeByTrigger],
+    () => ({ manualTxns, loaded, add, addPersisted, adopt, update, remove, removeByTrigger }),
+    [manualTxns, loaded, add, addPersisted, adopt, update, remove, removeByTrigger],
   );
   return <ManualTxnsContext.Provider value={value}>{children}</ManualTxnsContext.Provider>;
 }

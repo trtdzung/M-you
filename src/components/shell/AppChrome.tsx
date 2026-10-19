@@ -173,6 +173,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
   const pfm = pathname === "/pfm" || pathname.startsWith("/pfm/");
   const goals = pathname.startsWith("/goals");
   const transfer = pathname === "/transfer" || pathname.startsWith("/transfer-confirm");
+  const wrapped = pathname === "/wrapped" || pathname.startsWith("/wrapped/");
 
   if (pfm) {
     return (
@@ -191,6 +192,16 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
   if (goals) {
     return (
       <PhoneShell background={<PeachBg />} className="shell-calm goals-app-shell" mainClassName="shell-main--goals no-scrollbar overflow-x-hidden">
+        {children}
+      </PhoneShell>
+    );
+  }
+
+  if (wrapped) {
+    // Story viewer: own edges, no nav/FAB. The calm surface only shows behind the
+    // non-story states (loading / error / consent / insufficient).
+    return (
+      <PhoneShell background={<CalmBg />} className="shell-calm" mainClassName="shell-main--transfer">
         {children}
       </PhoneShell>
     );

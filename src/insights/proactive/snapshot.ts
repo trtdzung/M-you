@@ -1,7 +1,7 @@
 /** Financial snapshot v2. Pure: financial facts and hypotheses stay separate. */
 import type { Asset, Goal, JarConfig, Liability, StoredCategory, Transaction } from "@/domain/models";
 import { computeFinancials, type RawData } from "@/domain/engine/finance-compose";
-import { computeFinancialHealthScore } from "@/domain/engine/health-score";
+import { composeFinancialHealthScore } from "@/domain/engine/health-score-compose";
 import { aggregateCashflow, netExpenseByCategory } from "@/domain/engine/cashflow";
 import { addMonthsToKey, dateToMonthKey, monthPeriodFromKey, VN_UTC_OFFSET_MS, type Period } from "@/domain/engine/types";
 
@@ -271,14 +271,14 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
   });
   const sorted = txns.slice().sort((a, b) => b.postedAt.localeCompare(a.postedAt) || a.id.localeCompare(b.id));
 
-  const healthScore = computeFinancialHealthScore({
-    cashflow: fin.cashflow,
-    monthlyCashflows: history,
+  const healthScore = composeFinancialHealthScore({
+    financials: fin,
     accounts: raw.accounts,
-    networth: fin.networth,
     liabilities,
-    liabilitiesConfirmedComplete: overlay.complete,
-    goals: fin.goals,
+    transactions: txns,
+    fixedCategoryIds: fixed,
+    month,
+    profileComplete: overlay.complete,
     now,
     asOf: today,
   });

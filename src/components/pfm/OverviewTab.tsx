@@ -9,6 +9,7 @@ import { CashflowOverviewCard } from "@/components/cashflow/CashflowOverviewCard
 import { CashflowTrendCard } from "@/components/cashflow/CashflowTrendCard";
 import { HuOverviewRow } from "@/components/hu-envelope/HuOverviewRow";
 import { SpendingCalendar } from "@/components/pfm/SpendingCalendar";
+import { WrappedEntryCard } from "@/components/wrapped/WrappedEntryCard";
 import type { JarDonutDatum } from "@/components/report/SpendingDonut";
 import { cashflowTrend, monthPeriodFromKey, selectUnlabeledSpend } from "@/domain/engine";
 import { useInsights } from "@/state/useInsights";
@@ -68,6 +69,8 @@ export function OverviewTab() {
   return (
     <div data-testid="cockpit-root" className="flex min-h-full flex-col gap-5 pb-6">
       <CashflowOverviewCard cashflow={cashflow} prevCashflow={prevCashflow} />
+
+      <WrappedEntryCard transactions={transactions} />
 
       <HuOverviewRow financials={financials} unlabeledItems={unlabeledItems} transactions={transactions} raw={raw} />
 

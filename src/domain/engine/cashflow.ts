@@ -46,20 +46,31 @@ export function inPeriod(txn: Transaction, period: Period): boolean {
   return isoInPeriod(txn.postedAt, period);
 }
 
+/**
+ * The ONE per-transaction counted-expense rule: what `txn` adds to net expense in
+ * `period` — `+amount` for a posted expense/fee, `−amount` for a posted refund
+ * (it reverses its category), and `null` when the row is not counted at all
+ * (non-posted incl. `refunded`/`reversed`/`pending`, outside the period, a
+ * rebalance bookkeeping move, income, transfer, card payment). `null` is "not
+ * spend", never 0, so callers can tell an uncounted row from a zero-amount one.
+ */
+export function signedExpenseContribution(txn: Transaction, period: Period): number | null {
+  if (txn.status !== "posted" || !inPeriod(txn, period)) return null;
+  // Inter-jar rebalance txns are a bookkeeping move, NOT spend — excluded from
+  // spend-by-category + jar `spent` + cashflow expense exactly like a transfer
+  // (invariant #6). The engine folds them into each jar's `balance` via `rebalanceNetByJar`.
+  if (isRebalanceCategory(txn.categoryId)) return null;
+  if (EXPENSE_TYPES.has(txn.type)) return txn.amount;
+  if (txn.type === "refund") return -txn.amount;
+  return null;
+}
+
 /** Net expense per category for posted transactions (gross − refunds). */
 export function netExpenseByCategory(txns: Transaction[], period: Period): Map<string, number> {
   const byCat = new Map<string, number>();
   for (const t of txns) {
-    if (t.status !== "posted" || !inPeriod(t, period)) continue;
-    // Inter-jar rebalance txns are a bookkeeping move, NOT spend — excluded from
-    // spend-by-category + jar `spent` + cashflow expense exactly like a transfer
-    // (invariant #6). The engine folds them into each jar's `balance` via `rebalanceNetByJar`.
-    if (isRebalanceCategory(t.categoryId)) continue;
-    if (EXPENSE_TYPES.has(t.type)) {
-      byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amount);
-    } else if (t.type === "refund") {
-      byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) - t.amount);
-    }
+    const contribution = signedExpenseContribution(t, period);
+    if (contribution !== null) byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + contribution);
   }
   return byCat;
 }
