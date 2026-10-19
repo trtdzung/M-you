@@ -11,7 +11,7 @@ export function GoalsPreviewApp({ embedded = false }: { embedded?: boolean }) {
   return (
     <PreviewStoreProvider entryScreen={embedded ? "GoalList" : undefined}>
       <div className="goals-preview flex min-h-full flex-col">
-        <PreviewBanner />
+        {!embedded && <PreviewBanner />}
         <ScreenHost />
       </div>
       <TestPanel />
