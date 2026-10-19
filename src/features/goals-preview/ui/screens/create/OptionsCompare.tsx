@@ -39,7 +39,7 @@ function OptionCard({
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-strong" aria-hidden>
           {index}
         </span>
-        <h2 className="flex-1 text-[16px] font-bold text-text">{title}</h2>
+        <h2 className="flex-1 !text-[16px] !leading-6 !font-bold text-text">{title}</h2>
         {badge && <span className="rounded-full bg-warning-soft px-2.5 py-1 text-[11px] font-semibold text-text">{badge}</span>}
       </header>
       {children}

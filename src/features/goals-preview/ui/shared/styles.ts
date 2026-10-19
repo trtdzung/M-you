@@ -23,6 +23,11 @@ export const listRow = `flex min-h-14 w-full items-center gap-3 px-4 py-3 text-l
 export const divider = "divide-y divide-border";
 
 export const sectionTitle = "text-[15px] font-semibold text-text";
+/**
+ * Section heading for the create-goal steps. `!` beats the app-wide
+ * `.pfm-app-shell #main-content h2 { font-size: 18px }` rule when embedded in /pfm.
+ */
+export const stepTitle = "!text-[15px] !leading-[22px] !font-semibold text-text";
 export const screenPadding = "flex flex-col gap-4 pb-6";
 
 export const warningBox = "rounded-2xl bg-warning-soft px-3.5 py-3 text-sm text-text";

@@ -13,7 +13,7 @@ import { BottomActions } from "../../shared/BottomActions";
 import { EmptyState } from "../../shared/EmptyState";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { SummaryRows } from "../../shared/SummaryRows";
-import { card, ghostButton, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
+import { card, ghostButton, primaryButton, ring, screenPadding, stepTitle } from "../../shared/styles";
 import { formatAccountNumber } from "./wizard";
 
 /** Màn hình thành công sau khi mở tài khoản mục tiêu. */
@@ -65,14 +65,14 @@ export function CreateSuccess({ params }: ScreenProps) {
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface text-positive">
           <PartyPopper size={28} aria-hidden />
         </span>
-        <h2 className="text-[20px] font-bold text-text">Chúc mừng bạn!</h2>
+        <h2 className="!text-[20px] !leading-7 !font-bold text-text">Chúc mừng bạn!</h2>
         <p className="text-sm text-text">
           Mục tiêu “{goal.name}” đã sẵn sàng. Hãy bắt đầu dành dụm từng chút một.
         </p>
       </section>
 
       <section className={`${card} flex flex-col gap-2`}>
-        <h2 className={sectionTitle}>Tài khoản mục tiêu</h2>
+        <h2 className={stepTitle}>Tài khoản mục tiêu</h2>
         <div className="flex items-center justify-between gap-3">
           <p className="text-[20px] font-bold tabular-nums tracking-wide text-text">{formatAccountNumber(account.number)}</p>
           <button type="button" onClick={copy} className={`${ghostButton} ${ring}`} aria-label="Sao chép số tài khoản">
@@ -84,7 +84,7 @@ export function CreateSuccess({ params }: ScreenProps) {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className={sectionTitle}>Kế hoạch tháng đầu tiên</h2>
+        <h2 className={stepTitle}>Kế hoạch tháng đầu tiên</h2>
         <SummaryRows
           rows={[
             { label: "Số dư hiện tại", value: value.total, source: value.fixedCounted > 0 ? "self_reported" : "msb", emphasis: true },
