@@ -72,6 +72,30 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
   );
 }
 
+const qtyGroup = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+/**
+ * Chuẩn hoá ô số lượng về dạng thô "1234.5": bỏ dấu phẩy ngăn nghìn, dấu chấm là dấu thập phân (tối đa 2 số).
+ * Bàn phím điện thoại tiếng Việt chỉ có ",": gõ "," ở cuối khi chưa có phần thập phân được hiểu là dấu thập phân.
+ */
+function parseQtyInput(text: string, prevRaw: string, fractional: boolean): string {
+  let t = text;
+  if (fractional && t.endsWith(",") && !prevRaw.includes(".")) t = `${t.slice(0, -1)}.`;
+  t = t.replace(/,/g, "");
+  if (!fractional) return t.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12);
+  const [int = "", ...rest] = t.replace(/[^\d.]/g, "").split(".");
+  const intPart = int.replace(/^0+(?=\d)/, "").slice(0, 12);
+  return rest.length ? `${intPart || "0"}.${rest.join("").slice(0, 2)}` : intPart;
+}
+
+/** Hiển thị số lượng thô với dấu phẩy ngăn nghìn, giữ nguyên phần thập phân đang gõ. */
+function formatQtyInput(raw: string): string {
+  if (raw === "") return "";
+  const [int, dec] = raw.split(".");
+  const grouped = int === "" ? "" : qtyGroup.format(Number(int));
+  return dec === undefined ? grouped : `${grouped}.${dec}`;
+}
+
 /** Thêm tài sản ngoài MSB: tài sản vật chất (tự khai giá) hoặc tài sản tài chính ở nơi khác (tự định giá). */
 export function AddAsset({ params }: ScreenProps) {
   const { state, dispatch, nav } = usePreview();
@@ -122,7 +146,7 @@ export function AddAsset({ params }: ScreenProps) {
 
   const valuation: Valuation = manualFund ? "manual" : type.valuation;
   const instrument = getInstrument(instrumentId);
-  const qty = Number(quantity.replace(",", "."));
+  const qty = Number(quantity);
   const ratePa = Number(rate.replace(",", "."));
   const accrual =
     valuation === "accrual" && principal && ratePa >= 0 && rate !== ""
@@ -256,8 +280,8 @@ export function AddAsset({ params }: ScreenProps) {
                   inputMode={instrument.fractional ? "decimal" : "numeric"}
                   className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tabular-nums text-text outline-none placeholder:text-muted"
                   placeholder="0"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value.replace(instrument.fractional ? /[^\d.,]/g : /\D/g, "").slice(0, 10))}
+                  value={formatQtyInput(quantity)}
+                  onChange={(e) => setQuantity(parseQtyInput(e.target.value, quantity, instrument.fractional))}
                 />
                 <span className="shrink-0 text-sm font-semibold text-muted">{instrument.unit}</span>
               </div>
@@ -340,7 +364,7 @@ export function AddAsset({ params }: ScreenProps) {
         rows={[
           { label: "Mục tiêu", value: goal.name },
           { label: "Tài sản", value: finalName },
-          ...(valuation === "market" && instrument ? [{ label: "Số lượng", value: `${quantity} ${instrument.unit}` }] : []),
+          ...(valuation === "market" && instrument ? [{ label: "Số lượng", value: `${formatQtyInput(quantity)} ${instrument.unit}` }] : []),
           { label: valuation === "manual" ? "Giá trị tự khai" : "Giá trị ước tính hôm nay", value: assetValue, source },
           ...(valuation === "manual" ? [{ label: "Ngày định giá", value: dateVi(date) }] : []),
           { label: "Tính vào mục tiêu", value: counted ? `${percent}%` : "Không tính" },

@@ -127,7 +127,7 @@ export function InstrumentPicker({
   };
 
   const unitPrice = (m: MarketInstrument) => seriesPriceAt(m.priceSeries, today, shiftPct);
-  const priceLabel = (price: number) => formatVnd(price).replace(/ VND$/, " đ");
+  const priceLabel = (price: number) => formatVnd(price);
 
   if (selected) {
     const price = unitPrice(selected);
