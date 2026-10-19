@@ -19,12 +19,12 @@ import type {
 import { saveInsightDraft } from "@/insights/proactive/chat-handoff";
 import { HealthScoreSheet } from "./HealthScoreSheet";
 
-import { useAppMonthKey } from "@/state/app-clock";
+import { useAppToday } from "@/state/app-clock";
 
 const TOTAL_SLIDES = 3;
 
 export function HomeInsightWidget() {
-  const monthKey = useAppMonthKey();
+  const today = useAppToday();
   const { persona } = usePersona();
   const profile = useAssetLiabilities();
   const goals = useGoals();
@@ -61,7 +61,9 @@ export function HomeInsightWidget() {
     },
   });
   const revision = JSON.stringify([jars.config, corrections.corrections, manualTxns]);
-  const resultKey = payload + revision + monthKey;
+  const resultKey = payload + revision;
+  const requestIdentity = JSON.stringify([ready, payload, revision, refresh]);
+  const previousRequestIdentity = useRef<string | null>(null);
 
   const currentResult = data?.key === resultKey && ready ? data.result : null;
   const healthScore = currentResult?.healthScore ?? null;
@@ -78,14 +80,18 @@ export function HomeInsightWidget() {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    setSheetMode("none");
-    setActiveSlide(0);
+    const clockOnly = previousRequestIdentity.current === requestIdentity;
+    previousRequestIdentity.current = requestIdentity;
+    if (!clockOnly) {
+      setSheetMode("none");
+      setActiveSlide(0);
+    }
 
     if (!ready) return () => controller.abort();
 
     const deadline = setTimeout(() => {
       controller.abort();
-      setData(null);
+      if (!clockOnly) setData(null);
       setError("Chưa tải được gợi ý. Thử lại");
       setLoading(false);
     }, 30_300);
@@ -119,7 +125,7 @@ export function HomeInsightWidget() {
         })
         .catch(() => {
           if (!controller.signal.aborted) {
-            setData(null);
+            if (!clockOnly) setData(null);
             setError("Chưa tải được gợi ý. Thử lại");
           }
         })
@@ -134,7 +140,7 @@ export function HomeInsightWidget() {
       clearTimeout(deadline);
       controller.abort();
     };
-  }, [ready, payload, resultKey, refresh, persona.cif]);
+  }, [ready, payload, resultKey, refresh, persona.cif, today, requestIdentity]);
 
   const prevSlide = useCallback(() => {
     setActiveSlide((curr) => (curr > 0 ? curr - 1 : TOTAL_SLIDES - 1));
