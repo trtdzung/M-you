@@ -4,7 +4,7 @@ import "server-only";
  * Ghi kết quả của reducer / engine (`next`) xuống DB thật: mở / đóng tài khoản
  * mục tiêu (dòng `accounts`), bút toán thật trong `transactions` cho mỗi GoalTxn mới
  * (bảng STANDARD 4.2, 2 chân cùng `transferGroupId` khi chuyển giữa 2 tài khoản
- * của khách — như `src/lib/security/fd-store.ts`), chân điều chỉnh công cụ test
+ * của khách — như `src/lib/security/fd-store.ts`), chân điều chỉnh
  * cho phần chênh số dư TK chính không do Mục tiêu, rồi ghi đè `gv2_*`.
  * Tất cả trong MỘT transaction; cuối cùng đọc lại số dư và so với `next` —
  * lệch là throw (rollback toàn bộ).
@@ -28,7 +28,7 @@ export class GoalInsufficientFundsError extends Error {}
 /** Số dư đọc lại không khớp kết quả reducer — rollback. */
 export class GoalPostingMismatchError extends Error {}
 
-const ADJUST_NOTE = "Điều chỉnh từ công cụ test";
+const ADJUST_NOTE = "Điều chỉnh số dư tài khoản chính";
 const MAIN_NAME = "Tài khoản chính";
 
 type Direction = "debit" | "credit";
@@ -222,7 +222,7 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
     }
   }
 
-  // Phần chênh TK chính không do giao dịch Mục tiêu (lương / chi tiêu mô phỏng của công cụ test).
+  // Phần chênh TK chính không do giao dịch Mục tiêu (lương khi tua thời gian, v.v.).
   let adjust = Math.round(next.customer.mainCasaBalance - prev.customer.mainCasaBalance - mainDelta);
   const adjustLeg = (amount: number, at: string): Leg => ({
     txn: single(main.id, amount > 0 ? "credit" : "debit", Math.abs(amount), at, "transfer", ADJUST_NOTE, ADJUST_NOTE),
@@ -239,7 +239,7 @@ export function applyPostings(cif: string, prev: WorldState, next: WorldState, p
     }
   }
   const timed: Leg[] = [...salaryLegs, ...legs];
-  // Phần còn lại (sự kiện công cụ test): tiền vào ghi trước, tiền ra ghi sau các chân cùng thời điểm.
+  // Phần còn lại: tiền vào ghi trước, tiền ra ghi sau các chân cùng thời điểm.
   if (adjust > 0) timed.unshift(adjustLeg(adjust, stamp(next.clock.today)));
   if (adjust < 0) timed.push(adjustLeg(adjust, stamp(next.clock.today)));
   // Theo thời gian; cùng thời điểm thì giữ thứ tự ở trên (lương trước việc khác trong ngày).

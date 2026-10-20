@@ -1,7 +1,6 @@
 import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenId, ScreenParams } from "../model/screens";
 import type {
-  CustomerProfile,
   DeclaredAssetCategory,
   GoalFlexibility,
   GoalTemplate,
@@ -44,8 +43,6 @@ export interface CreateGoalInput {
   assets?: DeclaredAssetInput[];
 }
 
-export type SimEvent = "salary" | "bigExpense" | "standingOrderFail" | "overdue";
-
 export type NavAction =
   | { type: "nav/params"; params: ScreenParams }
   | { type: "nav/push"; screen: ScreenId; params?: ScreenParams }
@@ -73,10 +70,7 @@ export type PreviewAction =
    */
   | { type: "world/sync"; world: WorldState; goalIdMap?: Record<string, string>; unsavedGoalIds?: string[] }
   | { type: "advanceTime"; days: number }
-  | { type: "setFundPriceShift"; pct: number }
   | { type: "setRiskProfile"; profile: RiskProfile }
-  | { type: "setCustomer"; patch: Partial<CustomerProfile> }
-  | { type: "triggerEvent"; event: SimEvent; goalId?: string }
   // --- create
   | { type: "createGoal"; input: CreateGoalInput }
   // --- cash

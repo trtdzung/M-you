@@ -37,7 +37,7 @@ export type GoalsV2ActionResult = ({ ok: true; createdGoalId?: string } & GoalsV
 
 // --- Danh sách cho phép (F1) ------------------------------------------------
 // Server chỉ nhận thao tác nghiệp vụ liệt kê tường minh dưới đây; `world/sync`, `hydrate`,
-// `loadScenario`, `reset`, `setCustomer`, `nav/*`, `toast/*`, `dismissSuggestion` và mọi
+// `loadScenario`, `reset`, `nav/*`, `toast/*`, `dismissSuggestion` và mọi
 // type lạ đều bị từ chối. Mỗi trường được kiểm kiểu rồi dựng lại action sạch (bỏ trường thừa).
 
 type Obj = Record<string, unknown>;
@@ -56,7 +56,6 @@ const FLEXIBILITIES = new Set(["date_fixed", "date_flexible", "amount_flexible"]
 const DECLARED_CATEGORIES = new Set(["house", "car", "motorbike", "other", "gold", "stock", "external_fund", "deposit", "bond"]);
 const VALUE_SOURCES = new Set(["msb", "self_reported", "estimated"]);
 const RISK_PROFILE_VALUES = new Set(["conservative", "balanced", "growth"]);
-const SIM_EVENTS = new Set(["salary", "bigExpense", "standingOrderFail", "overdue"]);
 
 class InvalidAction extends Error {}
 class RejectedAction extends Error {}
@@ -160,12 +159,8 @@ function parseFields(type: string, a: Obj): Obj {
   switch (type) {
     case "advanceTime":
       return { days: num(a, "days", (n) => positiveInt(n) && n <= MAX_ADVANCE_DAYS) };
-    case "setFundPriceShift":
-      return { pct: num(a, "pct", (n) => n > -100 && n <= 1000) };
     case "setRiskProfile":
       return { profile: oneOf(a, "profile", RISK_PROFILE_VALUES) };
-    case "triggerEvent":
-      return { event: oneOf(a, "event", SIM_EVENTS), ...opt(a, "goalId", str) };
     case "createGoal":
       if (!isObj(a.input)) throw new InvalidAction("input");
       return { input: goalInput(a.input) };

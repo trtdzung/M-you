@@ -1,7 +1,7 @@
 import { getInvestProduct, getLoanProduct } from "../data/products";
 import { getScenario } from "../data/scenarios";
 import { makeAsset } from "../engine/assets";
-import { advanceTime, applySalary, describeAdvance, payDueInstalments, runStandingOrder } from "../engine/advance";
+import { advanceTime, describeAdvance, runStandingOrder } from "../engine/advance";
 import { addMonths, daysBetween, formatISODate, monthsBetween, nextDayOfMonth } from "../engine/dates";
 import { findGoal, goalBalance, makeAccountNumber, nextId, postTxn } from "../engine/ledger";
 import { applyLifecycle, refreshLoanStatuses } from "../engine/lifecycle";
@@ -12,7 +12,7 @@ import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { DeclaredAssetCategory, Goal, MsbAsset, ToastTone } from "../model/types";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import type { DeclaredAssetInput, PreviewAction, SimEvent } from "./actions";
+import type { DeclaredAssetInput, PreviewAction } from "./actions";
 
 export const STORAGE_KEY = "goals-preview:v1";
 const EMPTY_SCENARIO_ID = "empty";
@@ -253,27 +253,11 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
   const today = draft.clock.today;
 
   switch (action.type) {
-    case "setFundPriceShift": {
-      draft.market.fundPriceShiftPct = action.pct;
-      refreshFundSnapshots(draft);
-      toast(draft, `Giá chứng chỉ quỹ ${action.pct >= 0 ? "+" : ""}${action.pct}% so với chuỗi giá gốc.`, "info");
-      return draft;
-    }
-
     case "setRiskProfile": {
       draft.customer = { ...draft.customer, riskProfile: action.profile, riskProfileAsked: true };
       toast(draft, "Đã lưu khẩu vị đầu tư của bạn.", "success");
       return draft;
     }
-
-    case "setCustomer": {
-      draft.customer = { ...draft.customer, ...action.patch };
-      toast(draft, "Đã cập nhật hồ sơ khách hàng mô phỏng.", "info");
-      return draft;
-    }
-
-    case "triggerEvent":
-      return triggerEvent(state, draft, action.event, action.goalId);
 
     case "createGoal": {
       const deposit = Math.max(0, Math.round(action.input.initialDeposit ?? 0));
@@ -724,47 +708,5 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     default:
       return state;
-  }
-}
-
-function triggerEvent(state: PreviewState, draft: PreviewState, event: SimEvent, goalId?: string): PreviewState {
-  const today = draft.clock.today;
-  switch (event) {
-    case "salary": {
-      applySalary(draft);
-      payDueInstalments(draft, today);
-      toast(draft, `Lương về: +${formatVnd(draft.customer.monthlyIncome)} (sau chi tiêu còn ${formatVnd(draft.customer.mainCasaBalance)}).`, "info");
-      return draft;
-    }
-    case "bigExpense": {
-      const amount = 12_000_000;
-      draft.customer.mainCasaBalance = Math.max(0, draft.customer.mainCasaBalance - amount);
-      toast(draft, `Chi tiêu lớn: -${formatVnd(amount)} từ tài khoản chính.`, "warning");
-      return draft;
-    }
-    case "standingOrderFail": {
-      const goal =
-        findGoal(draft, goalId) ?? draft.goals.find((g) => g.standingOrder?.active && (g.status === "accumulating" || g.status === "repaying"));
-      if (!goal?.standingOrder) return fail(state, "Không có mục tiêu nào đang bật trích tự động.");
-      draft.customer.mainCasaBalance = Math.min(draft.customer.mainCasaBalance, Math.max(0, goal.standingOrder.amount - 1_000_000));
-      const wasActive = goal.standingOrder.active;
-      goal.standingOrder.active = true;
-      runStandingOrder(draft, goal.id, today);
-      goal.standingOrder.active = wasActive;
-      toast(draft, `Trích tự động cho “${goal.name}” không thành công: tài khoản chính không đủ số dư.`, "error");
-      return draft;
-    }
-    case "overdue": {
-      const loan =
-        draft.loans.find((l) => l.status === "active" && (!goalId || l.goalId === goalId)) ?? undefined;
-      if (!loan) return fail(state, "Không có khoản vay nào đang hoạt động.");
-      const row = loan.schedule.find((r) => r.status !== "paid");
-      if (!row) return fail(state, "Khoản vay không còn kỳ nào.");
-      if (daysBetween(today, row.dueDate) > 0) row.dueDate = today;
-      row.status = "overdue";
-      refreshLoanStatuses(loan, today);
-      toast(draft, `Kỳ ${row.period} (${formatVnd(row.payment)}) đã quá hạn.`, "error");
-      return draft;
-    }
   }
 }
