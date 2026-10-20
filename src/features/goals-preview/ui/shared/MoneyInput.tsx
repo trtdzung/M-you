@@ -31,6 +31,7 @@ export function MoneyInput({
   placeholder = "0",
   autoFocus,
   disabled,
+  emphasis = true,
 }: {
   value: number | null;
   onChange: (value: number | null) => void;
@@ -43,6 +44,7 @@ export function MoneyInput({
   placeholder?: string;
   autoFocus?: boolean;
   disabled?: boolean;
+  emphasis?: boolean;
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
@@ -67,7 +69,7 @@ export function MoneyInput({
           aria-describedby={hintId}
           value={value === null ? "" : groupFormatter.format(value)}
           onChange={(event) => onChange(parseVndInput(event.target.value))}
-          className={cn(input, "pr-14 text-[20px] font-semibold tabular-nums", shownError && "border-negative")}
+          className={cn(input, "pr-14 tabular-nums", emphasis ? "text-[20px] font-semibold" : "font-normal", shownError && "border-negative")}
         />
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted">
           VND

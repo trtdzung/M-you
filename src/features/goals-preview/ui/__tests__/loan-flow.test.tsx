@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stateFromScenario } from "../../store/reducer";
+import { goalValue } from "../../engine";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push() {}, replace() {}, back() {}, refresh() {}, prefetch() {} }),
@@ -19,6 +20,7 @@ vi.mock("@/components/shell/PanelActive", () => ({
 
 import { PreviewStoreProvider, usePreview } from "../../store/PreviewStore";
 import { ScreenHost } from "../ScreenHost";
+import { GoalsPreviewApp } from "../../GoalsPreviewApp";
 
 const box = vi.hoisted(() => ({ ctx: null as any }));
 function Probe() {
@@ -36,6 +38,20 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval a
     vi.useRealTimers();
     localStorage.clear();
     vi.unstubAllGlobals();
+  });
+
+  it("returns to the goal list when the Goals tab is selected again", async () => {
+    const world = stateFromScenario("s01-car-feasible");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      world: { ...world, customer: { ...world.customer, cif: "CIF_0001" } },
+      market: { instruments: [], refreshing: false, asOf: null },
+    }))));
+    render(<GoalsPreviewApp embedded />);
+    const goalButton = await screen.findByRole("button", { name: new RegExp(world.goals[0].name) });
+    fireEvent.click(goalButton);
+    expect(document.querySelector('[data-screen="GoalDetail"]')).not.toBeNull();
+    act(() => { window.dispatchEvent(new Event("pfm:open-goals-list")); });
+    expect(document.querySelector('[data-screen="GoalList"]')).not.toBeNull();
   });
 
   it("Goal 'Vay' → LoanAppHome → LoanAppSurvey; 'Tiếp tục' disabled until filled; stores application in localStorage and shows toast; dispatches takeLoan 20s later", async () => {
@@ -97,6 +113,10 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval a
 
     // 3. Now on LoanAppSurvey
     expect(screen.getByRole("heading", { name: "Khảo sát thông tin" })).toBeInTheDocument();
+    const prefilledPrincipal = screen.getByLabelText("Bạn cần vay bao nhiêu tiền?") as HTMLInputElement;
+    expect(Number(prefilledPrincipal.value.replace(/\D/g, ""))).toBe(Math.max(0, testGoal.targetAmount - goalValue(world, testGoal).total));
+    expect(screen.getByLabelText(/Bạn muốn trả trong bao lâu\?/)).toHaveTextContent("60 tháng");
+    expect(screen.getByLabelText("Tổng thu nhập hàng tháng của bạn là bao nhiêu?")).toHaveValue("");
 
     const continueButton = screen.getByRole("button", { name: "Tiếp tục" });
     // "Tiếp tục" is disabled until required fields are filled
@@ -111,14 +131,16 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval a
 
     const genderSelect = screen.getByLabelText(/Giới tính của bạn/);
     act(() => {
-      fireEvent.change(genderSelect, { target: { value: "Nam" } });
+      fireEvent.click(genderSelect);
     });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Nam" })); });
     expect(continueButton).toBeDisabled();
 
     const sourceSelect = screen.getByLabelText(/Nguồn thu nhập chính của bạn là gì\?/);
     act(() => {
-      fireEvent.change(sourceSelect, { target: { value: "Lương" } });
+      fireEvent.click(sourceSelect);
     });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Lương" })); });
     expect(continueButton).toBeDisabled();
 
     const incomeInput = screen.getByLabelText("Tổng thu nhập hàng tháng của bạn là bao nhiêu?");
@@ -129,8 +151,9 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval a
 
     const debtSelect = screen.getByLabelText(/Bạn có đang vay ở tổ chức tài chính nào khác không\?/);
     act(() => {
-      fireEvent.change(debtSelect, { target: { value: "Không" } });
+      fireEvent.click(debtSelect);
     });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Không" })); });
     expect(continueButton).toBeDisabled();
 
     const principalInput = screen.getByLabelText("Bạn cần vay bao nhiêu tiền?");
@@ -141,14 +164,16 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval a
 
     const termSelect = screen.getByLabelText(/Bạn muốn trả trong bao lâu\?/);
     act(() => {
-      fireEvent.change(termSelect, { target: { value: "24 tháng" } });
+      fireEvent.click(termSelect);
     });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "24 tháng" })); });
     expect(continueButton).toBeDisabled();
 
     const collateralSelect = screen.getByLabelText(/Bạn có tài sản nào có thể dùng để đảm bảo cho khoản vay không\?/);
     act(() => {
-      fireEvent.change(collateralSelect, { target: { value: "Ô tô" } });
+      fireEvent.click(collateralSelect);
     });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Ô tô" })); });
 
     // Now all required fields are filled -> "Tiếp tục" is enabled!
     expect(continueButton).not.toBeDisabled();

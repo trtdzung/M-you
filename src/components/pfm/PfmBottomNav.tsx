@@ -33,6 +33,7 @@ export function PfmBottomNav() {
     (PFM_TABS.some((t) => t.id === tabParam) ? (tabParam as PfmTabId) : "overview");
 
   function go(id: PfmTabId) {
+    if (id === "goals") window.dispatchEvent(new Event("pfm:open-goals-list"));
     router.replace(`/pfm?${withPfmTab(params ?? new URLSearchParams(), id)}`, { scroll: false });
   }
 

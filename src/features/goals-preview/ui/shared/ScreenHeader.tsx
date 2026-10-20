@@ -15,17 +15,21 @@ export function ScreenHeader({
   onBack,
   hideBack,
   right,
+  compact = false,
+  plain = false,
 }: {
   title: string;
   subtitle?: string;
   onBack?: () => void;
   hideBack?: boolean;
   right?: ReactNode;
+  compact?: boolean;
+  plain?: boolean;
 }) {
   const nav = useNav();
   const showBack = !hideBack && (onBack !== undefined || nav.canGoBack);
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-2 rounded-b-2xl bg-[#f8e2d8] px-1 py-3">
+    <header className={`flex items-center gap-2 px-1 ${plain ? "relative bg-transparent" : `sticky top-0 z-20 bg-[#f8e2d8] ${compact ? "" : "rounded-b-2xl"}`} ${compact ? "py-2" : "py-3"}`}>
       {showBack && (
         <button
           type="button"
@@ -37,7 +41,7 @@ export function ScreenHeader({
         </button>
       )}
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-[22px] font-bold leading-7 text-text">{title}</h1>
+        <h1 className={`truncate leading-7 text-text ${compact ? "text-[20px] font-semibold" : "text-[22px] font-bold"}`}>{title}</h1>
         {subtitle && <p className="truncate text-[13px] leading-5 text-muted">{subtitle}</p>}
       </div>
       {right}
