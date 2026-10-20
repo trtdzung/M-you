@@ -28,6 +28,9 @@ describe("rewindToNow", () => {
   const txnCount = () => (fx.db.prepare("SELECT COUNT(*) AS n FROM transactions WHERE cif = ?").get(CIF) as { n: number }).n;
 
   it("tua 4 tháng rồi rewind: số dư, giao dịch, lịch trích và đồng hồ về như trước khi tua", () => {
+    // `data/pfm.sqlite3` may hold rows stamped after the real "now" (made while testing with the clock moved on): the first rewind
+    // settles them, so the snapshot below is the state a rewind leaves and the test does not depend on how clean the seed DB is.
+    rewindToNow(CIF);
     const created = applyAction(CIF, "rw-create", { type: "createGoal", input: { ...goalInput("rw"), initialDeposit: 50_000 } });
     expect(created.ok).toBe(true);
     const gid = created.ok ? created.createdGoalId! : "";
