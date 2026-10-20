@@ -95,13 +95,7 @@
 .hold-screen-countdown { font-size:40px; line-height:1.2; font-weight:700; font-variant-numeric:tabular-nums; }
 .hold-screen-message { font-size:14px; line-height:1.6; color:var(--color-muted); }
 .hold-screen-message strong { color:var(--color-text); }
-.hold-screen [data-testid="shield-diagnosis"] { gap:16px; }
-.hold-screen .shield-diagnosis-question { padding:0; border-radius:0; background:transparent; font-size:16px; line-height:1.5; font-weight:600; }
-.hold-screen .shield-options { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-.hold-screen .shield-action { height:48px; padding:0 12px; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); font-size:16px; font-weight:600; }
-.hold-screen .shield-action:first-child { border-color:var(--color-negative); color:var(--color-negative); background:var(--color-negative-soft); }
 .hold-screen .transfer-alert-actions { margin-top:0; }
-.hold-screen .transfer-alert-recipient, .hold-screen .transfer-alert-checklist li { min-width:0; }
-.hold-screen .transfer-alert-checklist li > span:last-child { min-width:0; }
+.hold-screen .transfer-alert-recipient { min-width:0; }
 .hold-screen-footnote { text-align:center; font-size:12px; line-height:1.5; color:var(--color-muted); }
 .hold-screen :is(button,a):focus-visible { outline:2px solid var(--color-warning); outline-offset:3px; }

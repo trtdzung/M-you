@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Hourglass, Phone } from "lucide-react";
 import { formatVnd } from "@/lib/format";
-import { Diagnosis } from "./Diagnosis";
 import { Emphasized } from "./InterventionCopy";
 import { TRANSFER_SUPPORT_HREF, transferSupportHref, transferHoldCopy, transferRecipientParts, type TransferDetails } from "@/lib/security/transfer-copy";
 import type { Hold } from "@/lib/security/holds";
@@ -52,11 +51,6 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, details }:
   const router = useRouter();
   const [hold, setHold] = useState(initial);
   const [left, setLeft] = useState(initial.remainingMs);
-  const [answer, setAnswer] = useState<"Có" | "Không" | null>(null);
-
-  useEffect(() => {
-    setAnswer(null);
-  }, [initial.id]);
 
   // Server time is the truth (test tools may end the wait); count down locally between polls.
   useEffect(() => {
@@ -108,42 +102,22 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, details }:
         </div>
         {details.amount !== undefined && <p className="transfer-alert-amount">{formatVnd(details.amount)}</p>}
       </div>}
-      <div className={`hold-screen-diagnosis ${answer === "Có" ? "hidden" : ""}`}>
-        <Diagnosis cif={cif} id={hold.id} question={copy.question} onAnswer={setAnswer} sourceLine={false} />
-      </div>
-      {answer === "Có" && (
-        <div className="transfer-alert-content">
-          <p className="transfer-alert-guidance">
-            <Emphasized {...copy.yes.message} />
-          </p>
-          <ol className="transfer-alert-checklist">
-            {copy.yes.steps.map((step, index) => (
-              <li key={step}><span className="transfer-alert-step" aria-hidden="true">{index + 1}</span><span>{step}</span></li>
-            ))}
-          </ol>
-        </div>
-      )}
       <div className="transfer-alert-actions">
         <button type="button" className="transfer-alert-stop" onClick={() => void cancel()}>
           {copy.primary}
         </button>
-        {answer === "Có" ? (
-          <a className="transfer-alert-support" href={TRANSFER_SUPPORT_HREF} onClick={event => {
-              event.preventDefault();
-              router.push(transferSupportHref(window.location.pathname + window.location.search));
-            }}>
-            <Phone size={16} aria-hidden="true" />{copy.yes.secondary}
-          </a>
-        ) : (
-          <>
-            {released && (
-              <button type="button" className="transfer-alert-proceed" onClick={() => void send()}>
-                {copy.secondary}
-              </button>
-            )}
-            <p className="hold-screen-footnote">{copy.footnote}</p>
-          </>
+        {released && (
+          <button type="button" className="transfer-alert-proceed" onClick={() => void send()}>
+            {copy.secondary}
+          </button>
         )}
+        <a className="transfer-alert-support" href={TRANSFER_SUPPORT_HREF} onClick={event => {
+            event.preventDefault();
+            router.push(transferSupportHref(window.location.pathname + window.location.search));
+          }}>
+          <Phone size={16} aria-hidden="true" />{copy.yes.secondary}
+        </a>
+        <p className="hold-screen-footnote">{copy.footnote}</p>
       </div>
     </div>
   );
