@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/primitives";
 import { Emphasized } from "@/components/security/InterventionCopy";
 import {
-  transferSafeCopy, TRANSFER_SUPPORT_HREF,
+  transferSafeCopy, TRANSFER_SUPPORT_HREF, transferSupportHref,
   type TransferDetails, type TransferSafeVariant,
 } from "@/lib/security/transfer-copy";
 
@@ -13,6 +15,7 @@ export function TransferSafe({ variant, details }: {
   variant: TransferSafeVariant;
   details: TransferDetails;
 }) {
+  const router = useRouter();
   const copy = transferSafeCopy(variant, details);
 
   return (
@@ -28,7 +31,10 @@ export function TransferSafe({ variant, details }: {
         </div>
       </Card>
       <Link href="/" className="login-submit text-center">{copy.primary}</Link>
-      <Link href={TRANSFER_SUPPORT_HREF} className="shield-danger-link text-center">{copy.secondary}</Link>
+      <a href={TRANSFER_SUPPORT_HREF} onClick={event => {
+            event.preventDefault();
+            router.push(transferSupportHref(window.location.pathname + window.location.search));
+          }} className="shield-danger-link text-center">{copy.secondary}</a>
     </div>
   );
 }

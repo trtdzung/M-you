@@ -26,6 +26,10 @@ export const TRANSFER_LABELS = {
   home: "Về trang chủ",
 } as const;
 export const TRANSFER_SUPPORT_HREF = "/settings/sos";
+
+export function transferSupportHref(from: string): string {
+  return `${TRANSFER_SUPPORT_HREF}?from=${encodeURIComponent(from)}`;
+}
 const TRANSFER_CLASSIFY = {
   question: "Có ai đang gọi điện hướng dẫn anh/chị không?",
   answers: ["Có", "Không"],

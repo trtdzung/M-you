@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { useEffect, useState } from "react";
 import { Hourglass } from "lucide-react";
 import { Diagnosis } from "./Diagnosis";
 import { Emphasized } from "./InterventionCopy";
-import { TRANSFER_SUPPORT_HREF, transferHoldCopy } from "@/lib/security/transfer-copy";
+import { TRANSFER_SUPPORT_HREF, transferSupportHref, transferHoldCopy } from "@/lib/security/transfer-copy";
 import type { Hold } from "@/lib/security/holds";
 
 const POLL_MS = 3_000;
@@ -45,6 +47,7 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled }: {
   onSend: () => void;
   onCancelled: () => void;
 }) {
+  const router = useRouter();
   const [hold, setHold] = useState(initial);
   const [left, setLeft] = useState(initial.remainingMs);
   const [answer, setAnswer] = useState<"Có" | "Không" | null>(null);
@@ -112,7 +115,10 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled }: {
         {copy.primary}
       </button>
       {answer === "Có" ? (
-        <a className="shield-danger-link text-center" href={TRANSFER_SUPPORT_HREF}>
+        <a className="shield-danger-link text-center" href={TRANSFER_SUPPORT_HREF} onClick={event => {
+            event.preventDefault();
+            router.push(transferSupportHref(window.location.pathname + window.location.search));
+          }}>
           {copy.yes.secondary}
         </a>
       ) : (

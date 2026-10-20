@@ -1,12 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { Emphasized } from "@/components/security/InterventionCopy";
 import { Diagnosis } from "@/components/security/Diagnosis";
 import type { Intervention } from "@/lib/security/intervention-types";
 import {
-  TRANSFER_LABELS, TRANSFER_RED_STEPS, TRANSFER_SUPPORT_HREF,
+  TRANSFER_LABELS, TRANSFER_RED_STEPS, TRANSFER_SUPPORT_HREF, transferSupportHref,
   transferProceedLabel, transferRecipientSummary, transferRedReason,
   type TransferDetails,
 } from "@/lib/security/transfer-copy";
@@ -30,6 +32,7 @@ export function TransferAlertSheet(props: Props) {
 }
 
 function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, onClose, onChoose }: Props & { intervention: Intervention }) {
+  const router = useRouter();
   const [step, setStep] = useState<"question" | "yes" | "no">(classifyOnly ? "yes" : "question");
   const wait = Math.min(60, Math.max(30, intervention.countdownSec ?? FALLBACK_WAIT_SECONDS));
   const [seconds, setSeconds] = useState(wait);
@@ -65,7 +68,10 @@ function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, 
           {TRANSFER_LABELS.stop}
         </button>
         {step === "yes"
-          ? <a className="shield-danger-link" href={TRANSFER_SUPPORT_HREF}>{TRANSFER_LABELS.support}</a>
+          ? <a className="shield-danger-link" href={TRANSFER_SUPPORT_HREF} onClick={event => {
+            event.preventDefault();
+            router.push(transferSupportHref(window.location.pathname + window.location.search));
+          }}>{TRANSFER_LABELS.support}</a>
           : <button type="button" className="shield-danger-link disabled:opacity-50" disabled={seconds > 0}
               onClick={() => { if (seconds === 0) onChoose(TRANSFER_LABELS.proceed); }}>
               {transferProceedLabel(seconds)}
