@@ -17,7 +17,6 @@ const SECURITY_CHILDREN = new Set([
   "lookup",
   "case",
   "sos",
-  "test-tools",
 ]);
 
 function pathnameOf(href: string): string {

@@ -232,16 +232,15 @@ CREATE TABLE IF NOT EXISTS security_events (
 );
 CREATE INDEX IF NOT EXISTS idx_security_events_cif_at ON security_events (cif, at);
 
--- Scam Shield engine clock per persona (E02): test tools shift "now" and pin the
--- hour warnings are judged at. Kept apart from `security_profiles` because the
--- app rewrites that row whole.
+-- Scam Shield engine clock per persona (E02): goals advance shifts "now" via
+-- clock_offset_ms. Kept apart from `security_profiles` because the app rewrites
+-- that row whole. alert_hour / skip_hold retained for existing DB files.
 CREATE TABLE IF NOT EXISTS security_engine_state (
   cif TEXT PRIMARY KEY,
   clock_offset_ms INTEGER NOT NULL DEFAULT 0,
   alert_hour INTEGER CHECK (alert_hour IS NULL OR (alert_hour BETWEEN 0 AND 23)),
   -- E14: when the customer opened the account (BT1 «Trong 7 ngày đầu»); null = unknown.
   account_opened_at INTEGER,
-  -- T01: test tools skip the UC10 hold wait (the hold releases immediately).
   skip_hold INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
@@ -257,7 +256,7 @@ CREATE TABLE IF NOT EXISTS warned_accounts (
   note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (account, bank)
 );
--- demo data: obviously fake numbers (9704 0000 …), seeded once; test tools can edit.
+-- demo data: obviously fake numbers (9704 0000 …), seeded once.
 INSERT OR IGNORE INTO warned_accounts (account, bank, level, note) VALUES
   ('9704000000000001', 'VietinBank', 'danger', 'Giả danh công an / cơ quan thuế'),
   ('9704000000000002', 'BIDV', 'danger', 'Việc làm online, làm nhiệm vụ hưởng hoa hồng'),
@@ -335,7 +334,7 @@ CREATE TABLE IF NOT EXISTS ai_journal (
 CREATE INDEX IF NOT EXISTS idx_ai_journal_cif_at ON ai_journal (cif, at);
 
 -- Kill switch for the Fraud agent (A10). No row means on. Env
--- FRAUD_AGENT_ENABLED=0/false/off forces off and the test-tools toggle cannot override it.
+-- FRAUD_AGENT_ENABLED=0/false/off forces off.
 CREATE TABLE IF NOT EXISTS fraud_agent_switch (
   agent TEXT PRIMARY KEY,
   enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),

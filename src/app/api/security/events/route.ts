@@ -5,7 +5,7 @@ import { evaluate } from "@/lib/security/orchestrator";
 
 /**
  * Scam Shield event log for one persona. The browser posts what happened
- * (screens opened, test-tools simulations); server code records its own events
+ * (screens opened, transfers); server code records its own events
  * directly with `recordEvent`.
  */
 

@@ -3,7 +3,7 @@
 import { useAppNow } from "@/state/app-clock";
 
 import Link from "next/link";
-import { CircleHelp, FlaskConical, PenLine, Search, ShieldCheck, Smartphone, TriangleAlert } from "lucide-react";
+import { CircleHelp, PenLine, Search, ShieldCheck, Smartphone, TriangleAlert } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts, isTransferLocked } from "@/state/security/selectors";
@@ -69,8 +69,6 @@ export function SecurityHub() {
     <Panel title="Thiết lập khác"><Row label="Quản lý thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Chữ ký số" icon={PenLine} href={href("signature")} /></Panel>
 
     <Panel><Row label="Kiến thức bảo mật hữu ích" icon={CircleHelp} href={href("knowledge")} detail="Trang bị kiến thức để bảo vệ tài sản" /></Panel>
-    {/* Testers: shown in every build, biz test runs a production image. */}
-    <Panel><Row label="Công cụ test (demo)" icon={FlaskConical} href={href("test-tools")} detail="Đặt nhanh trạng thái, giờ giả lập, kịch bản chuyển tiền" /></Panel>
     <button type="button" onClick={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push(href("sos")); }); }} className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-negative bg-white py-3 font-semibold text-negative"><TriangleAlert size={20} aria-hidden />Tôi nghĩ mình bị lừa</button>
   </div>;
 }

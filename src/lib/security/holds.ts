@@ -9,7 +9,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
-import { engineNow, readEngineClock } from "./clock";
+import { engineNow } from "./clock";
 import { recordEvent } from "./events";
 import { readProfile } from "./profile-store";
 import { buildTransferContext, type TransferReview } from "./signal-context";
@@ -47,8 +47,7 @@ export function needsHold(cif: string, review: TransferReview): boolean {
 export function requestHold(cif: string, review: TransferReview): Hold | null {
   if (!needsHold(cif, review)) return null;
   const now = engineNow(cif).getTime();
-  // Test tools: "bỏ qua thời gian giữ" releases the hold at once.
-  const releaseAt = readEngineClock(cif).skipHold ? now : now + HOLD_MINUTES * 60 * 1000;
+  const releaseAt = now + HOLD_MINUTES * 60 * 1000;
   const row: Row = { id: randomUUID(), cif, status: "holding", amount: review.amount, review: JSON.stringify(review), created_at: now, release_at: releaseAt };
   getDb()
     .prepare("INSERT INTO transfer_holds (id, cif, status, amount, review, created_at, release_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -61,12 +60,6 @@ export function requestHold(cif: string, review: TransferReview): Hold | null {
   return view(row, now);
 }
 
-/** Test tools: every open hold of this persona may be sent now. */
-export function skipOpenHolds(cif: string): number {
-  const now = engineNow(cif).getTime();
-  return getDb().prepare("UPDATE transfer_holds SET release_at = ? WHERE cif = ? AND status = 'holding'").run(now, cif).changes;
-}
-
 export function getHold(cif: string, id: string): Hold | null {
   const row = getDb().prepare("SELECT * FROM transfer_holds WHERE cif = ? AND id = ?").get(cif, id) as Row | undefined;
   return row ? view(row, engineNow(cif).getTime()) : null;
@@ -74,20 +67,12 @@ export function getHold(cif: string, id: string): Hold | null {
 
 /**
  * cancel: the customer drops the transfer. sent: it went through after the wait.
- * skip (test tools): the wait ends now. Returns the hold, or null when unknown or closed.
+ * Returns the hold, or null when unknown or closed.
  */
-export function updateHold(cif: string, id: string, action: "cancel" | "sent" | "skip"): Hold | null {
+export function updateHold(cif: string, id: string, action: "cancel" | "sent"): Hold | null {
   const hold = getHold(cif, id);
   if (!hold || hold.status !== "holding") return null;
-  const now = engineNow(cif).getTime();
   if (action === "sent" && hold.remainingMs > 0) return null;
-  const db = getDb();
-  if (action === "skip") db.prepare("UPDATE transfer_holds SET release_at = ? WHERE cif = ? AND id = ?").run(now, cif, id);
-  else db.prepare("UPDATE transfer_holds SET status = ? WHERE cif = ? AND id = ?").run(action === "cancel" ? "cancelled" : "sent", cif, id);
+  getDb().prepare("UPDATE transfer_holds SET status = ? WHERE cif = ? AND id = ?").run(action === "cancel" ? "cancelled" : "sent", cif, id);
   return getHold(cif, id);
-}
-
-/** Test tools: end every running hold of a persona now. */
-export function skipAllHolds(cif: string): number {
-  return getDb().prepare("UPDATE transfer_holds SET release_at = ? WHERE cif = ? AND status = 'holding'").run(engineNow(cif).getTime(), cif).changes;
 }

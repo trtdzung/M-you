@@ -124,9 +124,8 @@ export function buildTransferContext(cif: string, review: TransferReview): Signa
   const now = base.now.getTime();
   const transfersOutAll = eventsSince(cif, 0, ["transfer_out"]) as SecurityEvent<"transfer_out">[];
   const chainStart = now - ALERT_RULES.chainWindowMs;
-  // Ledger rows the test tools just wrote for this chain carry the full account number.
-  // Drop those (and any debit in the same 10-minute window) from "already paid", or T1
-  // turns off and T6 cannot fire. The 90-day largest outflow still sees them.
+  // Debits inside the current 10-minute chain window are not "already paid" for T1,
+  // or T6 cannot fire. The 90-day largest outflow still sees them.
   const agedForKnown = base.history.filter(txn => {
     if (txn.direction !== "debit" || txn.type !== "transfer") return true;
     const at = Date.parse(txn.postedAt);
