@@ -118,6 +118,7 @@ export function TransferConfirm() {
   const [redFor, setRedFor] = useState<Intervention | null>(null);
   const shownRed = useRef<string | null>(null);
   const [classifyFor, setClassifyFor] = useState<Intervention | null>(null);
+  const someoneAskedFor = useRef<string | null>(null);
   const [hiddenBanner, setHiddenBanner] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [safeVariant, setSafeVariant] = useState<TransferSafeVariant | null>(null);
@@ -145,6 +146,7 @@ export function TransferConfirm() {
 
   /** One place for every Scam Shield choice: engine log, alert log, then the action. */
   async function chooseShield(intervention: Intervention, choice: string) {
+    if (choice === TRANSFER_LABELS.someoneAsked) someoneAskedFor.current = intervention.id;
     const action = (await respondIntervention(persona.cif, intervention.id, choice)) ?? actionFor(choice);
     const state = useSecurityStore.getState();
     const family = intervention.level === "red" && action.kind === "stop" && state.familyAlerts ? effectiveContacts(state) : [];
@@ -153,13 +155,13 @@ export function TransferConfirm() {
     state.logAlert({ level: intervention.level === "red" ? "red" : "yellow", situation: intervention.copy.message, choice, note: familyNote ? `${source}. ${familyNote}` : source });
     setRedFor(null);
     setClassifyFor(null);
+    if (choice === TRANSFER_LABELS.someoneAsked) return setClassifyFor(intervention);
     if (action.kind === "proceed") {
       setHiddenBanner(intervention.id);
       void proceed();
       return;
     }
     setHiddenBanner(intervention.id);
-    if (choice === TRANSFER_LABELS.someoneAsked) return setClassifyFor(intervention);
     if (action.kind === "navigate") return router.push(action.href);
     setSafeVariant("stopped");
   }
@@ -187,6 +189,7 @@ export function TransferConfirm() {
     const verdict = await shieldState.ensure();
     setChecking(false);
     if (verdict?.level === "red") return setRedFor(verdict);
+    if (verdict?.level === "yellow" && someoneAskedFor.current === verdict.id) return setClassifyFor(verdict);
     // Yellow: «Bấm tiếp ngay» — confirming is the customer's answer.
     if (verdict?.level === "yellow") return void chooseShield(verdict, "Tiếp tục");
     void proceed();
