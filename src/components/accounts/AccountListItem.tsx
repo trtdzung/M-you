@@ -15,9 +15,9 @@ export function AccountListItem({ account }: { account: Account }) {
       className="flex min-h-[112px] items-center gap-3 border-b border-[#dfe5ee] py-5 last:border-b-0 transition-opacity active:opacity-70 focus-visible:rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50"
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[17px] leading-6 font-medium text-text">{title}</p>
-        <p className="mt-1 text-[15px] leading-6 text-muted">{account.maskedNumber}</p>
-        <p className="mt-2 text-[18px] font-semibold tabular-nums text-text">{formatVnd(account.balance).replace(" VND", "")} <span className="font-normal text-muted">VND</span></p>
+        <p className="truncate text-[14px] leading-6 font-medium text-text">{title}</p>
+        <p className="mt-1 text-[12px] leading-6 text-muted">{account.maskedNumber}</p>
+        <p className="mt-2 text-[14px] font-semibold tabular-nums text-text">{formatVnd(account.balance).replace(" VND", "")} <span className="font-normal text-muted">VND</span></p>
       </div>
       <div className="flex flex-col items-end gap-0.5">
         <div className="flex items-center gap-1.5">
