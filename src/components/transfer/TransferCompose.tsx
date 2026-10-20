@@ -5,7 +5,6 @@ import { useAppNow } from "@/state/app-clock";
 import { useEffect, useMemo, useState } from "react";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
-import { checkRecipient } from "@/components/security/checkRecipient";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Home, Lock, QrCode } from "lucide-react";
@@ -74,8 +73,6 @@ export function TransferCompose() {
       recipientLast4: lastFourDigits(next.accountNumber ?? next.accountMasked),
       recipientBank: next.bankName ?? "",
     });
-    // DH4: check the account against the warning list right at this step.
-    checkRecipient(next);
     setRecipient(next);
     setStep("amount");
   }

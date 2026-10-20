@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { diagnose, readDiagnosis } from "@/lib/security/diagnosis";
-import { DIAGNOSE_ANSWERS } from "@/lib/security/scenario-copy";
 const validCif = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 64;
-const ANSWERS = new Set<string>(DIAGNOSE_ANSWERS);
+const ANSWERS = new Set(["Có", "Không"]);
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const cif = req.nextUrl.searchParams.get("cif");

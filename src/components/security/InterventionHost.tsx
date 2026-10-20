@@ -102,14 +102,16 @@ export function InterventionHost() {
   };
   const choose = (item: Intervention) => (choice: string) => void respond(item.id, choice).then(act);
 
-  const visible = items.filter(item => !SELF_DRAWN.has(item.target));
+  // Recipient-entry red alerts use the transfer companion flow in TransferCompose.
+  const visible = items.filter(item => !SELF_DRAWN.has(item.target)
+    && !(item.target === "recipient-entry" && item.level === "red" && item.surface === "popup"));
   const routedFullscreen = useRef<string | null>(null);
   const fullscreen = visible.find(item => item.surface === "fullscreen");
   useEffect(() => {
     if (!fullscreen || routedFullscreen.current === fullscreen.id) return;
     routedFullscreen.current = fullscreen.id;
     shown(fullscreen.id);
-    if (pathname !== "/settings/sos" && pathname !== "/settings/case") router.push("/settings/sos");
+    if (fullscreen.status === "pending" && pathname !== "/settings/sos" && pathname !== "/settings/case") router.push("/settings/sos");
   }, [fullscreen, pathname, router, shown]);
 
   const popup = visible.find(item => item.surface === "popup");

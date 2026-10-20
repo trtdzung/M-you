@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Transaction } from "@/domain/models";
 import { AccountNotFoundError, debitAccount } from "@/lib/accounts-store";
 import { ManualTxnIdConflictError } from "@/lib/manual-txns-store";
+import { InterCustomerTransferRejectedError, type IncomingCredit } from "@/lib/security/credit-store";
+import { evaluate } from "@/lib/security/orchestrator";
 import {
   GoalTransferConflictError,
   GoalTransferRejectedError,
@@ -60,9 +62,18 @@ export async function POST(req: NextRequest) {
     if (record && isOwnGoalTransfer(cif, record)) {
       return NextResponse.json(transferToOwnGoalAccount(cif, accountId, amount, record));
     }
-    const accounts = guardTransferReplay(cif, accountId, amount, record, (r) => debitAccount(cif, accountId, amount, r));
+    const credits: IncomingCredit[] = [];
+    const accounts = guardTransferReplay(cif, accountId, amount, record, (r) => debitAccount(cif, accountId, amount, r, credit => credits.push(credit)));
+    for (const credit of credits) {
+      try {
+        evaluate(credit.cif, "incoming_credit", { txnId: credit.txnId });
+      } catch (err) {
+        console.error("Scam Shield evaluate after credit failed", err);
+      }
+    }
     return NextResponse.json(accounts);
   } catch (err) {
+    if (err instanceof InterCustomerTransferRejectedError) return NextResponse.json({ error: err.message }, { status: 422 });
     if (err instanceof AccountNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 });
     if (err instanceof ManualTxnIdConflictError) return NextResponse.json({ error: err.message }, { status: 409 });
     if (err instanceof GoalTransferConflictError) return NextResponse.json({ error: err.message }, { status: 409 });

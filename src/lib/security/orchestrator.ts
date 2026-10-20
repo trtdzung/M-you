@@ -72,6 +72,7 @@ function evaluateTransfer(cif: string, review: TransferReview, target: "transfer
   const dedupeKey = `${target}|${result.primary}|${review.amount}|${key ?? review.recipientAccount}|${(review.memo ?? "").trim()}`;
   const context: StoredContext = {
     scenarios: result.scenarios, classify: result.classify, evidence: evidenceOf(signals), key,
+    ...(target === "transfer-confirm" ? { transferSignals: signals.filter(s => ["T4", "T5", "T8"].includes(s.code)).map(({ code, facts }) => ({ code, facts })) } : {}),
     facts: { warned: ctx.warned, memo: redactSecurityText(review.memo ?? ""), holdEligible: result.holdEligible, amount: review.amount, recipientName: review.recipientName, recipientLast4: last4 ?? "", recipientBank: review.recipientBank ?? "" },
   };
   const before = findOpenByDedupe(cif, dedupeKey);

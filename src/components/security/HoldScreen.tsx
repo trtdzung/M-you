@@ -1,9 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { useEffect, useState } from "react";
-import { Hourglass } from "lucide-react";
+import { Hourglass, Phone } from "lucide-react";
 import { formatVnd } from "@/lib/format";
-import { Diagnosis } from "./Diagnosis";
+import { Emphasized } from "./InterventionCopy";
+import { TRANSFER_SUPPORT_HREF, transferSupportHref, transferHoldCopy, transferRecipientParts, type TransferDetails } from "@/lib/security/transfer-copy";
 import type { Hold } from "@/lib/security/holds";
 
 const POLL_MS = 3_000;
@@ -38,19 +41,16 @@ const mmss = (ms: number) => {
  * the customer's threshold. The rule releases it; the customer can cancel any
  * time. While waiting M-You asks one diagnostic question (UC 12).
  */
-export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, onChoose, notice }: {
+export function HoldScreen({ cif, hold: initial, onSend, onCancelled, details }: {
   cif: string;
   hold: Hold;
+  details?: TransferDetails;
   onSend: () => void;
   onCancelled: () => void;
-  onScam: () => void;
-  onChoose: (choice: string) => void;
-  notice?: string | null;
 }) {
-  const [proposed, setProposed] = useState<string[]>([]);
+  const router = useRouter();
   const [hold, setHold] = useState(initial);
   const [left, setLeft] = useState(initial.remainingMs);
-  useEffect(() => { setProposed([]); }, [initial.id]);
 
   // Server time is the truth (test tools may end the wait); count down locally between polls.
   useEffect(() => {
@@ -80,27 +80,43 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
     onCancelled();
   };
   const released = left <= 0;
+  const copy = transferHoldCopy({ amount: hold.amount, recipientName: hold.recipientName }, left);
+
+  const recipient = details ? transferRecipientParts(details) : null;
 
   return (
-    <div data-testid="shield-hold" className="flex flex-col gap-4">
-      <div className="flex flex-col items-center gap-2 rounded-[20px] bg-warning-soft p-5 text-center" role="status">
-        <Hourglass size={36} className="text-warning" aria-hidden />
-        <p className="text-lg font-bold">{released ? "Đã hết thời gian giữ" : "Đang giữ giao dịch"}</p>
-        <p className="text-3xl font-bold tabular-nums">{mmss(left)}</p>
-        <p className="text-sm leading-relaxed">
-          {formatVnd(hold.amount)} tới {hold.recipientName} là người nhận mới, vượt ngưỡng bạn đặt. Hệ thống MSB giữ giao dịch để bạn có thời gian kiểm tra. Bạn có thể hủy bất cứ lúc nào.
+    <div data-testid="shield-hold" className="hold-screen">
+      <div className="hold-screen-status" role="status">
+        <span className="transfer-alert-icon hold-screen-icon" aria-hidden="true"><Hourglass size={20} /></span>
+        <p className="hold-screen-title">{released ? "Đã hết thời gian giữ" : "Đang giữ giao dịch"}</p>
+        <p className="hold-screen-countdown">{mmss(left)}</p>
+        <p className="hold-screen-message">
+          <Emphasized {...copy.message} />
         </p>
       </div>
-      <div className="rounded-[20px] border border-border bg-white p-4">
-        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} />
+      {details && recipient && <div className="transfer-alert-recipient">
+        <span className="transfer-alert-avatar" aria-hidden="true">{recipient.initials}</span>
+        <div className="transfer-alert-recipient-copy">
+          <p className="transfer-alert-recipient-name">{recipient.name}</p>
+          <p className="transfer-alert-recipient-meta">{recipient.bankAccount}</p>
+        </div>
+        {details.amount !== undefined && <p className="transfer-alert-amount">{formatVnd(details.amount)}</p>}
+      </div>}
+      <div className="transfer-alert-actions">
+        <button type="button" className="transfer-alert-stop" onClick={() => void cancel()}>
+          {copy.primary}
+        </button>
+        <button type="button" className="transfer-alert-proceed" disabled={!released} onClick={() => { if (released) void send(); }}>
+          {copy.secondary}
+        </button>
+        <a className="transfer-alert-support" href={TRANSFER_SUPPORT_HREF} onClick={event => {
+            event.preventDefault();
+            router.push(transferSupportHref(window.location.pathname + window.location.search));
+          }}>
+          <Phone size={16} aria-hidden="true" />{copy.yes.secondary}
+        </a>
+        <p className="hold-screen-footnote">{copy.footnote}</p>
       </div>
-      {notice && <p role="status" className="text-sm leading-relaxed">{notice}</p>}
-      <button type="button" className="shield-danger-primary" onClick={() => void cancel()}>Hủy giao dịch</button>
-      {!proposed.includes("Tôi nghĩ mình bị lừa") && <button type="button" className="shield-danger-secondary" onClick={onScam}>Tôi nghĩ mình bị lừa</button>}
-      <button type="button" disabled={!released} className="login-submit disabled:opacity-50" onClick={() => void send()}>
-        {released ? "Chuyển ngay" : `Chờ kiểm tra · ${mmss(left)}`}
-      </button>
-      <p className="text-xs leading-relaxed text-muted">M-You không tự chặn tiền của bạn. Việc giữ giao dịch do hệ thống MSB thực hiện theo cài đặt của bạn.</p>
     </div>
   );
 }

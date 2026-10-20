@@ -6,24 +6,10 @@ import { formatVnd } from "@/lib/format";
 import { getSecurityCif } from "@/state/security/storage";
 import { pokeInterventions } from "./useInterventions";
 
-const DRAFT_PREFIX = "msb-pfm.transfer-draft.";
-
-/** The newest transfer draft still open in this tab (the money's next stop), if any. */
-function latestDraft(): { amount: number; name: string; accountNumber?: string; accountMasked: string; recipientBankName?: string; memo: string | null } | null {
-  try {
-    const drafts = Object.keys(sessionStorage).filter(key => key.startsWith(DRAFT_PREFIX))
-      .map(key => JSON.parse(sessionStorage.getItem(key) ?? "null"))
-      .filter(Boolean);
-    return drafts.at(-1) ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * "Tất toán sổ" (simulated): settle a savings account early into the current
- * account. DH5's screen is «Màn rút FD»: when a transfer to a new recipient is
- * already drafted, the engine is asked right here and its red popup shows.
+ * account. No risk evaluation here: the withdrawal is recorded (fd_settled) and
+ * the transfer confirm screen evaluates it (DH5).
  */
 export function FdSettleScreen({ open, accountId, balance, onClose, onDone }: {
   open: boolean;
@@ -47,13 +33,6 @@ export function FdSettleScreen({ open, accountId, balance, onClose, onDone }: {
       const res = await fetch("/api/security/fd-settle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, accountId, amount: value }) });
       if (!res.ok) throw new Error(String(res.status));
       setMessage(`Đã tất toán ${formatVnd(value)} về tài khoản thanh toán (giả lập).`);
-      const draft = latestDraft();
-      if (draft) {
-        await fetch("/api/security/evaluate", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cif, trigger: "fd_settle_review", review: { amount: draft.amount, recipientName: draft.name, recipientAccount: draft.accountNumber ?? draft.accountMasked, recipientBank: draft.recipientBankName ?? null, memo: draft.memo } }),
-        }).catch(() => {});
-      }
       pokeInterventions();
       onDone();
     } catch {

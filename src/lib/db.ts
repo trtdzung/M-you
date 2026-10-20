@@ -20,6 +20,8 @@ import {
 import { needsGoalAccountMigration, rebuildAccountsForGoal } from "./db-migrate-goal-account";
 import { migrateSecurityEngine } from "./security/db-migrate";
 
+import { seedLinhcxDefaults } from "./db-seed-linhcx";
+
 let instance: Database.Database | null = null;
 
 export function getDb(): Database.Database {
@@ -76,6 +78,7 @@ export function getDb(): Database.Database {
   } catch {
     // already migrated, or the table doesn't exist yet — schema.sql below creates it fresh
   }
+  seedLinhcxDefaults(db);
   instance = db;
   return db;
 }

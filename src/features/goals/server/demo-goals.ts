@@ -79,6 +79,8 @@ export const DEMO_GOALS: Record<string, DemoGoal[]> = {
   ],
 };
 
+DEMO_GOALS.CIF_0004 = structuredClone(DEMO_GOALS.CIF_0001);
+
 const iso = (date: string) => `${date}T00:00:00.000Z`;
 
 /** Inserts the sample goals for `cif` in one transaction; re-running adds nothing. */

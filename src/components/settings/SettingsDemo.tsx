@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Bell, Check, ChevronRight, Eye, EyeOff, FileCheck2, FileText, Headphones, Languages, LayoutGrid, LockKeyhole, LogOut, Palette, PenLine, ShieldCheck, Smartphone, Wallet, KeyRound } from "lucide-react";
 import { Sheet } from "@/components/primitives";
 import { usePersona } from "@/providers/context";
@@ -28,6 +29,13 @@ const ANSWERS = ["Bạn chọn 3 câu hỏi bảo mật và thiết lập câu t
 function SecretField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   const [visible, setVisible] = useState(false);
   return <label className="mb-5 block"><span className="mb-2 block text-sm font-medium">{label}</span><span className="settings-input flex items-center"><input aria-label={label} type={visible ? "text" : "password"} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder ?? label} autoComplete="off" className="min-w-0 flex-1 bg-transparent outline-none" /><button type="button" aria-label={`${visible ? "Ẩn" : "Hiện"} ${label.toLowerCase()}`} onClick={() => setVisible(!visible)} className="flex h-10 w-10 items-center justify-center">{visible ? <EyeOff size={22} /> : <Eye size={22} />}</button></span></label>;
+}
+
+function SosBackLink({ fallback }: { fallback: string }) {
+  const from = useSearchParams().get("from");
+  const href = from?.startsWith("/") && !from.startsWith("//") && !from.includes("://") && !from.includes("\\")
+    ? from : fallback;
+  return <Link href={href} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>;
 }
 
 export function SettingsDemo({ section }: { section?: SettingsSection }) {
@@ -113,7 +121,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   }
 
   return <div className={`settings-demo ${demo.appearance === "simple" ? "settings-simple" : ""}`}>
-    <header className="settings-header">{section && <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
+    <header className="settings-header">{section && (section === "sos" ? <Suspense fallback={<Link href={settingsParent("/settings/sos") ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}><SosBackLink fallback={settingsParent("/settings/sos") ?? "/settings"} /></Suspense> : <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>)}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
     {section && <p className="mb-4 text-xs text-muted">Giả lập MSB · Chỉ dùng thông tin mẫu</p>}
     <div className="flex flex-col gap-5">{content}</div>
     <Sheet open={faq !== null} title="Câu hỏi thường gặp" onClose={() => setFaq(null)}>{faq !== null && <><h3 className="mb-4 font-semibold">{FAQ[faq]}</h3><p className="pb-6 text-sm leading-relaxed">{ANSWERS[faq]}</p></>}</Sheet>

@@ -1,6 +1,7 @@
 // What the Scam Shield engine shows the customer, and what the app may send
 // back. Shared by the server (orchestrator) and the client (InterventionHost).
 
+import type { Signal } from "./signals";
 import type { HandbookContext } from "./handbook";
 import type { ScenarioId, ScenarioLevel, Surface } from "./scenario-copy";
 
@@ -32,6 +33,8 @@ export type Intervention = {
   classify: boolean;
   /** Signal evidence the decision rests on (for the inspector and the agent). */
   evidence: { code: string; evidence: string }[];
+  /** Transfer-only engine facts for companion copy; absent on older interventions. */
+  transferSignals?: Pick<Signal, "code" | "facts">[];
   createdAt: number;
   choice: string | null;
 };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * (Re)creates data/pfm.sqlite3 from data/schema.sql and seeds the 3
+ * (Re)creates data/pfm.sqlite3 from data/schema.sql and seeds the 4
  * prototype personas' saved-recipient accounts. Drops and reseeds the
  * `beneficiaries` table every run — a dev/demo convenience, not a migration
  * tool (see data/schema.md). Run with `npm run db:seed`.
@@ -31,6 +31,9 @@ const JAR_ANCHOR = (() => {
 })();
 
 const SEED_BENEFICIARIES = [
+  { id: "b_linhcx_lan", cif: "CIF_0004", name: "Nguyễn Thị Lan", accountNumber: "19012345678901", bankName: "MSB" },
+  { id: "b_linhcx_binh", cif: "CIF_0004", name: "Trần Văn Bình", accountNumber: "0071000123456", bankName: "Vietcombank" },
+  { id: "b_linhcx_landlord", cif: "CIF_0004", name: "Chủ nhà Phạm Văn Đức", accountNumber: "12010009988776", bankName: "MSB" },
   // CIF_0001 — Minh, Lương ổn định (persona "stable")
   { id: "b_stable_lan", cif: "CIF_0001", name: "Nguyễn Thị Lan", accountNumber: "19012345678901", bankName: "MSB" },
   { id: "b_stable_binh", cif: "CIF_0001", name: "Trần Văn Bình", accountNumber: "0071000123456", bankName: "Vietcombank" },
@@ -63,6 +66,7 @@ const SEED_JARS = JSON.parse(readFileSync(SEED_JARS_PATH, "utf8"));
 // (Σ/CASA ≈ 0.94, dư về "Chờ phân bổ") and fixes CIF_0002 over-allocation.
 const SALARY_BASE_BY_CIF = {
   CIF_0001: 30_000_000,
+  CIF_0004: 30_000_000,
   CIF_0002: 35_000_000,
   CIF_0003: 100_000_000,
 };
@@ -77,6 +81,7 @@ const CIFS = Object.keys(SALARY_BASE_BY_CIF);
 // these seeds. `accounts-store.ts` seeds the same shape lazily; this script is
 // just the committed-DB path.
 const PERSONA_ACCOUNTS = {
+  CIF_0004: { personaId: "linhcx", seed: 4004, tier: "M-FIRST GOLD" },
   CIF_0001: { personaId: "stable", seed: 1001, tier: "M-FIRST GOLD" },
   CIF_0002: { personaId: "irregular", seed: 2002, tier: "M-FIRST" },
   CIF_0003: { personaId: "wealthy", seed: 3003, tier: "M-FIRST PRIVATE" },
@@ -202,7 +207,7 @@ const insertAllJars = db.transaction(() => {
       const scaledLimit =
         jar.budgetLimit === undefined ? null : Math.round(jar.budgetLimit * scale);
       insertJar.run({
-        id: jar.id,
+        id: cif === "CIF_0004" ? `linhcx_${jar.id}` : jar.id,
         cif,
         label: jar.label,
         categoryIds: JSON.stringify(jar.categoryIds),
@@ -212,7 +217,7 @@ const insertAllJars = db.transaction(() => {
         createdAt: JAR_ANCHOR,
       });
       if (scaledLimit !== null) {
-        insertOpening.run({ cif, id: `led-seed-${jar.id}`, jarId: jar.id, amount: scaledLimit, createdAt: JAR_ANCHOR });
+        insertOpening.run({ cif, id: `led-seed-${cif === "CIF_0004" ? `linhcx_${jar.id}` : jar.id}`, jarId: cif === "CIF_0004" ? `linhcx_${jar.id}` : jar.id, amount: scaledLimit, createdAt: JAR_ANCHOR });
       }
     });
   }
