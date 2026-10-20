@@ -20,6 +20,10 @@ export interface PlanMilestone {
   title: string;
   detail?: string;
   action?: string;
+  /** Months from the moment the plan was built (0..480); only plans for an existing goal carry it. */
+  month?: number;
+  /** Last month of a range (`month`..480); only together with `month`. */
+  end_month?: number;
 }
 export interface PlanOption {
   id: PlanId;
@@ -34,6 +38,8 @@ export interface PlanOption {
 }
 export interface PlanRoadmapUi {
   type: "plan_roadmap";
+  /** Present only when the plan is for an existing goal: "Chọn phương án này" then saves it as that goal's roadmap. */
+  goal_id?: string;
   title: string;
   baseline: string;
   assumptions: string[];
@@ -52,18 +58,23 @@ const optStr = (v: unknown, max: number): boolean => v === undefined || str(v, m
 const only = (f: Record<string, unknown>, allowed: string[]) =>
   Object.entries(f).every(([k, v]) => v === undefined || allowed.includes(k));
 
+const MAX_MONTH = 480;
+const month = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_MONTH;
+
 function validMetric(m: unknown): boolean {
   return isObj(m) && only(m, ["label", "value"]) && str(m.label, 30) && str(m.value, 40);
 }
 function validMilestone(m: unknown): boolean {
   return (
     isObj(m) &&
-    only(m, ["when", "kind", "title", "detail", "action"]) &&
+    only(m, ["when", "kind", "title", "detail", "action", "month", "end_month"]) &&
     str(m.when, 30) &&
     typeof m.kind === "string" && KINDS.has(m.kind) &&
     str(m.title, 60) &&
     optStr(m.detail, 200) &&
-    optStr(m.action, 120)
+    optStr(m.action, 120) &&
+    (m.month === undefined || month(m.month)) &&
+    (m.end_month === undefined || (month(m.end_month) && month(m.month) && m.end_month >= m.month))
   );
 }
 function validPlan(p: unknown): boolean {
@@ -85,7 +96,8 @@ export function isPlanRoadmapUi(ui: UiPayload | null | undefined): ui is PlanRoa
   try {
     if (!isObj(ui) || ui.type !== "plan_roadmap") return false;
     const c = ui as Record<string, unknown>;
-    if (!only(c, ["type", "title", "baseline", "assumptions", "plans"])) return false;
+    if (!only(c, ["type", "goal_id", "title", "baseline", "assumptions", "plans"])) return false;
+    if (c.goal_id !== undefined && !str(c.goal_id, 64)) return false;
     if (!str(c.title, 80) || !str(c.baseline, 200)) return false;
     if (!Array.isArray(c.assumptions) || c.assumptions.length > 8 || !c.assumptions.every((a) => str(a, 80))) return false;
     if (!Array.isArray(c.plans) || c.plans.length < 1 || c.plans.length > 3 || !c.plans.every(validPlan)) return false;

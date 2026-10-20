@@ -6,7 +6,7 @@ import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
 import { initialPreviewState, previewReducer } from "./reducer";
-import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, requestMarketRefresh, type GoalIdResolution, type WorldPayload } from "./server-sync";
+import { ActionQueue, GOALS_CHANGED_EVENT, fetchWorld, isLocalOnlyAction, pollMarket, requestMarketRefresh, type GoalIdResolution, type WorldPayload } from "./server-sync";
 import { syncGoalInsights } from "../client/goal-insight-store";
 import { hydrateMarket } from "../data/market";
 import { usePersonaCif } from "@/providers/context";
@@ -151,6 +151,24 @@ function useServerWorld(
   }, [cif, entryScreen, reloadKey, rawDispatch, applyPayload, stateRef]);
 
   const reload = useCallback(() => setReloadKey((key) => key + 1), []);
+
+  // A chat card (create / edit goal, choose a roadmap...) changed the goals on the server: re-read them quietly, keeping the screen.
+  useEffect(() => {
+    if (!cif || loadStatus !== "ready") return;
+    let alive = true;
+    const onChanged = () => {
+      fetchWorld(cif)
+        .then((payload) => {
+          if (alive) applyPayload(payload);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener(GOALS_CHANGED_EVENT, onChanged);
+    return () => {
+      alive = false;
+      window.removeEventListener(GOALS_CHANGED_EVENT, onChanged);
+    };
+  }, [cif, loadStatus, applyPayload]);
 
   const dispatch = useCallback(
     (action: PreviewAction) => {

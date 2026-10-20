@@ -55,6 +55,10 @@ const GOAL_TEMPLATES = new Set(["car", "house", "travel", "education", "emergenc
 const FLEXIBILITIES = new Set(["date_fixed", "date_flexible", "amount_flexible"]);
 const DECLARED_CATEGORIES = new Set(["house", "car", "motorbike", "other", "gold", "stock", "external_fund", "deposit", "bond"]);
 const VALUE_SOURCES = new Set(["msb", "self_reported", "estimated"]);
+const ROADMAP_KINDS = new Set(["reserve", "save", "switch", "buy", "loan", "repay", "done"]);
+const ROADMAP_PLAN_IDS = new Set(["no_loan", "loan_now", "optimized"]);
+const MAX_ROADMAP_MILESTONES = 10;
+const MAX_ROADMAP_MONTH = 480;
 const RISK_PROFILE_VALUES = new Set(["conservative", "balanced", "growth"]);
 
 class InvalidAction extends Error {}
@@ -93,6 +97,31 @@ function bool(o: Obj, k: string): boolean {
   if (typeof o[k] !== "boolean") throw new InvalidAction(k);
   return o[k] as boolean;
 }
+/** Chuỗi không rỗng (sau khi cắt khoảng trắng), tối đa `max` ký tự (đếm theo code point). */
+function limited(o: Obj, k: string, max: number): string {
+  const v = o[k];
+  if (typeof v !== "string" || v.trim() === "" || Array.from(v).length > max) throw new InvalidAction(k);
+  return v;
+}
+const monthIn = (n: number) => Number.isInteger(n) && n >= 0 && n <= MAX_ROADMAP_MONTH;
+
+/** Các mốc của `setRoadmap`: 1..10 mốc, `endMonth` (nếu có) >= `month`. */
+function roadmapMilestones(a: Obj): Obj[] {
+  const list = a.milestones;
+  if (!Array.isArray(list) || list.length < 1 || list.length > MAX_ROADMAP_MILESTONES || list.some((m) => !isObj(m))) throw new InvalidAction("milestones");
+  return (list as Obj[]).map((m) => {
+    const month = num(m, "month", monthIn);
+    return {
+      month,
+      ...opt(m, "endMonth", (x, k) => num(x, k, (n) => monthIn(n) && n >= month)),
+      kind: oneOf(m, "kind", ROADMAP_KINDS),
+      title: limited(m, "title", 60),
+      ...opt(m, "detail", (x, k) => limited(x, k, 200)),
+      ...opt(m, "action", (x, k) => limited(x, k, 120)),
+    };
+  });
+}
+
 /** Trường tuỳ chọn: vắng mặt → không có trong action sạch. */
 function opt<T>(o: Obj, k: string, read: (o: Obj, k: string) => T): { [key: string]: T } {
   return o[k] === undefined ? {} : { [k]: read(o, k) };
@@ -182,6 +211,13 @@ function parseFields(type: string, a: Obj): Obj {
         amount: num(a, "amount", nonNegative),
         dayOfMonth: num(a, "dayOfMonth", (n) => Number.isInteger(n) && n >= 1 && n <= 31),
         ...opt(a, "active", bool),
+      };
+    case "setRoadmap":
+      return {
+        ...goalId(),
+        planId: oneOf(a, "planId", ROADMAP_PLAN_IDS),
+        planName: limited(a, "planName", 40),
+        milestones: roadmapMilestones(a),
       };
     case "reserveLoan":
       return { ...goalId(), productId: str(a, "productId"), principal: num(a, "principal", positive), termMonths: num(a, "termMonths", positiveInt) };

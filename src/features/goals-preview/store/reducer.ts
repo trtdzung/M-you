@@ -346,6 +346,27 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
       return draft;
     }
 
+    case "setRoadmap": {
+      const goal = findGoal(draft, action.goalId);
+      if (!goal) return fail(state, "Không tìm thấy mục tiêu.");
+      if (goal.status === "closed" || goal.status === "completed") return fail(state, "Mục tiêu đã kết thúc nên không đặt lộ trình được.");
+      goal.roadmap = {
+        planId: action.planId,
+        planName: action.planName,
+        chosenAt: today,
+        milestones: action.milestones.map((m) => ({
+          date: addMonths(today, m.month),
+          ...(m.endMonth === undefined ? {} : { endDate: addMonths(today, m.endMonth) }),
+          kind: m.kind,
+          title: m.title,
+          ...(m.detail === undefined ? {} : { detail: m.detail }),
+          ...(m.action === undefined ? {} : { action: m.action }),
+        })),
+      };
+      toast(draft, `Đã đặt lộ trình “${action.planName}” cho “${goal.name}”.`);
+      return draft;
+    }
+
     case "runStandingOrderNow": {
       const result = runStandingOrder(draft, action.goalId, today);
       if (result === "skipped") return fail(state, "Chưa có lệnh trích tự động đang bật.");

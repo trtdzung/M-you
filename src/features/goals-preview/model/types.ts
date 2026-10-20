@@ -84,6 +84,27 @@ export interface StandingOrder {
   failedCount: number;
 }
 
+export type RoadmapKind = "reserve" | "save" | "switch" | "buy" | "loan" | "repay" | "done";
+
+/** Một mốc trong lộ trình khách chọn từ kế hoạch của trợ lý (ngày đã tính từ hôm nay lúc chọn). */
+export interface RoadmapMilestone {
+  date: ISODate;
+  /** Chỉ có với mốc dạng khoảng ("từ … đến …"). */
+  endDate?: ISODate;
+  kind: RoadmapKind;
+  title: string;
+  detail?: string;
+  action?: string;
+}
+
+/** Lộ trình riêng của mục tiêu: thay cho lộ trình tự tính khi khách chọn một phương án trong chat. */
+export interface GoalRoadmap {
+  planId: string;
+  planName: string;
+  chosenAt: ISODate;
+  milestones: RoadmapMilestone[];
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -119,6 +140,8 @@ export interface Goal {
   originalTargetAmount?: number;
   originalTargetDate?: ISODate;
   note?: string;
+  /** Lộ trình khách chọn từ chat (thay cho lộ trình tự tính ở màn chi tiết). */
+  roadmap?: GoalRoadmap;
 }
 
 // ---------------------------------------------------------------- account & txns

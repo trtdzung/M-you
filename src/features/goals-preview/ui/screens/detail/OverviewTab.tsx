@@ -197,25 +197,50 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
 
       {(goal.status === "accumulating" || goal.status === "repaying") && <GoalCoach goalId={goal.id} goalName={goal.name} />}
 
-      <section className={`${card} flex flex-col gap-3`}>
+      <section className={`${card} flex flex-col gap-3`} aria-label="Lộ trình">
         <h2 className={sectionTitle}>Lộ trình</h2>
-        <ol className="flex flex-col">
-          {timeline.map((t, i) => (
-            <li key={`${t.date}-${t.label}-${i}`} className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <span className={cn("mt-1.5 h-3 w-3 shrink-0 rounded-full", t.done ? "bg-positive" : "border-2 border-border bg-surface")} />
-                {i < timeline.length - 1 && <span className="w-px flex-1 bg-border" />}
-              </div>
-              <div className="pb-4">
-                <p className={cn("text-sm", t.done ? "font-semibold text-text" : "text-muted")}>{t.label}</p>
-                <p className="text-[12px] text-muted">
-                  {t.label.includes("Mốc ") || t.label.includes("mốc ") ? "Kế hoạch: " : ""}{formatISODate(t.date)}
-                  {t.note ? ` · ${t.note}` : ""}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        {goal.roadmap ? (
+          <>
+            <p className="text-[12px] text-muted">{`Theo phương án «${goal.roadmap.planName}» · chọn ngày ${formatISODate(goal.roadmap.chosenAt)}`}</p>
+            <ol className="flex flex-col">
+              {goal.roadmap.milestones.map((m, i, all) => {
+                const done = m.date <= today;
+                return (
+                  <li key={`${m.date}-${m.kind}-${i}`} className="flex gap-3" data-done={done ? "true" : "false"}>
+                    <div className="flex flex-col items-center">
+                      <span className={cn("mt-1.5 h-3 w-3 shrink-0 rounded-full", done ? "bg-positive" : "border-2 border-border bg-surface")} />
+                      {i < all.length - 1 && <span className="w-px flex-1 bg-border" />}
+                    </div>
+                    <div className="min-w-0 pb-4">
+                      <p className={cn("break-words text-sm", done ? "font-semibold text-text" : "text-muted")}>{m.title}</p>
+                      <p className="text-[12px] text-muted">{m.endDate ? `từ ${formatISODate(m.date)} đến ${formatISODate(m.endDate)}` : formatISODate(m.date)}</p>
+                      {m.detail && <p className="break-words text-[12px] text-muted">{m.detail}</p>}
+                      {m.action && <p className="break-words text-[12px] font-medium text-primary-strong">{m.action}</p>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </>
+        ) : (
+          <ol className="flex flex-col">
+            {timeline.map((t, i) => (
+              <li key={`${t.date}-${t.label}-${i}`} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <span className={cn("mt-1.5 h-3 w-3 shrink-0 rounded-full", t.done ? "bg-positive" : "border-2 border-border bg-surface")} />
+                  {i < timeline.length - 1 && <span className="w-px flex-1 bg-border" />}
+                </div>
+                <div className="pb-4">
+                  <p className={cn("text-sm", t.done ? "font-semibold text-text" : "text-muted")}>{t.label}</p>
+                  <p className="text-[12px] text-muted">
+                    {t.label.includes("Mốc ") || t.label.includes("mốc ") ? "Kế hoạch: " : ""}{formatISODate(t.date)}
+                    {t.note ? ` · ${t.note}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       <Sheet open={loanWarning} title="Hồ sơ vay có thể chưa đủ điều kiện" onClose={() => setLoanWarning(false)}>

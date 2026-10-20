@@ -30,6 +30,9 @@ export function isLocalOnlyAction(action: PreviewAction): boolean {
   );
 }
 
+/** Fired on `window` after a chat card changed the customer's goals on the server, so an already-open Mục tiêu screen re-reads them. */
+export const GOALS_CHANGED_EVENT = "pfm:goals-changed";
+
 export async function fetchWorld(cif: string): Promise<WorldPayload> {
   const res = await fetch(`${BASE}?cif=${encodeURIComponent(cif)}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GET goals-v2 ${res.status}`);

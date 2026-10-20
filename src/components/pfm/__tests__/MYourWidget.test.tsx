@@ -349,7 +349,7 @@ describe("MYourWidget", () => {
     expect(screen.queryByText("Đề xuất tạo mục tiêu mới")).not.toBeInTheDocument();
   });
 
-  it("renders the plan roadmap card under the reply; choosing a plan sends its choice_text, then the card is disabled", async () => {
+  it("renders the plan roadmap card under the reply; a card without a goal is read-only", async () => {
     const planUi = {
       type: "plan_roadmap",
       title: "Căn hộ 1,2 tỷ · 10 năm",
@@ -380,18 +380,12 @@ describe("MYourWidget", () => {
 
     expect(await screen.findByText("Căn hộ 1,2 tỷ · 10 năm")).toBeInTheDocument();
     expect(screen.getByText("Góp khoảng 12 triệu/tháng vào tiết kiệm MSB")).toBeInTheDocument();
-    const choose = screen.getByRole("button", { name: "Chọn phương án này" });
-    expect(choose).toBeEnabled();
-
-    send.mockResolvedValueOnce({ answer: "Đã ghi nhận lựa chọn.", thread_id: "CIF_0001" });
-    fireEvent.click(choose);
-    expect(send).toHaveBeenLastCalledWith("Tôi chọn phương án Kết hợp tối ưu: mua ở tháng 60", "CIF_0001");
-    expect(await screen.findByText("Đã ghi nhận lựa chọn.")).toBeInTheDocument();
-    // The conversation moved on: the card (still shown) can no longer be used.
-    expect(screen.getByRole("button", { name: "Chọn phương án này" })).toBeDisabled();
+    // an older card with no goal_id has nothing to attach a roadmap to: no choose button, and nothing is sent to the agent
+    expect(screen.queryByRole("button", { name: "Chọn phương án này" })).not.toBeInTheDocument();
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("after the customer creates a goal from the chat card, the chat tells the agent so it can ask about assets", async () => {
+  it("creating a goal from the chat card does not message the agent", async () => {
     goalApi.send.mockResolvedValue({ ok: true, createdGoalId: "goal-9" });
     const send = vi.spyOn(agentApi, "sendChatMessage");
     send.mockResolvedValueOnce({
@@ -407,12 +401,34 @@ describe("MYourWidget", () => {
     fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Tạo mục tiêu mua xe" } });
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
-    const create = await screen.findByRole("button", { name: "Tạo mục tiêu" });
-    send.mockResolvedValueOnce({ answer: "Bạn có tài sản nào sẵn có không?", thread_id: "CIF_0001" });
-    fireEvent.click(create);
-    await waitFor(() => expect(send).toHaveBeenLastCalledWith("Mình đã tạo mục tiêu «Mua xe».", "CIF_0001"));
-    expect(await screen.findByText("Bạn có tài sản nào sẵn có không?")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Tạo mục tiêu" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Đã tạo mục tiêu" })).toBeDisabled());
     expect(goalApi.send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1); // only the customer's own message
+  });
+
+  it("choosing a plan for an existing goal saves the roadmap and does not message the agent", async () => {
+    goalApi.send.mockResolvedValue({ ok: true });
+    const planUi = {
+      type: "plan_roadmap", goal_id: "goal-3", title: "Mua nhà · 5 năm", baseline: "Đạt mục tiêu ở tháng 60",
+      assumptions: [],
+      plans: [{
+        id: "no_loan", name: "Không vay", verdict: "recommended", headline: "Đạt mục tiêu ở tháng 60", metrics: [],
+        milestones: [{ when: "Tháng 0", month: 0, kind: "reserve", title: "Giữ quỹ dự phòng" }, { when: "Tháng 60", month: 60, kind: "buy", title: "Mua mục tiêu" }],
+        choice_text: "Tôi chọn phương án Không vay",
+      }],
+    };
+    const send = vi.spyOn(agentApi, "sendChatMessage");
+    send.mockResolvedValueOnce({ answer: "Đây là lộ trình.", thread_id: "CIF_0001", ui: planUi as agentApi.UiPayload });
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Gợi ý lộ trình cho mục tiêu Mua nhà" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Chọn phương án này" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Đã đặt lộ trình" })).toBeDisabled());
+    expect(goalApi.send).toHaveBeenCalledWith("CIF_0001", expect.objectContaining({ type: "setRoadmap", goalId: "goal-3", planId: "no_loan" }));
+    expect(send).toHaveBeenCalledTimes(1); // nothing was sent to the agent after the choice
   });
 
   it("drops a malformed plan roadmap and shows only the text", async () => {

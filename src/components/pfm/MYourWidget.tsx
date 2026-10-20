@@ -504,19 +504,9 @@ export function MYourWidget() {
                       {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
                       {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
                       {m.role === "agent" && isJarUi(m.ui, expenseIds) && <AgentJarUiCard ui={m.ui} />}
-                      {m.role === "agent" && isGoalUi(m.ui) && (
-                        <AgentGoalUiCard
-                          ui={m.ui}
-                          // the agent then asks for the assets the customer already has and suggests a roadmap (skill goal-plan)
-                          onCreated={(goalName) => void postMessage(`Mình đã tạo mục tiêu «${goalName}».`)}
-                        />
-                      )}
+                      {m.role === "agent" && isGoalUi(m.ui) && <AgentGoalUiCard ui={m.ui} />}
                       {m.role === "agent" && isPlanRoadmapUi(m.ui) && (
-                        <AgentPlanRoadmapCard
-                          ui={m.ui}
-                          disabled={sending || idx !== messages.length - 1}
-                          onChoose={(text) => void postMessage(text)}
-                        />
+                        <AgentPlanRoadmapCard ui={m.ui} />
                       )}
                       {clarify && (isLatestUnanswered || isReopened) && (
                         <AgentClarifyOptionsCard

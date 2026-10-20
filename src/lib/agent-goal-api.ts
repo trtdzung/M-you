@@ -1,4 +1,5 @@
 import type { PreviewAction } from "@/features/goals-preview/store/actions";
+import { GOALS_CHANGED_EVENT } from "@/features/goals-preview/store/server-sync";
 import type { UiPayload } from "./agent-api";
 
 /**
@@ -263,6 +264,7 @@ export async function sendGoalAction(cif: string, action: PreviewAction): Promis
       body: JSON.stringify({ cif, requestId: crypto.randomUUID(), action }),
     });
     if (res.ok) {
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(GOALS_CHANGED_EVENT));
       const body = (await res.json().catch(() => null)) as { createdGoalId?: unknown } | null;
       return typeof body?.createdGoalId === "string" && body.createdGoalId !== "" ? { ok: true, createdGoalId: body.createdGoalId } : { ok: true };
     }

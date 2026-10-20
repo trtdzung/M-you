@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ChevronDown, TriangleAlert } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { markApplied, proposalKey, wasApplied } from "@/lib/agent-applied";
+import { sendGoalAction } from "@/lib/agent-goal-api";
 import type { MilestoneKind, PlanOption, PlanRoadmapUi, PlanVerdict } from "@/lib/agent-plan-api";
+import { usePersona } from "@/providers/context";
 
 const VERDICT_BADGE: Record<PlanVerdict, { label: string; className: string }> = {
   recommended: { label: "Khuyến nghị", className: "bg-positive-soft text-positive" },
@@ -23,25 +26,21 @@ const DOT: Record<MilestoneKind, string> = {
   repay: "bg-warning",
 };
 
+/** Same look as the "Lộ trình" list of the goal detail: dot and line on the left, title, when, then the one action. */
 function Timeline({ plan }: { plan: PlanOption }) {
   return (
-    <ol className="relative mt-1 flex flex-col gap-3 border-l-2 border-border pl-4">
-      {plan.milestones.map((m, i) => (
-        <li key={i} className="relative">
-          <span
-            aria-hidden
-            data-kind={m.kind}
-            className={cn("absolute -left-[23px] top-1 h-3 w-3 rounded-full ring-2 ring-surface", DOT[m.kind])}
-          />
-          <p className="break-words text-xs font-bold text-text">{m.when}</p>
-          <p className="break-words text-sm text-text">{m.title}</p>
-          {m.detail && <p className="break-words text-xs text-muted">{m.detail}</p>}
-          {m.action && (
-            <p className="mt-0.5 flex items-start gap-1 text-xs font-medium text-primary-strong">
-              <ArrowRight size={12} aria-hidden className="mt-0.5 shrink-0" />
-              <span className="min-w-0 break-words">{m.action}</span>
-            </p>
-          )}
+    <ol className="mt-1 flex flex-col">
+      {plan.milestones.map((m, i, all) => (
+        <li key={i} className="flex gap-3">
+          <div className="flex flex-col items-center">
+            <span aria-hidden data-kind={m.kind} className={cn("mt-1.5 h-3 w-3 shrink-0 rounded-full", DOT[m.kind])} />
+            {i < all.length - 1 && <span aria-hidden className="w-px flex-1 bg-border" />}
+          </div>
+          <div className="min-w-0 pb-3">
+            <p className="break-words text-sm font-semibold text-text">{m.title}</p>
+            <p className="text-[12px] text-muted">{m.when}</p>
+            {m.action && <p className="break-words text-[12px] font-medium text-primary-strong">{m.action}</p>}
+          </div>
         </li>
       ))}
     </ol>
@@ -52,12 +51,21 @@ function PlanSection({
   plan,
   initiallyOpen,
   disabled,
-  onChoose,
+  canChoose,
+  buttonLabel,
+  error,
+  onPick,
 }: {
   plan: PlanOption;
   initiallyOpen: boolean;
+  /** False for a card without a goal: nothing to attach the roadmap to, so no choose button. */
+  canChoose: boolean;
   disabled?: boolean;
-  onChoose: (text: string) => void;
+  /** Label of the choose button (it says what pressing it does). */
+  buttonLabel: string;
+  /** Problem to show under the button after a refused choice. */
+  error?: string | null;
+  onPick: (plan: PlanOption) => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const badge = VERDICT_BADGE[plan.verdict];
@@ -91,32 +99,18 @@ function PlanSection({
 
       {collapsible && open && (
         <>
-          {plan.metrics.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {plan.metrics.map((m, mi) => (
-                <span key={`${mi}-${m.label}`} className="max-w-full break-words rounded-full bg-surface px-2 py-0.5 text-[11px] text-muted">
-                  {m.label}: {m.value}
-                </span>
-              ))}
-            </div>
-          )}
           <Timeline plan={plan} />
-          {plan.risk && (
-            <p className="flex items-start gap-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs text-warning">
-              <TriangleAlert size={13} aria-hidden className="mt-0.5 shrink-0" />
-              <span className="min-w-0 break-words">{plan.risk}</span>
-            </p>
-          )}
-          {plan.choice_text && (
+          {canChoose && plan.choice_text && (
             <button
               type="button"
               disabled={disabled}
-              onClick={() => onChoose(plan.choice_text as string)}
+              onClick={() => onPick(plan)}
               className="mt-1 h-9 rounded-full bg-primary px-4 text-sm font-semibold text-white disabled:opacity-40"
             >
-              Chọn phương án này
+              {buttonLabel}
             </button>
           )}
+          {error && <p role="alert" className="break-words text-xs text-negative">{error}</p>}
         </>
       )}
     </section>
@@ -124,41 +118,71 @@ function PlanSection({
 }
 
 /**
- * The `plan_roadmap` card: title, baseline and assumption chips, then one section per plan with a verdict badge, a metrics row,
- * a vertical milestone timeline, the bad-scenario risk line and a "Chọn phương án này" button that sends the plan's
- * `choice_text` as the customer's next chat message (`onChoose`). The recommended plan (else the first choosable one) starts
- * expanded; `not_recommended` plans show only name, badge, headline and reason. It never talks to the network itself.
+ * The `plan_roadmap` card, kept short: the title, then one section per plan with a verdict badge, a one-line headline, the
+ * milestone list (title, when, action; like the goal detail "Lộ trình") and a "Chọn phương án này" button. The recommended plan
+ * (else the first choosable one) starts expanded; `not_recommended` plans show only name, badge, headline and reason. The
+ * baseline, assumptions, metrics, details and bad-scenario lines of the payload are for the agent's answer, not drawn here.
+ *
+ * A roadmap always belongs to a goal (`ui.goal_id`): the button saves the plan as that goal's roadmap (`setRoadmap`, shown in the
+ * goal's "Lộ trình" section) and tells the agent nothing. A card from an older conversation that has no `goal_id` is shown for
+ * reading only (no choose button).
  */
-export function AgentPlanRoadmapCard({
-  ui,
-  disabled,
-  onChoose,
-  fullWidth = false,
-}: {
-  ui: PlanRoadmapUi;
-  /** True while a message is in flight or the conversation has moved on — the choose buttons disable. */
-  disabled?: boolean;
-  onChoose: (text: string) => void;
-  fullWidth?: boolean;
-}) {
+export function AgentPlanRoadmapCard({ ui, fullWidth = false }: { ui: PlanRoadmapUi; fullWidth?: boolean }) {
+  const { persona } = usePersona();
+  const goalId = ui.goal_id;
+  const planKey = (plan: PlanOption) => proposalKey(persona.cif, { type: "setRoadmap", goalId, plan });
+  const [appliedId, setAppliedId] = useState<string | null>(() => (goalId ? (ui.plans.find((p) => wasApplied(planKey(p)))?.id ?? null) : null));
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [problem, setProblem] = useState<{ planId: string; text: string } | null>(null);
   const openId = (ui.plans.find((p) => p.verdict === "recommended") ?? ui.plans.find((p) => p.verdict !== "not_recommended"))?.id;
+
+  async function pick(plan: PlanOption) {
+    if (!goalId) return;
+    // milestones the agent gave no month for cannot be placed on the calendar
+    const milestones = plan.milestones.flatMap((m) =>
+      m.month === undefined
+        ? []
+        : [{
+            month: m.month,
+            ...(m.end_month === undefined ? {} : { endMonth: m.end_month }),
+            kind: m.kind,
+            title: m.title,
+            ...(m.detail ? { detail: m.detail } : {}),
+            ...(m.action ? { action: m.action } : {}),
+          }],
+    );
+    if (milestones.length === 0) {
+      setProblem({ planId: plan.id, text: "Phương án này chưa có mốc thời gian nên chưa đặt được lộ trình." });
+      return;
+    }
+    setBusyId(plan.id);
+    setProblem(null);
+    const result = await sendGoalAction(persona.cif, { type: "setRoadmap", goalId, planId: plan.id, planName: plan.name, milestones });
+    setBusyId(null);
+    if (!result.ok) {
+      setProblem({ planId: plan.id, text: result.error });
+      return;
+    }
+    markApplied(planKey(plan));
+    setAppliedId(plan.id);
+  }
+
+  // saving a roadmap is independent of the conversation: only an action in flight blocks the buttons
+  const labelFor = (plan: PlanOption) => (busyId === plan.id ? "Đang đặt lộ trình…" : appliedId === plan.id ? "Đã đặt lộ trình" : "Chọn phương án này");
   return (
     <div className={cn("shadow-card mt-2 flex flex-col gap-3 rounded-2xl bg-surface p-3", fullWidth ? "w-full" : "w-[85%]")}>
-      <div className="flex flex-col gap-1">
-        <p className="break-words text-sm font-semibold text-text">{ui.title}</p>
-        <p className="break-words text-xs text-muted">{ui.baseline}</p>
-        {ui.assumptions.length > 0 && (
-          <div className="mt-0.5 flex flex-wrap gap-1.5">
-            {ui.assumptions.map((a, i) => (
-              <span key={`${i}-${a}`} className="max-w-full break-words rounded-full bg-surface-tint px-2 py-0.5 text-[11px] text-muted">
-                {a}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <p className="break-words text-sm font-semibold text-text">{ui.title}</p>
       {ui.plans.map((p) => (
-        <PlanSection key={p.id} plan={p} initiallyOpen={p.id === openId} disabled={disabled} onChoose={onChoose} />
+        <PlanSection
+          key={p.id}
+          plan={p}
+          initiallyOpen={p.id === openId}
+          canChoose={goalId !== undefined}
+          disabled={busyId !== null || appliedId === p.id}
+          buttonLabel={labelFor(p)}
+          error={problem?.planId === p.id ? problem.text : null}
+          onPick={(plan) => void pick(plan)}
+        />
       ))}
     </div>
   );

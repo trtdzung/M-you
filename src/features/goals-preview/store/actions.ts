@@ -6,6 +6,7 @@ import type {
   GoalTemplate,
   ISODate,
   RiskProfile,
+  RoadmapKind,
   ToastTone,
   ValueSource,
 } from "../model/types";
@@ -43,6 +44,15 @@ export interface CreateGoalInput {
   assets?: DeclaredAssetInput[];
 }
 
+export interface RoadmapMilestoneInput {
+  month: number;
+  endMonth?: number;
+  kind: RoadmapKind;
+  title: string;
+  detail?: string;
+  action?: string;
+}
+
 export type NavAction =
   | { type: "nav/params"; params: ScreenParams }
   | { type: "nav/push"; screen: ScreenId; params?: ScreenParams }
@@ -78,6 +88,8 @@ export type PreviewAction =
   | { type: "withdraw"; goalId: string; amount: number; note?: string; emergency?: boolean }
   | { type: "setStandingOrder"; goalId: string; amount: number; dayOfMonth: number; active?: boolean }
   | { type: "runStandingOrderNow"; goalId: string }
+  /** Phương án khách chọn trong chat thành lộ trình của mục tiêu; `month` = số tháng kể từ hôm nay (0..480). */
+  | { type: "setRoadmap"; goalId: string; planId: string; planName: string; milestones: RoadmapMilestoneInput[] }
   // --- loan reservation (before the due date)
   | { type: "reserveLoan"; goalId: string; productId: string; principal: number; termMonths: number }
   | { type: "cancelReservedLoan"; goalId: string }

@@ -108,4 +108,33 @@ describe("isPlanRoadmapUi", () => {
     expect(ok(card({ title: "🏠".repeat(70) + " · 40 năm" }))).toBe(true);
     expect(ok(card({ title: "🏠".repeat(81) }))).toBe(false);
   });
+
+  describe("goal_id and month / end_month", () => {
+    it("accepts goal_id and integer month / end_month; cards without them stay valid", () => {
+      expect(ok(card({ goal_id: "goal-1" }))).toBe(true);
+      expect(ok(card({ goal_id: s(64) }))).toBe(true);
+      expect(ok(card({ plans: [plan({ milestones: [milestone({ month: 0 }), milestone({ month: 480 })] })] }))).toBe(true);
+      expect(ok(card({ plans: [plan({ milestones: [milestone({ month: 1, end_month: 60 }), milestone({ month: 5, end_month: 5 })] })] }))).toBe(true);
+      expect(ok(card({ goal_id: undefined, plans: [plan({ milestones: [milestone({ month: undefined })] })] }))).toBe(true);
+    });
+    it("rejects a blank, over-long or non-string goal_id", () => {
+      for (const g of ["", "   ", s(65), 5, true, null, ["a"]]) expect(ok(card({ goal_id: g }))).toBe(false);
+      expect(ok(card({ goal_id: "😀".repeat(64) }))).toBe(true);
+      expect(ok(card({ goal_id: "😀".repeat(65) }))).toBe(false);
+    });
+    it("rejects month outside 0..480, non-integers, booleans and strings", () => {
+      for (const m of [-1, 481, 1.5, NaN, Infinity, true, "3", null]) {
+        expect(ok(card({ plans: [plan({ milestones: [milestone({ month: m })] })] })), String(m)).toBe(false);
+      }
+    });
+    it("rejects end_month without month, below month, above 480 or of a wrong type", () => {
+      const withM = (extra: Record<string, unknown>) => ok(card({ plans: [plan({ milestones: [milestone(extra)] })] }));
+      expect(withM({ end_month: 5 })).toBe(false);
+      expect(withM({ month: 6, end_month: 5 })).toBe(false);
+      expect(withM({ month: 6, end_month: 481 })).toBe(false);
+      expect(withM({ month: 6, end_month: 7.5 })).toBe(false);
+      expect(withM({ month: 6, end_month: true })).toBe(false);
+      expect(withM({ month: 6, end_month: "9" })).toBe(false);
+    });
+  });
 });

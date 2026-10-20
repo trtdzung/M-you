@@ -48,31 +48,6 @@ describe("AgentGoalCreateCard", () => {
     ]);
   });
 
-  it("tells the chat the goal was created, with the name the customer confirmed, once", async () => {
-    const onCreated = vi.fn();
-    render(<AgentGoalCreateCard form={createForm()} onCreated={onCreated} />);
-    fireEvent.change(screen.getByLabelText("Tên mục tiêu"), { target: { value: "Xe gia đình" } });
-    expect(onCreated).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Tạo mục tiêu" }));
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
-    expect(onCreated).toHaveBeenCalledWith("Xe gia đình");
-  });
-
-  it("does not tell the chat when the goal was refused, nor when the card is re-rendered as already applied", async () => {
-    const onCreated = vi.fn();
-    send.mockResolvedValueOnce({ ok: false, error: "Từ chối" });
-    const form = createForm();
-    const { unmount } = render(<AgentGoalCreateCard form={form} onCreated={onCreated} />);
-    fireEvent.click(screen.getByRole("button", { name: "Tạo mục tiêu" }));
-    await waitFor(() => expect(screen.getByText("Từ chối")).toBeTruthy());
-    expect(onCreated).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Tạo mục tiêu" }));
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
-    unmount();
-    render(<AgentGoalCreateCard form={form} onCreated={onCreated} />); // same proposal again: shown as done, no new message
-    expect(onCreated).toHaveBeenCalledTimes(1);
-  });
-
   it("sends what the customer edited, not the agent's first draft", async () => {
     render(<AgentGoalCreateCard form={createForm()} />);
     fireEvent.change(screen.getByLabelText("Tên mục tiêu"), { target: { value: "Xe gia đình" } });

@@ -13,12 +13,7 @@ const MONTHLY_DAYS = Array.from({ length: MONTHLY_DAY_MAX }, (_, i) => i + 1);
  * customer's confirmation, after which pfm writes ONE `createGoal` (goal, goal account, opening deposit taken from the main
  * account, and the monthly auto-debit when the plan has an amount). There is no draft: a refused action creates nothing.
  */
-export function AgentGoalCreateCard({ form, fullWidth = false, onCreated }: {
-  form: CreateGoalUi;
-  fullWidth?: boolean;
-  /** Called once, right after THIS confirmation created the goal (never when the card is re-rendered from history). */
-  onCreated?: (goalName: string) => void;
-}) {
+export function AgentGoalCreateCard({ form, fullWidth = false }: { form: CreateGoalUi; fullWidth?: boolean }) {
   const { persona } = usePersona();
   const today = useAppToday();
   const key = proposalKey(persona.cif, form);
@@ -62,7 +57,6 @@ export function AgentGoalCreateCard({ form, fullWidth = false, onCreated }: {
     });
     if (!created.ok) return card.fail(created.error);
     card.finish();
-    onCreated?.(name.trim());
   }
 
   return (
