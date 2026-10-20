@@ -84,6 +84,7 @@ export function TransferConfirm() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<MockExecutedTransfer | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
   const [recipientSaved, setRecipientSaved] = useState(false);
   // Categorization (phase 04): the txn recorded on confirm and its source jar.
   const [createdTxnId, setCreatedTxnId] = useState<string | null>(null);
@@ -140,24 +141,34 @@ export function TransferConfirm() {
 
   /** One place for every Scam Shield choice: engine log, alert log, then the action. */
   async function chooseShield(intervention: Intervention, choice: string) {
-    if (choice === TRANSFER_LABELS.someoneAsked) someoneAskedFor.current = intervention.id;
-    const action = (await respondIntervention(persona.cif, intervention.id, choice)) ?? actionFor(choice);
-    const state = useSecurityStore.getState();
-    const family = intervention.level === "red" && action.kind === "stop" && state.familyAlerts ? effectiveContacts(state) : [];
-    const familyNote = family.length > 0 ? `Đã báo người thân ${family.map(contact => contact.name).join(", ")} (giả lập)` : null;
-    const source = `Nguồn: ${intervention.source === "agent" ? "M-You" : "tự động"} (${intervention.scenario})`;
-    state.logAlert({ level: intervention.level === "red" ? "red" : "yellow", situation: intervention.copy.message, choice, note: familyNote ? `${source}. ${familyNote}` : source });
-    setRedFor(null);
-    setClassifyFor(null);
-    if (choice === TRANSFER_LABELS.someoneAsked) return setClassifyFor(intervention);
-    if (action.kind === "proceed") {
-      setHiddenBanner(intervention.id);
-      void proceed();
-      return;
+    const isProceeding = actionFor(choice).kind === "proceed";
+    if (isProceeding) {
+      setProceeding(true);
+      setRedFor(null);
+      setClassifyFor(null);
     }
-    setHiddenBanner(intervention.id);
-    if (action.kind === "navigate") return router.push(action.href);
-    setSafeVariant("stopped");
+    try {
+      if (choice === TRANSFER_LABELS.someoneAsked) someoneAskedFor.current = intervention.id;
+      const action = (await respondIntervention(persona.cif, intervention.id, choice)) ?? actionFor(choice);
+      const state = useSecurityStore.getState();
+      const family = intervention.level === "red" && action.kind === "stop" && state.familyAlerts ? effectiveContacts(state) : [];
+      const familyNote = family.length > 0 ? `Đã báo người thân ${family.map(contact => contact.name).join(", ")} (giả lập)` : null;
+      const source = `Nguồn: ${intervention.source === "agent" ? "M-You" : "tự động"} (${intervention.scenario})`;
+      state.logAlert({ level: intervention.level === "red" ? "red" : "yellow", situation: intervention.copy.message, choice, note: familyNote ? `${source}. ${familyNote}` : source });
+      setRedFor(null);
+      setClassifyFor(null);
+      if (choice === TRANSFER_LABELS.someoneAsked) return setClassifyFor(intervention);
+      if (action.kind === "proceed") {
+        setHiddenBanner(intervention.id);
+        await proceed();
+        return;
+      }
+      setHiddenBanner(intervention.id);
+      if (action.kind === "navigate") return router.push(action.href);
+      setSafeVariant("stopped");
+    } finally {
+      if (isProceeding) setProceeding(false);
+    }
   }
 
   /** The classify-only popup (DH3 "Có người yêu cầu"): logged locally, the intervention is already answered. */
@@ -172,9 +183,14 @@ export function TransferConfirm() {
   // UC 10 (b): a transfer the customer chose to send may still wait (rule, opt-in).
   const [hold, setHold] = useState<Hold | null>(null);
   async function proceed() {
-    const held = review ? await requestTransferHold(persona.cif, review) : null;
-    if (held) return setHold(held);
-    void runConfirm();
+    setProceeding(true);
+    try {
+      const held = review ? await requestTransferHold(persona.cif, review) : null;
+      if (held) return setHold(held);
+      await runConfirm();
+    } finally {
+      setProceeding(false);
+    }
   }
 
   async function confirmWithShield() {
@@ -494,10 +510,10 @@ export function TransferConfirm() {
         type="button"
         aria-label="Xác nhận chuyển tiền"
         onClick={confirmWithShield}
-        disabled={submitting || checking}
+        disabled={submitting || checking || proceeding}
         className="login-submit mt-auto disabled:opacity-60"
       >
-        {submitting ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
+        {submitting || proceeding ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
       </button>
       <TransferAlertSheet details={transferDetails} cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => {
         if (!redFor) return;
