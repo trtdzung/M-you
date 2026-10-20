@@ -503,7 +503,7 @@ export function TransferConfirm() {
         disabled={submitting || checking}
         className="login-submit mt-auto disabled:opacity-60"
       >
-        {submitting ? "Đang xử lý…" : "Xác nhận"}
+        {submitting ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
       </button>
       <TransferAlertSheet details={transferDetails} cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => {
         if (!redFor) return;
