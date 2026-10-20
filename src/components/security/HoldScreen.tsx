@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Hourglass } from "lucide-react";
-import { formatVnd } from "@/lib/format";
 import { Diagnosis } from "./Diagnosis";
+import { Emphasized } from "./InterventionCopy";
+import { transferHoldCopy } from "@/lib/security/transfer-copy";
 import type { Hold } from "@/lib/security/holds";
 
 const POLL_MS = 3_000;
@@ -50,7 +51,12 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
   const [proposed, setProposed] = useState<string[]>([]);
   const [hold, setHold] = useState(initial);
   const [left, setLeft] = useState(initial.remainingMs);
-  useEffect(() => { setProposed([]); }, [initial.id]);
+  const [answer, setAnswer] = useState<"Có" | "Không" | null>(null);
+
+  useEffect(() => {
+    setProposed([]);
+    setAnswer(null);
+  }, [initial.id]);
 
   // Server time is the truth (test tools may end the wait); count down locally between polls.
   useEffect(() => {
@@ -80,6 +86,7 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
     onCancelled();
   };
   const released = left <= 0;
+  const copy = transferHoldCopy({ amount: hold.amount, recipientName: hold.recipientName }, left);
 
   return (
     <div data-testid="shield-hold" className="flex flex-col gap-4">
@@ -88,19 +95,42 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
         <p className="text-lg font-bold">{released ? "Đã hết thời gian giữ" : "Đang giữ giao dịch"}</p>
         <p className="text-3xl font-bold tabular-nums">{mmss(left)}</p>
         <p className="text-sm leading-relaxed">
-          {formatVnd(hold.amount)} tới {hold.recipientName} là người nhận mới, vượt ngưỡng bạn đặt. Hệ thống MSB giữ giao dịch để bạn có thời gian kiểm tra. Bạn có thể hủy bất cứ lúc nào.
+          <Emphasized {...copy.message} />
         </p>
       </div>
-      <div className="rounded-[20px] border border-border bg-white p-4">
-        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} />
+      <div className={`rounded-[20px] border border-border bg-white p-4 ${answer === "Có" ? "hidden" : ""}`}>
+        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} onAnswer={setAnswer} />
       </div>
+      {answer === "Có" && (
+        <div className="flex flex-col gap-2 rounded-[20px] border border-border bg-white p-4">
+          <p className="text-base font-semibold leading-relaxed">
+            <Emphasized {...copy.yes.message} />
+          </p>
+          <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed">
+            {copy.yes.steps.map(step => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      )}
       {notice && <p role="status" className="text-sm leading-relaxed">{notice}</p>}
-      <button type="button" className="shield-danger-primary" onClick={() => void cancel()}>Hủy giao dịch</button>
-      {!proposed.includes("Tôi nghĩ mình bị lừa") && <button type="button" className="shield-danger-secondary" onClick={onScam}>Tôi nghĩ mình bị lừa</button>}
-      <button type="button" disabled={!released} className="login-submit disabled:opacity-50" onClick={() => void send()}>
-        {released ? "Chuyển ngay" : `Chờ kiểm tra · ${mmss(left)}`}
+      <button type="button" className="shield-danger-primary" onClick={() => void cancel()}>
+        {copy.primary}
       </button>
-      <p className="text-xs leading-relaxed text-muted">M-You không tự chặn tiền của bạn. Việc giữ giao dịch do hệ thống MSB thực hiện theo cài đặt của bạn.</p>
+      {answer === "Có" ? (
+        <button type="button" className="shield-danger-link text-center" onClick={onScam}>
+          {copy.yes.secondary}
+        </button>
+      ) : (
+        <>
+          {released && (
+            <button type="button" className="shield-danger-link text-center" onClick={() => void send()}>
+              {copy.secondary}
+            </button>
+          )}
+          <p className="text-center text-xs leading-relaxed text-muted">{copy.footnote}</p>
+        </>
+      )}
     </div>
   );
 }
