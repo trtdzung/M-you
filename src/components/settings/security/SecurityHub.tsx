@@ -7,11 +7,10 @@ import { CircleHelp, PenLine, Search, ShieldCheck, Smartphone, TriangleAlert } f
 import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts, isTransferLocked } from "@/state/security/selectors";
-import { useSettingsDemo } from "../SettingsDemoContext";
 import { Badge, Panel, Row, Toggle } from "../settings-ui";
 import { SecurityGauge } from "./SecurityGauge";
 import { SecurityLoading } from "./SecurityLoading";
-import { securityScore } from "./security-score";
+import { securityScore } from "@/lib/security/security-score";
 import { useRecovery } from "@/components/security/useRecovery";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 import { pokeInterventions } from "@/components/security/useInterventions";
@@ -19,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { requestEmergency } from "@/components/security/emergency";
 import { useEffect } from "react";
 import { usePersona } from "@/providers/context";
-import type { SecurityScore } from "./security-score";
+import type { SecurityScore } from "@/lib/security/security-score";
 
 const href = (target: string) => `/settings/${target}`;
 const timeLabel = (at: number) => new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(at);
@@ -31,14 +30,12 @@ export function SecurityHub() {
   useScreenEvent("hub_open");
   const router = useRouter();
   const { persona } = usePersona();
-  const demo = useSettingsDemo();
   const recovery = useRecovery();
-  const security = useSecurityStore(useShallow(state => ({ hasHydrated: state.hasHydrated, aiProtect: state.aiProtect, antiPhishingCode: state.antiPhishingCode, emergencyContacts: state.emergencyContacts, trustedContacts: state.trustedContacts, transferLockUntil: state.transferLockUntil, pendingOff: state.pendingOff })));
+  const security = useSecurityStore(useShallow(state => ({ hasHydrated: state.hasHydrated, pinSet: state.pinSet, faceVerified: state.faceVerified, faceId: state.faceId, passwordUpdated: state.passwordUpdated, advanced: state.advanced, updateAuth: state.updateAuth, aiProtect: state.aiProtect, antiPhishingCode: state.antiPhishingCode, emergencyContacts: state.emergencyContacts, trustedContacts: state.trustedContacts, transferLockUntil: state.transferLockUntil, pendingOff: state.pendingOff })));
   if (!security.hasHydrated) return <SecurityLoading />;
   // A contact being removed stays in effect until the 24h wait ends.
   const activeContacts = effectiveContacts(security).length;
-  // Score mixes the old demo auth fields with the Scam Shield store.
-  const score = securityScore({ passwordUpdated: demo.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1], faceId: demo.faceId, advanced: demo.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
+  const score = securityScore({ pinSet: security.pinSet, faceVerified: security.faceVerified, passwordUpdated: security.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1], faceId: security.faceId, advanced: security.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
   const lockUntil = isTransferLocked(security, appNow.getTime()) ? security.transferLockUntil : null;
   const offAt = security.pendingOff.aiProtect;
 
@@ -52,11 +49,11 @@ export function SecurityHub() {
     <div data-shield-slot="hub-gauge" />
     <Panel><Row label="M-You bảo vệ bạn" icon={ShieldCheck} href={href("protect")} detail="Trợ lý AI · Kiểm tra mỗi lệnh chuyển tiền, cảnh báo khi có dấu hiệu lừa đảo" trailing={offAt !== undefined ? <Badge>Tắt lúc {timeLabel(offAt)}</Badge> : <Badge good={security.aiProtect}>{security.aiProtect ? "Đang bật" : "Đang tắt"}</Badge>} /></Panel>
     <Panel title="Xác thực">
-      <Row label="Mã PIN" href={href("pin")} detail="Dùng để đăng nhập và xác thực giao dịch" trailing={<Badge good>Đã thiết lập</Badge>} />
-      <div className="settings-row"><span className="flex-1"><strong>Sinh trắc học Face ID</strong><span className="mt-1 block text-sm text-muted">Xác thực nhanh chóng trên thiết bị</span></span><Toggle label="Sinh trắc học Face ID" checked={demo.faceId} onChange={() => demo.update({ faceId: !demo.faceId })} /></div>
-      <Row label="Mật khẩu" href={href("password")} trailing={<Badge good={demo.passwordUpdated}>{demo.passwordUpdated ? "Đã cập nhật" : "Đã hết hạn"}</Badge>} />
-      <Row label="Xác thực khuôn mặt" href={href("face")} detail="Dùng cho giao dịch giá trị lớn và cài đặt quan trọng" trailing={<Badge good>Đã xác minh</Badge>} />
-      <Row label="Xác thực nâng cao" href={href("advanced")} detail="Thêm lớp xác thực câu hỏi bảo mật khi giao dịch" trailing={<Badge good={demo.advanced}>{demo.advanced ? "Đã thiết lập" : "Chưa thiết lập"}</Badge>} />
+      <Row label="Mã PIN" href={href("pin")} detail="Dùng để đăng nhập và xác thực giao dịch" trailing={<Badge good={security.pinSet}>{security.pinSet ? "Đã thiết lập" : "Chưa thiết lập"}</Badge>} />
+      <div className="settings-row"><span className="flex-1"><strong>Sinh trắc học Face ID</strong><span className="mt-1 block text-sm text-muted">Xác thực nhanh chóng trên thiết bị</span></span><Toggle label="Sinh trắc học Face ID" checked={security.faceId} onChange={() => security.updateAuth({ faceId: !security.faceId })} /></div>
+      <Row label="Mật khẩu" href={href("password")} trailing={<Badge good={security.passwordUpdated}>{security.passwordUpdated ? "Đã cập nhật" : "Đã hết hạn"}</Badge>} />
+      <Row label="Xác thực khuôn mặt" href={href("face")} detail="Dùng cho giao dịch giá trị lớn và cài đặt quan trọng" trailing={<Badge good={security.faceVerified}>{security.faceVerified ? "Đã xác minh" : "Chưa xác minh"}</Badge>} />
+      <Row label="Xác thực nâng cao" href={href("advanced")} detail="Thêm lớp xác thực câu hỏi bảo mật khi giao dịch" trailing={<Badge good={security.advanced}>{security.advanced ? "Đã thiết lập" : "Chưa thiết lập"}</Badge>} />
     </Panel>
     <Panel title={<>Bảo vệ nâng cao <span className="ml-1 rounded-full bg-primary px-2 py-0.5 align-middle text-[10px] font-bold text-white">MỚI</span></>}>
       <Row label="Mã chống giả mạo" href={href("anti-phishing")} detail="Dấu hiệu nhận diện bổ sung trên các kênh hỗ trợ mã" trailing={<Badge good={security.antiPhishingCode !== null}>{security.antiPhishingCode !== null ? "Đã bật" : "Chưa bật"}</Badge>} />

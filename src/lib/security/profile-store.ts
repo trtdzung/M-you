@@ -11,6 +11,11 @@ import { SECURITY_DEFAULTS } from "@/state/security/defaults";
 import type { AlertLogEntry, EmergencyContact, SecurityState, TrustedContact } from "@/state/security/types";
 import { getDb } from "@/lib/db";
 
+import { securityScore, type SecurityScore } from "./security-score";
+import { recoveryState } from "./recovery";
+
+export type SavedSecurityScore = Omit<SecurityScore, "nextSteps"> & { next_steps: SecurityScore["nextSteps"]; updated_at: number };
+
 const MAX_LIST = 200;
 const MAX_TEXT = 200;
 
@@ -70,7 +75,17 @@ export function sanitizeSecurityState(v: unknown): SecurityState | { error: stri
     if (!isTime(at)) return { error: "pendingOff is invalid" };
     pendingOff[key] = at;
   }
+  const auth: Pick<SecurityState, "pinSet" | "faceVerified" | "faceId" | "passwordUpdated" | "advanced"> = {
+    pinSet: SECURITY_DEFAULTS.pinSet, faceVerified: SECURITY_DEFAULTS.faceVerified,
+    faceId: SECURITY_DEFAULTS.faceId, passwordUpdated: SECURITY_DEFAULTS.passwordUpdated, advanced: SECURITY_DEFAULTS.advanced,
+  };
+  for (const key of Object.keys(auth) as (keyof typeof auth)[]) {
+    if (v[key] === undefined) continue;
+    if (typeof v[key] !== "boolean") return { error: `${key} is invalid` };
+    auth[key] = v[key];
+  }
   return {
+    ...auth,
     aiProtect: v.aiProtect as boolean,
     familyAlerts: v.familyAlerts as boolean,
     securityTips: v.securityTips as boolean,
@@ -105,11 +120,36 @@ export function readProfile(cif: string): SecurityState {
   return readSavedProfile(cif) ?? SECURITY_DEFAULTS;
 }
 
-export function writeProfile(cif: string, state: SecurityState): void {
+function calculateScore(cif: string, state: SecurityState): SavedSecurityScore {
+  const recovery = recoveryState(cif, state);
+  const { nextSteps, ...score } = securityScore({
+    ...state, passwordUpdated: state.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1],
+    antiPhishing: state.antiPhishingCode !== null,
+    activeEmergencyContacts: state.emergencyContacts.length, trustedContacts: state.trustedContacts.length,
+  });
+  return { ...score, next_steps: nextSteps, updated_at: Date.now() };
+}
+
+/** JSON payload migration: old flags use defaults; a missing/stale score is backfilled lazily. */
+export function readProfileScore(cif: string): SavedSecurityScore {
+  const state = readProfile(cif);
+  const calculated = calculateScore(cif, state);
+  const row = getDb().prepare("SELECT payload FROM security_profiles WHERE cif = ?").get(cif) as { payload: string } | undefined;
+  let saved: SavedSecurityScore | undefined;
+  try { saved = row ? JSON.parse(row.payload).score : undefined; } catch { /* Replace invalid legacy payloads with defaults. */ }
+  const { updated_at: _now, ...current } = calculated;
+  const { updated_at: _then, ...previous } = saved ?? {};
+  if (saved && JSON.stringify(current) === JSON.stringify(previous)) return saved;
+  return writeProfile(cif, state);
+}
+
+export function writeProfile(cif: string, state: SecurityState): SavedSecurityScore {
+  const score = calculateScore(cif, state);
   getDb()
     .prepare(
       `INSERT INTO security_profiles (cif, payload, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(cif) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
     )
-    .run(cif, JSON.stringify(state), Date.now());
+    .run(cif, JSON.stringify({ ...state, score }), score.updated_at);
+  return score;
 }

@@ -18,6 +18,7 @@ export const MAX_EMERGENCY_CONTACTS = 2;
 type OffKey = keyof PendingOff;
 
 type SecurityActions = {
+  updateAuth: (patch: Partial<Pick<SecurityState, "pinSet" | "faceVerified" | "faceId" | "passwordUpdated" | "advanced">>) => void;
   /** Turning on applies now; turning off becomes a 24h request. */
   setAiProtect: (on: boolean, now?: number) => void;
   requestOff: (key: OffKey, now?: number) => void;
@@ -67,6 +68,7 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
   return {
     ...SECURITY_DEFAULTS,
     hasHydrated: false,
+    updateAuth: patch => set(patch),
 
     setAiProtect: (on, now = clockNow()) => {
       if (on) set(state => ({ aiProtect: true, pendingOff: withoutPending(state.pendingOff, "aiProtect") }));

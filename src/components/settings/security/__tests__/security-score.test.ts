@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { securityScore, type SecurityScoreInput } from "../security-score";
+import { securityScore, type SecurityScoreInput } from "@/lib/security/security-score";
 
 describe("securityScore", () => {
   const allOff: SecurityScoreInput = {
+    pinSet: true,
+    faceVerified: true,
     passwordUpdated: false,
     faceId: false,
     advanced: false,
@@ -27,6 +29,8 @@ describe("securityScore", () => {
 
   it("calculates maximum score 100 with level 'Rất cao' when all features are active", () => {
     const allOn: SecurityScoreInput = {
+      pinSet: true,
+      faceVerified: true,
       passwordUpdated: true, // 15
       faceId: true, // 5
       advanced: true, // 10
