@@ -33,7 +33,7 @@ export function TransferHeader({
       >
         <ArrowLeft size={22} strokeWidth={2} />
       </button>
-      <h1 className="text-[22px] font-bold tracking-tight text-text">{title}</h1>
+      <h1 className="text-[20px] font-bold tracking-tight text-text">{title}</h1>
       <div className="ml-auto" aria-hidden={!rightIcon}>
         {rightIcon && (
           <button

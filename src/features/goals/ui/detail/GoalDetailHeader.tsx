@@ -9,7 +9,7 @@ export function GoalDetailHeader({ goal }: { goal: SavingsGoalView }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="w-full break-words text-[22px] leading-7 font-semibold text-text">{goal.name}</h2>
+        <h2 className="w-full break-words text-[18px] leading-7 font-semibold text-text">{goal.name}</h2>
         <FlexibilityBadge flexibility={goal.flexibility} />
         {goal.status === "active" && goal.currentAmount === 0 ? <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[12px] text-muted">Chưa có khoản góp</span> : <GoalStatusBadge status={goal.status} state={goal.progress.state} />}
       </div>

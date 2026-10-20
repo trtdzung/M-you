@@ -165,8 +165,8 @@ export function RecipientPicker({
                     </span>
                   )}
                   <span className="min-w-0">
-                    <span className="block truncate text-base font-semibold text-text">{option.name}</span>
-                    <span className="mt-0.5 block truncate text-[13px] text-muted">
+                    <span className="block truncate text-[15.5px] leading-6 font-semibold text-text">{option.name}</span>
+                    <span className="mt-0.5 block truncate text-[12px] text-muted">
                       {(bank?.name ?? option.bankName) && <span>{bank?.name ?? option.bankName} · </span>}
                       <span className="tabular-nums">{option.accountNumber}</span>
                     </span>

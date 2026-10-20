@@ -99,7 +99,7 @@ export function PfmTxnList() {
               aria-pressed={active}
               onClick={() => setJar(chip.jarId)}
               className={cn(
-                "inline-flex min-h-[40px] items-center rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                "inline-flex min-h-[40px] items-center rounded-full border px-3 text-[13px] leading-5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 active ? "border-primary bg-[#fff0e7] text-primary" : "border-border bg-surface text-muted hover:text-text",
               )}
             >
@@ -121,7 +121,7 @@ export function PfmTxnList() {
         <div className="flex flex-col gap-4">
           {groups.map(({ key, rows }) => (
             <section key={key} className="overflow-hidden rounded-[18px] bg-white">
-              <h3 className="bg-[#f5f7f9] px-5 py-3 text-sm font-medium text-muted">{dayLabel(key)}</h3>
+              <h3 className="bg-[#f5f7f9] px-5 py-3 text-[12px] leading-5 font-medium text-muted">{dayLabel(key)}</h3>
               <Card padding="none" className="divide-y divide-border px-5">
                 {rows.map((t) => {
                   const correction = corrections[t.id];

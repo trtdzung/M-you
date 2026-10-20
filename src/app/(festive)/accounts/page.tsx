@@ -73,7 +73,7 @@ export default function AccountsPage() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
                 <ArrowLeftRight size={20} strokeWidth={1.8} />
               </span>
-              <span className="text-base font-semibold text-text">Tất cả giao dịch</span>
+              <span className="text-[14px] leading-6 font-semibold text-text">Tất cả giao dịch</span>
             </Link>
           </section>
         </>

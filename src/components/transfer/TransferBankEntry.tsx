@@ -60,7 +60,7 @@ export function TransferBankEntry({
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
       <Card className="transfer-card flex flex-col gap-4">
         <div>
-          <label className="mb-2 block text-[15px] font-medium text-text">Ngân hàng nhận</label>
+          <label className="mb-2 block text-[13px] font-medium text-text">Ngân hàng nhận</label>
           <button
             type="button"
             onClick={() => setBankSheetOpen(true)}
@@ -76,7 +76,7 @@ export function TransferBankEntry({
         </div>
 
         <div>
-          <label htmlFor="xfer-account" className="mb-2 block text-[15px] font-medium text-text">
+          <label htmlFor="xfer-account" className="mb-2 block text-[13px] font-medium text-text">
             Số tài khoản/Số thẻ
           </label>
           <div className="transfer-input-frame flex h-14 items-center gap-2.5 rounded-[10px] border border-[#dfe5ee] bg-white px-3.5">
@@ -99,7 +99,7 @@ export function TransferBankEntry({
         </div>
 
         <div>
-          <label htmlFor="xfer-recipient-name" className="mb-2 block text-[15px] font-medium text-text">
+          <label htmlFor="xfer-recipient-name" className="mb-2 block text-[13px] font-medium text-text">
             Tên người nhận
           </label>
           <input
@@ -118,7 +118,7 @@ export function TransferBankEntry({
         type="button"
         disabled={!canContinue}
         onClick={submit}
-        className="login-submit shrink-0 disabled:opacity-40"
+        className="login-submit shrink-0 !text-[16px] disabled:opacity-40"
       >
         Tiếp tục
       </button>

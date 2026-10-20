@@ -578,7 +578,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 .home-insight-sheet { padding: 20px 20px calc(24px + var(--safe-area-bottom)); }
 .home-insight-sheet h2 { font-size: 16px; line-height: 1.4; }
 .home-insight-sheet p { line-height: 1.6; }
-.home-insight-sheet .login-submit { font-size: 15px; }
+.home-insight-sheet .login-submit { font-size: 14px; }
 .home-insight-secondary {
   display: flex;
   width: 100%;
@@ -590,7 +590,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border-radius: 9px;
   background: white;
   color: var(--color-primary-strong);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -655,7 +655,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border-color: #dfe5ee;
   background: #fff;
   color: #10284b;
-  font-size: 15px;
+  font-size: 14px;
 }
 .transfer-category-sheet > div.grid > button[aria-pressed="true"] {
   border-color: #ff650b;
@@ -754,7 +754,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border: 1px solid #dfe5ee;
 }
 .goals-app-shell .goal-create-fields label {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .goals-app-shell .goal-create-fields > section {
@@ -767,19 +767,19 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   background: #fff;
   border-radius: 24px 24px 0 0;
 }
-.goals-app-shell [role="dialog"] h2 { font-size: 20px; font-weight: 700; }
+.goals-app-shell [role="dialog"] h2 { font-weight: 700; }
 
 .goals-app-shell .rounded-card {
   border-radius: 18px;
   box-shadow: none;
 }
-.goals-app-shell .goal-detail-screen h2 { font-size: 18px; line-height: 26px; font-weight: 600; }
+.goals-app-shell .goal-detail-screen h2 { line-height: 26px; font-weight: 600; }
 .goals-app-shell .goal-primary-button {
   min-height: 48px;
   border-radius: 9px;
   background: linear-gradient(180deg, #ffa54f 0%, #ee6335 100%);
   color: #fff;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 .goals-app-shell .goal-secondary-button {
@@ -788,7 +788,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   background: #fff;
   border-color: #ff650b;
   color: #ff650b;
-  font-size: 15px;
+  font-size: 14px;
 }
 .goals-app-shell .goal-secondary-button:disabled,
 .goals-app-shell .goal-primary-button:disabled {
