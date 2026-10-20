@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  IMAGE: vcr.vngcloud.vn/111480-abp114564/pfm-ui
+  IMAGE: vcr.vngcloud.vn/111480-abp115132/pfm-ui
 
 jobs:
   test:
