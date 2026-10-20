@@ -116,6 +116,7 @@ export function TransferConfirm() {
       }
     : null), [isValidDraft, amount, name, draft, acct, memo]);
   const shieldState = useTransferShield(persona.cif, review);
+  const verdictPending = review !== null && (shieldState.status === "idle" || shieldState.status === "loading");
   const [redFor, setRedFor] = useState<Intervention | null>(null);
   const [classifyFor, setClassifyFor] = useState<Intervention | null>(null);
   const someoneAskedFor = useRef<string | null>(null);
@@ -510,7 +511,7 @@ export function TransferConfirm() {
         type="button"
         aria-label="Xác nhận chuyển tiền"
         onClick={confirmWithShield}
-        disabled={submitting || checking || proceeding}
+        disabled={submitting || checking || proceeding || verdictPending}
         className="login-submit mt-auto disabled:opacity-60"
       >
         {submitting || proceeding ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
