@@ -6,7 +6,7 @@ import { CHANGE_WORDS, shortVnd } from "./scenarios";
 
 export type TransferText = { text: string; emphasis: string[] };
 export type TransferDetails = {
-  amount: number;
+  amount?: number;
   recipientName: string;
   recipientBank: string;
   /** Full or masked account; only the last four digits are displayed. */
@@ -120,10 +120,10 @@ export function transferProceedLabel(seconds: number): string {
 /** Recipient line for red step 1, separate from its reason. */
 export function transferRecipientSummary(details: TransferDetails): string {
   const last4 = details.recipientAccount.replace(/\D/g, "").slice(-4);
-  return `${details.recipientName} · ${details.recipientBank} ••••${last4} · ${formatVnd(details.amount)}`;
+  return `${details.recipientName} · ${details.recipientBank} ••••${last4}${details.amount === undefined ? "" : ` · ${formatVnd(details.amount)}`}`;
 }
 
-export function transferHoldCopy(details: Pick<TransferDetails, "amount" | "recipientName">, remainingMs: number) {
+export function transferHoldCopy(details: { amount: number; recipientName: string }, remainingMs: number) {
   const seconds = Math.ceil(Math.max(0, remainingMs) / 1000);
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   return {
@@ -146,7 +146,7 @@ export function transferSafeCopy(variant: TransferSafeVariant, details: Transfer
   const last4 = details.recipientAccount.replace(/\D/g, "").slice(-4);
   return {
     heading: text(headings[variant], headings[variant]),
-    summary: `${formatVnd(details.amount)} tới ${details.recipientName} · ${details.recipientBank} ••••${last4}`,
+    summary: `${details.amount === undefined ? "" : `${formatVnd(details.amount)} tới `}${details.recipientName} · ${details.recipientBank} ••••${last4}`,
     message: text('Nếu ai đó gọi lại giục chuyển tiền, đừng nghe theo. MSB không bao giờ yêu cầu chuyển tiền vào "tài khoản an toàn".'),
     primary: TRANSFER_LABELS.home,
     secondary: TRANSFER_LABELS.support,
