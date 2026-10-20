@@ -6,8 +6,7 @@ import { fraudAgentEnabled } from "./fraud-switch";
 import { redactSecurityText } from "./redact";
 import { readProfile } from "./profile-store";
 
-export const CLASSIFY_QUESTION = "Có ai đang gọi điện hướng dẫn anh/chị không?";
-export const CLASSIFY_ANSWERS = ["Có", "Không"] as const;
+const CLASSIFY_QUESTION = "Có ai đang gọi điện hướng dẫn anh/chị không?";
 
 export type Diagnosis = { answers: string[]; pending: boolean; next_question: string | null; conclusion: string | null; proposals: string[]; source: "rule" | "agent"; trace: unknown[] };
 const initial = (): Diagnosis => ({ answers: [], pending: false, next_question: CLASSIFY_QUESTION, conclusion: null, proposals: [], source: "rule", trace: [] });

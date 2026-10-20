@@ -11,6 +11,7 @@ const HANDBOOK: Record<string, HandbookContext> = {
 };
 
 const NAVIGATE: Record<string, string> = {
+  "Gọi MSB hỗ trợ": "/settings/sos",
   "Link bài đầy đủ": "/settings/knowledge?article=msb_security",
   "Trung tâm bảo mật": "/settings/security",
   "Bật mã": "/settings/anti-phishing",
@@ -26,7 +27,7 @@ const NAVIGATE: Record<string, string> = {
 };
 const PROCEED = new Set(["Đã gọi, tiếp tục", "Đã kiểm tra, tiếp tục", "Tôi tự chuyển", "Tiếp tục", "Vẫn tiếp tục", "Vẫn chuyển"]);
 const STOP = new Set(["Để tôi gọi", "Kiểm tra lại", "Có người yêu cầu → xem thêm", "Dừng lại", "Hủy giao dịch", "Dừng để gọi xác nhận", "Dừng để kiểm tra", "Dừng giao dịch"]);
-const EMERGENCY = new Set(["Tôi nghĩ mình bị lừa", "Khóa ngay", "Không phải tôi → khóa ngay", "Gọi MSB hỗ trợ"]);
+const EMERGENCY = new Set(["Tôi nghĩ mình bị lừa", "Khóa ngay", "Không phải tôi → khóa ngay"]);
 
 /** What a chip does. Unknown choices only close the intervention. */
 export function actionFor(choice: string): RespondAction {

@@ -8,10 +8,8 @@ import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
 import { TransferAlertSheet } from "@/app/transfer-confirm/TransferAlertSheet";
 import { TransferSafe } from "@/app/transfer-confirm/TransferSafe";
 import { useInterventions } from "@/components/security/useInterventions";
-import { requestEmergency } from "@/components/security/emergency";
-import { TRANSFER_LABELS, TRANSFER_SUPPORT_HREF, type TransferDetails } from "@/lib/security/transfer-copy";
+import { TRANSFER_LABELS, type TransferDetails } from "@/lib/security/transfer-copy";
 import type { Intervention } from "@/lib/security/intervention-types";
-import type { MouseEvent } from "react";
 import { checkRecipient } from "@/components/security/checkRecipient";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -250,21 +248,6 @@ export function TransferCompose() {
     if (choice === TRANSFER_LABELS.stop && shieldDetails) setSafeDetails(shieldDetails);
   }
 
-  // Both reused components render support links; React capture also covers the sheet portal.
-  function supportFromShield(event: MouseEvent<HTMLDivElement>) {
-    if (!(event.target instanceof Element) || !event.target.closest(`a[href="${TRANSFER_SUPPORT_HREF}"]`)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    void (async () => {
-      if (recipientAlert) {
-        setAnsweredAlerts(previous => [...previous, recipientAlert.id]);
-        await respond(recipientAlert.id, TRANSFER_LABELS.support);
-      }
-      const ok = await requestEmergency(cif, "enter");
-      if (ok) router.push(TRANSFER_SUPPORT_HREF);
-    })();
-  }
-
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
   function writeDraftAndGo(extras: Pick<StoredTransferDraft, "plannedReallocation"> = {}) {
     if (!recipient || block.blocked || isNavigationTransitionPending()) return;
@@ -314,7 +297,7 @@ export function TransferCompose() {
   }
 
   if (safeDetails) {
-    return <div onClickCapture={supportFromShield}><TransferSafe variant="stopped" details={safeDetails} /></div>;
+    return <TransferSafe variant="stopped" details={safeDetails} />;
   }
 
   let content: React.ReactNode;
@@ -406,12 +389,10 @@ export function TransferCompose() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col">{content}</div>
-      <div onClickCapture={supportFromShield}>
-        <TransferAlertSheet cif={cif} open={Boolean(recipientAlert && shieldDetails)} intervention={recipientAlert ?? null}
-          details={shieldDetails}
-          onClose={() => { if (recipientAlert) chooseRecipientAlert(recipientAlert, "Đóng"); }}
-          onChoose={choice => { if (recipientAlert) chooseRecipientAlert(recipientAlert, choice); }} />
-      </div>
+      <TransferAlertSheet cif={cif} open={Boolean(recipientAlert && shieldDetails)} intervention={recipientAlert ?? null}
+        details={shieldDetails}
+        onClose={() => { if (recipientAlert) chooseRecipientAlert(recipientAlert, "Đóng"); }}
+        onChoose={choice => { if (recipientAlert) chooseRecipientAlert(recipientAlert, choice); }} />
     </div>
   );
 }

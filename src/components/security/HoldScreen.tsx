@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Hourglass } from "lucide-react";
 import { Diagnosis } from "./Diagnosis";
 import { Emphasized } from "./InterventionCopy";
-import { transferHoldCopy } from "@/lib/security/transfer-copy";
+import { TRANSFER_SUPPORT_HREF, transferHoldCopy } from "@/lib/security/transfer-copy";
 import type { Hold } from "@/lib/security/holds";
 
 const POLL_MS = 3_000;
@@ -39,22 +39,17 @@ const mmss = (ms: number) => {
  * the customer's threshold. The rule releases it; the customer can cancel any
  * time. While waiting M-You asks one diagnostic question (UC 12).
  */
-export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, onChoose, notice }: {
+export function HoldScreen({ cif, hold: initial, onSend, onCancelled }: {
   cif: string;
   hold: Hold;
   onSend: () => void;
   onCancelled: () => void;
-  onScam: () => void;
-  onChoose: (choice: string) => void;
-  notice?: string | null;
 }) {
-  const [proposed, setProposed] = useState<string[]>([]);
   const [hold, setHold] = useState(initial);
   const [left, setLeft] = useState(initial.remainingMs);
   const [answer, setAnswer] = useState<"Có" | "Không" | null>(null);
 
   useEffect(() => {
-    setProposed([]);
     setAnswer(null);
   }, [initial.id]);
 
@@ -99,7 +94,7 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
         </p>
       </div>
       <div className={`rounded-[20px] border border-border bg-white p-4 ${answer === "Có" ? "hidden" : ""}`}>
-        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} onAnswer={setAnswer} sourceLine={false} />
+        <Diagnosis cif={cif} id={hold.id} question={copy.question} onAnswer={setAnswer} sourceLine={false} />
       </div>
       {answer === "Có" && (
         <div className="flex flex-col gap-2 rounded-[20px] border border-border bg-white p-4">
@@ -113,14 +108,13 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
           </ol>
         </div>
       )}
-      {notice && <p role="status" className="text-sm leading-relaxed">{notice}</p>}
       <button type="button" className="shield-danger-primary" onClick={() => void cancel()}>
         {copy.primary}
       </button>
       {answer === "Có" ? (
-        <button type="button" className="shield-danger-link text-center" onClick={onScam}>
+        <a className="shield-danger-link text-center" href={TRANSFER_SUPPORT_HREF}>
           {copy.yes.secondary}
-        </button>
+        </a>
       ) : (
         <>
           {released && (

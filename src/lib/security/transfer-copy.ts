@@ -12,7 +12,7 @@ export type TransferDetails = {
   /** Full or masked account; only the last four digits are displayed. */
   recipientAccount: string;
 };
-export type TransferSafeVariant = "stopped" | "cancelled" | "callback";
+export type TransferSafeVariant = "stopped" | "cancelled";
 
 export const TRANSFER_LABELS = {
   stopToCall: "Dừng để gọi xác nhận",
@@ -26,7 +26,7 @@ export const TRANSFER_LABELS = {
   home: "Về trang chủ",
 } as const;
 export const TRANSFER_SUPPORT_HREF = "/settings/sos";
-export const TRANSFER_CLASSIFY = {
+const TRANSFER_CLASSIFY = {
   question: "Có ai đang gọi điện hướng dẫn anh/chị không?",
   answers: ["Có", "Không"],
 } as const;
@@ -141,7 +141,6 @@ export function transferSafeCopy(variant: TransferSafeVariant, details: Transfer
   const headings: Record<TransferSafeVariant, string> = {
     stopped: "Anh/chị đã an toàn. Tiền chưa được chuyển.",
     cancelled: "Đã hủy lệnh. Tiền chưa được chuyển.",
-    callback: "MSB sẽ gọi lại cho anh/chị. Tiền chưa được chuyển.",
   };
   const last4 = details.recipientAccount.replace(/\D/g, "").slice(-4);
   return {

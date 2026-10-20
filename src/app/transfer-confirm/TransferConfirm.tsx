@@ -1,6 +1,5 @@
 "use client";
 
-import { requestEmergency } from "@/components/security/emergency";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
@@ -39,7 +38,7 @@ import { TransferFundingPreview } from "./TransferFundingPreview";
 import { TransferAlertBanner } from "./TransferAlertBanner";
 import { TransferAlertSheet } from "./TransferAlertSheet";
 import { TransferSafe } from "./TransferSafe";
-import { TRANSFER_LABELS, TRANSFER_SUPPORT_HREF, type TransferDetails, type TransferSafeVariant } from "@/lib/security/transfer-copy";
+import { TRANSFER_LABELS, type TransferDetails, type TransferSafeVariant } from "@/lib/security/transfer-copy";
 
 /**
  * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field
@@ -121,7 +120,6 @@ export function TransferConfirm() {
   const [classifyFor, setClassifyFor] = useState<Intervention | null>(null);
   const [hiddenBanner, setHiddenBanner] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [shieldNotice, setShieldNotice] = useState<string | null>(null);
   const [safeVariant, setSafeVariant] = useState<TransferSafeVariant | null>(null);
   const transferDetails: TransferDetails = {
     amount,
@@ -162,9 +160,7 @@ export function TransferConfirm() {
     }
     setHiddenBanner(intervention.id);
     if (choice === TRANSFER_LABELS.someoneAsked) return setClassifyFor(intervention);
-    if (action.kind === "emergency") return router.push("/settings/sos");
-    if (action.kind === "case") return router.push("/settings/case");
-    if (action.kind === "callback") return setSafeVariant("callback");
+    if (action.kind === "navigate") return router.push(action.href);
     setSafeVariant("stopped");
   }
 
@@ -173,11 +169,7 @@ export function TransferConfirm() {
     const action = actionFor(choice);
     useSecurityStore.getState().logAlert({ level: "yellow", situation: "Có người yêu cầu chuyển thêm", choice });
     setClassifyFor(null);
-    if (action.kind === "emergency") {
-      void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); });
-      return;
-    }
-    if (action.kind === "callback") return setSafeVariant("callback");
+    if (action.kind === "navigate") return router.push(action.href);
     setSafeVariant("stopped");
   }
 
@@ -191,7 +183,6 @@ export function TransferConfirm() {
 
   async function confirmWithShield() {
     if (committedRef.current || submitting || done || checking) return;
-    setShieldNotice(null);
     setChecking(true);
     const verdict = await shieldState.ensure();
     setChecking(false);
@@ -441,15 +432,8 @@ export function TransferConfirm() {
           <HoldScreen
             cif={persona.cif}
             hold={hold}
-            notice={shieldNotice}
             onSend={() => { setHold(null); void runConfirm(); }}
             onCancelled={() => { setHold(null); setSafeVariant("cancelled"); }}
-            onScam={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push(TRANSFER_SUPPORT_HREF); }); }}
-            onChoose={choice => {
-              if (choice === "Tôi nghĩ mình bị lừa") void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); });
-              else if (choice === "Yêu cầu MSB tra soát") router.push("/settings/case");
-              else if (actionFor(choice).kind === "callback") { setHold(null); setSafeVariant("callback"); }
-            }}
           />
         </div>
       </div>
@@ -506,7 +490,6 @@ export function TransferConfirm() {
         />
       )}
 
-      {shieldNotice && <p role="status" className="text-sm text-text">{shieldNotice}</p>}
       {error && <p className="text-sm text-negative">{error}</p>}
 
       <button

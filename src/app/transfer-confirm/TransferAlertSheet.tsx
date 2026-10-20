@@ -40,18 +40,17 @@ function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, 
     return () => window.clearInterval(timer);
   }, [wait]);
 
-  const reason = transferRedReason(intervention, { recipientName: details?.recipientName ?? "người nhận này" })
-    ?? { text: intervention.copy.message, emphasis: intervention.copy.emphasis };
+  const reason = transferRedReason(intervention, { recipientName: details?.recipientName ?? "người nhận này" });
   const close = () => step === "yes" ? onChoose(TRANSFER_LABELS.stop) : onClose();
 
   return (
     <Sheet open title={TRANSFER_RED_STEPS.heading.text} onClose={close}>
       <div data-testid="shield-red" className="shield-alert-content">
         {step === "question" && <>
-          <p className="shield-red-reason"><Emphasized {...reason} /></p>
+          {reason && <p className="shield-red-reason"><Emphasized {...reason} /></p>}
           {details && <p>{transferRecipientSummary(details)}</p>}
           <Diagnosis cif={cif} id={intervention.id} sessionLine={false} sourceLine={false}
-            onChoose={onChoose} onAnswer={answer => setStep(answer === "Có" ? "yes" : "no")} />
+            question={TRANSFER_RED_STEPS.question} onAnswer={answer => setStep(answer === "Có" ? "yes" : "no")} />
         </>}
         {step === "yes" && <>
           <p><Emphasized {...TRANSFER_RED_STEPS.yes.message} /></p>
