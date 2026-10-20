@@ -26,7 +26,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
   return (
     <div
       role={toast.tone === "error" ? "alert" : "status"}
-      className="pointer-events-auto flex items-start gap-2.5 rounded-2xl bg-ink-soft px-3.5 py-3 text-[13px] leading-5 text-white shadow-nav"
+      className="pointer-events-auto flex items-start gap-2.5 rounded-2xl bg-ink-soft px-3.5 py-3 text-xs leading-5 text-white shadow-nav"
     >
       <Icon size={18} aria-hidden className={cn("mt-px shrink-0", className)} />
       <p className="min-w-0 flex-1">{toast.message}</p>

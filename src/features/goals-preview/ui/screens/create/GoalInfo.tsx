@@ -197,7 +197,7 @@ export function GoalInfo({ params }: ScreenProps) {
         chips={quickAmounts.map((a) => ({ label: formatShort(a), amount: a }))}
         footer={
           cif && (
-            <button type="button" onClick={() => setEstimateOpen(true)} className={cn("self-start text-[13px] text-muted", ring)}>
+            <button type="button" onClick={() => setEstimateOpen(true)} className={cn("self-start text-xs text-muted", ring)}>
               Chưa rõ? <span className="font-semibold text-primary-strong underline">Để M-You ước tính</span>
             </button>
           )
@@ -222,8 +222,8 @@ export function GoalInfo({ params }: ScreenProps) {
             {assets.map((a, i) => (
               <li key={`${a.name}-${i}`} className="flex items-center justify-between gap-2 rounded-2xl bg-surface-muted px-3 py-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[15px] font-semibold text-text">{a.name}</p>
-                  <p className="text-[12px] text-muted">
+                  <p className="truncate text-sm font-semibold text-text">{a.name}</p>
+                  <p className="text-xs text-muted">
                     Tính vào mục tiêu {formatVnd(countedValue(a))} ({a.countPercent}% của {formatVnd(a.value)})
                   </p>
                 </div>
@@ -317,7 +317,7 @@ export function GoalInfo({ params }: ScreenProps) {
         )}
       >
         <div className="flex items-center gap-1">
-          <p className="text-[13px] text-muted">Mỗi tháng cần góp khoảng</p>
+          <p className="text-xs text-muted">Mỗi tháng cần góp khoảng</p>
           <InfoTooltip
             label="mức góp mỗi tháng"
             warning={tone === "negative"}
@@ -341,16 +341,16 @@ export function GoalInfo({ params }: ScreenProps) {
                 style={{ width: `${Math.min(100, Math.round(share * 100))}%` }}
               />
             </div>
-            <span className="text-[13px] font-semibold tabular-nums text-text">{share <= 1 ? `${Math.round(share * 100)}% số dư` : "Vượt số dư"}</span>
+            <span className="text-xs font-semibold tabular-nums text-text">{share <= 1 ? `${Math.round(share * 100)}% số dư` : "Vượt số dư"}</span>
           </div>
         )}
         {note && (
-          <p className="text-[13px] leading-5 text-text">
+          <p className="text-xs leading-5 text-text">
             Lưu ý: mục tiêu mới có thể ảnh hưởng đến dòng tiền các mục tiêu hiện có. Mỗi tháng bạn đang góp {formatVnd(note.existing)} cho các mục tiêu đang diễn ra; cộng {formatVnd(monthly)} cho mục tiêu này là {formatVnd(note.total)}, vượt {Math.round(CASHFLOW_NOTE_SHARE * 100)}% số dư hằng tháng sau khi trừ chi tiêu (mức tối đa {formatVnd(note.limit)}, số dư {formatVnd(note.surplus)}).
           </p>
         )}
         {stuck && (
-          <p className="text-[13px] leading-5 text-text">Số dư hằng tháng gần như đã dành cho mục tiêu khác. Bạn vẫn có thể tiếp tục và điều chỉnh sau.</p>
+          <p className="text-xs leading-5 text-text">Số dư hằng tháng gần như đã dành cho mục tiêu khác. Bạn vẫn có thể tiếp tục và điều chỉnh sau.</p>
         )}
         {fixes.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">

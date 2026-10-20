@@ -13,7 +13,7 @@ import { useGoalContext } from "./common";
 function Group({ title, rows }: { title: string; rows: SummaryRow[] }): ReactNode {
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="text-[13px] font-semibold text-muted">{title}</h3>
+      <h3 className="text-xs font-semibold text-muted">{title}</h3>
       <SummaryRows rows={rows} />
     </section>
   );
@@ -41,7 +41,7 @@ export function LoanSettleSheet({ goalId, open, onClose, onDone }: { goalId: str
   return (
     <Sheet open={open} title={`Xác nhận mua ${goal.name}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
-        <p className="text-[14px] leading-6 text-text">
+        <p className="text-sm leading-6 text-text">
           Hồ sơ vay của bạn đã được phê duyệt. Để mua {goal.name}, ngân hàng sẽ quy đổi tài sản bạn đã tích luỹ và giải ngân khoản vay cho phần còn lại.
         </p>
         <Group
@@ -62,11 +62,11 @@ export function LoanSettleSheet({ goalId, open, onClose, onDone }: { goalId: str
             { label: "Tổng phải trả", value: monthly * termMonths },
           ]}
         />
-        <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[14px] leading-6 text-text">
+        <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm leading-6 text-text">
           <li>Khoản vay được giải ngân trực tiếp, không đi qua tài khoản mục tiêu.</li>
           <li>Sau khi hoàn tất, mục tiêu chuyển sang giai đoạn trả vay. Tiến độ tính theo số gốc đã trả, không gồm giá trị tài sản vừa mua.</li>
         </ul>
-        <p role="alert" className="flex items-center gap-2 rounded-2xl bg-negative-soft px-3.5 py-3 text-[13px] font-medium text-negative">
+        <p role="alert" className="flex items-center gap-2 rounded-2xl bg-negative-soft px-3.5 py-3 text-xs font-medium text-negative">
           <CircleAlert size={18} className="shrink-0" aria-hidden /> Sau khi xác nhận, bạn không thể hoàn tác.
         </p>
         <div className="flex flex-col gap-2">

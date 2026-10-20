@@ -140,7 +140,7 @@ export const CATEGORY_META: Record<InsightCategory, CategoryMeta> = {
   },
   SECURITY_GREEN: {
     category: "SECURITY_GREEN",
-    label: "Bảo mật · Xanh",
+    label: "Bảo mật",
     slotGroup: "GROW_AND_GUIDE",
     defaultTone: "security",
     iconName: "ShieldCheck",

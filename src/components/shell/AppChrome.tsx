@@ -15,13 +15,9 @@ import { BottomNav } from "./BottomNav";
 import { PhoneShell } from "./PhoneShell";
 import { InterventionHost } from "@/components/security/InterventionHost";
 
-function FestiveBg() {
-  return (
-    <>
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/bg-2-9.png')] bg-cover bg-top" />
-      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent to-black/20" />
-    </>
-  );
+/** Soft pink MF wallpaper (device-sized). Used everywhere except festive Home (HL). */
+function SoftBg() {
+  return <div aria-hidden className="soft-festive-bg absolute inset-0 -z-10" />;
 }
 
 function CalmBg() {
@@ -31,10 +27,6 @@ function CalmBg() {
       <div aria-hidden className="absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-surface-tint/80 to-transparent" />
     </>
   );
-}
-
-function PeachBg() {
-  return <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-[#fce0d5] to-[#fbd0d4]" />;
 }
 
 function inHorizontalScroller(target: Element, canvas: HTMLElement): boolean {
@@ -191,7 +183,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
   if (pfm) {
     return (
       <PhoneShell
-        background={<PeachBg />}
+        background={<SoftBg />}
         nav={<PfmBottomNav />}
         fab={<MYourWidget />}
         className="shell-calm pfm-app-shell"
@@ -204,7 +196,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
 
   if (goals) {
     return (
-      <PhoneShell background={<PeachBg />} className="shell-calm goals-app-shell" mainClassName="shell-main--goals no-scrollbar overflow-x-hidden">
+      <PhoneShell background={<SoftBg />} className="shell-calm goals-app-shell" mainClassName="shell-main--goals no-scrollbar overflow-x-hidden">
         {children}
       </PhoneShell>
     );
@@ -222,7 +214,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
 
   if (transfer) {
     return (
-      <PhoneShell background={<PeachBg />} className="shell-calm transfer-shell" mainClassName="shell-main--transfer">
+      <PhoneShell background={<SoftBg />} className="shell-calm transfer-shell" mainClassName="shell-main--transfer">
         {children}
       </PhoneShell>
     );
@@ -233,7 +225,11 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
       className={pathname.startsWith("/accounts") ? "shell-calm accounts-shell" : settings ? "shell-calm settings-shell" : home ? "login-shell home-shell" : undefined}
       mainClassName={settingsDetail ? "settings-main-detail" : undefined}
       background={
-        (settings || pathname.startsWith("/accounts")) ? <PeachBg /> : home ? <div aria-hidden className="login-background absolute inset-0 -z-10" /> : <FestiveBg />
+        home ? (
+          <div aria-hidden className="home-festive-bg absolute inset-0 -z-10" />
+        ) : (
+          <SoftBg />
+        )
       }
       nav={settingsDetail ? undefined : <BottomNav />}
       fab={

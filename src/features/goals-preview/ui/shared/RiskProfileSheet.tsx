@@ -38,7 +38,7 @@ export function RiskProfileSheet({
       <div className="flex flex-col gap-4">
         {QUESTIONS.map((q, qi) => (
           <div key={q.title} role="radiogroup" aria-label={q.title} className="flex flex-col gap-2">
-            <p className="text-[15px] font-semibold text-text">{q.title}</p>
+            <p className="text-sm font-semibold text-text">{q.title}</p>
             {q.options.map((label, oi) => {
               const active = answers[qi] === oi;
               return (

@@ -80,11 +80,11 @@ export function PriceEstimateSheet({
   return (
     <Sheet open={open} title="M-You ước tính giá" onClose={close}>
       <div className="flex flex-col gap-4">
-        {phase === "loading-form" && <p role="status" className="animate-pulse text-[14px] text-muted">M-You đang chuẩn bị vài câu hỏi…</p>}
+        {phase === "loading-form" && <p role="status" className="animate-pulse text-sm text-muted">M-You đang chuẩn bị vài câu hỏi…</p>}
 
         {phase === "form" && (
           <>
-            <p className="text-[14px] leading-6 text-text">Trả lời vài câu hỏi, M-You sẽ tra giá thị trường và đề xuất một mức giá cho mục tiêu.</p>
+            <p className="text-sm leading-6 text-text">Trả lời vài câu hỏi, M-You sẽ tra giá thị trường và đề xuất một mức giá cho mục tiêu.</p>
             {/* Cùng dạng "hỏi lại bằng nút bấm" của chat: mỗi lần một câu, có ô tự nhập; trả lời câu cuối là chạy luôn. */}
             <AgentClarifyOptionsCard
               ui={{ type: "clarify_options", questions: questions.map((q) => ({ question: q.title, options: q.options })) }}
@@ -99,18 +99,18 @@ export function PriceEstimateSheet({
           </>
         )}
 
-        {phase === "researching" && <p role="status" className="animate-pulse text-[14px] leading-6 text-muted">M-You đang tìm giá thị trường, có thể mất khoảng nửa phút…</p>}
+        {phase === "researching" && <p role="status" className="animate-pulse text-sm leading-6 text-muted">M-You đang tìm giá thị trường, có thể mất khoảng nửa phút…</p>}
 
         {phase === "result" && estimate && (
           <>
             <div className="flex flex-col gap-1 rounded-2xl bg-surface-tint px-4 py-3">
-              <span className="text-[13px] text-muted">M-You đề xuất</span>
-              <span className="text-2xl font-bold tabular-nums text-text">{formatVnd(estimate.amount)}</span>
-              {estimate.low !== estimate.high && <span className="text-[13px] text-muted">Khoảng {formatVnd(estimate.low)} – {formatVnd(estimate.high)}</span>}
+              <span className="text-xs text-muted">M-You đề xuất</span>
+              <span className="text-lg font-bold tabular-nums text-text">{formatVnd(estimate.amount)}</span>
+              {estimate.low !== estimate.high && <span className="text-xs text-muted">Khoảng {formatVnd(estimate.low)} – {formatVnd(estimate.high)}</span>}
             </div>
-            <p className="text-[14px] leading-6 text-text">{estimate.summary}</p>
+            <p className="text-sm leading-6 text-text">{estimate.summary}</p>
             {estimate.sources.length > 0 && (
-              <ul className="flex flex-col gap-1 text-[13px] text-muted">
+              <ul className="flex flex-col gap-1 text-xs text-muted">
                 {estimate.sources.map((source) => (
                   <li key={source.url} className="truncate">
                     <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-primary-strong underline">{source.title}</a>
@@ -118,18 +118,18 @@ export function PriceEstimateSheet({
                 ))}
               </ul>
             )}
-            <p className="text-[12px] leading-5 text-muted">Giá tham khảo tổng hợp từ web, chưa phải báo giá chính thức.</p>
+            <p className="text-xs leading-5 text-muted">Giá tham khảo tổng hợp từ web, chưa phải báo giá chính thức.</p>
             <div className="flex flex-col gap-2">
               <button type="button" className={primaryButton} onClick={() => { onApply(estimate.amount); close(); }}>OK</button>
               <button type="button" className={secondaryButton} onClick={() => run(true)}>Chạy lại</button>
-              <button type="button" className="text-[13px] font-semibold text-primary-strong" onClick={() => setPhase("form")}>Sửa lựa chọn</button>
+              <button type="button" className="text-xs font-semibold text-primary-strong" onClick={() => setPhase("form")}>Sửa lựa chọn</button>
             </div>
           </>
         )}
 
         {(phase === "none" || phase === "error") && (
           <>
-            <p role="alert" className="rounded-2xl bg-warning-soft px-3.5 py-3 text-[14px] leading-6 text-text">
+            <p role="alert" className="rounded-2xl bg-warning-soft px-3.5 py-3 text-sm leading-6 text-text">
               {phase === "none" ? "M-You chưa tìm đủ giá để đề xuất cho lựa chọn này. Bạn thử đổi lựa chọn hoặc chạy lại nhé." : "Chưa ước tính được lúc này. Bạn thử lại sau nhé."}
             </p>
             <div className="flex flex-col gap-2">

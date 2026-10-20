@@ -41,8 +41,8 @@ export function ScreenHeader({
         </button>
       )}
       <div className="min-w-0 flex-1">
-        <h1 className={`truncate leading-7 text-text ${compact ? "text-[20px] font-semibold" : "text-[22px] font-bold"}`}>{title}</h1>
-        {subtitle && <p className="truncate text-[13px] leading-5 text-muted">{subtitle}</p>}
+        <h1 className="truncate text-[20px] font-bold leading-7 text-text">{title}</h1>
+        {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
       </div>
       {right}
     </header>

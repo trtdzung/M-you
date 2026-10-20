@@ -15,7 +15,7 @@ export function TemplatePick(_props: ScreenProps) {
     <div className={screenPadding}>
       <ScreenHeader title="Tạo mục tiêu" subtitle="Bạn muốn tiết kiệm cho điều gì?" />
       <StepProgress steps={WIZARD_STEPS} current={0} />
-      <p className="text-[13px] leading-5 text-muted">Mỗi mục tiêu có một tài khoản riêng để tiền không bị lẫn.</p>
+      <p className="text-xs leading-5 text-muted">Mỗi mục tiêu có một tài khoản riêng để tiền không bị lẫn.</p>
 
       <div className="grid grid-cols-2 gap-3">
         {TEMPLATES.map((t) => {
@@ -30,7 +30,7 @@ export function TemplatePick(_props: ScreenProps) {
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
                 <Icon size={24} strokeWidth={1.8} aria-hidden />
               </span>
-              <span className="text-[16px] font-bold text-text">{t.title}</span>
+              <span className="text-sm font-bold text-text">{t.title}</span>
             </button>
           );
         })}

@@ -50,7 +50,7 @@ export function SplitProgressBar({
         )}
       </div>
       {showLegend && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] leading-4 text-muted">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs leading-4 text-muted">
           <span className="inline-flex items-center gap-1.5">
             <span aria-hidden className="h-2 w-2 rounded-full bg-primary" />
             Tiền {formatVnd(cash)}

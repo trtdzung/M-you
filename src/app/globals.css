@@ -559,11 +559,54 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 .home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 76px; gap: 12px; }
 .home-quick-grid span { font-size: 12px; line-height: 1.35; }
 .home-quick-grid > div:last-child > * { flex: 1; }
-.home-shell .login-anniversary { height: clamp(195px, 23dvh, 230px); }
 .home-shell .login-years { font-size: 175px; }
 .home-quick-grid > div:first-child { row-gap: 14px; }
 .home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 64px; }
-.home-shell .login-anniversary { height: 190px; }
+/* Clear the bird + 35 block in the HL wallpaper (top ~1/3). */
+.home-shell .login-anniversary { height: clamp(240px, calc(32dvh - 20px), 320px); }
+
+/*
+ * Anniversary wallpapers by device-canvas size (not browser width — desktop
+ * still uses the 440×956 phone frame):
+ *   ≤382px → *375x667 (SE / short)
+ *   default → *390x844 (modern phone + desktop preview)
+ *   ≥600px → *820x1180 (tablet before lg phone-frame)
+ * Login + Home = HL (cam). Calm shells = MF (hồng nhạt).
+ */
+.device-canvas {
+  container-type: size;
+  container-name: device;
+}
+.home-festive-bg,
+.soft-festive-bg {
+  background-position: top center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.home-festive-bg {
+  background-color: #ed1321;
+  background-image: url("/brand/HL390x844.png");
+}
+.soft-festive-bg {
+  background-color: #fce0d5;
+  background-image: url("/brand/MF390x844.png");
+}
+@container device (max-width: 382px) {
+  .home-festive-bg {
+    background-image: url("/brand/HL375x667.png");
+  }
+  .soft-festive-bg {
+    background-image: url("/brand/MF375x667.png");
+  }
+}
+@container device (min-width: 600px) {
+  .home-festive-bg {
+    background-image: url("/brand/HL820x1180.png");
+  }
+  .soft-festive-bg {
+    background-image: url("/brand/MF820x1180.png");
+  }
+}
 .home-shell .home-account { padding: 12px 16px; }
 .home-quick-grid { padding-top: 12px; }
 .home-quick-grid > div:first-child { row-gap: 8px; }

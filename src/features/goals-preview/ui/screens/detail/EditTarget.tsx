@@ -84,7 +84,7 @@ export function EditTarget({ params }: ScreenProps) {
           {dateError && <p className={fieldError}>{dateError}</p>}
         </section>
 
-        <p className="text-[13px] leading-5 text-muted">
+        <p className="text-xs leading-5 text-muted">
           Hiện có {formatVndCompact(ctx.value.total)}. Bước sau sẽ tính lại số tiền góp mỗi tháng để bạn xem và xác nhận.
         </p>
         {error && <p className={fieldError}>{error}</p>}

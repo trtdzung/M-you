@@ -233,7 +233,7 @@ describe("financial snapshot", () => {
     expect(guide?.securityLevel).toBe("GREEN");
     expect(guide?.metric.unit).toBe("points");
     expect(guide?.metric.value).toBe(45);
-    expect(guide?.badgeText).toBe("Bảo mật · Xanh");
+    expect(guide?.badgeText).toBe("Bảo mật");
   });
 
   it("slot diversity algorithm selects distinct categories for Slide 2 and Slide 3", () => {

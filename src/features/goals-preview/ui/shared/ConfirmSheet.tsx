@@ -37,8 +37,8 @@ export function ConfirmSheet({
     <Sheet open={open} title={title} description={description} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <SummaryRows rows={rows} />
-        {note && <div className="text-[13px] leading-5 text-muted">{note}</div>}
-        <p className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+        {note && <div className="text-xs leading-5 text-muted">{note}</div>}
+        <p className="flex items-center gap-1.5 text-xs leading-4 text-muted">
           <ShieldCheck size={14} aria-hidden />
           Bản xem trước: không cần OTP, không có giao dịch thật.
         </p>

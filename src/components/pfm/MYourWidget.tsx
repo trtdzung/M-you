@@ -385,7 +385,7 @@ export function MYourWidget() {
             visual === "exiting" ? "sheet-panel-out" : "sheet-panel-in",
           )}
         >
-          <div className="shrink-0 bg-[#fce0d5]"><StatusBar /></div>
+          <div className="shrink-0 lg:bg-[#fce0d5]"><StatusBar /></div>
           <header className="flex shrink-0 items-center gap-3 border-b border-[#dfe5ee] bg-white px-4 py-4">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}

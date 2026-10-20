@@ -23,7 +23,7 @@ export function SummaryRows({ rows, className }: { rows: SummaryRow[]; className
         <div key={row.label} className="flex flex-col gap-1.5 py-3">
           <dt className="text-sm text-muted">
             {row.label}
-            {row.hint && <span className="block text-[12px] leading-4 text-muted/80">{row.hint}</span>}
+            {row.hint && <span className="block text-xs leading-4 text-muted/80">{row.hint}</span>}
           </dt>
           <dd className={cn("text-left text-sm text-text whitespace-nowrap", row.emphasis && "text-base font-bold")}>
             {typeof row.value === "number" ? <Amount amount={row.value} source={row.source} /> : row.value}

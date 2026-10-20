@@ -110,18 +110,18 @@ export function LoanSimulator({ params }: ScreenProps) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1 rounded-2xl bg-positive-soft p-3">
-              <span className="flex items-center gap-1 text-[12px] font-semibold text-positive">
+              <span className="flex items-center gap-1 text-xs font-semibold text-positive">
                 <CalendarCheck size={14} aria-hidden /> Có khoản vay
               </span>
-              <span className="text-[16px] font-bold tabular-nums text-text">{isDue ? "Ngay bây giờ" : formatISODate(goal.targetDate)}</span>
-              <span className="text-[12px] text-muted">đúng hạn</span>
+              <span className="text-sm font-bold tabular-nums text-text">{isDue ? "Ngay bây giờ" : formatISODate(goal.targetDate)}</span>
+              <span className="text-xs text-muted">đúng hạn</span>
             </div>
             <div className="flex flex-col gap-1 rounded-2xl bg-surface-muted/70 p-3">
-              <span className="flex items-center gap-1 text-[12px] font-semibold text-muted">
+              <span className="flex items-center gap-1 text-xs font-semibold text-muted">
                 <CalendarClock size={14} aria-hidden /> Chỉ tự tích luỹ
               </span>
-              <span className="text-[16px] font-bold tabular-nums text-text">{soloDate ? formatISODate(soloDate) : "Chưa xác định"}</span>
-              <span className="text-[12px] text-muted">{soloDate ? `chậm ${formatMonths(Math.max(0, Math.round((Date.parse(soloDate) - Date.parse(goal.targetDate)) / 2_629_746_000)))}` : "chưa đủ dữ liệu thu chi"}</span>
+              <span className="text-sm font-bold tabular-nums text-text">{soloDate ? formatISODate(soloDate) : "Chưa xác định"}</span>
+              <span className="text-xs text-muted">{soloDate ? `chậm ${formatMonths(Math.max(0, Math.round((Date.parse(soloDate) - Date.parse(goal.targetDate)) / 2_629_746_000)))}` : "chưa đủ dữ liệu thu chi"}</span>
             </div>
           </div>
         </section>
@@ -132,7 +132,7 @@ export function LoanSimulator({ params }: ScreenProps) {
       <section className={`${card} flex flex-col gap-4`} aria-label="Khoản vay">
         <div className="flex items-center justify-between gap-2">
           <h2 className={sectionTitle}>{product.name.replace(" MSB", "")}</h2>
-          <span className="text-[13px] font-semibold text-text">{rateText(product.ratePa)}</span>
+          <span className="text-xs font-semibold text-text">{rateText(product.ratePa)}</span>
         </div>
         <AmountCard
           bare
@@ -157,7 +157,7 @@ export function LoanSimulator({ params }: ScreenProps) {
 
       {short && reserved && canReserve && (
         <section className={`${card} flex flex-wrap items-center justify-between gap-2`} aria-label="Khoản vay đã đặt trước">
-          <span className="text-[13px] text-text">
+          <span className="text-xs text-text">
             Đã đặt trước {formatVndCompact(reserved.principal)} · {formatMonths(reserved.termMonths)}
           </span>
           <button type="button" className={`${ghostButton} !min-h-9 !text-negative`} onClick={() => dispatch({ type: "cancelReservedLoan", goalId: goal.id })}>
@@ -169,18 +169,18 @@ export function LoanSimulator({ params }: ScreenProps) {
       {!amountError && (
         <section className={`${card} flex flex-col gap-3`} aria-label="Kết quả mô phỏng">
           <div className="flex items-center gap-1">
-            <p className="text-[13px] text-muted">Trả mỗi tháng khoảng</p>
+            <p className="text-xs text-muted">Trả mỗi tháng khoảng</p>
             <InfoTooltip label="lưu ý về lãi suất" text={INDICATIVE_NOTE} />
           </div>
           <p className={heroNumber}>{formatVndCompact(quote.monthlyPayment)}</p>
           <dl className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-surface-muted/70 p-3">
-              <dt className="text-[12px] text-muted">Tổng lãi</dt>
-              <dd className="text-[16px] font-semibold tabular-nums text-text">{formatVndCompact(totalInt)}</dd>
+              <dt className="text-xs text-muted">Tổng lãi</dt>
+              <dd className="text-sm font-semibold tabular-nums text-text">{formatVndCompact(totalInt)}</dd>
             </div>
             <div className="rounded-2xl bg-surface-muted/70 p-3">
-              <dt className="text-[12px] text-muted">Tổng phải trả</dt>
-              <dd className="text-[16px] font-semibold tabular-nums text-text">{formatVndCompact(principal + totalInt)}</dd>
+              <dt className="text-xs text-muted">Tổng phải trả</dt>
+              <dd className="text-sm font-semibold tabular-nums text-text">{formatVndCompact(principal + totalInt)}</dd>
             </div>
           </dl>
           <DtiGauge

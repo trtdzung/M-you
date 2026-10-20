@@ -1,20 +1,20 @@
 /**
- * Class strings for goals-preview, in the style of src/features/goals/ui/styles.ts
- * (design-system token classes only). Tap targets ≥ 44px.
+ * Class strings for goals-preview, aligned with Tổng quan type scale
+ * (SectionHeader / PfmHeader / jar cards). Tap targets ≥ 44px.
  */
 
 export const ring = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50";
 
-export const input = `min-h-12 w-full rounded-xl border border-border bg-surface px-4 text-[16px] text-text ${ring}`;
+export const input = `min-h-12 w-full rounded-xl border border-border bg-surface px-4 text-sm text-text ${ring}`;
 export const label = "text-sm font-medium text-text";
-export const hint = "text-[13px] leading-5 text-muted";
+export const hint = "text-xs leading-5 text-muted";
 export const fieldError = "text-sm text-negative";
 
 /** One per screen. */
-export const primaryButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-[15px] font-semibold text-primary-fg transition-opacity disabled:opacity-50 ${ring}`;
-export const secondaryButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 text-[15px] font-semibold text-text transition-colors hover:bg-surface-muted disabled:opacity-50 ${ring}`;
+export const primaryButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-fg transition-opacity disabled:opacity-50 ${ring}`;
+export const secondaryButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-text transition-colors hover:bg-surface-muted disabled:opacity-50 ${ring}`;
 export const ghostButton = `inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold text-primary-strong transition-colors hover:bg-primary-soft/60 ${ring}`;
-export const dangerButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-negative/40 bg-surface px-4 text-[15px] font-semibold text-negative ${ring}`;
+export const dangerButton = `inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-negative/40 bg-surface px-4 text-sm font-semibold text-negative ${ring}`;
 export const chip = `inline-flex min-h-11 items-center rounded-full border border-border bg-surface px-3.5 text-sm font-semibold text-text transition-colors hover:bg-surface-muted ${ring}`;
 export const chipSelected = `inline-flex min-h-11 items-center rounded-full border border-primary bg-primary px-3.5 text-sm font-semibold text-primary-fg ${ring}`;
 
@@ -23,14 +23,14 @@ export const listRow = `flex min-h-14 w-full items-center gap-3 px-4 py-3 text-l
 export const divider = "divide-y divide-border";
 
 /**
- * Type scale for every goals-preview screen (px): 28 hero number (one per screen) · 22 page title / figure ·
- * 20 emphasis title · 16 card title / input / callout · 15 section title · 14 body · 12–13 caption · 10–11 tag.
+ * Type scale synced to Tổng quan (px): 18 hero/figure (text-lg) · 20 page title ·
+ * 16 section title (text-base) · 14 card title / body / button (text-sm) · 12 caption (text-xs) · 11 meta.
  */
-export const sectionTitle = "!text-[15px] !leading-[22px] !font-semibold text-text";
-export const heroNumber = "text-[28px] font-bold leading-9 tabular-nums text-text";
-export const figure = "text-[22px] font-bold leading-7 tabular-nums text-text";
-export const emphasisTitle = "!text-[20px] !leading-7 !font-bold text-text";
-export const calloutTitle = "text-[16px] font-bold leading-6 text-text";
+export const sectionTitle = "text-base font-semibold text-text";
+export const heroNumber = "text-lg font-bold leading-none tabular-nums text-text";
+export const figure = "text-lg font-bold leading-none tabular-nums text-text";
+export const emphasisTitle = "text-[20px] font-bold leading-7 text-text";
+export const calloutTitle = "text-sm font-semibold leading-5 text-text";
 export const screenPadding = "flex flex-col gap-4 pb-6";
 
 export const warningBox = "rounded-2xl bg-warning-soft px-3.5 py-3 text-sm text-text";

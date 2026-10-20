@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnniversaryHero } from "@/components/home/AnniversaryHero";
 import { HomePageFrame } from "@/components/home/HomePageFrame";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
@@ -31,7 +30,11 @@ export default function HomePage() {
 
   return (
     <HomePageFrame notifications={9}>
-      <AnniversaryHero />
+      {/* Space for the baked-in bird + 35 logo in the HL wallpaper. */}
+      <div
+        className="login-anniversary"
+        aria-label="MSB · Vươn tầm từ di sản · 35 năm · 2026 Bính Ngọ"
+      />
 
       <div className="flex flex-col gap-4">
           <HomeInsightWidget />

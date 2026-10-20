@@ -91,10 +91,10 @@ export function StandingOrderSetup({ params }: ScreenProps) {
       <section className={`${card} flex flex-col gap-1`}>
         <h2 className={sectionTitle}>Nguồn tiền</h2>
         <p className="text-sm text-text">Tài khoản chính {state.customer.mainCasaNumber}</p>
-        <p className="text-[13px] text-muted">
+        <p className="text-xs text-muted">
           Số dư hiện tại: <Amount amount={balance} source="msb" />
         </p>
-        <p className="text-[13px] text-muted">Lần trích đầu tiên: {formatISODate(nextRun)}</p>
+        <p className="text-xs text-muted">Lần trích đầu tiên: {formatISODate(nextRun)}</p>
       </section>
 
       <BottomActions inline>

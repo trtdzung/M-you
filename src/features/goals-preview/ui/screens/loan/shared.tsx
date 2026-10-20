@@ -150,7 +150,7 @@ export function DtiGauge({
         <div className={cn("absolute inset-y-0 left-0 transition-all", DTI_BAR[tone])} style={{ width: `${fill}%` }} />
         <div aria-hidden className="absolute inset-y-0 w-0.5 bg-text/70" style={{ left: `${limit}%` }} />
       </div>
-      {!compact && <p className="text-[12px] leading-4 text-muted">{detail}</p>}
+      {!compact && <p className="text-xs leading-4 text-muted">{detail}</p>}
     </div>
   );
 }

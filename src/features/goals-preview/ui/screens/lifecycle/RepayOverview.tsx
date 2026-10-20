@@ -102,7 +102,7 @@ export function RepayOverview({ params }: ScreenProps) {
         >
           <div className="absolute inset-y-0 left-0 bg-positive" style={{ width: `${repaidPct * 100}%` }} />
         </div>
-        <p className="mt-1.5 text-[12px] leading-4 text-muted">
+        <p className="mt-1.5 text-xs leading-4 text-muted">
           Đã trả {pct(repaidPct)} của khoản vay {formatVnd(loan.principal)}
         </p>
       </section>
@@ -140,7 +140,7 @@ export function RepayOverview({ params }: ScreenProps) {
 
       <div className={`${card} overflow-hidden p-0 ${divider}`}>
         <button type="button" className={listRow} onClick={() => nav.push("RepaySchedule", { goalId: goal.id, loanId: loan.id })}>
-          <span className="flex-1 text-[15px] font-semibold text-text">Xem lịch trả nợ</span>
+          <span className="flex-1 text-sm font-semibold text-text">Xem lịch trả nợ</span>
         </button>
         <button
           type="button"
@@ -148,8 +148,8 @@ export function RepayOverview({ params }: ScreenProps) {
           onClick={() => nav.push("Prepay", { goalId: goal.id, loanId: loan.id })}
         >
           <span className="flex-1">
-            <span className="block text-[15px] font-semibold text-text">Trả trước một phần nợ gốc</span>
-            <span className="block text-[13px] leading-5 text-muted">
+            <span className="block text-sm font-semibold text-text">Trả trước một phần nợ gốc</span>
+            <span className="block text-xs leading-5 text-muted">
               Giảm lãi và số tiền phải trả mỗi tháng.
             </span>
           </span>

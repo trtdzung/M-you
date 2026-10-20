@@ -63,8 +63,8 @@ export function WithdrawFlow({ params }: ScreenProps) {
       ) : (
         <>
           <section className={`${card} flex items-center justify-between gap-3 !py-3`}>
-            <span className="text-[13px] text-muted">Có thể rút · TK mục tiêu</span>
-            <span className="text-[16px] font-semibold tabular-nums text-text">{formatVnd(balance)}</span>
+            <span className="text-xs text-muted">Có thể rút · TK mục tiêu</span>
+            <span className="text-sm font-semibold tabular-nums text-text">{formatVnd(balance)}</span>
           </section>
 
           <AmountCard
@@ -91,7 +91,7 @@ export function WithdrawFlow({ params }: ScreenProps) {
                 <h2 className={sectionTitle}>{stage.phase === 2 ? "Tiến độ trả khoản vay" : "Tiến độ mục tiêu"}</h2>
                 <InfoTooltip label="tác động của việc rút" warning={showImpact} text={impactTip} />
               </div>
-              <span className={cn("text-[13px] font-semibold tabular-nums", showImpact ? "text-negative" : "text-text")}>
+              <span className={cn("text-xs font-semibold tabular-nums", showImpact ? "text-negative" : "text-text")}>
                 {showImpact ? `${nowPct}% → ${afterPct}%` : `${nowPct}%`}
               </span>
             </div>

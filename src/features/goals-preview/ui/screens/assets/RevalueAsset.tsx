@@ -65,14 +65,14 @@ export function RevalueAsset({ params }: ScreenProps) {
       <section className={cn(card, "flex flex-col gap-4")}>
         <h2 className={sectionTitle}>Ảnh hưởng đến mục tiêu</h2>
         <div className="rounded-2xl bg-surface-muted p-3">
-          <p className="text-[13px] text-muted">Tiến độ sau cập nhật</p>
+          <p className="text-xs text-muted">Tiến độ sau cập nhật</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
             <span className={figure}>{pct(progress.after)}</span>
             <span className="text-sm text-muted">{delta === 0 ? "Không thay đổi" : `Trước: ${pct(progress.before)}`}</span>
           </div>
         </div>
         <dl className="flex flex-col gap-3 text-sm">
-          <div className="flex flex-col gap-1"><dt className="text-muted">Giá trị được tính vào mục tiêu</dt><dd className="font-semibold text-text">{formatVnd(newCounted)}</dd>{delta !== 0 && <dd className="text-[12px] text-muted">Trước: {formatVnd(oldCounted)}</dd>}</div>
+          <div className="flex flex-col gap-1"><dt className="text-muted">Giá trị được tính vào mục tiêu</dt><dd className="font-semibold text-text">{formatVnd(newCounted)}</dd>{delta !== 0 && <dd className="text-xs text-muted">Trước: {formatVnd(oldCounted)}</dd>}</div>
           <div className="flex flex-wrap items-center justify-between gap-2"><dt className="text-muted">Thay đổi giá tài sản</dt><dd className={cn("font-semibold", diff > 0 ? "text-positive" : diff < 0 ? "text-negative" : "text-text")}>{diff === 0 ? "Không thay đổi" : `${diff > 0 ? "+" : ""}${formatVnd(diff)}`}</dd></div>
         </dl>
       </section>

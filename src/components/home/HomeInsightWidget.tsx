@@ -601,30 +601,23 @@ export function HomeInsightWidget() {
             </span>
           )}
 
-          {/* Right: Dots Indicator & Slide Counter */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5" role="tablist" aria-label="Danh sách slide gợi ý">
-              {Array.from({ length: totalSlides }).map((_, idx) => {
-                const isActive = activeSlide === idx;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-label={`Chuyển đến slide ${idx + 1}`}
-                    onClick={() => setActiveSlide(idx)}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                      isActive ? "w-5 bg-primary" : "w-1.5 bg-[#FDBA74]/60 hover:bg-orange-300"
-                    }`}
-                  />
-                );
-              })}
-            </div>
-
-            <span className="text-[12px] font-semibold text-[#344054] tabular-nums" aria-live="polite">
-              {activeSlide + 1} / {totalSlides}
-            </span>
+          <div className="flex items-center gap-1.5" role="tablist" aria-label="Danh sách slide gợi ý">
+            {Array.from({ length: totalSlides }).map((_, idx) => {
+              const isActive = activeSlide === idx;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-label={`Chuyển đến slide ${idx + 1}`}
+                  onClick={() => setActiveSlide(idx)}
+                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    isActive ? "w-5 bg-primary" : "w-1.5 bg-[#FDBA74]/60 hover:bg-orange-300"
+                  }`}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -688,15 +681,6 @@ export function HomeInsightWidget() {
                               <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${visuals.dot}`} />
                               <span className="truncate">{item.impactLine || item.candidate.impactLine}</span>
                             </div>
-                          ) : null}
-
-                          {item.candidate.metric?.label ? (
-                            <span className="block truncate text-[12px] text-[#64748B] mt-0.5 leading-tight font-medium">
-                              {item.candidate.metric.label}:{" "}
-                              <span className="font-bold text-[#0C1A30]">
-                                {formatCandidateMetric(item.candidate.metric)}
-                              </span>
-                            </span>
                           ) : null}
                         </div>
 

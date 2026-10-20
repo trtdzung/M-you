@@ -1,6 +1,5 @@
 "use client";
 
-import { AnniversaryHero } from "@/components/home/AnniversaryHero";
 import { useCallback, useState } from "react";
 import { ArrowUpRight, Bell, ChevronDown, Eye, EyeOff, Headphones, QrCode, ScanFace, ScanLine, UserRound } from "lucide-react";
 import { PhoneShell } from "@/components/shell/PhoneShell";
@@ -39,7 +38,7 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
   }
 
   return (
-    <PhoneShell className="login-shell" background={<div aria-hidden className="login-background absolute inset-0 -z-10" />} mainClassName="shell-main--login">
+    <PhoneShell className="login-shell" background={<div aria-hidden className="home-festive-bg absolute inset-0 -z-10" />} mainClassName="shell-main--login">
       <div className="pb-8">
         <header className="login-topbar">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -49,7 +48,11 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
             <button type="button" aria-label="Ngôn ngữ" className="flex h-11 items-center gap-2 rounded-[10px] bg-[#fff3eb] px-3 text-sm font-semibold text-text" onClick={() => setSheet("language")}>VN <ChevronDown size={17} /></button>
           </div>
         </header>
-        <AnniversaryHero />
+        {/* Same HL wallpaper as Home — space for baked-in bird + 35 logo. */}
+        <div
+          className="login-anniversary"
+          aria-label="MSB · Vươn tầm từ di sản · 35 năm · 2026 Bính Ngọ"
+        />
         <section className="login-welcome" aria-label="Đăng nhập khách hàng">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">

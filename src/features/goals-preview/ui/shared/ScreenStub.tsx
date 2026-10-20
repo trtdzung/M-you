@@ -18,7 +18,7 @@ export function ScreenStub({ title, params }: { title: string; params?: ScreenPa
         <p className="text-base font-semibold text-text">Đang xây dựng</p>
         <p className="text-sm text-muted">Màn hình “{title}” sẽ có trong bản xem trước sắp tới.</p>
         {entries.length > 0 && (
-          <p className="text-[12px] text-muted">
+          <p className="text-xs text-muted">
             {entries.map(([k, v]) => `${k}=${String(v)}`).join(" · ")}
           </p>
         )}

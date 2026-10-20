@@ -24,7 +24,7 @@ export function SuggestChip({ label, selected, onClick }: { label: string; selec
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-9 items-center rounded-full border px-3 text-[13px] font-medium tabular-nums transition-colors",
+        "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium tabular-nums transition-colors",
         selected ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-surface text-text hover:bg-surface-muted",
         ring,
       )}
@@ -59,13 +59,14 @@ export function AmountField({
   labelledBy,
   invalid,
   autoFocus,
-  size = "lg",
+  size: _size = "lg",
 }: {
   value: number | null;
   onChange: (value: number | null) => void;
   labelledBy: string;
   invalid?: boolean;
   autoFocus?: boolean;
+  /** Kept for callers; size is unified with Tổng quan (text-lg). */
   size?: "lg" | "md";
 }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -112,7 +113,6 @@ export function AmountField({
     }
   };
 
-  const long = text.length > 11;
   return (
     <div
       className={cn(
@@ -131,10 +131,7 @@ export function AmountField({
         onKeyDown={onKeyDown}
         onChange={(e) => commit(e.target.value, digitsBefore(e.target.value, e.target.selectionStart ?? e.target.value.length))}
         aria-invalid={invalid ? true : undefined}
-        className={cn(
-          "min-w-0 flex-1 bg-transparent font-bold tabular-nums text-text outline-none placeholder:text-muted",
-          size === "lg" ? (long ? "text-[22px]" : "text-[28px]") : long ? "text-[18px]" : "text-[22px]",
-        )}
+        className="min-w-0 flex-1 bg-transparent text-lg font-bold tabular-nums text-text outline-none placeholder:text-muted"
       />
       <span className="shrink-0 text-sm font-semibold text-muted">VND</span>
     </div>

@@ -178,9 +178,9 @@ export function InstrumentPicker({
       <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface-muted/40 px-3.5 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[16px] font-bold text-text">{selected.name}</p>
-            {selected.fullName && <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{selected.fullName}</p>}
-            <p className="mt-1.5 text-[13px] tabular-nums text-muted">
+            <p className="text-sm font-bold text-text">{selected.name}</p>
+            {selected.fullName && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{selected.fullName}</p>}
+            <p className="mt-1.5 text-xs tabular-nums text-muted">
               {kind === "stock" ? "Giá đóng cửa" : "NAV công bố"} · {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}
               <span className="mt-0.5 block font-semibold text-text">{priceLabel(price)}/{kind === "stock" ? "cp" : selected.unit}</span>
             </p>
@@ -332,7 +332,7 @@ function InstrumentSheet({
 
         {!checking && filtered.length > 0 && (
           <>
-            <p className="px-1 pb-1 text-[12px] font-semibold uppercase tracking-wide text-muted">{heading}</p>
+            <p className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">{heading}</p>
             <ul className="flex flex-col">
               {filtered.map((m) => {
                 const price = unitPrice(m);
@@ -347,10 +347,10 @@ function InstrumentSheet({
                       className={cn(listRow, "!min-h-11 !gap-2 !px-1")}
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-[15px] font-bold text-text">{m.name}</p>
-                        {m.fullName && <p className="truncate text-[13px] text-muted">{m.fullName}</p>}
+                        <p className="text-sm font-bold text-text">{m.name}</p>
+                        {m.fullName && <p className="truncate text-xs text-muted">{m.fullName}</p>}
                       </div>
-                      <span className="shrink-0 text-[13px] font-semibold tabular-nums text-text">{displayPrice}</span>
+                      <span className="shrink-0 text-xs font-semibold tabular-nums text-text">{displayPrice}</span>
                     </button>
                   </li>
                 );

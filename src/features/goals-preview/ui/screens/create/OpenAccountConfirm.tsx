@@ -91,8 +91,8 @@ function Body({ goal, deposit }: { goal: WizardPlan; deposit: number }) {
             { label: "Góp mỗi tháng", value: formatVndCompact(monthly) },
           ].map((row) => (
             <div key={row.label}>
-              <dt className="text-[13px] text-muted">{row.label}</dt>
-              <dd className="text-[16px] font-semibold tabular-nums text-text">{row.value}</dd>
+              <dt className="text-xs text-muted">{row.label}</dt>
+              <dd className="text-sm font-semibold tabular-nums text-text">{row.value}</dd>
             </div>
           ))}
         </dl>
@@ -119,7 +119,7 @@ function Body({ goal, deposit }: { goal: WizardPlan; deposit: number }) {
             <div className="flex flex-col gap-2">
               <h3 className={sectionTitle}>Vào ngày</h3>
               <DayOfMonthPicker value={day} onChange={setDay} />
-              <p className="text-[13px] text-muted">Lần đầu: {formatISODate(nextDayOfMonth(state.clock.today, day))}</p>
+              <p className="text-xs text-muted">Lần đầu: {formatISODate(nextDayOfMonth(state.clock.today, day))}</p>
             </div>
           </>
         )}

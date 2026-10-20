@@ -25,7 +25,7 @@ export function DueResult({ params }: ScreenProps) {
         </div>
         <GoalStatusBadge status={goal.status} />
       </div>
-      <p className="mb-3 mt-1 text-[13px] text-muted">Mục tiêu {formatVnd(goal.targetAmount)} · hạn {formatISODate(goal.targetDate)}</p>
+      <p className="mb-3 mt-1 text-xs text-muted">Mục tiêu {formatVnd(goal.targetAmount)} · hạn {formatISODate(goal.targetDate)}</p>
       <SplitProgressBar cash={value.cash} assets={value.assets} target={goal.targetAmount} />
     </div>
   );
@@ -120,7 +120,7 @@ export function DueResult({ params }: ScreenProps) {
           </p>
         </div>
         {progress}
-        <p className="text-[13px] leading-5 text-muted">
+        <p className="text-xs leading-5 text-muted">
           Nếu vay {formatVnd(probe.principal)} trong {probe.termMonths} tháng, bạn trả khoảng {formatVnd(probe.quote.monthlyPayment)}/tháng (số tham khảo).
         </p>
         <BottomActions>

@@ -69,14 +69,14 @@ export function MoneyInput({
           aria-describedby={hintId}
           value={value === null ? "" : groupFormatter.format(value)}
           onChange={(event) => onChange(parseVndInput(event.target.value))}
-          className={cn(input, "pr-14 tabular-nums", emphasis ? "text-[20px] font-semibold" : "font-normal", shownError && "border-negative")}
+          className={cn(input, "pr-14 tabular-nums", emphasis ? "text-lg font-semibold" : "font-normal", shownError && "border-negative")}
         />
         <span aria-hidden className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted">
           VND
         </span>
       </div>
       <div id={hintId} className="flex flex-col gap-0.5">
-        {words && <p className="text-[13px] italic leading-5 text-muted">{words}</p>}
+        {words && <p className="text-xs italic leading-5 text-muted">{words}</p>}
         {shownError ? <p className={fieldError}>{shownError}</p> : hint ? <p className={hintClass}>{hint}</p> : null}
       </div>
       {(quickAmounts?.length || max !== undefined) && (

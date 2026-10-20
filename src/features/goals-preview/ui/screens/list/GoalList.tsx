@@ -40,8 +40,8 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
           {goalEmoji(goal)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[16px] font-semibold text-text">{goal.name}</p>
-          <p className="text-[12px] text-muted">
+          <p className="text-sm font-semibold text-text">{goal.name}</p>
+          <p className="text-xs text-muted">
             {TEMPLATE_LABEL[goal.template]}{phase2 ? " · giai đoạn 2 trả vay" : ""} · hạn {formatISODate(history ? goal.targetDate : stage.targetDate)}
           </p>
         </div>
@@ -56,7 +56,7 @@ function GoalCard({ state, goal, onOpen }: { state: PreviewState; goal: Goal; on
         <span className="text-sm font-semibold text-text">{pct}% {phase2 ? "giai đoạn 2" : "đã tích luỹ"}</span>
         {showProgress ? <ProgressStateBadge state={progressState(state, goal)} /> : <GoalStatusBadge status={goal.status} />}
       </div>
-      {v.source === "self_reported" && <p className="text-[12px] text-muted">Bao gồm tài sản tự khai</p>}
+      {v.source === "self_reported" && <p className="text-xs text-muted">Bao gồm tài sản tự khai</p>}
     </button>
   );
 }
@@ -118,17 +118,17 @@ export function GoalList({ params }: ScreenProps) {
       {active.length > 0 && (
         <section className={`${card} flex flex-col gap-3`} aria-label="Tổng quan mục tiêu">
           <div>
-            <p className="text-[13px] text-muted">Tổng giá trị đang tích luỹ</p>
+            <p className="text-xs text-muted">Tổng giá trị đang tích luỹ</p>
             <Amount amount={summary.totalValue} source={active.some((g) => goalValue(state, g).source === "self_reported") ? "self_reported" : "msb"} className={heroNumber} />
           </div>
-          {active.some((g) => goalValue(state, g).source === "self_reported") && <p className="text-[12px] text-muted">Tổng gồm tiền tại MSB và tài sản tự khai.</p>}
+          {active.some((g) => goalValue(state, g).source === "self_reported") && <p className="text-xs text-muted">Tổng gồm tiền tại MSB và tài sản tự khai.</p>}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-[12px] text-muted">Góp mỗi tháng</p>
+              <p className="text-xs text-muted">Góp mỗi tháng</p>
               <Amount amount={summary.monthly} source="msb" className="font-semibold text-text" />
             </div>
             <div>
-              <p className="text-[12px] text-muted">Dư dự kiến/tháng</p>
+              <p className="text-xs text-muted">Dư dự kiến/tháng</p>
               <Amount
                 amount={summary.left}
                 source={summary.left === "unknown" ? undefined : "estimated"}
@@ -183,7 +183,7 @@ export function GoalList({ params }: ScreenProps) {
             <li key={g.id} className="flex items-stretch gap-2">
               {sorting && tab === "active" && (
                 <div className="flex shrink-0 flex-col justify-center gap-1">
-                  <span className="text-center text-[12px] font-semibold text-muted">#{i + 1}</span>
+                  <span className="text-center text-xs font-semibold text-muted">#{i + 1}</span>
                   <button
                     type="button"
                     aria-label={`Đưa ${g.name} lên`}

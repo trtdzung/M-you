@@ -51,10 +51,10 @@ export function SellAsset({ params }: ScreenProps) {
 
       <section className={cn(card, "flex flex-col gap-1")}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[13px] text-muted">Giá trị hiện tại</p>
+          <p className="text-xs text-muted">Giá trị hiện tại</p>
           {quote?.early && <InfoTooltip warning label="tất toán trước hạn" text={`${quote.note}. ${quote.lostInterest > 0 ? `Phần lãi bị giảm theo báo giá hiện tại: ${formatVnd(quote.lostInterest)}.` : "Kiểm tra mức lãi áp dụng khi tất toán trước hạn trước khi xác nhận."}`} />}
         </div>
-        <Amount amount={isMsb ? quote?.gross : assetValue(asset, state)} source={asset.source} className="text-2xl font-bold" />
+        <Amount amount={isMsb ? quote?.gross : assetValue(asset, state)} source={asset.source} className="text-lg font-bold" />
       </section>
 
       {partial && (

@@ -47,7 +47,7 @@ function QuickTile({ icon: Icon, label, onClick }: { icon: LucideIcon; label: st
   return (
     <button type="button" onClick={onClick} className={`flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-surface-muted/70 px-1 text-center ${ring}`}>
       <Icon size={22} aria-hidden className="text-primary-strong" />
-      <span className="text-[13px] font-medium leading-4 text-text">{label}</span>
+      <span className="text-xs font-medium leading-4 text-text">{label}</span>
     </button>
   );
 }
@@ -72,14 +72,14 @@ export function HomeMock({ params }: ScreenProps) {
           {state.customer.name.trim().split(/\s+/).pop()?.[0] ?? "K"}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] leading-5 text-muted">Xin chào</p>
+          <p className="text-xs leading-5 text-muted">Xin chào</p>
           <h1 className="truncate text-[20px] font-bold leading-6 text-text">{state.customer.name}</h1>
         </div>
       </header>
 
       <section className={`${card} bg-primary text-primary-fg`} aria-label="Tài khoản chính">
-        <p className="text-[13px] opacity-80">Tài khoản thanh toán · {state.customer.mainCasaNumber}</p>
-        <p className="mt-1 text-[28px] font-bold leading-9 tabular-nums">{formatVnd(state.customer.mainCasaBalance)}</p>
+        <p className="text-xs opacity-80">Tài khoản thanh toán · {state.customer.mainCasaNumber}</p>
+        <p className="mt-1 text-lg font-bold leading-none tabular-nums">{formatVnd(state.customer.mainCasaBalance)}</p>
       </section>
 
       <section className="flex flex-col gap-2" aria-label="Mục tiêu ưu tiên">
@@ -96,12 +96,12 @@ export function HomeMock({ params }: ScreenProps) {
             className={`${card} flex flex-col gap-3 text-left ${ring}`}
           >
             <div className="flex items-center gap-3">
-              <span aria-hidden className="text-2xl">
+              <span aria-hidden className="text-lg">
                 {goalEmoji(top)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold text-text">{top.name}</p>
-                <p className="text-[13px] text-muted">
+                <p className="truncate text-sm font-semibold text-text">{top.name}</p>
+                <p className="text-xs text-muted">
                   {formatVnd(goalValue(state, top).total)} / {formatVnd(top.targetAmount)} · {Math.round(progressPct(state, top))}%
                 </p>
               </div>
@@ -117,7 +117,7 @@ export function HomeMock({ params }: ScreenProps) {
               target={top.targetAmount}
               showLegend={false}
             />
-            <p className="text-[13px] leading-5 text-text">
+            <p className="text-xs leading-5 text-text">
               <span className="font-semibold">Bước tiếp theo: </span>
               {nextStep(state, top)}
             </p>
@@ -128,8 +128,8 @@ export function HomeMock({ params }: ScreenProps) {
               <Plus size={20} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-text">Tạo mục tiêu đầu tiên</span>
-              <span className="block text-[13px] text-muted">Mua xe, mua nhà, du lịch… mỗi mục tiêu một tài khoản riêng.</span>
+              <span className="block text-sm font-semibold text-text">Tạo mục tiêu đầu tiên</span>
+              <span className="block text-xs text-muted">Mua xe, mua nhà, du lịch… mỗi mục tiêu một tài khoản riêng.</span>
             </span>
             <ChevronRight size={18} aria-hidden className="text-muted" />
           </button>
@@ -158,7 +158,7 @@ export function HomeMock({ params }: ScreenProps) {
             <CreditCard size={20} aria-hidden className="shrink-0 text-muted" />
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-medium text-text">Tài khoản thanh toán</span>
-              <span className="block text-[12px] text-muted">{state.customer.mainCasaNumber}</span>
+              <span className="block text-xs text-muted">{state.customer.mainCasaNumber}</span>
             </span>
             <span className="text-sm font-semibold tabular-nums text-text">{formatVnd(state.customer.mainCasaBalance)}</span>
           </li>
@@ -174,7 +174,7 @@ export function HomeMock({ params }: ScreenProps) {
                   <Target size={20} aria-hidden className="shrink-0 text-primary-strong" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-text">Mục tiêu: {goal?.name ?? a.name}</span>
-                    <span className="block text-[12px] text-muted">{a.number}</span>
+                    <span className="block text-xs text-muted">{a.number}</span>
                   </span>
                   <span className="text-sm font-semibold tabular-nums text-text">{formatVnd(a.balance)}</span>
                 </button>

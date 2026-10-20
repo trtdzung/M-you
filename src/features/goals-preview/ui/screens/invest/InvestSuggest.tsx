@@ -99,7 +99,7 @@ export function InvestSuggest({ params }: ScreenProps) {
 
       <section className={cn(card, "flex flex-col gap-1")}>
         <div className="flex items-center gap-1">
-          <p className="text-[13px] text-muted">Số tiền có thể đầu tư</p>
+          <p className="text-xs text-muted">Số tiền có thể đầu tư</p>
           <InfoTooltip
             label="cách tính số tiền có thể đầu tư"
             text={`Toàn bộ số dư tài khoản mục tiêu: ${formatVnd(account?.balance ?? 0)}. Còn ${months} tháng đến ngày mục tiêu (${dateVi(goal.targetDate)}).`}
@@ -135,9 +135,9 @@ export function InvestSuggest({ params }: ScreenProps) {
                       {active && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
                     </span>
                     <Icon size={18} className="shrink-0 text-primary-strong" aria-hidden />
-                    <span className="text-[16px] font-semibold text-text">{s.title}</span>
+                    <span className="text-sm font-semibold text-text">{s.title}</span>
                   </span>
-                  <span className="pl-7 text-[13px] text-muted">
+                  <span className="pl-7 text-xs text-muted">
                     {p.returnLabel} · {s.maturityDate ? `đáo hạn ${dateVi(s.maturityDate).slice(3)}` : fund ? "giá thay đổi hằng ngày" : "rút được mọi lúc"} · {RISK_LEVEL_LABEL[s.riskLevel].toLowerCase()}
                   </span>
                   <span className="pl-7 text-sm text-text">Đầu tư {formatVndCompact(s.suggestedAmount)}</span>
@@ -160,7 +160,7 @@ export function InvestSuggest({ params }: ScreenProps) {
       </section>
 
       <section className="flex items-center gap-1 px-1" aria-label="Lưu ý">
-        <p className="text-[13px] text-muted">Lợi suất là dự kiến, không cam kết.</p>
+        <p className="text-xs text-muted">Lợi suất là dự kiến, không cam kết.</p>
         <InfoTooltip
           label="lưu ý khi đầu tư"
           text="Giá trị đầu tư có thể thay đổi, riêng quỹ có thể giảm giá. Đầu tư xong, tiền chuyển từ tài khoản mục tiêu sang tài sản của cùng mục tiêu, giá trị mục tiêu không đổi."

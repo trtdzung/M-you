@@ -57,10 +57,10 @@ export function StandingOrderManage({ params }: ScreenProps) {
               />
             )}
           </div>
-          <p className="text-[13px] text-muted">
+          <p className="text-xs text-muted">
             {active ? `${formatVnd(so!.amount)} · ngày ${so!.dayOfMonth} · lần tới ${formatISODate(so!.nextRunDate)}` : "Bật lại để tiếp tục trích hằng tháng."}
           </p>
-          <p className="text-[13px] text-muted">{lastLine}</p>
+          <p className="text-xs text-muted">{lastLine}</p>
         </section>
       )}
 

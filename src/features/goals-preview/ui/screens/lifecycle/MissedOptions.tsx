@@ -39,8 +39,8 @@ function OptionCard({
       >
         <span className="mt-0.5 shrink-0 text-primary-strong">{icon}</span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold text-text">{title}</span>
-          <span className="block text-[13px] leading-5 text-muted">{summary}</span>
+          <span className="block text-sm font-semibold text-text">{title}</span>
+          <span className="block text-xs leading-5 text-muted">{summary}</span>
         </span>
       </button>
       {selected && children && <div className="flex flex-col gap-2 px-4 pb-4">{children}</div>}
@@ -118,7 +118,7 @@ export function MissedOptions({ params }: ScreenProps) {
           summary={needMonths ? `Nếu giữ mức tích luỹ ${formatVnd(monthly)}/tháng, cần khoảng ${formatMonths(needMonths)}.` : "Chọn ngày mới để tiếp tục tích luỹ."}
         >
           <SliderRow label="Gia hạn thêm" value={extMonths} min={1} max={60} onChange={setMonths} format={formatMonths} />
-          <p className="text-[13px] leading-5 text-muted">
+          <p className="text-xs leading-5 text-muted">
             Hạn mới {formatISODate(newDate)}. {monthly > 0 ? (extendEnough ? `Dự kiến đủ tiền (ước tính ${formatVnd(projected)}).` : `Dự kiến có ${formatVnd(projected)}, vẫn chưa đủ, hãy kéo dài thêm.`) : "Chưa đủ dữ liệu để ước tính, bạn có thể tự chọn thời gian."}
           </p>
         </OptionCard>
@@ -131,7 +131,7 @@ export function MissedOptions({ params }: ScreenProps) {
           summary={canReduce ? `Hạ mục tiêu xuống ${formatVnd(reduceTo)}, đúng bằng số bạn đang có.` : "Số tiền hiện có quá nhỏ để hạ mục tiêu."}
         >
           {canReduce && (
-            <p className="text-[13px] leading-5 text-muted">
+            <p className="text-xs leading-5 text-muted">
               Mục tiêu sẽ hoàn thành ngay với số tiền mới. Số tiền gốc {formatVnd(goal.targetAmount)} vẫn được ghi lại.
             </p>
           )}
@@ -148,7 +148,7 @@ export function MissedOptions({ params }: ScreenProps) {
               : "Khoản trả sẽ vượt 40% thu nhập nên chưa thể vay phần thiếu này."
           }
         >
-          <p className="text-[13px] leading-5 text-muted">Vay là phương án cuối cùng. Mục tiêu sẽ Đạt mục tiêu, rồi bước sang giai đoạn tích luỹ & trả nợ.</p>
+          <p className="text-xs leading-5 text-muted">Vay là phương án cuối cùng. Mục tiêu sẽ Đạt mục tiêu, rồi bước sang giai đoạn tích luỹ & trả nợ.</p>
         </OptionCard>
 
         <OptionCard

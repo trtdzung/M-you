@@ -82,7 +82,7 @@ export function GoalDetail({ params }: ScreenProps) {
             <span className="font-semibold text-text">{pct}% {phase === 2 ? "giai đoạn 2" : "mục tiêu"}</span>
             <span className="text-muted">Hạn {formatISODate(stage.targetDate)}</span>
           </div>
-          <span className="flex items-center justify-between text-[13px] font-semibold text-primary-strong">Xem chi tiết tiến độ <ChevronRight size={18} aria-hidden /></span>
+          <span className="flex items-center justify-between text-xs font-semibold text-primary-strong">Xem chi tiết tiến độ <ChevronRight size={18} aria-hidden /></span>
         </button>
         {canEditTarget && (
           <button
@@ -102,7 +102,7 @@ export function GoalDetail({ params }: ScreenProps) {
         <section className={`${card} flex flex-col gap-2`} aria-label="Kết quả giai đoạn 1">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-semibold text-text">Giai đoạn 1 · Tích luỹ</span>
-            <span className="text-[13px] font-semibold text-positive">Đã đạt {formatISODate(phaseOne.achievedAt)}</span>
+            <span className="text-xs font-semibold text-positive">Đã đạt {formatISODate(phaseOne.achievedAt)}</span>
           </div>
           <p className="text-sm text-muted">
             Tự tích luỹ <span className="font-semibold text-text">{formatVndCompact(phaseOne.saved)}</span> + vay{" "}

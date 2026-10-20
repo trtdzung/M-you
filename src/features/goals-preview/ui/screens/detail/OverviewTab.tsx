@@ -129,7 +129,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
           <p className="flex items-center gap-2 font-semibold">
             <PartyPopper size={18} aria-hidden /> Bạn đã đủ tiền trước hạn
           </p>
-          <p className="text-[13px] text-muted">
+          <p className="text-xs text-muted">
             Đủ ngày {formatISODate(goal.reachedEarlyAt)}, sớm hơn hạn {formatISODate(goal.targetDate)}. Bạn có thể hoàn thành ngay hoặc
             tiếp tục tích luỹ đến hạn.
           </p>
@@ -151,7 +151,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
               key={q.label}
               type="button"
               onClick={q.go}
-              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl text-[13px] font-semibold shadow-card ${q.label === "Nạp tiền" ? "bg-primary text-primary-fg" : "bg-surface text-text"} ${ring}`}
+              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold shadow-card ${q.label === "Nạp tiền" ? "bg-primary text-primary-fg" : "bg-surface text-text"} ${ring}`}
             >
               <q.icon size={20} aria-hidden className={q.label === "Nạp tiền" ? "text-primary-fg" : "text-primary-strong"} />
               {q.label}
@@ -172,7 +172,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
         </div>
         {goal.status === "accumulating" || goal.status === "paused" || goal.status === "missed" || goal.status === "repaying" ? <>
           <div>
-            <p className="text-[13px] text-muted">{phase2 ? "Cần góp mỗi tháng để đủ trả góp" : "Cần góp mỗi tháng"} · còn {fe.monthsLeft} tháng</p>
+            <p className="text-xs text-muted">{phase2 ? "Cần góp mỗi tháng để đủ trả góp" : "Cần góp mỗi tháng"} · còn {fe.monthsLeft} tháng</p>
             <p className={`mt-1 ${figure}`}>{typeof required === "number" ? formatVnd(required) : "Chưa đủ dữ liệu"}</p>
           </div>
           <dl className="flex flex-col gap-3 border-t border-border pt-3 text-sm">
@@ -186,7 +186,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
             <span>
               Đã đặt trước khoản vay <b>{formatVnd(goal.plannedLoan.principal)}</b>, giải ngân {formatISODate(goal.targetDate)}
             </span>
-            <span className="shrink-0 text-[13px] font-semibold text-primary-strong">Xem</span>
+            <span className="shrink-0 text-xs font-semibold text-primary-strong">Xem</span>
           </button>
         ) : fe.status === "infeasible" && goal.status === "accumulating" ? (
           <button type="button" className={secondaryButton} onClick={() => nav.push("LoanSimulator", { goalId })}>
@@ -232,7 +232,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
                 </div>
                 <div className="pb-4">
                   <p className={cn("text-sm", t.done ? "font-semibold text-text" : "text-muted")}>{t.label}</p>
-                  <p className="text-[12px] text-muted">
+                  <p className="text-xs text-muted">
                     {t.label.includes("Mốc ") || t.label.includes("mốc ") ? "Kế hoạch: " : ""}{formatISODate(t.date)}
                     {t.note ? ` · ${t.note}` : ""}
                   </p>
@@ -245,7 +245,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
 
       <Sheet open={loanWarning} title="Hồ sơ vay có thể chưa đủ điều kiện" onClose={() => setLoanWarning(false)}>
         <div className="flex flex-col gap-4">
-          <p className="text-[14px] leading-6 text-text">
+          <p className="text-sm leading-6 text-text">
             Để hồ sơ vay được phê duyệt, bạn nên có khoản tích luỹ từ {Math.round(LOAN_MIN_SAVED_RATIO * 100)}% giá trị mục tiêu trở lên.
           </p>
           <SummaryRows
