@@ -5,10 +5,12 @@ import { clipOutput, recordAiJournal, toolNames } from "./ai-journal";
 import { fraudAgentEnabled } from "./fraud-switch";
 import { redactSecurityText } from "./redact";
 import { readProfile } from "./profile-store";
-import { CLASSIFY_QUESTIONS } from "./scenario-copy";
+
+export const CLASSIFY_QUESTION = "Có ai đang gọi điện hướng dẫn anh/chị không?";
+export const CLASSIFY_ANSWERS = ["Có", "Không"] as const;
 
 export type Diagnosis = { answers: string[]; pending: boolean; next_question: string | null; conclusion: string | null; proposals: string[]; source: "rule" | "agent"; trace: unknown[] };
-const initial = (): Diagnosis => ({ answers: [], pending: false, next_question: CLASSIFY_QUESTIONS[0], conclusion: null, proposals: [], source: "rule", trace: [] });
+const initial = (): Diagnosis => ({ answers: [], pending: false, next_question: CLASSIFY_QUESTION, conclusion: null, proposals: [], source: "rule", trace: [] });
 function row(cif: string, id: string) {
   const db = getDb();
   const intervention = db.prepare("SELECT context FROM interventions WHERE cif=? AND id=?").get(cif, id) as { context: string } | undefined;
@@ -20,8 +22,11 @@ export function readDiagnosis(cif: string, id: string): Diagnosis | null {
   const r = row(cif, id);
   if (!r) return null;
   const state: Diagnosis = r.data.diagnosis ?? initial();
+  if (state.answers.length >= 1) {
+    state.next_question = null;
+  }
   if (fraudAgentEnabled() || state.source !== "agent") return state;
-  const next = state.answers.length < CLASSIFY_QUESTIONS.length ? CLASSIFY_QUESTIONS[state.answers.length] : null;
+  const next = state.answers.length === 0 ? CLASSIFY_QUESTION : null;
   return { ...state, source: "rule", next_question: next, conclusion: null, proposals: [], trace: [] };
 }
 function save(cif: string, id: string, state: Diagnosis): void {
@@ -34,11 +39,11 @@ function save(cif: string, id: string, state: Diagnosis): void {
 /** Persist each answer before invoking the model; concurrent submissions cannot add questions. */
 export async function diagnose(cif: string, id: string, answer: string): Promise<Diagnosis | null> {
   const state = readDiagnosis(cif, id);
-  if (!state || state.pending || state.answers.length >= 2) return null;
+  if (!state || state.pending || state.answers.length >= 1) return null;
   state.answers.push(redactSecurityText(answer));
   state.pending = true;
   save(cif, id, state);
-  const fallback = { ...state, pending: false, next_question: state.answers.length < 2 ? CLASSIFY_QUESTIONS[1] : null, conclusion: null, proposals: [], source: "rule" as const, trace: [] };
+  const fallback = { ...state, pending: false, next_question: null, conclusion: null, proposals: [], source: "rule" as const, trace: [] };
   if (!readProfile(cif).aiProtect || !fraudAgentEnabled()) { save(cif, id, fallback); return fallback; }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -52,7 +57,7 @@ export async function diagnose(cif: string, id: string, answer: string): Promise
       && (result.next_question === null || typeof result.next_question === "string" && result.next_question.length <= 400)
       && (result.conclusion === null || typeof result.conclusion === "string" && result.conclusion.length <= 800)
       && Array.isArray(result.proposals) && result.proposals.length <= 3 && result.proposals.every((p: string) => ["callback", "emergency_lock", "case", "none"].includes(p))
-      && Array.isArray(result.trace) && result.trace.length <= 30 && !(state.answers.length >= 2 && result.next_question !== null);
+      && Array.isArray(result.trace) && result.trace.length <= 30 && !(state.answers.length >= 1 && result.next_question !== null);
     if (!shaped) {
       recordAiJournal(cif, "diagnose", id, tools, "thất bại");
       save(cif, id, fallback);
@@ -60,7 +65,7 @@ export async function diagnose(cif: string, id: string, answer: string): Promise
     }
     recordAiJournal(cif, "diagnose", id, tools, clipOutput(result.conclusion || result.next_question || "thành công"));
     if (!readProfile(cif).aiProtect || !fraudAgentEnabled()) { save(cif, id, fallback); return fallback; }
-    const next: Diagnosis = { ...state, ...result, pending: false, source: "agent" };
+    const next: Diagnosis = { ...state, ...result, next_question: null, pending: false, source: "agent" };
     save(cif, id, next);
     return next;
   } catch {
