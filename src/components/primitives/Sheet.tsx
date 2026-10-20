@@ -235,7 +235,7 @@ export function Sheet({
             {frame.titleIcon ? (
               <div className="flex items-center gap-[10px]">
                 <span className="shrink-0" aria-hidden="true">{frame.titleIcon}</span>
-                <h2 id={titleId} className="text-[18px] font-semibold text-text">
+                <h2 id={titleId} className="text-[16px] font-semibold text-text">
                   {frame.title}
                 </h2>
               </div>

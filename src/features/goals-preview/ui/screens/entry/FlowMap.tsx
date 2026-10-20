@@ -121,12 +121,12 @@ export function FlowMap({ params }: ScreenProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold leading-5 text-text">{idea.title}</p>
-                <p className="text-[13px] leading-5 text-muted">{idea.body}</p>
+                <p className="text-xs leading-5 text-muted">{idea.body}</p>
               </div>
             </li>
           ))}
         </ol>
-        <p className="text-[12px] leading-4 text-muted">
+        <p className="text-xs leading-4 text-muted">
           Mọi số liệu và gợi ý ở đây là mô phỏng, không gọi AI hay hệ thống ngân hàng thật.
         </p>
       </section>
@@ -144,7 +144,7 @@ export function FlowMap({ params }: ScreenProps) {
 
       <section className="flex flex-col gap-2">
         <h2 className={sectionTitle}>Kịch bản thử ({SCENARIOS.length})</h2>
-        <p className="text-[13px] leading-5 text-muted">Chọn một kịch bản để nạp dữ liệu và nhảy tới màn cần xem.</p>
+        <p className="text-xs leading-5 text-muted">Chọn một kịch bản để nạp dữ liệu và nhảy tới màn cần xem.</p>
         <ul className="flex flex-col gap-2.5">
           {SCENARIOS.map((sc) => {
             const current = state.scenarioId === sc.id;
@@ -155,12 +155,12 @@ export function FlowMap({ params }: ScreenProps) {
                     {sc.code}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold leading-5 text-text">{sc.title}</p>
-                    <p className="mt-0.5 text-[13px] leading-5 text-muted">{sc.description}</p>
+                    <p className="text-sm font-semibold leading-5 text-text">{sc.title}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted">{sc.description}</p>
                   </div>
                 </div>
                 {sc.highlights.length > 0 && (
-                  <ul className="ml-10 list-disc pl-4 text-[12px] leading-4 text-muted">
+                  <ul className="ml-10 list-disc pl-4 text-xs leading-4 text-muted">
                     {sc.highlights.slice(0, 3).map((h) => (
                       <li key={h}>{h}</li>
                     ))}
@@ -184,7 +184,7 @@ export function FlowMap({ params }: ScreenProps) {
 
       <section className="flex flex-col gap-2">
         <h2 className={sectionTitle}>Các luồng màn hình</h2>
-        <p className="text-[13px] leading-5 text-muted">
+        <p className="text-xs leading-5 text-muted">
           Bấm để vào thẳng một màn, dùng dữ liệu của kịch bản hiện tại. Một số màn cần đúng loại dữ liệu mới có nội dung.
         </p>
         {FLOW_GROUPS.map((group, index) => (
@@ -202,7 +202,7 @@ export function FlowMap({ params }: ScreenProps) {
                     <button type="button" onClick={() => nav.push(item.screen, jump.params)} className={listRow}>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium text-text">{item.label}</span>
-                        <span className="block text-[12px] leading-4 text-muted">
+                        <span className="block text-xs leading-4 text-muted">
                           {item.hint}
                           {jump.missing ? ` · lưu ý: ${jump.missing}` : ""}
                         </span>

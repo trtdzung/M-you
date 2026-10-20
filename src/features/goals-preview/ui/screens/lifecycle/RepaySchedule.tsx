@@ -50,14 +50,14 @@ export function RepaySchedule({ params }: ScreenProps) {
             className={cn(card, "flex flex-col gap-1.5 py-3", index === nextIndex && "ring-2 ring-primary/40", row.status === "overdue" && "ring-2 ring-negative/40")}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[15px] font-semibold text-text">
+              <span className="text-sm font-semibold text-text">
                 Kỳ {row.period} · {formatISODate(row.dueDate)}
               </span>
               <span className={cn("inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold", CHIP_TONE[row.status])}>
                 {LOAN_ROW_LABEL[row.status]}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-[13px] leading-5">
+            <div className="grid grid-cols-3 gap-2 text-xs leading-5">
               <span className="text-muted">
                 Gốc
                 <span className="block font-semibold tabular-nums text-text">{formatVnd(row.principal)}</span>
@@ -71,7 +71,7 @@ export function RepaySchedule({ params }: ScreenProps) {
                 <span className="block font-semibold tabular-nums text-text">{formatVnd(row.payment)}</span>
               </span>
             </div>
-            {row.paidAt && <p className="text-[12px] leading-4 text-muted">Đã trả ngày {formatISODate(row.paidAt)}</p>}
+            {row.paidAt && <p className="text-xs leading-4 text-muted">Đã trả ngày {formatISODate(row.paidAt)}</p>}
           </li>
         ))}
       </ul>

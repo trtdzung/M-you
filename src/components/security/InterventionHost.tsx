@@ -41,7 +41,7 @@ function InlineNotice({ item, slot, onChoose, onShown }: { item: Intervention; s
     <InterventionBody intervention={item} onChoose={select} extra={item.scenario === "BT4" && <button type="button" className="shield-danger-link" onClick={() => onChoose("Không phải tôi → khóa ngay")}>Không phải tôi → khóa ngay</button>} />
   </>;
   return createPortal(<>
-    <section aria-label="Gợi ý bảo mật của M-You" data-testid="shield-tooltip" className="shield-inline-notice">{content}</section>
+    <section aria-label="Gợi ý bảo mật của M-You" data-testid="shield-tooltip" className={`shield-inline-notice${item.scenario === "BT2" || item.scenario === "HUB" ? " shield-hub-notice" : ""}`}>{content}</section>
     <Sheet open={trustChoice !== null} title="Lưu vào danh bạ tin cậy?" onClose={() => setTrustChoice(null)}>
       <p className="mb-5 text-base leading-relaxed">Người nhận của giao dịch này sẽ được áp dụng ngoại lệ với một số cảnh báo và giữ giao dịch theo cài đặt. Hãy xác minh người nhận trước khi lưu. Bạn có thể gỡ trong Trung tâm bảo mật.</p>
       <button type="button" className="login-submit" onClick={() => { if (trustChoice) onChoose(trustChoice); setTrustChoice(null); }}>Xác nhận lưu</button>

@@ -12,7 +12,7 @@ export function PreviewBanner() {
   return (
     <div
       role="note"
-      className="mt-1 flex items-center gap-2 rounded-full bg-source-mock-soft px-3 py-1.5 text-[12px] leading-4 text-source-mock"
+      className="mt-1 flex items-center gap-2 rounded-full bg-source-mock-soft px-3 py-1.5 text-xs leading-4 text-source-mock"
     >
       <FlaskConical size={14} aria-hidden className="shrink-0" />
       <span className="font-semibold">Bản xem trước – dữ liệu mô phỏng</span>

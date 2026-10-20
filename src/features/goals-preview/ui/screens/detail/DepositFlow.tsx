@@ -46,8 +46,8 @@ export function DepositFlow({ params }: ScreenProps) {
       ) : (
         <>
           <section className={`${card} flex items-center justify-between gap-3 !py-3`}>
-            <span className="text-[13px] text-muted">Từ TK chính ••{state.customer.mainCasaNumber.slice(-4)}</span>
-            <span className="text-[16px] font-semibold tabular-nums text-text">{formatVnd(balance)}</span>
+            <span className="text-xs text-muted">Từ TK chính ••{state.customer.mainCasaNumber.slice(-4)}</span>
+            <span className="text-sm font-semibold tabular-nums text-text">{formatVnd(balance)}</span>
           </section>
 
           <AmountCard
@@ -63,7 +63,7 @@ export function DepositFlow({ params }: ScreenProps) {
           <section className={`${card} flex flex-col gap-3`} aria-label="Tiến độ sau khi nạp">
             <div className="flex items-center justify-between gap-2">
               <h2 className={sectionTitle}>{phase2 ? "Tiến độ trả khoản vay" : "Tiến độ mục tiêu"}</h2>
-              <span className={`text-[13px] font-semibold tabular-nums ${reaches ? "text-positive" : "text-text"}`}>
+              <span className={`text-xs font-semibold tabular-nums ${reaches ? "text-positive" : "text-text"}`}>
                 {!valid ? `${nowPct}%` : reaches ? `${nowPct}% → Đủ ✓` : `${nowPct}% → ${afterPct}%`}
               </span>
             </div>

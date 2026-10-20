@@ -63,7 +63,7 @@ export function TransferSaveRecipient({
     <div className="flex flex-col gap-4 px-4 pb-6">
       <Card className="transfer-card flex flex-col gap-4">
         <div>
-          <label className="mb-2 block text-[15px] font-medium text-text">Ngân hàng nhận</label>
+          <label className="mb-2 block text-[13px] font-medium text-text">Ngân hàng nhận</label>
           <button
             type="button"
             onClick={() => setBankSheetOpen(true)}
@@ -79,7 +79,7 @@ export function TransferSaveRecipient({
         </div>
 
         <div>
-          <label htmlFor="xfer-save-account" className="mb-2 block text-[15px] font-medium text-text">
+          <label htmlFor="xfer-save-account" className="mb-2 block text-[13px] font-medium text-text">
             Số tài khoản/Số thẻ
           </label>
           <input
@@ -98,7 +98,7 @@ export function TransferSaveRecipient({
 
         {accountValid && (
           <div>
-            <label htmlFor="xfer-save-name" className="mb-2 block text-[15px] font-medium text-text">
+            <label htmlFor="xfer-save-name" className="mb-2 block text-[13px] font-medium text-text">
               Tên người nhận
             </label>
             <input
@@ -111,7 +111,7 @@ export function TransferSaveRecipient({
         )}
 
         <div>
-          <label htmlFor="xfer-nickname" className="mb-2 block text-[15px] font-medium text-text">
+          <label htmlFor="xfer-nickname" className="mb-2 block text-[13px] font-medium text-text">
             Tên gợi nhớ
           </label>
           <input
@@ -144,7 +144,7 @@ export function TransferSaveRecipient({
         type="button"
         disabled={!canContinue}
         onClick={submit}
-        className="login-submit mt-2 disabled:opacity-40"
+        className="login-submit mt-2 !text-[16px] disabled:opacity-40"
       >
         Tiếp tục
       </button>

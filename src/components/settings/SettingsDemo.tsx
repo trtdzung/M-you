@@ -113,17 +113,22 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "knowledge") {
     content = <KnowledgeScreen />;
   } else if (section === "privacy") {
-    content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
+    content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4 !text-[14px] leading-6" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
   } else if (isShieldSection(section)) {
     content = <ShieldSection section={section} />;
   } else {
     content = <><Panel title={section === "support" ? "Chúng tôi có thể giúp gì cho bạn?" : "Bảo vệ tài khoản của bạn"}><Row label="Không chia sẻ mã OTP, PIN hoặc mật khẩu" icon={LockKeyhole} onClick={() => setSheet("safety")} /><Row label="Kiểm tra thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Quyền dữ liệu và trợ lý AI" icon={ShieldCheck} href={href("privacy")} /></Panel>{section === "support" && <Notice>Đây là trung tâm hỗ trợ mô phỏng. Khi cần hỗ trợ tài khoản thật, hãy sử dụng các kênh chính thức trong app MSB.</Notice>}</>;
   }
 
-  return <div className={`settings-demo ${demo.appearance === "simple" ? "settings-simple" : ""}`}>
-    <header className="settings-header">{section && (section === "sos" ? <Suspense fallback={<Link href={settingsParent("/settings/sos") ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}><SosBackLink fallback={settingsParent("/settings/sos") ?? "/settings"} /></Suspense> : <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>)}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
+  const fixedHeader = !section || section === "security";
+  const body = <>
     {section && <p className="mb-4 text-xs text-muted">Giả lập MSB · Chỉ dùng thông tin mẫu</p>}
     <div className="flex flex-col gap-5">{content}</div>
+  </>;
+
+  return <div className={`settings-demo ${fixedHeader ? "settings-demo--fixed-header" : ""} ${demo.appearance === "simple" ? "settings-simple" : ""}`}>
+    <header className="settings-header">{section && (section === "sos" ? <Suspense fallback={<Link href={settingsParent("/settings/sos") ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}><SosBackLink fallback={settingsParent("/settings/sos") ?? "/settings"} /></Suspense> : <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>)}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
+    {fixedHeader ? <div className="settings-scroll-content no-scrollbar">{body}</div> : body}
     <Sheet open={faq !== null} title="Câu hỏi thường gặp" onClose={() => setFaq(null)}>{faq !== null && <><h3 className="mb-4 font-semibold">{FAQ[faq]}</h3><p className="pb-6 text-sm leading-relaxed">{ANSWERS[faq]}</p></>}</Sheet>
     <Sheet open={!!feedback} title="Thông báo" onClose={() => setFeedback(null)}>{feedback && <><p className="mb-5 text-sm leading-relaxed" role="status">{feedback}</p><Action onClick={() => setFeedback(null)}>Đã hiểu</Action></>}</Sheet>
     <Sheet open={!!sheet} title={sheet === "logout" ? "Đăng xuất" : sheet === "revoke" ? "Thu hồi đồng ý" : "Thông tin"} onClose={() => setSheet(null)}>

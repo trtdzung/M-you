@@ -69,8 +69,8 @@ export function CreateSuccess({ params }: ScreenProps) {
           <PartyPopper size={22} aria-hidden />
         </span>
         <div className="min-w-0">
-          <h2 className={`${emphasisTitle} !text-[17px]`}>Chúc mừng bạn!</h2>
-          <p className="truncate text-[13px] text-text">“{goal.name}” đã sẵn sàng.</p>
+          <h2 className={emphasisTitle}>Chúc mừng bạn!</h2>
+          <p className="truncate text-xs text-text">“{goal.name}” đã sẵn sàng.</p>
         </div>
       </section>
 
@@ -83,7 +83,7 @@ export function CreateSuccess({ params }: ScreenProps) {
           </button>
         </div>
         <p className="text-[20px] font-bold tabular-nums tracking-wide text-text">{formatAccountNumber(account.number)}</p>
-        <p className="truncate text-[13px] text-muted">{account.name}</p>
+        <p className="truncate text-xs text-muted">{account.name}</p>
       </section>
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Kế hoạch tháng đầu tiên">
@@ -97,8 +97,8 @@ export function CreateSuccess({ params }: ScreenProps) {
             { label: "Trích tự động", value: autoText },
           ].map((row) => (
             <div key={row.label}>
-              <dt className="text-[13px] text-muted">{row.label}</dt>
-              <dd className="text-[16px] font-semibold tabular-nums text-text">{row.value}</dd>
+              <dt className="text-xs text-muted">{row.label}</dt>
+              <dd className="text-sm font-semibold tabular-nums text-text">{row.value}</dd>
             </div>
           ))}
         </dl>

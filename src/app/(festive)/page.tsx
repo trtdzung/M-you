@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnniversaryHero } from "@/components/home/AnniversaryHero";
-import { HomeHeader } from "@/components/shell/HomeHeader";
+import { HomePageFrame } from "@/components/home/HomePageFrame";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
@@ -30,9 +29,12 @@ export default function HomePage() {
   const primary = current?.accounts.find(a => a.type === "current") ?? null;
 
   return (
-    <div>
-      <HomeHeader notifications={9} />
-      <AnniversaryHero />
+    <HomePageFrame notifications={9}>
+      {/* Space for the baked-in bird + 35 logo in the HL wallpaper. */}
+      <div
+        className="login-anniversary"
+        aria-label="MSB · Vươn tầm từ di sản · 35 năm · 2026 Bính Ngọ"
+      />
 
       <div className="flex flex-col gap-4">
           <HomeInsightWidget />
@@ -77,6 +79,6 @@ export default function HomePage() {
             ]}
           />
         </div>
-    </div>
+    </HomePageFrame>
   );
 }

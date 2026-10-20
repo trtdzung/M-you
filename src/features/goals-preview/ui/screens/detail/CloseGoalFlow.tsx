@@ -45,7 +45,7 @@ export function CloseGoalFlow({ params }: ScreenProps) {
           <p className="flex items-center gap-2 font-semibold">
             <AlertTriangle size={18} aria-hidden /> Chưa thể đóng mục tiêu
           </p>
-          <p className="text-[13px] text-muted">
+          <p className="text-xs text-muted">
             Mục tiêu còn khoản vay chưa trả hết ({formatVnd(loan!.schedule.filter((r) => r.status !== "paid").reduce((s, r) => s + r.principal, 0))} gốc còn lại).
             Hãy trả hết hoặc tất toán trước, sau đó bạn có thể đóng mục tiêu.
           </p>
@@ -71,7 +71,7 @@ export function CloseGoalFlow({ params }: ScreenProps) {
             <section className={`${warningBox} flex flex-col gap-1`}>
               <p className="font-semibold">Có khoản chưa đến hạn</p>
               {earlyDeposits.map((a) => (
-                <p key={a.id} className="text-[13px] text-muted">
+                <p key={a.id} className="text-xs text-muted">
                   {a.name} đáo hạn {formatISODate(a.maturityDate)} — tất toán sớm sẽ mất phần lớn lãi, có thể bị phạt.
                 </p>
               ))}

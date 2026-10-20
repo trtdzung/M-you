@@ -26,7 +26,7 @@ export function GoalNameField({
         placeholder={GOALS_COPY.form.namePlaceholder}
         maxLength={80}
         aria-invalid={error ? true : undefined}
-        className={`${input} text-[16px]`}
+        className={`${input} leading-6`}
       />
       {error && (
         <p role="alert" className={fieldError}>

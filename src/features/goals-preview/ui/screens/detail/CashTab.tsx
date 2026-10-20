@@ -73,20 +73,20 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
             </button>
           </div>
           <div>
-            <p className="text-[12px] text-muted">Số dư</p>
+            <p className="text-xs text-muted">Số dư</p>
             <Amount amount={account.balance} className={figure} />
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-[12px] text-muted">Lãi suất không kỳ hạn</p>
+              <p className="text-xs text-muted">Lãi suất không kỳ hạn</p>
               <p className="font-semibold text-text">{account.interestRatePa}%/năm</p>
             </div>
             <div>
-              <p className="text-[12px] text-muted">Lãi đã nhận</p>
+              <p className="text-xs text-muted">Lãi đã nhận</p>
               <Amount amount={interestEarned} className="font-semibold text-text" />
             </div>
           </div>
-          {account.status === "closed" && <p className="text-[13px] text-muted">Tài khoản đã đóng ngày {formatISODate(goal.closedAt)}.</p>}
+          {account.status === "closed" && <p className="text-xs text-muted">Tài khoản đã đóng ngày {formatISODate(goal.closedAt)}.</p>}
         </section>
       ) : (
         <p className="rounded-card bg-surface-muted p-4 text-sm text-muted">Mục tiêu chưa có tài khoản.</p>
@@ -113,7 +113,7 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className={sectionTitle}>Lịch sử giao dịch</h2>
-          <button type="button" aria-label="Lọc loại giao dịch" aria-haspopup="dialog" onClick={() => setFilterOpen(true)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold transition-colors", ring, filter === "all" ? "border-border bg-surface text-text hover:bg-surface-muted" : "border-primary/20 bg-primary-soft text-primary-strong")}>
+          <button type="button" aria-label="Lọc loại giao dịch" aria-haspopup="dialog" onClick={() => setFilterOpen(true)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition-colors", ring, filter === "all" ? "border-border bg-surface text-text hover:bg-surface-muted" : "border-primary/20 bg-primary-soft text-primary-strong")}>
             <SlidersHorizontal size={16} aria-hidden />
             {FILTERS.find((f) => f.value === filter)?.label}
             <ChevronDown size={14} aria-hidden className="opacity-60" />
@@ -129,14 +129,14 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
             ))}
           </div>
         </Sheet>
-        <p className="text-[12px] text-muted">{shown.length} giao dịch{filter !== "all" ? ` · ${FILTERS.find((f) => f.value === filter)?.label}` : ""}</p>
+        <p className="text-xs text-muted">{shown.length} giao dịch{filter !== "all" ? ` · ${FILTERS.find((f) => f.value === filter)?.label}` : ""}</p>
         {shown.length === 0 ? (
           <p className="rounded-card bg-surface-muted p-4 text-center text-sm text-muted">Chưa có giao dịch nào.</p>
         ) : (
           <div className="flex min-w-0 flex-col gap-4">
             {Object.entries(groups).map(([day, entries]) => (
               <div key={day} className="min-w-0">
-                <h3 className="mb-2 text-[12px] font-medium text-muted">{formatISODate(day)}</h3>
+                <h3 className="mb-2 text-xs font-medium text-muted">{formatISODate(day)}</h3>
                 <ul className="divide-y divide-border rounded-card bg-surface shadow-card">
                   {entries.map((t) => {
                     const dir = TXN_DIRECTION[t.kind];
@@ -149,7 +149,7 @@ export function CashTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
                             <p className={cn("text-sm font-semibold", t.kind === "standing_order_failed" ? "text-negative" : "text-text")}>{TXN_LABEL[t.kind]}</p>
                             <span className={cn("whitespace-nowrap text-sm font-semibold tabular-nums", dir > 0 ? "text-positive" : "text-text")}>{dir > 0 ? "+" : dir < 0 ? "−" : ""}{formatVnd(t.amount)}</span>
                           </div>
-                          {t.note && <p className="mt-1 break-words text-[12px] leading-5 text-muted">{t.note}</p>}
+                          {t.note && <p className="mt-1 break-words text-xs leading-5 text-muted">{t.note}</p>}
                         </div>
                       </li>
                     );

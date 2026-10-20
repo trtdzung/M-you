@@ -36,7 +36,7 @@ export function GoalCoach({ goalId, goalName }: { goalId: string; goalName: stri
           <img src="/icon_agent.png" alt="" width={32} height={32} draggable={false} className="h-8 w-8 shrink-0 rounded-full" />
           <h2 className={sectionTitle}>M-You gợi ý</h2>
         </div>
-        <p role="status" className="animate-pulse text-[15px] leading-6 text-muted">M-You đang xem xét mục tiêu của bạn…</p>
+        <p role="status" className="animate-pulse text-sm leading-6 text-muted">M-You đang xem xét mục tiêu của bạn…</p>
       </section>
     );
   }
@@ -60,10 +60,10 @@ export function GoalCoach({ goalId, goalName }: { goalId: string; goalName: stri
         </div>
       </div>
 
-      <p className="text-[15px] leading-6 text-text">{emphasize(insight.observation)}</p>
+      <p className="text-sm leading-6 text-text">{emphasize(insight.observation)}</p>
 
       <div className="rounded-2xl bg-surface-tint px-3.5 py-3">
-        <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-primary-strong">
+        <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-primary-strong">
           <TrendingUp size={16} aria-hidden /> Gợi ý cho bạn
         </p>
         <p className="text-sm leading-5 text-text">

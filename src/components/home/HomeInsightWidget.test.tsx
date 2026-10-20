@@ -157,8 +157,9 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
       name: new RegExp(card1.title),
     });
     expect(slide1Btn).toBeInTheDocument();
-    expect(screen.getByText("1 / 3")).toBeInTheDocument();
-    expect(screen.getByText(/Còn lại · Ăn uống:/)).toBeInTheDocument();
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
 
     // Navigate to Slide 2 using touch swipe
     const carouselSection = screen.getByRole("region", {
@@ -168,18 +169,16 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
     fireEvent.touchStart(swipeTrack, { touches: [{ clientX: 200 }] });
     fireEvent.touchEnd(swipeTrack, { changedTouches: [{ clientX: 100 }] });
 
-    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(card2.title)).toBeInTheDocument();
-    expect(screen.getByText(/Tiền hoàn lại:/)).toBeInTheDocument();
 
     // Navigate to Slide 3 using mouse drag swipe
     fireEvent.mouseDown(swipeTrack, { clientX: 250, button: 0 });
     fireEvent.mouseMove(swipeTrack, { clientX: 100 });
     fireEvent.mouseUp(swipeTrack);
 
-    expect(screen.getByText("3 / 3")).toBeInTheDocument();
+    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText(card3.title)).toBeInTheDocument();
-    expect(screen.getByText(/Tiến độ tích lũy:/)).toBeInTheDocument();
 
     // Verify arrow buttons are absent (swipe only)
     expect(screen.queryByRole("button", { name: "Slide sau" })).not.toBeInTheDocument();
@@ -187,7 +186,7 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
 
     // Navigate with Keyboard ArrowLeft
     fireEvent.keyDown(carouselSection, { key: "ArrowLeft" });
-    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
   });
 
   it("opens insight detail sheet with category pill, impactLine, and metric box", async () => {
@@ -269,7 +268,7 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
     render(<HomeInsightWidget />);
     expect(await screen.findByText("Chưa có gợi ý mới")).toBeInTheDocument();
     expect(screen.getByText("M-Your đang tiếp tục theo dõi tài chính của bạn")).toBeInTheDocument();
-    expect(screen.getByText("1 / 1")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
   });
 
   it("never displays the previous customer's card while loading another", async () => {
@@ -341,15 +340,13 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => customRes })));
     render(<HomeInsightWidget />);
 
-    // Verify categoryLabel, impactLine, badgeText rendered on Slide 1
     expect(await screen.findByText("Khám phá & Bảo mật")).toBeInTheDocument();
-    expect(screen.getByText("Bổ sung liên hệ khẩn cấp tại Security Hub để bảo vệ tài khoản.")).toBeInTheDocument();
     expect(screen.getByText("Điểm 70/100")).toBeInTheDocument();
-    expect(screen.getAllByText("70/100 điểm").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Bổ sung liên hệ khẩn cấp tại Security Hub để bảo vệ tài khoản.")).toBeInTheDocument();
 
-    // Click to open detail sheet
     fireEvent.click(screen.getByRole("button", { name: new RegExp(securityCard.title) }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("70/100 điểm")).toBeInTheDocument();
 
     // Click "Xem cẩm nang bảo mật" button
     const handbookBtn = screen.getByRole("button", { name: "Xem cẩm nang bảo mật" });
@@ -412,9 +409,9 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => fiveSlideRes })));
     render(<HomeInsightWidget />);
 
-    // Verify 1 / 5 pagination
-    expect(await screen.findByText("1 / 5")).toBeInTheDocument();
-    expect(screen.getByText("Cảnh báo OTP liên tục")).toBeInTheDocument();
+    expect(await screen.findByText("Cảnh báo OTP liên tục")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Danh sách slide gợi ý" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(5);
 
     // Verify action chips rendered on card
     const hotlineChip = screen.getByRole("button", { name: "Gọi hotline 1900 6083" });

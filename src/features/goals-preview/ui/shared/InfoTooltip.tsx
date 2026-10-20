@@ -60,8 +60,8 @@ export function InfoTooltip({ label, text, warning = false }: { label: string; t
           className="absolute top-full z-30 rounded-2xl bg-[#1e293b] p-4 text-left text-white shadow-[0_8px_24px_rgba(15,23,42,0.18)]"
         >
           <span aria-hidden style={{ left: placement.arrow - 5 }} className="absolute -top-1 h-2.5 w-2.5 rotate-45 bg-[#1e293b]" />
-          <span className="mb-1.5 block text-[13px] font-semibold leading-5">{label.charAt(0).toUpperCase() + label.slice(1)}</span>
-          <span className="block text-[13px] font-normal leading-5 text-slate-200">{text}</span>
+          <span className="mb-1.5 block text-xs font-semibold leading-5">{label.charAt(0).toUpperCase() + label.slice(1)}</span>
+          <span className="block text-xs font-normal leading-5 text-slate-200">{text}</span>
         </span>
       )}
     </span>

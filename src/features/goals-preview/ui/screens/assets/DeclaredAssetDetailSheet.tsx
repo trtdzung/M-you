@@ -49,7 +49,7 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
           <SourceTag source={auto ? "estimated" : "self_reported"} />
         </div>
         <section className="rounded-2xl bg-source-self-soft p-4">
-          <p className="text-[13px] text-muted">Giá trị tính vào mục tiêu</p>
+          <p className="text-xs text-muted">Giá trị tính vào mục tiêu</p>
           <p className={`mt-1 ${heroNumber}`}>{formatVnd(counted)}</p>
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="text-sm text-muted">
@@ -73,19 +73,19 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
               {asset.quantity.toLocaleString("vi-VN")} {instrument.unit} × {formatVnd(unitPrice)} (giá ngày {formatISODate(seriesPointAt(instrument.priceSeries, state.clock.today)?.date).slice(0, 5)}) = <b>{formatVnd(now)}</b>
             </p>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[12px] text-muted">
+              <p className="text-xs text-muted">
                 {priceDate ? `Giá ngày ${formatISODate(priceDate)}` : earliestDate ? `Giá sớm nhất có: ${dateVi(earliestDate)}` : ""}
               </p>
               <button
                 type="button"
                 disabled={pricesRefreshing}
                 onClick={refreshPrices}
-                className="text-[13px] font-semibold text-primary-strong disabled:opacity-60"
+                className="text-xs font-semibold text-primary-strong disabled:opacity-60"
               >
                 {pricesRefreshing ? "Đang cập nhật…" : "Cập nhật lại"}
               </button>
             </div>
-            <p className="text-[12px] text-muted">
+            <p className="text-xs text-muted">
               Giá {instrument.name}
               {instrument.fullName ? ` (${instrument.fullName})` : ""} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}
             </p>
@@ -95,7 +95,7 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
                   aria-label={`Số lượng mới (${instrument.unit})`}
                   inputMode={instrument.fractional ? "decimal" : "numeric"}
                   autoFocus
-                  className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tabular-nums text-text outline-none placeholder:text-muted"
+                  className="min-w-0 flex-1 bg-transparent text-lg font-bold tabular-nums text-text outline-none placeholder:text-muted"
                   placeholder={String(asset.quantity)}
                   value={qty}
                   onChange={(e) => setQty(e.target.value.replace(instrument.fractional ? /[^\d.,]/g : /\D/g, "").slice(0, 10))}
@@ -113,7 +113,7 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
               Gốc {formatVnd(asset.accrual.principal)} · lãi {String(asset.accrual.ratePa).replace(".", ",")}%/năm từ {dateVi(asset.accrual.startDate)}
               {asset.accrual.maturityDate ? ` · đáo hạn ${dateVi(asset.accrual.maturityDate)}` : ""}
             </p>
-            {asset.institution && <p className="text-[12px] text-muted">Tại {asset.institution}</p>}
+            {asset.institution && <p className="text-xs text-muted">Tại {asset.institution}</p>}
           </section>
         )}
 

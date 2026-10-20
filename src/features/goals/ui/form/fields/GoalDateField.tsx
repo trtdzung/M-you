@@ -52,7 +52,7 @@ export function GoalDateField({
           setMonth((value || min).slice(0, 7));
           setView("days");
           setOpen(true);
-        }} className={`${input} flex w-full items-center justify-between text-[16px]`}>
+        }} className={`${input} flex w-full items-center justify-between leading-6`}>
           <span className={value ? "text-text" : "text-muted"}>{value ? value.split("-").reverse().join("/") : "Chọn ngày hoàn thành"}</span>
           <CalendarDays size={20} className="text-muted" aria-hidden="true" />
         </button>

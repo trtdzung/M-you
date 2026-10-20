@@ -119,7 +119,7 @@ export function TransferAmountStep({
 
       <Card className="transfer-card flex flex-col gap-4">
         <div>
-          <label className="mb-2 block text-[15px] font-medium text-text">Tài khoản nguồn</label>
+          <label className="mb-2 block text-[13px] font-medium text-text">Tài khoản nguồn</label>
           <button
             type="button"
             onClick={() => setSourceSheetOpen(true)}
@@ -148,7 +148,7 @@ export function TransferAmountStep({
         </div>
 
         <div>
-          <label htmlFor="xfer-amount" className="mb-2 inline-flex items-center gap-1 text-[15px] font-medium text-text">
+          <label htmlFor="xfer-amount" className="mb-2 inline-flex items-center gap-1 text-[13px] font-medium text-text">
             Số tiền <Info size={13} className="text-muted" aria-hidden />
           </label>
           <div className="transfer-input-frame flex h-14 items-center gap-2 rounded-[10px] border border-border bg-surface px-3.5">
@@ -166,7 +166,7 @@ export function TransferAmountStep({
         </div>
 
         <div>
-          <label htmlFor="xfer-memo" className="mb-2 block text-[15px] font-medium text-text">
+          <label htmlFor="xfer-memo" className="mb-2 block text-[13px] font-medium text-text">
             Nội dung
           </label>
           <input
@@ -200,7 +200,7 @@ export function TransferAmountStep({
           type="button"
           disabled={!canContinue}
           onClick={onContinue}
-          className="login-submit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
+          className="login-submit !text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Tiếp tục
         </button>

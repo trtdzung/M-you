@@ -45,7 +45,7 @@ export function LoanAppSurvey({ params }: ScreenProps) {
   return (
     <div className={screenPadding}>
       <ScreenHeader compact title="Khảo sát thông tin" right={<button type="button" className={ghostButton} onClick={() => nav.pop()}>Bỏ qua</button>} />
-      <p className="text-[16px] leading-6 text-text">Vui lòng điền một số thông tin để hệ thống tính toán hạn mức dự kiến cho quý khách</p>
+      <p className="text-sm leading-6 text-text">Vui lòng điền một số thông tin để hệ thống tính toán hạn mức dự kiến cho quý khách</p>
       <div className={`${card} flex flex-col gap-6`}>
         <label className="flex flex-col gap-1.5"><span className={label}>Độ tuổi của bạn</span><input className={input} inputMode="numeric" placeholder="Nhập" value={answers.age ?? ""} onChange={(e) => set("age", e.target.value)} /></label>
         {select("gender", "Giới tính của bạn", ["Nam", "Nữ", "Khác"])}
@@ -63,7 +63,7 @@ export function LoanAppSurvey({ params }: ScreenProps) {
         <div className="flex flex-col gap-2">
           {picker?.options.map((option) => (
             <button key={option} type="button" aria-pressed={answers[picker.key] === option}
-              className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-[16px] ${answers[picker.key] === option ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-surface text-text"}`}
+              className={`flex min-h-12 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left text-sm ${answers[picker.key] === option ? "border-primary bg-primary-soft text-primary-strong" : "border-border bg-surface text-text"}`}
               onClick={() => { set(picker.key, option); setPicker(null); }}>
               <span>{option}</span>
               {answers[picker.key] === option && <Check size={18} aria-hidden />}
@@ -71,7 +71,7 @@ export function LoanAppSurvey({ params }: ScreenProps) {
           ))}
         </div>
       </Sheet>
-      <BottomActions><button type="button" className={`inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 text-[16px] font-semibold text-primary-fg transition-colors disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-muted disabled:text-muted ${ring}`} disabled={!complete} onClick={submit}>Tiếp tục</button></BottomActions>
+      <BottomActions><button type="button" className={`inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 text-sm font-semibold text-primary-fg transition-colors disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-muted disabled:text-muted ${ring}`} disabled={!complete} onClick={submit}>Tiếp tục</button></BottomActions>
     </div>
   );
 }

@@ -76,20 +76,20 @@ export function MsbAssetDetail({ params, embedded = false, onNavigate }: ScreenP
       {isDeposit ? (
         <>
           <section className="flex flex-col gap-1 py-1">
-            <p className="text-[13px] text-muted">Tiền đang gửi</p>
+            <p className="text-xs text-muted">Tiền đang gửi</p>
             <Amount amount={asset.principal} unknownLabel="Chưa rõ tiền gốc" className={figure} />
             <p className="text-sm text-muted">{asset.ratePa !== undefined ? `Lãi suất ${String(asset.ratePa).replace(".", ",")}%/năm` : "Chưa rõ lãi suất"}</p>
           </section>
           <section className="flex flex-col gap-3 rounded-2xl bg-primary-soft p-4">
-            <div className="flex items-center justify-between gap-2"><p className="text-[13px] font-medium text-primary-strong">{matured ? "Giá trị tại ngày đáo hạn (dự kiến)" : "Dự kiến nhận khi đáo hạn"}</p><InfoTooltip label="số tiền dự kiến nhận" text="Ước tính nếu giữ đến đáo hạn, không phải số tiền nhận khi tất toán hôm nay." /></div>
+            <div className="flex items-center justify-between gap-2"><p className="text-xs font-medium text-primary-strong">{matured ? "Giá trị tại ngày đáo hạn (dự kiến)" : "Dự kiến nhận khi đáo hạn"}</p><InfoTooltip label="số tiền dự kiến nhận" text="Ước tính nếu giữ đến đáo hạn, không phải số tiền nhận khi tất toán hôm nay." /></div>
             <Amount amount={atMaturity} unknownLabel="Chưa đủ dữ liệu" source="estimated" className={figure} />
             {asset.maturityDate && <p className="flex items-center gap-2 text-sm text-text"><CalendarDays size={16} aria-hidden />Ngày {dateVi(asset.maturityDate)}</p>}
-            {asset.principal !== undefined && atMaturity !== undefined && <div className="flex flex-wrap justify-between gap-2 border-t border-primary/15 pt-3 text-[13px]"><span className="text-muted">Gốc {formatVnd(asset.principal)}</span><span className="font-semibold text-positive">Lãi dự kiến +{formatVnd(atMaturity - asset.principal)}</span></div>}
+            {asset.principal !== undefined && atMaturity !== undefined && <div className="flex flex-wrap justify-between gap-2 border-t border-primary/15 pt-3 text-xs"><span className="text-muted">Gốc {formatVnd(asset.principal)}</span><span className="font-semibold text-positive">Lãi dự kiến +{formatVnd(atMaturity - asset.principal)}</span></div>}
           </section>
           <section className="flex items-start gap-3 rounded-2xl border border-border p-4">
             <Target size={20} aria-hidden className="mt-0.5 shrink-0 text-primary-strong" />
             <div className="min-w-0"><h2 className={sectionTitle}>Góp vào {goal.name}</h2><p className="mt-1 text-sm leading-5 text-muted">{asset.countPercent}% giá trị hiện tại được tính vào mục tiêu: <span className="font-semibold text-text">{formatVnd(Math.round(value * asset.countPercent / 100))}</span>.</p>
-            {asset.maturityDate && <p className={`mt-2 text-[13px] leading-5 ${afterTarget ? "text-warning" : "text-positive"}`}>{afterTarget ? "Đáo hạn sau ngày mục tiêu. Tất toán sớm có thể làm giảm lãi." : "Đáo hạn trước hoặc đúng ngày mục tiêu."}</p>}</div>
+            {asset.maturityDate && <p className={`mt-2 text-xs leading-5 ${afterTarget ? "text-warning" : "text-positive"}`}>{afterTarget ? "Đáo hạn sau ngày mục tiêu. Tất toán sớm có thể làm giảm lãi." : "Đáo hạn trước hoặc đúng ngày mục tiêu."}</p>}</div>
           </section>
           <details className="rounded-2xl border border-border p-4">
             <summary className="cursor-pointer text-sm font-semibold text-text">Thông tin khoản gửi</summary>
@@ -104,7 +104,7 @@ export function MsbAssetDetail({ params, embedded = false, onNavigate }: ScreenP
       ) : (
         <>
           <section className={cn(card, "flex flex-col gap-1")}>
-            <p className="text-[13px] text-muted">Giá trị hiện tại</p>
+            <p className="text-xs text-muted">Giá trị hiện tại</p>
             <Amount amount={value} source="msb" className="text-3xl font-bold" />
             <p className={cn("text-sm font-semibold tabular-nums", gainTone)}>{gain > 0 ? "+" : ""}{formatVnd(gain)} ({gain > 0 ? "+" : ""}{(Math.round(gainPct * 100) / 100).toString().replace(".", ",")}%) <span className="font-normal text-muted">{gain >= 0 ? "lãi" : "lỗ"} so với giá vốn</span></p>
             {asset.category === "fund" && <p className={hint}>Giá chứng chỉ quỹ thay đổi hằng ngày, không cam kết lợi nhuận.</p>}
@@ -126,7 +126,7 @@ export function MsbAssetDetail({ params, embedded = false, onNavigate }: ScreenP
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <p className="flex items-center gap-1.5 text-[12px] text-muted">
+          <p className="flex items-center gap-1.5 text-xs text-muted">
             Giá do MSB cung cấp <SourceTag source="msb" />
           </p>
         </section>
@@ -151,7 +151,7 @@ export function MsbAssetDetail({ params, embedded = false, onNavigate }: ScreenP
 
       </div>
       <div className={embedded ? "flex shrink-0 flex-col gap-2 border-t border-border bg-surface pb-[calc(16px+var(--safe-area-bottom,0px))] pt-3" : "flex flex-col gap-2 pt-2"}>
-        {isDeposit && !matured && <p className="text-center text-[12px] leading-4 text-muted">Xem số tiền nhận và ảnh hưởng đến lãi trước khi xác nhận.</p>}
+        {isDeposit && !matured && <p className="text-center text-xs leading-4 text-muted">Xem số tiền nhận và ảnh hưởng đến lãi trước khi xác nhận.</p>}
         {matured && asset.category === "term_deposit" ? (
           <>
             <button type="button" className={primaryButton} onClick={() => go("MaturityChoice")}>

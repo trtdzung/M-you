@@ -34,4 +34,18 @@ describe("Scam Shield context and response preservation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận lưu" }));
     expect(state.respond).toHaveBeenCalledWith("notice-1", "Lưu vào danh bạ tin cậy");
   });
+  it.each(["BT2", "HUB"] as const)("preserves %s engine choices and points in the redesigned recommendation cards", scenario => {
+    state.items = [notice({ scenario, target: "hub-gauge", copy: { message: "Mã chống giả mạo (+15) và xác thực nâng cao (+10).", question: null, chips: ["Bật mã", "Thiết lập"], emphasis: [] } })];
+    const slot = document.createElement("div"); slot.dataset.shieldSlot = "hub-gauge"; document.body.append(slot);
+    render(<InterventionHost />);
+    expect(screen.getByRole("heading", { name: "M-You gợi ý cho bạn" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Tăng 15 điểm")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tăng 10 điểm")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mã chống giả mạo: Thiết lập ngay" }));
+    expect(state.respond).toHaveBeenLastCalledWith("notice-1", "Bật mã");
+    fireEvent.click(screen.getByRole("button", { name: "Xác thực nâng cao: Thiết lập ngay" }));
+    expect(state.respond).toHaveBeenLastCalledWith("notice-1", "Thiết lập");
+    fireEvent.click(screen.getByRole("button", { name: "Đóng gợi ý bảo mật" }));
+    expect(state.respond).toHaveBeenLastCalledWith("notice-1", "Đóng");
+  });
 });

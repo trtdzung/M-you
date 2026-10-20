@@ -11,7 +11,7 @@ export function StepProgress({ steps, current, className }: { steps: string[]; c
           <span key={step} className={cn("h-1.5 flex-1 rounded-full", i <= index ? "bg-primary" : "bg-surface-muted")} />
         ))}
       </div>
-      <p className="text-[12px] leading-4 text-muted">
+      <p className="text-xs leading-4 text-muted">
         Bước {index + 1}/{total} · <span className="font-semibold text-text">{steps[index]}</span>
       </p>
     </div>

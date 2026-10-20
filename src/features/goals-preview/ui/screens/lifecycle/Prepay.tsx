@@ -72,7 +72,7 @@ export function Prepay({ params }: ScreenProps) {
             { label: "Ngày tất toán", value: payoffNow ? formatISODate(today) : formatISODate(payoffDate), hint: payoffNow ? "Tất toán ngay, rút ngắn " + unpaid.length + " tháng" : "Không đổi" },
           ]}
         />
-        <p className="text-[12px] leading-4 text-muted">
+        <p className="text-xs leading-4 text-muted">
           Bản mô phỏng không tính phí trả trước hạn. Thực tế phí (nếu có) theo hợp đồng vay của MSB.
         </p>
       </Section>

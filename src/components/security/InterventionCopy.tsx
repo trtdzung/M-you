@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { SecurityRecommendations } from "./SecurityRecommendations";
 import { AI_SESSION_LINE } from "@/lib/security/scenario-copy";
 import type { Intervention } from "@/lib/security/intervention-types";
 
@@ -56,20 +57,9 @@ export function InterventionBody({ intervention, onChoose, extra }: {
     : copy.message;
   const cards = (intervention.scenario === "BT2" || intervention.scenario === "HUB") ? progressCards(message, copy.chips) : null;
   return (
-    <div className="shield-notice-body">
+    <div className={`shield-notice-body${cards ? " shield-progress-body" : ""}`}>
       {cards ? (
-        <>
-          <p className="shield-source">Tiến độ bảo mật</p>
-          <div className="shield-progress">
-            {cards.map(card => (
-              <article key={card.cta} className="shield-progress-card">
-                <strong>{card.label}</strong>
-                {card.points != null && <p>+{card.points} điểm</p>}
-                <button type="button" aria-label={`${card.label}: Thực hiện`} onClick={() => onChoose(card.cta)}>Thực hiện</button>
-              </article>
-            ))}
-          </div>
-        </>
+        <SecurityRecommendations suggestions={cards} onChoose={onChoose} />
       ) : (
         <>
           {intervention.scenario !== "BT6" && <SourceLine intervention={intervention} />}

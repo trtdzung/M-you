@@ -543,7 +543,8 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   gap: 10px;
   border-radius: 12px;
   color: #10284b;
-  font-size: 13px;
+  font-size: 11px;
+  line-height: 19.5px;
   font-weight: 500;
 }
 .login-shortcuts svg { stroke-width: 1.7; }
@@ -556,15 +557,56 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 .home-quick-grid { background: #ffecef; border-color: white; padding: 18px 8px 12px; }
 .home-quick-grid > div:first-child { row-gap: 24px; }
 .home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 76px; gap: 12px; }
-.home-quick-grid svg { width: 29px; height: 29px; }
-.home-quick-grid span { font-size: 13px; line-height: 1.35; }
+.home-quick-grid span { font-size: 12px; line-height: 1.35; }
 .home-quick-grid > div:last-child > * { flex: 1; }
-.home-shell .shell-bottom-nav { padding-inline: 30px; }
-.home-shell .login-anniversary { height: clamp(195px, 23dvh, 230px); }
 .home-shell .login-years { font-size: 175px; }
 .home-quick-grid > div:first-child { row-gap: 14px; }
 .home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 64px; }
-.home-shell .login-anniversary { height: 190px; }
+/* Clear the bird + 35 block in the HL wallpaper (top ~1/3). */
+.home-shell .login-anniversary { height: clamp(240px, calc(32dvh - 20px), 320px); }
+
+/*
+ * Anniversary wallpapers by device-canvas size (not browser width — desktop
+ * still uses the 440×956 phone frame):
+ *   ≤382px → *375x667 (SE / short)
+ *   default → *390x844 (modern phone + desktop preview)
+ *   ≥600px → *820x1180 (tablet before lg phone-frame)
+ * Login + Home = HL (cam). Calm shells = MF (hồng nhạt).
+ */
+.device-canvas {
+  container-type: size;
+  container-name: device;
+}
+.home-festive-bg,
+.soft-festive-bg {
+  background-position: top center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.home-festive-bg {
+  background-color: #ed1321;
+  background-image: url("/brand/HL390x844.png");
+}
+.soft-festive-bg {
+  background-color: #fce0d5;
+  background-image: url("/brand/MF390x844.png");
+}
+@container device (max-width: 382px) {
+  .home-festive-bg {
+    background-image: url("/brand/HL375x667.png");
+  }
+  .soft-festive-bg {
+    background-image: url("/brand/MF375x667.png");
+  }
+}
+@container device (min-width: 600px) {
+  .home-festive-bg {
+    background-image: url("/brand/HL820x1180.png");
+  }
+  .soft-festive-bg {
+    background-image: url("/brand/MF820x1180.png");
+  }
+}
 .home-shell .home-account { padding: 12px 16px; }
 .home-quick-grid { padding-top: 12px; }
 .home-quick-grid > div:first-child { row-gap: 8px; }
@@ -578,9 +620,9 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 }
 .home-insight-card button:focus-visible { outline-offset: -3px; }
 .home-insight-sheet { padding: 20px 20px calc(24px + var(--safe-area-bottom)); }
-.home-insight-sheet h2 { font-size: 18px; line-height: 1.4; }
+.home-insight-sheet h2 { font-size: 16px; line-height: 1.4; }
 .home-insight-sheet p { line-height: 1.6; }
-.home-insight-sheet .login-submit { font-size: 15px; }
+.home-insight-sheet .login-submit { font-size: 14px; }
 .home-insight-secondary {
   display: flex;
   width: 100%;
@@ -592,7 +634,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border-radius: 9px;
   background: white;
   color: var(--color-primary-strong);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -628,7 +670,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   padding: 0 16px 12px;
   border-bottom: 1px solid #dfe5ee;
 }
-.transfer-sheet h2 { font-size: 20px; font-weight: 700; color: #10284b; }
+.transfer-sheet h2 { font-size: 16px; font-weight: 700; color: #10284b; }
 .transfer-sheet > div:first-child > button { color: #10284b; }
 .transfer-sheet input:focus-visible { outline: 2px solid #ff9b60; outline-offset: 1px; }
 
@@ -657,7 +699,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border-color: #dfe5ee;
   background: #fff;
   color: #10284b;
-  font-size: 15px;
+  font-size: 14px;
 }
 .transfer-category-sheet > div.grid > button[aria-pressed="true"] {
   border-color: #ff650b;
@@ -688,7 +730,6 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   box-shadow: none;
 }
 .pfm-app-shell #main-content h2 {
-  font-size: 18px;
   line-height: 26px;
   font-weight: 600;
 }
@@ -697,7 +738,6 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border-radius: 24px 24px 0 0;
 }
 .pfm-app-shell [role="dialog"] h2 {
-  font-size: 20px;
   line-height: 28px;
   font-weight: 700;
 }
@@ -715,9 +755,9 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 }
 .pfm-transactions .txn-row:hover { background: transparent; }
 .pfm-transactions .txn-row:active { opacity: 0.7; }
-.pfm-transactions .txn-row-title { font-size: 16px; font-weight: 600; line-height: 24px; }
-.pfm-transactions .txn-row-meta { margin-top: 4px; font-size: 13px; line-height: 20px; }
-.pfm-transactions .txn-row-amount { font-size: 15px; line-height: 22px; }
+.pfm-transactions .txn-row-title { font-weight: 600; line-height: 24px; }
+.pfm-transactions .txn-row-meta { margin-top: 4px; line-height: 20px; }
+.pfm-transactions .txn-row-amount { line-height: 22px; }
 .pfm-transaction-sheet > div:first-child {
   border-bottom: 1px solid #dfe5ee;
   padding-bottom: 16px;
@@ -729,7 +769,6 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 
 .pfm-budget .budget-jar-card { padding: 20px; }
 .pfm-budget .budget-jar-card > div:first-child > div > div:first-child {
-  font-size: 16px;
   line-height: 24px;
   align-items: flex-start;
 }
@@ -737,13 +776,11 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   font-weight: 600;
 }
 .pfm-budget .budget-jar-card > div:first-child > div > div:last-child {
-  font-size: 13px;
   line-height: 20px;
   flex-wrap: wrap;
   gap: 4px;
 }
 .pfm-budget .budget-jar-card > div:nth-child(2) {
-  font-size: 14px;
   line-height: 22px;
 }
 
@@ -761,7 +798,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border: 1px solid #dfe5ee;
 }
 .goals-app-shell .goal-create-fields label {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .goals-app-shell .goal-create-fields > section {
@@ -774,19 +811,19 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   background: #fff;
   border-radius: 24px 24px 0 0;
 }
-.goals-app-shell [role="dialog"] h2 { font-size: 20px; font-weight: 700; }
+.goals-app-shell [role="dialog"] h2 { font-weight: 700; }
 
 .goals-app-shell .rounded-card {
   border-radius: 18px;
   box-shadow: none;
 }
-.goals-app-shell .goal-detail-screen h2 { font-size: 18px; line-height: 26px; font-weight: 600; }
+.goals-app-shell .goal-detail-screen h2 { line-height: 26px; font-weight: 600; }
 .goals-app-shell .goal-primary-button {
   min-height: 48px;
   border-radius: 9px;
   background: linear-gradient(180deg, #ffa54f 0%, #ee6335 100%);
   color: #fff;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 .goals-app-shell .goal-secondary-button {
@@ -795,7 +832,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   background: #fff;
   border-color: #ff650b;
   color: #ff650b;
-  font-size: 15px;
+  font-size: 14px;
 }
 .goals-app-shell .goal-secondary-button:disabled,
 .goals-app-shell .goal-primary-button:disabled {

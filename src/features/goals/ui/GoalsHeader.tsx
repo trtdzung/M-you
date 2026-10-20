@@ -18,7 +18,7 @@ export function GoalsHeader({ title = GOALS_COPY.title, onBack }: { title?: stri
       >
         <ArrowLeft size={22} strokeWidth={2} />
       </button>
-      <h1 className="text-[22px] leading-7 font-bold text-text">{title}</h1>
+      <h1 className="text-[20px] leading-7 font-bold text-text">{title}</h1>
     </header>
   );
 }

@@ -30,7 +30,7 @@ export function GoalListItem({
             <span className="font-medium">{Math.round(goal.progress.percent)}%</span>
           </div>
           <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 leading-7">
-            <span className="text-[24px] font-semibold tracking-tight text-text">{formatGoalMoney(goal.currentAmount)}</span>
+            <span className="text-[14px] font-semibold tracking-tight text-text">{formatGoalMoney(goal.currentAmount)}</span>
             <span className="text-[14px] text-muted">/ {formatGoalMoney(goal.targetAmount)} VND</span>
           </p>
           <div className="mt-3">
@@ -42,7 +42,7 @@ export function GoalListItem({
         </div>
         <div className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border/60 pt-3 text-[13px] leading-5">
           <div><p className="mb-1 flex items-center gap-1.5 text-muted"><CalendarDays size={14} aria-hidden="true" />Đến hạn</p><p className="font-medium text-text">{goal.targetDate.split("-").reverse().join("/")}</p></div>
-          {goal.status === "active" && goal.currentAmount < goal.targetAmount && <div className="text-right"><p className="mb-1 text-muted">{goal.monthlyContribution !== null ? "Dự định mỗi tháng" : "Cần góp mỗi tháng"}</p><p className="text-[17px] leading-6 font-semibold tabular-nums text-text">{formatGoalMoney(goal.monthlyContribution ?? goal.feasibility.requiredMonthly)} <span className="text-[11px] font-normal text-muted">VND</span></p></div>}
+          {goal.status === "active" && goal.currentAmount < goal.targetAmount && <div className="text-right"><p className="mb-1 text-muted">{goal.monthlyContribution !== null ? "Dự định mỗi tháng" : "Cần góp mỗi tháng"}</p><p className="text-[12px] leading-6 font-semibold tabular-nums text-text">{formatGoalMoney(goal.monthlyContribution ?? goal.feasibility.requiredMonthly)} <span className="text-[11px] font-normal text-muted">VND</span></p></div>}
           {goal.status === "active" && goal.currentAmount < goal.targetAmount && <p className="col-span-2 text-right text-[12px] leading-5 text-muted">{goal.monthlyContribution !== null ? "Mức góp do bạn tự đặt" : "Mức góp ước tính, chưa tính lãi"}</p>}
         </div>
       </Card>

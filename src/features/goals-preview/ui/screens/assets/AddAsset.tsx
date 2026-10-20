@@ -49,7 +49,7 @@ const TERMS: Record<"deposit" | "bond", number[]> = { deposit: [6, 12, 24, 36], 
 function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeDef[]; value: DeclaredAssetCategory; onPick: (t: TypeDef) => void }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-[13px] font-semibold text-muted">{title}</h3>
+      <h3 className="text-xs font-semibold text-muted">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
         {types.map((t) => (
           <button
@@ -232,7 +232,7 @@ export function AddAsset({ params }: ScreenProps) {
           {manualFund && (
             <button
               type="button"
-              className="self-start text-[13px] font-semibold text-primary-strong"
+              className="self-start text-xs font-semibold text-primary-strong"
               onClick={() => {
                 setManualFund(false);
                 setValue(null);
@@ -287,7 +287,7 @@ export function AddAsset({ params }: ScreenProps) {
                 <input
                   id="asset-qty"
                   inputMode={instrument.fractional ? "decimal" : "numeric"}
-                  className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tabular-nums text-text outline-none placeholder:text-muted"
+                  className="min-w-0 flex-1 bg-transparent text-lg font-bold tabular-nums text-text outline-none placeholder:text-muted"
                   placeholder="0"
                   value={formatQtyInput(quantity)}
                   onChange={(e) => setQuantity(parseQtyInput(e.target.value, instrument.fractional))}
@@ -295,14 +295,14 @@ export function AddAsset({ params }: ScreenProps) {
                 <span className="shrink-0 text-sm font-semibold text-muted">{type.category === "stock" ? "cp" : instrument.unit}</span>
               </div>
               {type.category === "gold" && (
-                <p className="text-[13px] text-muted">Giá mua vào{quoteTime ? ` lúc ${quoteTime}` : ""} ngày {priceDate}: {formatVnd(unitPrice)}/{instrument.unit}</p>
+                <p className="text-xs text-muted">Giá mua vào{quoteTime ? ` lúc ${quoteTime}` : ""} ngày {priceDate}: {formatVnd(unitPrice)}/{instrument.unit}</p>
               )}
             </div>
           )}
           <div className="rounded-2xl bg-primary-soft px-4 py-3" aria-live="polite" aria-atomic="true">
-            <p className="text-[13px] text-muted">Giá trị ước tính</p>
-            <p className="mt-1 text-[24px] font-bold tabular-nums tracking-tight text-text">{autoValue ? formatVnd(autoValue) : "—"}</p>
-            <p className="mt-1 text-[12px] text-muted">{instrument ? `Theo ${type.category === "stock" ? "giá đóng cửa" : type.category === "gold" ? "giá mua vào" : "NAV công bố"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
+            <p className="text-xs text-muted">Giá trị ước tính</p>
+            <p className="mt-1 text-lg font-bold tabular-nums tracking-tight text-text">{autoValue ? formatVnd(autoValue) : "—"}</p>
+            <p className="mt-1 text-xs text-muted">{instrument ? `Theo ${type.category === "stock" ? "giá đóng cửa" : type.category === "gold" ? "giá mua vào" : "NAV công bố"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
           </div>
         </section>
       )}
@@ -344,8 +344,8 @@ export function AddAsset({ params }: ScreenProps) {
 
       {valuation === "accrual" && (
         <section className={cn(card, "flex items-center justify-between gap-3")} aria-label={valueLabel}>
-          <span className="text-[13px] text-muted">{valueLabel}</span>
-          <span className="text-[16px] font-bold tabular-nums text-text">{autoValue ? formatVnd(autoValue) : "—"}</span>
+          <span className="text-xs text-muted">{valueLabel}</span>
+          <span className="text-sm font-bold tabular-nums text-text">{autoValue ? formatVnd(autoValue) : "—"}</span>
         </section>
       )}
 
@@ -362,9 +362,9 @@ export function AddAsset({ params }: ScreenProps) {
         </div>
         {counted && <SliderRow label="Tỷ lệ được tính" value={percent} min={10} max={100} step={10} onChange={setPercent} format={(v) => `${v}%`} />}
         <div className="border-t border-border pt-3" aria-live="polite" aria-atomic="true">
-          <p className="text-[13px] text-muted">Giá trị tính vào mục tiêu</p>
+          <p className="text-xs text-muted">Giá trị tính vào mục tiêu</p>
           <p className="mt-1 text-xl font-bold tabular-nums text-text">{valid ? formatVnd(countedValue) : "—"}</p>
-          <p className="mt-1 text-[13px] text-muted">Tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b></p>
+          <p className="mt-1 text-xs text-muted">Tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b></p>
         </div>
       </section>
 

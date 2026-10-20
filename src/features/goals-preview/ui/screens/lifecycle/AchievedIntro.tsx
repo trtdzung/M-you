@@ -43,15 +43,15 @@ export function AchievedIntro({ params }: ScreenProps) {
           <li className="flex gap-3">
             <CheckCircle2 size={22} className="mt-0.5 shrink-0 text-positive" aria-hidden />
             <div>
-              <p className="text-[15px] font-semibold text-text">Giai đoạn 1: Tích luỹ</p>
-              <p className="text-[13px] leading-5 text-muted">Bạn đã tiết kiệm và vay phần thiếu. Hoàn tất.</p>
+              <p className="text-sm font-semibold text-text">Giai đoạn 1: Tích luỹ</p>
+              <p className="text-xs leading-5 text-muted">Bạn đã tiết kiệm và vay phần thiếu. Hoàn tất.</p>
             </div>
           </li>
           <li className="flex gap-3">
             <Circle size={22} className="mt-0.5 shrink-0 text-primary-strong" aria-hidden />
             <div>
-              <p className="text-[15px] font-semibold text-text">Giai đoạn 2: Tích luỹ & trả nợ</p>
-              <p className="text-[13px] leading-5 text-muted">
+              <p className="text-sm font-semibold text-text">Giai đoạn 2: Tích luỹ & trả nợ</p>
+              <p className="text-xs leading-5 text-muted">
                 Bạn tiếp tục nạp tiền vào tài khoản mục tiêu, MSB tự trừ tiền trả nợ mỗi kỳ. Trả hết nợ là Hoàn thành.
               </p>
             </div>

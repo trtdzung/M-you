@@ -21,7 +21,7 @@ export function CoachQuestion({
   const [text, setText] = useState("");
   return (
     <div className="flex flex-col gap-3">
-      <p className="rounded-2xl rounded-tl-sm bg-surface-tint p-4 text-[16px] leading-6 text-text">{question.text}</p>
+      <p className="rounded-2xl rounded-tl-sm bg-surface-tint p-4 text-[14px] leading-6 text-text">{question.text}</p>
       {question.hint && (
         <p role="note" className={`rounded-2xl bg-warning-soft px-3.5 py-3 ${hint}`}>
           {question.hint.code === "far_beyond" && question.hint.months

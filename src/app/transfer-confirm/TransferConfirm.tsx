@@ -513,7 +513,7 @@ export function TransferConfirm() {
         aria-label="Xác nhận chuyển tiền"
         onClick={confirmWithShield}
         disabled={submitting || checking || proceeding || verdictPending}
-        className="login-submit mt-auto disabled:opacity-60"
+        className="login-submit mt-auto !text-[14px] disabled:opacity-60"
       >
         {submitting || proceeding ? "Đang xử lý…" : "Xác nhận chuyển tiền"}
       </button>
@@ -538,12 +538,12 @@ function ConfirmHeader() {
 }
 
 const inputCls =
-  "min-h-12 w-full rounded-[10px] border border-[#dfe5ee] bg-white px-3 py-2 text-base text-text outline-none focus:border-primary";
+  "min-h-12 w-full rounded-[10px] border border-[#dfe5ee] bg-white px-3 py-2 text-[14px] leading-6 text-text outline-none focus:border-primary";
 
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[15px] font-medium text-muted">{label}</span>
+      <span className="text-[11px] font-medium text-muted">{label}</span>
       {children}
     </label>
   );

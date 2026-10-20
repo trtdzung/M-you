@@ -385,7 +385,7 @@ export function MYourWidget() {
             visual === "exiting" ? "sheet-panel-out" : "sheet-panel-in",
           )}
         >
-          <div className="shrink-0 bg-[#fce0d5]"><StatusBar /></div>
+          <div className="shrink-0 lg:bg-[#fce0d5]"><StatusBar /></div>
           <header className="flex shrink-0 items-center gap-3 border-b border-[#dfe5ee] bg-white px-4 py-4">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -400,7 +400,7 @@ export function MYourWidget() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-xs text-muted">Trợ lý Tài chính của bạn</p>
-              <h2 id={titleId} className="text-[20px] font-bold text-text">
+              <h2 id={titleId} className="text-[16px] font-bold text-text">
                 M-You
               </h2>
             </div>
@@ -491,7 +491,7 @@ export function MYourWidget() {
                     <div key={m.id} className={cn("flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
                       <div
                         className={cn(
-                          "max-w-[85%] rounded-[18px] px-4 py-3 text-[15px] leading-6",
+                          "max-w-[85%] rounded-[18px] px-4 py-3 text-[14px] leading-6",
                           m.role === "user"
                             ? "rounded-br-sm border border-[#ffd3ba] bg-[#fff0e7] text-text"
                             : m.error
@@ -549,7 +549,7 @@ export function MYourWidget() {
                 rows={1}
                 disabled={composerDisabled || voiceBusy}
                 placeholder="Nhắn tin cho M-You…"
-                className="min-h-12 max-h-32 min-w-0 flex-1 resize-none rounded-[9px] border border-[#dfe5ee] bg-white px-3.5 py-3 text-[15px] text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
+                className="min-h-12 max-h-32 min-w-0 flex-1 resize-none rounded-[9px] border border-[#dfe5ee] bg-white px-3.5 py-3 text-[14px] text-text outline-none placeholder:text-muted focus:border-primary focus:bg-surface disabled:opacity-60"
               />
               <button
                 type="button"

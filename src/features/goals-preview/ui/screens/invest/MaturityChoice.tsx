@@ -60,7 +60,7 @@ export function MaturityChoice({ params }: ScreenProps) {
       <ScreenHeader title="Khoản đáo hạn" subtitle={asset.name} />
 
       <section className={cn(card, "flex flex-col gap-2")}>
-        <p className="text-[13px] text-muted">{isMatured ? `Đã đáo hạn ngày ${dateVi(maturity)}` : `Đáo hạn ngày ${dateVi(maturity)}`}</p>
+        <p className="text-xs text-muted">{isMatured ? `Đã đáo hạn ngày ${dateVi(maturity)}` : `Đáo hạn ngày ${dateVi(maturity)}`}</p>
         <Amount amount={total} source="msb" className="text-3xl font-bold" />
         <SummaryRows
           rows={[
@@ -84,8 +84,8 @@ export function MaturityChoice({ params }: ScreenProps) {
           >
             <Icon size={22} className="mt-0.5 shrink-0 text-primary-strong" aria-hidden />
             <span className="flex flex-col gap-0.5">
-              <span className="text-[15px] font-semibold text-text">{title}</span>
-              <span className="text-[13px] leading-5 text-muted">{desc}</span>
+              <span className="text-sm font-semibold text-text">{title}</span>
+              <span className="text-xs leading-5 text-muted">{desc}</span>
             </span>
           </button>
         ))}

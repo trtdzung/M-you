@@ -103,23 +103,23 @@ export function LoanBlocked({ params }: ScreenProps) {
         <div className={`${card} overflow-hidden p-0 ${divider}`}>
           <button type="button" className={listRow} onClick={() => nav.push("GoalDetail", { goalId: goal.id })}>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold text-text">Tiết kiệm thêm mỗi tháng</span>
-              <span className="block text-[13px] leading-5 text-muted">So sánh các cách bù phần thiếu mà không cần vay.</span>
+              <span className="block text-sm font-semibold text-text">Tiết kiệm thêm mỗi tháng</span>
+              <span className="block text-xs leading-5 text-muted">So sánh các cách bù phần thiếu mà không cần vay.</span>
             </span>
           </button>
           {(
           <button type="button" className={listRow} onClick={() => setSheet("extend")}>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold text-text">Lùi ngày thêm 12 tháng</span>
-              <span className="block text-[13px] leading-5 text-muted">Ngày mới {formatISODate(extendDate)}, có thêm thời gian tích luỹ.</span>
+              <span className="block text-sm font-semibold text-text">Lùi ngày thêm 12 tháng</span>
+              <span className="block text-xs leading-5 text-muted">Ngày mới {formatISODate(extendDate)}, có thêm thời gian tích luỹ.</span>
             </span>
           </button>
           )}
           {reduceAmount !== null && (
             <button type="button" className={listRow} onClick={() => setSheet("reduce")}>
               <span className="flex-1">
-                <span className="block text-[15px] font-semibold text-text">Giảm mục tiêu xuống {formatVnd(reduceAmount)}</span>
-                <span className="block text-[13px] leading-5 text-muted">Khớp với số tiền bạn có thể có được.</span>
+                <span className="block text-sm font-semibold text-text">Giảm mục tiêu xuống {formatVnd(reduceAmount)}</span>
+                <span className="block text-xs leading-5 text-muted">Khớp với số tiền bạn có thể có được.</span>
               </span>
             </button>
           )}

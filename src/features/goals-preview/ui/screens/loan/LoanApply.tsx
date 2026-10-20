@@ -117,7 +117,7 @@ export function LoanApply({ params }: ScreenProps) {
                 <MoneyInput label="Giá trị tài sản" value={purchaseValue} onChange={setNewValue} />
               </>
             )}
-            <p className="text-[12px] leading-4 text-muted">Các tài sản khác của mục tiêu được dùng để mua mục tiêu và sẽ không còn trong mục tiêu. Tài sản mua không tính vào tiến độ trả nợ.</p>
+            <p className="text-xs leading-4 text-muted">Các tài sản khác của mục tiêu được dùng để mua mục tiêu và sẽ không còn trong mục tiêu. Tài sản mua không tính vào tiến độ trả nợ.</p>
           </div>
         </Section>
       )}
@@ -134,7 +134,7 @@ export function LoanApply({ params }: ScreenProps) {
         </span>
       </label>
 
-      <p className="text-[12px] leading-4 text-muted">{INDICATIVE_NOTE}</p>
+      <p className="text-xs leading-4 text-muted">{INDICATIVE_NOTE}</p>
 
       <BottomActions>
         {allowed ? (
@@ -150,7 +150,7 @@ export function LoanApply({ params }: ScreenProps) {
 
       <Sheet open={settleOpen} title="Tất toán các khoản đầu tư MSB" onClose={() => setSettleOpen(false)}>
         <div className="flex flex-col gap-4">
-          <p className="text-[14px] leading-6 text-text">
+          <p className="text-sm leading-6 text-text">
             Khi chuyển sang giai đoạn vay, các khoản đầu tư MSB của mục tiêu sẽ được tất toán và rút toàn bộ tiền đến thời điểm tất toán về tài khoản chính. Bạn chọn tất toán ngay hoặc vào kỳ tới.
           </p>
           <SummaryRows
@@ -160,7 +160,7 @@ export function LoanApply({ params }: ScreenProps) {
               hint: `Kỳ tới: ${formatISODate(a.type === "msb" ? nextSettleDate(a, today) : today)}`,
             }))}
           />
-          <p className="text-[12px] leading-4 text-muted">
+          <p className="text-xs leading-4 text-muted">
             Tất toán ngay: nhận giá trị hiện tại hôm nay. Tất toán vào kỳ tới: khoản đầu tư được giữ đến ngày hẹn rồi rút toàn bộ về tài khoản chính; tiền gửi có kỳ hạn tất toán vào ngày đáo hạn, các khoản còn lại vào ngày 1 tháng sau.
           </p>
           <div className="flex flex-col gap-2">

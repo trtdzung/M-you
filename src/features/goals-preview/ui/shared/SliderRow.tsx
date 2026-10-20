@@ -43,7 +43,7 @@ export function SliderRow({
         onChange={(event) => onChange(Number(event.target.value))}
         className="h-11 w-full cursor-pointer accent-[var(--color-primary)]"
       />
-      {hint && <p className="text-[12px] leading-4 text-muted">{hint}</p>}
+      {hint && <p className="text-xs leading-4 text-muted">{hint}</p>}
     </div>
   );
 }

@@ -105,7 +105,7 @@ export function BudgetTab() {
               <button
                 type="button"
                 onClick={openSettings}
-                className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-primary bg-white px-3 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-full border border-primary bg-white px-3 text-[13px] leading-5 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 <Plus size={14} aria-hidden /> Thêm ngân sách
               </button>
