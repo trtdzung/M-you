@@ -1,9 +1,9 @@
 /* Scam Shield presentation only. No global element selectors or shared theme overrides. */
 .shield-screen { display:flex; flex-direction:column; gap:20px; min-width:0; }
 .shield-screen.shield-hub { gap:12px; }
-.settings-demo--security { display:flex; flex-direction:column; height:100%; min-height:0; }
-.settings-demo--security > .settings-header { flex-shrink:0; }
-.settings-security-content { flex:1; min-height:0; overflow-y:auto; }
+.settings-demo--fixed-header { display:flex; flex-direction:column; height:100%; min-height:0; }
+.settings-demo--fixed-header > .settings-header { flex-shrink:0; }
+.settings-scroll-content { flex:1; min-height:0; overflow-y:auto; }
 .shield-screen .settings-panel { min-width:0; }
 .shield-screen .settings-row { flex-wrap:wrap; gap:12px; }
 .shield-screen .settings-row > span:first-child { min-width:180px; }
