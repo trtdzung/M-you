@@ -9,7 +9,7 @@ const holder = vi.hoisted(() => ({ db: null as Db | null }));
 vi.mock("@/lib/db", () => ({ getDb: () => holder.db! }));
 
 import { applyAction } from "../goal-service";
-import { MAX_AGE_MS, RETRY_MS, peekGoalInsight, readGoalInsight, settleGoalInsights, type AgentAnswer } from "../goal-insight";
+import { MAX_AGE_MS, RETRY_MS, peekGoalInsight, readAllGoalInsights, readGoalInsight, settleGoalInsights, type AgentAnswer } from "../goal-insight";
 
 process.env.AGENT_MODE = "mock";
 
@@ -95,5 +95,16 @@ describe("readGoalInsight", () => {
 
   it("mục tiêu không có thì RangeError", () => {
     expect(() => readGoalInsight(CIF, "nope", vi.fn())).toThrow(RangeError);
+  });
+
+  it("readAllGoalInsights: thẻ của mọi mục tiêu đang theo đuổi trong một lần đọc", async () => {
+    const ask = vi.fn(async (_cif: string, goalId: string) => card(goalId));
+    const first = readAllGoalInsights(CIF, ask);
+    expect(first.refreshing).toBe(true);
+    expect(Object.keys(first.insights)).toContain(gid);
+    await settleGoalInsights();
+    const again = readAllGoalInsights(CIF, ask);
+    expect(again.refreshing).toBe(false);
+    expect(again.insights[gid]?.observation).toContain("5.000.000 VND");
   });
 });

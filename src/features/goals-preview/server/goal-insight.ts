@@ -140,6 +140,20 @@ export function readGoalInsight(cif: string, goalId: string, ask: AskAgent = ask
   return { insight: parse(row), refreshing: running };
 }
 
+/** Thẻ của mọi mục tiêu đang theo đuổi, trong một lần đọc: màn Mục tiêu nạp sẵn để mở chi tiết là có thẻ ngay. Mục tiêu nào cũ thì khởi động làm mới ở nền. */
+export function readAllGoalInsights(cif: string, ask: AskAgent = askAgent, now: () => number = Date.now): { insights: Record<string, GoalInsight | null>; refreshing: boolean } {
+  const { world } = getWorld(cif);
+  const insights: Record<string, GoalInsight | null> = {};
+  let refreshing = false;
+  for (const goal of world.goals) {
+    if (goal.status !== "accumulating" && goal.status !== "repaying") continue;
+    const res = readGoalInsight(cif, goal.id, ask, now);
+    insights[goal.id] = res.insight;
+    refreshing ||= res.refreshing;
+  }
+  return { insights, refreshing };
+}
+
 /** Bản đã lưu, chỉ đọc: không đụng tới world, không khởi động làm mới. Cho agent chat đọc lại đúng thẻ khách đã thấy. */
 export function peekGoalInsight(cif: string, goalId: string): GoalInsight | null {
   return parse(table().prepare("SELECT * FROM gv2_goal_insights WHERE cif = ? AND goal_id = ?").get(cif, goalId) as Row | undefined);

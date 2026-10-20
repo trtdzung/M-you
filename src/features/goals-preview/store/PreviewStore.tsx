@@ -7,6 +7,7 @@ import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
 import { initialPreviewState, previewReducer } from "./reducer";
 import { ActionQueue, fetchWorld, isLocalOnlyAction, pollMarket, requestMarketRefresh, type GoalIdResolution, type WorldPayload } from "./server-sync";
+import { syncGoalInsights } from "../client/goal-insight-store";
 import { hydrateMarket } from "../data/market";
 import { usePersonaCif } from "@/providers/context";
 import { usePanelActive } from "@/components/shell/PanelActive";
@@ -85,6 +86,7 @@ function useServerWorld(
   const applyPayload = useCallback(
     (payload: WorldPayload, ids?: GoalIdResolution) => {
       hydrateMarket(payload.market.instruments);
+      syncGoalInsights(cif);
       rawDispatch({ type: "world/sync", world: payload.world, goalIdMap: ids?.goalIdMap, unsavedGoalIds: ids?.unsavedGoalIds });
       if (payload.market.refreshing && !cancelPollRef.current) {
         cancelPollRef.current = pollMarket(
@@ -98,7 +100,7 @@ function useServerWorld(
         );
       }
     },
-    [rawDispatch, stateRef],
+    [rawDispatch, stateRef, cif],
   );
 
   useEffect(() => {
