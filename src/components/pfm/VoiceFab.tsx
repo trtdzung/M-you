@@ -7,6 +7,7 @@ import { ArrowRight, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { prefersMotion } from "@/lib/motion";
 import { usePersona } from "@/providers/context";
+import { dropChatHistory } from "@/lib/chat-history-cache";
 import { sendChatMessage, isChartUi, isClarifyOptionsUi, isJarUi, isTransferFormUi, type UiPayload } from "@/lib/agent-api";
 import { useStreamingSpeech } from "@/lib/use-streaming-speech";
 import { jarSpeechContext } from "@/lib/speech-context";
@@ -135,6 +136,7 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
     // and chat share the same agent thread per persona.
     const { payload, onSent } = withPreferenceSeed(cif, text, preferences, prefStatus);
     try {
+      dropChatHistory(); // the thread grows on the server: a prefetched copy is out of date
       const res = await sendChatMessage(payload, cif);
       onSent();
       setReply({ answer: res.answer, ui: res.ui ?? null });

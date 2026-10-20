@@ -31,6 +31,7 @@ import { AgentGoalUiCard } from "./AgentGoalUiCard";
 import { isGoalUi } from "@/lib/agent-goal-api";
 import { ClarifyAnswerBubble } from "./ClarifyAnswerBubble";
 import { StatusBar } from "@/components/shell/StatusBar";
+import { dropChatHistory, peekChatHistory, pendingChatHistory } from "@/lib/chat-history-cache";
 import { takeInsightDraft, takePendingChatMessage } from "@/insights/proactive/chat-handoff";
 import { resetPreferenceSeed, withPreferenceSeed } from "@/lib/agent-preference-seed";
 import { useAgentPreferences } from "@/state/agent-preferences";
@@ -83,9 +84,9 @@ function composeVoiceDraft(prefix: string, transcript: string) {
  * `HuCategoryTab`'s `?hu=`). Wired to the
  * real agent (`src/lib/agent-api.ts`, proxied through `src/app/api/agent/chat`
  * so the client never sees `AGENT_API_KEY`) — `cif` is the active persona's
- * CIF. Opening the overlay always reloads real history from the agent (it has
- * its own server-side memory now, not just a local mock) and gates the
- * composer until that finishes loading.
+ * CIF. The real history (the agent has its own server-side memory) loads when the
+ * widget mounts, so the overlay opens on a ready thread; the composer is gated only
+ * until that first load finishes.
  */
 export function MYourWidget() {
   const { persona } = usePersona();
@@ -113,9 +114,10 @@ export function MYourWidget() {
     const timeout = window.setTimeout(() => setVisual("closed"), 320);
     return () => window.clearTimeout(timeout);
   }, [visual]);
-  const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">("loading");
+  const [prefetched] = useState(() => peekChatHistory(cif));
+  const [historyStatus, setHistoryStatus] = useState<"loading" | "ready">(prefetched ? "ready" : "loading");
   const [historyUnavailable, setHistoryUnavailable] = useState(false);
-  const [messages, setMessages] = useState<ChatBubble[]>([]);
+  const [messages, setMessages] = useState<ChatBubble[]>(() => (prefetched ? fromHistory(prefetched.messages) : []));
   const [input, setInput] = useState("");
   const [inputVisible, setInputVisible] = useState(""); // text shown in textarea/bubble
   const draftPersona = useRef(cif);
@@ -169,32 +171,65 @@ export function MYourWidget() {
     cancelVoice();
   }, [isOpen, cif, cancelVoice]);
 
-  const loadHistory = useCallback(() => {
-    setHistoryStatus("loading");
-    setHistoryUnavailable(false);
-    setDeleteError(false);
-    getChatHistory(cif)
+  // The thread is loaded as soon as the widget mounts (and when the persona changes), so opening the overlay shows
+  // it at once; from then on the screen only appends what the customer types and what the agent answers.
+  // Only the newest history request may touch the thread (StrictMode and persona switches start several), and a
+  // quiet refresh on open — it picks up turns sent elsewhere, e.g. by the voice button — is dropped when the
+  // customer has already posted something here since it started, so it can never wipe a fresh bubble.
+  const historyRequest = useRef(0);
+  const localTurns = useRef(0);
+  const loadHistory = useCallback((quiet = false) => {
+    const request = ++historyRequest.current;
+    const turnsAtStart = localTurns.current;
+    if (!quiet) {
+      setHistoryStatus("loading");
+      setHistoryUnavailable(false);
+      setDeleteError(false);
+    }
+    const stale = () => request !== historyRequest.current || (quiet && turnsAtStart !== localTurns.current);
+    // The first (non-quiet) load joins a prefetch that is still on its way instead of asking again.
+    (!quiet && pendingChatHistory(cif) || getChatHistory(cif))
       .then((res) => {
+        if (stale()) return;
         setMessages(fromHistory(res.messages));
-        const queued = takePendingChatMessage(cif);
-        if (queued) setPendingSend(queued);
+        setHistoryUnavailable(false);
         setHistoryStatus("ready");
       })
       .catch(() => {
+        if (stale() || quiet) return; // a failed quiet refresh keeps the thread already on screen
         // History belongs to the Agent Backend, while speech capture talks to
         // the STT service independently. Keep the composer available so a
         // temporary agent outage does not prevent local STT verification.
         setMessages([]);
         setHistoryUnavailable(true);
-        const queued = takePendingChatMessage(cif);
-        if (queued) setPendingSend(queued);
         setHistoryStatus("ready");
       });
   }, [cif]);
 
+  const mounted = useRef(false);
   useEffect(() => {
-    if (isOpen) loadHistory();
-  }, [isOpen, loadHistory]);
+    const first = !mounted.current;
+    mounted.current = true;
+    if (first && prefetched) return; // already on screen from the prefetch
+    setMessages([]);
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `prefetched` only matters for the very first run
+  }, [loadHistory]);
+
+  // Reopening: show the loaded thread right away and refresh it quietly (retry loudly if the first load failed).
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpen.current && historyStatus === "ready") loadHistory(!historyUnavailable);
+    wasOpen.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the open transition matters, not later status changes
+  }, [isOpen]);
+
+  // A question queued by another screen goes out once the overlay is open and the thread is there.
+  useEffect(() => {
+    if (!isOpen || historyStatus !== "ready") return;
+    const queued = takePendingChatMessage(cif);
+    if (queued) setPendingSend(queued);
+  }, [isOpen, historyStatus, cif]);
 
   // Jump to the newest message whenever the overlay opens, its history finishes
   // loading, or the thread grows — and keep following the bottom as the
@@ -243,6 +278,8 @@ export function MYourWidget() {
    */
   async function postMessage(text: string) {
     if (!text || composerDisabled || voiceBusy) return;
+    localTurns.current++;
+    dropChatHistory();
     const userId = `m${++idRef.current}`;
     const replyId = `m${++idRef.current}`;
     setMessages((prev) => [...prev, { id: userId, role: "user", text }]);
@@ -278,6 +315,8 @@ export function MYourWidget() {
     setInputVisible("");
     // Temporarily patch postMessage to use visibleForBubble for the bubble
     if (!composerDisabled && !voiceBusy) {
+      localTurns.current++;
+      dropChatHistory();
       const userId = `m${++idRef.current}`;
       const replyId = `m${++idRef.current}`;
       const { payload, onSent } = withPreferenceSeed(cif, text, preferences, prefStatus);
@@ -302,6 +341,8 @@ export function MYourWidget() {
     setDeleteError(false);
     try {
       await deleteChatHistory(cif);
+      localTurns.current++;
+      dropChatHistory();
       // The server confirmed the delete — the transcript is empty as of this response,
       // so the chat is usable again right away (no arbitrary cooldown, plan 260927).
       setMessages([]);
@@ -404,7 +445,7 @@ export function MYourWidget() {
                 <p>Không tải được lịch sử M-You. Bạn vẫn có thể thử nhập bằng giọng nói.</p>
                 <button
                   type="button"
-                  onClick={loadHistory}
+                  onClick={() => loadHistory()}
                   className="mt-2 font-semibold text-primary"
                 >
                   Thử tải lại lịch sử

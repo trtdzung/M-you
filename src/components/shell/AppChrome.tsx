@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { prefetchChatHistory } from "@/lib/chat-history-cache";
+import { usePersonaCif } from "@/providers/context";
 import { MYourWidget } from "@/components/pfm/MYourWidget";
 import { PfmBottomNav } from "@/components/pfm/PfmBottomNav";
 import { VoiceFab } from "@/components/pfm/VoiceFab";
@@ -63,6 +65,11 @@ export function AppChrome({ children }: { children: ReactNode }) {
 
 function AppChromeFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
+  // Fetch the M-You thread now: the chat widget only exists on /pfm, and "Chi tiết" on a goal opens it from elsewhere.
+  const personaCif = usePersonaCif();
+  useEffect(() => {
+    if (personaCif) prefetchChatHistory(personaCif);
+  }, [personaCif]);
   const router = useRouter();
 
   useEffect(() => {

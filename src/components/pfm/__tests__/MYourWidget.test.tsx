@@ -5,6 +5,7 @@ import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 import { PersonaProvider } from "@/providers/context";
 import { MYourWidget } from "../MYourWidget";
 import * as agentApi from "@/lib/agent-api";
+import { dropChatHistory, prefetchChatHistory } from "@/lib/chat-history-cache";
 import { savePendingChatMessage } from "@/insights/proactive/chat-handoff";
 
 
@@ -82,6 +83,70 @@ describe("MYourWidget", () => {
     expect(await screen.findByText("Kiểm tra bảo mật cho số điện thoại sau: 0912345678")).toBeInTheDocument();
     expect(await screen.findByText("Trả lời từ M-You")).toBeInTheDocument();
     expect(agentApi.sendChatMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads the history before the overlay opens, so opening shows the thread without a loading state", async () => {
+    nav.search = "";
+    const history = vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({
+      thread_id: "CIF_0001",
+      messages: [{ role: "assistant", content: "Chào bạn", ui: null }],
+    });
+    const tree = (
+      <PersonaProvider>
+        <MYourWidget />
+      </PersonaProvider>
+    );
+    const view = render(tree);
+    await waitFor(() => expect(history).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+
+    nav.search = "assistant=1";
+    view.rerender(tree);
+    expect(screen.queryByText("Đang tải hội thoại…")).not.toBeInTheDocument();
+    expect(screen.getByText("Chào bạn")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled();
+  });
+
+  it("sends a question queued before the overlay opens, and a late quiet refresh cannot wipe its bubble", async () => {
+    sessionStorage.clear();
+    nav.search = "";
+    let answerRefresh!: (value: { thread_id: string; messages: [] }) => void;
+    vi.spyOn(agentApi, "getChatHistory")
+      .mockResolvedValueOnce({ thread_id: "CIF_0001", messages: [] })
+      .mockImplementationOnce(() => new Promise((resolve) => { answerRefresh = resolve; }));
+    const tree = (
+      <PersonaProvider>
+        <MYourWidget />
+      </PersonaProvider>
+    );
+    const view = render(tree);
+    await act(async () => {});
+
+    savePendingChatMessage("CIF_0001", "Mình cần làm gì để kịp hạn mục tiêu?");
+    nav.search = "assistant=1";
+    view.rerender(tree);
+
+    await waitFor(() => expect(agentApi.sendChatMessage).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Mình cần làm gì để kịp hạn mục tiêu?")).toBeInTheDocument();
+    await act(async () => { answerRefresh({ thread_id: "CIF_0001", messages: [] }); });
+    expect(screen.getByText("Mình cần làm gì để kịp hạn mục tiêu?")).toBeInTheDocument();
+  });
+
+  it("starts from a thread prefetched by another screen: no loading state, no second fetch for the first load", async () => {
+    dropChatHistory();
+    nav.search = "";
+    const history = vi.spyOn(agentApi, "getChatHistory").mockResolvedValue({
+      thread_id: "CIF_0001",
+      messages: [{ role: "assistant", content: "Từ lần tải trước", ui: null }],
+    });
+    prefetchChatHistory("CIF_0001");
+    await act(async () => {});
+
+    renderWidget();
+    expect(history).toHaveBeenCalledTimes(1);
+    nav.search = "assistant=1";
+    expect(screen.queryByText("Đang tải hội thoại…")).not.toBeInTheDocument();
+    dropChatHistory();
   });
 
   it("hides the chat overlay until ?assistant=1 is set", async () => {
