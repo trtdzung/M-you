@@ -38,7 +38,6 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
       ...structuredClone(getWorld(CIF).world),
       nav: { stack: [] },
       toasts: [],
-      dismissedSuggestionIds: [],
       navSeq: 0,
     };
     const seq0 = local.seq;
@@ -149,7 +148,6 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
       ...getWorld(CIF).world,
       nav: { stack: [{ key: "list", screen: "GoalList", params: {} }] },
       toasts: [],
-      dismissedSuggestionIds: [],
     };
     state = previewReducer(state, create("r3-own"));
     const lid = state.lastCreatedGoalId!;
@@ -200,7 +198,6 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
         ...getWorld(CIF).world,
         nav: { stack: [{ key: "x", screen: "GoalList", params: {} }] },
         toasts: [],
-        dismissedSuggestionIds: [],
       };
       const existing = state.goals.at(-1);
       const a = create("NEW NEVER SAVED");
@@ -257,7 +254,6 @@ describe("Store queue N2/N3 + createdGoalId + navSeq (F6)", () => {
         ],
       },
       toasts: [],
-      dismissedSuggestionIds: [],
     };
     const keep = previewReducer(s, { type: "world/sync", world: w, unsavedGoalIds: ["goal-local-900"] });
     expect(keep.nav.stack).toHaveLength(2);

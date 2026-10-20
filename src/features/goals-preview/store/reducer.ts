@@ -33,7 +33,7 @@ export function stateFromScenario(scenarioId: string, jump = false): PreviewStat
   const target = jump ? scenario.jumpTo : undefined;
   const stack: ScreenEntry[] = [entry(1, "GoalList", target?.screen === "GoalList" ? target.params : undefined)];
   if (target && target.screen !== "GoalList") stack.push(entry(2, target.screen, target.params));
-  return { ...world, dismissedSuggestionIds: [], nav: { stack }, navSeq: stack.length, toasts: [] };
+  return { ...world, nav: { stack }, navSeq: stack.length, toasts: [] };
 }
 
 /** Customer's empty world: the state before the first server world arrives (never demo data). */
@@ -199,7 +199,6 @@ function syncWorld(state: PreviewState, world: WorldState, goalIdMap: Record<str
     nav,
     navSeq,
     toasts: state.toasts,
-    dismissedSuggestionIds: state.dismissedSuggestionIds,
     lastCreatedGoalId: last === undefined || lastLost ? undefined : mapId(last),
   };
 }
@@ -237,11 +236,6 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
 
     case "toast/dismiss":
       return { ...state, toasts: state.toasts.filter((t) => t.id !== action.id) };
-
-    case "dismissSuggestion":
-      return state.dismissedSuggestionIds.includes(action.id)
-        ? state
-        : { ...state, dismissedSuggestionIds: [...state.dismissedSuggestionIds, action.id] };
 
     case "advanceTime": {
       const { state: next, summary } = advanceTime(state, action.days);

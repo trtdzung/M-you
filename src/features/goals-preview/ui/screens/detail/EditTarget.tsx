@@ -109,8 +109,11 @@ export function EditTarget({ params }: ScreenProps) {
             { label: "Giá trị mục tiêu", value: `${formatVndCompact(goal.targetAmount)} → ${formatVndCompact(value)}`, emphasis: true },
             { label: "Ngày đến hạn", value: goal.targetDate === dateValue ? formatISODate(dateValue) : `${formatISODate(goal.targetDate)} → ${formatISODate(dateValue)}`, emphasis: goal.targetDate !== dateValue },
             { label: "Hiện có", value: ctx.value.total },
-            { label: "Cần góp mỗi tháng (tính lại)", value: recalculated, source: "estimated" },
-            { label: "Trích tự động hiện tại", value: so && so.active ? `${formatVnd(so.amount)} · ngày ${so.dayOfMonth}` : "Chưa bật" },
+            {
+              label: "Góp mỗi tháng",
+              value: `${so && so.active ? formatVnd(so.amount) : "Chưa bật"} → ${formatVnd(recalculated)}`,
+              emphasis: true,
+            },
           ]}
         />
       </section>

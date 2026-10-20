@@ -25,7 +25,6 @@ export function isLocalOnlyAction(action: PreviewAction): boolean {
   return (
     action.type.startsWith("nav/") ||
     action.type.startsWith("toast/") ||
-    action.type === "dismissSuggestion" ||
     action.type === "world/sync" ||
     action.type === "hydrate"
   );
