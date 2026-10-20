@@ -89,7 +89,7 @@ export function profileGuideSteps(profile: {
 }): GuideStep[] {
   const steps: GuideStep[] = [];
   if (profile.antiPhishingCode === null) steps.push({ label: "Mã chống giả mạo", points: 15, cta: "Bật mã" });
-  if (!profile.emergencyContacts.some(contact => contact.status === "active" || contact.status === "removing")) {
+  if (profile.emergencyContacts.length === 0) {
     steps.push({ label: "Người thân khẩn cấp", points: 15, cta: "Thêm người thân" });
   }
   if (!profile.aiProtect) steps.push({ label: "M-You bảo vệ bạn", points: 10, cta: "Bật bảo vệ" });

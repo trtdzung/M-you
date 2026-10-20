@@ -13,6 +13,6 @@ export function recoveryState(cif: string) {
   const events = eventsSince(cif, incident.at, ["password_changed", "devices_signed_out"]);
   return { incidentAt: incident.at, steps: [events.some(e => e.type === "password_changed" && e.at <= now),
     events.some(e => e.type === "devices_signed_out" && e.at <= now), profile.antiPhishingCode !== null,
-    profile.emergencyContacts.some(c => c.status === "active" || c.status === "removing")],
+    profile.emergencyContacts.length > 0],
     cooldown: now - incident.at < 7 * 24 * 60 * 60 * 1000 };
 }

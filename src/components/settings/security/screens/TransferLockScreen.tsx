@@ -22,7 +22,7 @@ export function TransferLockScreen() {
   const appNow = useAppNow();
   const transferLockUntil = useSecurityStore(state => state.transferLockUntil);
   const unlockAt = useSecurityStore(state => state.pendingOff.transferLock);
-  const { lockTransfers, requestOff, cancelOff, applyOff } = useSecurityStore.getState();
+  const { lockTransfers, requestOff, cancelOff } = useSecurityStore.getState();
   const [days, setDays] = useState<(typeof DURATIONS)[number]>(1);
   const [confirming, setConfirming] = useState(false);
   // An expired lock counts as off.
@@ -39,7 +39,7 @@ export function TransferLockScreen() {
         <Lock size={21} className="shrink-0 text-negative" aria-hidden />
         <p><strong>Đang khóa chuyển tiền ra ngoài đến {formatPendingAt(until)}</strong></p>
       </div>
-      {unlocking ? <PendingOffNotice action="Mở khóa chuyển tiền" at={unlockAt} onCancel={() => cancelOff("transferLock")} onApply={() => applyOff("transferLock")} />
+      {unlocking ? <PendingOffNotice action="Mở khóa chuyển tiền" at={unlockAt} onCancel={() => cancelOff("transferLock")} />
         : canUnlockEarly ? <Action onClick={() => setConfirming(true)}>Mở khóa sớm</Action>
         : <p className="px-1 text-sm leading-relaxed text-muted">Khóa còn dưới 24 giờ và sẽ tự hết lúc {formatPendingAt(until)}. Mở khóa sớm cũng cần chờ 24 giờ nên không nhanh hơn.</p>}
     </> : <>
@@ -69,7 +69,7 @@ const THRESHOLDS = [10_000_000, 20_000_000, 50_000_000] as const;
 function HoldPanel() {
   const appNow = useAppNow();
   const hold = useSecurityStore(useShallow(state => ({ on: state.holdEnabled, threshold: state.holdThreshold, offAt: state.pendingOff.hold })));
-  const { setHold, lowerHoldThreshold, cancelOff, applyOff } = useSecurityStore.getState();
+  const { setHold, lowerHoldThreshold, cancelOff } = useSecurityStore.getState();
   const [confirming, setConfirming] = useState(false);
   const pending = isPending(hold.offAt, appNow.getTime());
   return <>
@@ -89,7 +89,7 @@ function HoldPanel() {
         {hold.on && <p className="mt-2 text-xs leading-relaxed text-muted">Hạ ngưỡng có hiệu lực ngay. Nâng ngưỡng là giảm bảo mật: tắt rồi bật lại (chờ 24 giờ).</p>}
       </div>
     </Panel>
-    {pending && hold.offAt !== undefined && <PendingOffNotice action="Tắt giữ giao dịch" at={hold.offAt} onCancel={() => cancelOff("hold")} onApply={() => applyOff("hold")} />}
+    {pending && hold.offAt !== undefined && <PendingOffNotice action="Tắt giữ giao dịch" at={hold.offAt} onCancel={() => cancelOff("hold")} />}
     <ConfirmFaceSheet open={confirming} title="Tắt giữ giao dịch?" message="Tắt cần xác thực khuôn mặt và chờ 24 giờ để kẻ gian không thể hướng dẫn bạn tắt đi trong lúc đang bị dẫn dắt." onConfirm={() => { setHold(false, transferNow().getTime()); setConfirming(false); }} onClose={() => setConfirming(false)} />
   </>;
 }

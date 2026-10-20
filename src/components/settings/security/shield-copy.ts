@@ -12,5 +12,4 @@ export const SHIELD_TITLES: Record<ShieldSection, string> = {
   "alert-log": "Nhật ký cảnh báo",
   "ai-journal": "Nhật ký AI",
   sos: "Khẩn cấp",
-  "test-tools": "Công cụ test (demo)",
 };

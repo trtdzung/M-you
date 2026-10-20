@@ -30,7 +30,7 @@ const LEVELS = [
 export function ProtectScreen() {
   const appNow = useAppNow();
   const security = useSecurityStore(useShallow(state => ({ aiProtect: state.aiProtect, familyAlerts: state.familyAlerts, securityTips: state.securityTips, emergencyContacts: state.emergencyContacts, pendingOff: state.pendingOff })));
-  const { setAiProtect, cancelOff, applyOff, setFamilyAlerts, setSecurityTips } = useSecurityStore.getState();
+  const { setAiProtect, cancelOff, setFamilyAlerts, setSecurityTips } = useSecurityStore.getState();
   const [confirming, setConfirming] = useState(false);
   const offAt = security.pendingOff.aiProtect;
   const pending = isPending(offAt, appNow.getTime());
@@ -49,7 +49,7 @@ export function ProtectScreen() {
 
   return <>
     <Panel><div className="settings-row"><span className="flex-1"><strong>Bật bảo vệ bằng AI</strong><span className="mt-1 block text-sm text-muted">M-You là trợ lý AI của MSB. Bật lại có hiệu lực ngay.</span></span><Toggle label="Bật bảo vệ bằng AI" checked={on} onChange={toggle} disabled={pending} /></div></Panel>
-    {pending && <PendingOffNotice action="Tắt bảo vệ bằng AI" at={offAt} onCancel={() => cancelOff("aiProtect")} onApply={() => applyOff("aiProtect")} />}
+    {pending && <PendingOffNotice action="Tắt bảo vệ bằng AI" at={offAt} onCancel={() => cancelOff("aiProtect")} />}
     <div className={on ? undefined : "opacity-50"}>
       <Panel title="Tùy chỉnh">
         <div className="settings-row"><span className="flex-1"><strong>Báo người thân khi có cảnh báo Đỏ</strong>{!hasActiveContact && <Link href="/settings/emergency-contacts" className="mt-1 block text-sm text-primary underline underline-offset-4">Cần thêm người thân khẩn cấp trước</Link>}</span><Toggle label="Báo người thân khi có cảnh báo Đỏ" checked={security.familyAlerts && hasActiveContact} disabled={!on || !hasActiveContact} onChange={() => setFamilyAlerts(!security.familyAlerts)} /></div>

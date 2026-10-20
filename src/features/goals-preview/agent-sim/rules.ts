@@ -10,14 +10,14 @@ import type { Asset, Goal, MsbAsset, DeclaredAsset } from "../model/types";
 /**
  * Scripted "M-You gợi ý" rules — NO real AI call. Pure and deterministic:
  * ids are `${ruleKey}:${goalId | "all"}` so `dismissSuggestion` keeps them hidden.
- * Each rule has `build(state, goal, force)`; with `force` it skips the trigger
- * condition (used by the test panel to demo a card on any data).
+ * Each rule has `build(state, goal, force)`; callers always pass `force = false`
+ * so the trigger condition is required.
  */
 
 export interface SuggestionRule {
   key: string;
   kind: SuggestionKind;
-  /** Short name shown in the test panel. */
+  /** Short rule name (debug / journals). */
   label: string;
   /** Plain-language trigger condition. */
   when: string;
@@ -552,14 +552,4 @@ export function visibleSuggestions(state: PreviewState, goalId?: string): AgentS
 export function ruleOfSuggestion(id: string): SuggestionRule | undefined {
   const key = id.split(":")[0];
   return SUGGESTION_RULES.find((r) => r.key === key);
-}
-
-/** Builds a card for `ruleKey` ignoring its trigger condition (test panel demo). Null if the data has nothing to show. */
-export function forceSuggestion(state: PreviewState, ruleKey: string, goalId?: string): AgentSuggestion | null {
-  const rule = SUGGESTION_RULES.find((r) => r.key === ruleKey);
-  if (!rule) return null;
-  if (!rule.perGoal) return rule.build(state, undefined, true);
-  const goals = candidateGoals(state);
-  const goal = goals.find((g) => g.id === goalId) ?? goals[0];
-  return goal ? rule.build(state, goal, true) : null;
 }

@@ -6,12 +6,10 @@ import { readProfile } from "./profile-store";
 import { recoveryState } from "./recovery";
 import { renderHubGuide, type Moment, type MomentContext } from "./scenarios";
 
-const LARGE_BALANCE = 50_000_000;
-
 /**
  * UC11 moments the matrix does not already cover: a weekly device-login
- * handbook, and a two-step Hub coach on first use, a large balance, or after
- * an incident. Emergency (an open incident) may repeat the handbook.
+ * handbook, and a two-step Hub coach on first use or after an incident.
+ * Emergency (an open incident) may repeat the handbook.
  */
 export function educateMoments(cif: string, ctx: MomentContext, gauge: MomentContext["score"] = ctx.score): Moment[] {
   const out: Moment[] = [];
@@ -35,9 +33,6 @@ export function educateMoments(cif: string, ctx: MomentContext, gauge: MomentCon
     if (opens.length <= 1) out.push({ scenario: "HUB", key: "first", copy });
     const incidentAt = recoveryState(cif).incidentAt;
     if (incidentAt !== null) out.push({ scenario: "HUB", key: `incident:${incidentAt}`, copy });
-  }
-  if (ctx.trigger === "incoming_credit" && (ctx.credit?.amount ?? 0) >= LARGE_BALANCE) {
-    out.push({ scenario: "HUB", key: "balance", copy });
   }
   return out;
 }

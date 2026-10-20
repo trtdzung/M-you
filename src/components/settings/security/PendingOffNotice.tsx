@@ -3,8 +3,8 @@
 import { Clock } from "lucide-react";
 import { formatPendingAt } from "./pending";
 
-/** Shown while a security decrease waits 24h; `onApply` skips the wait for the demo. */
-export function PendingOffNotice({ action, at, onCancel, onApply }: { action: string; at: number; onCancel: () => void; onApply: () => void }) {
+/** Shown while a security decrease waits 24h. */
+export function PendingOffNotice({ action, at, onCancel }: { action: string; at: number; onCancel: () => void }) {
   return <div className="rounded-[20px] bg-warning-soft p-4 text-sm leading-relaxed" role="status">
     <div className="flex gap-3">
       <Clock size={21} className="shrink-0 text-warning" aria-hidden />
@@ -12,7 +12,6 @@ export function PendingOffNotice({ action, at, onCancel, onApply }: { action: st
     </div>
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pl-8">
       <button type="button" onClick={onCancel} className="rounded-full border border-warning bg-white px-4 py-2 font-semibold text-warning">Hủy yêu cầu</button>
-      <details className="w-full"><summary className="shield-details-summary">Công cụ mô phỏng</summary><p className="mb-2 text-sm text-muted">Chỉ dành cho kiểm thử: bỏ qua thời gian chờ trong bản mô phỏng.</p><button type="button" onClick={onApply} className="shield-action">Giả lập: đã qua 24 giờ</button></details>
     </div>
   </div>;
 }

@@ -23,7 +23,7 @@ function leg(base: Omit<Transaction, "accountId" | "direction" | "merchantName" 
 
 /** Settles `amount` of a savings account into the current account; returns the accounts after. */
 export function settleSavings(cif: string, savingsAccountId: string, amount: number): { accounts: Account[]; savingsBefore: number } {
-  readTransactions(cif); // seed history first (see credit-store)
+  readTransactions(cif); // seed history first
   const accounts = readAccounts(cif);
   const savings = accounts.find(a => a.id === savingsAccountId && a.type === "savings");
   const current = accounts.find(a => a.type === "current");

@@ -180,31 +180,22 @@ export function frequencyAllows(id: ScenarioId, history: ShownBefore[], now: num
   }
 }
 
-// --- Moments outside a transfer: BT1–BT6, SC3, SC4 ---------------------------
+// --- Moments outside a transfer: BT2, BT4–BT6, SC4 ---------------------------
 
 export type MomentContext = {
   now: number;
-  trigger: "app_open" | "transfer_screen_open" | "hub_open" | "incoming_credit" | "transfer_success" | "device_login";
-  /** BT1: days since the account was opened. */
-  accountAgeDays?: number | null;
+  trigger: "transfer_screen_open" | "hub_open" | "incoming_credit" | "transfer_success" | "device_login";
   /** BT2: current security score, level and the quickest steps up (Hub's own score). */
   score?: { total: number; level: "Rất cao" | "Cao" | "Tiêu chuẩn"; steps?: { label: string; points: number; cta: string }[] } | null;
-  /** BT3: the credit that just arrived (or the latest within the last day, for "lần mở app kế tiếp"). */
-  credit?: { amount: number; kind: "salary" | "income" | "transfer" } | null;
-  hasActiveEmergencyContact?: boolean;
   /** BT4 / BT5: money-in signals (T7a / T7b). */
   incomingSignals?: Signal[];
   /** BT6: same recipient paid again within 5 minutes. */
   repeatRecipientKey?: string | null;
-  /** SC3: an open fraud case and when it was opened. */
-  caseOpenedAt?: number | null;
   /** SC4: recovery steps still to do (0 = done). */
   recoveryStepsLeft?: number | null;
 };
 
 export type Moment = { scenario: ScenarioId; key: string | null; copy: Rendered; urgent?: boolean };
-
-const BT3_MIN = 50_000_000;
 
 // BT2 keeps the spec sentence and fills in the customer's two quickest steps (Hub score).
 const STEP_PHRASE: Record<string, string> = {
@@ -249,11 +240,7 @@ export function resolveMoment(ctx: MomentContext): Moment[] {
   const add = (scenario: ScenarioId, vars: Record<string, string> = {}, key: string | null = null) =>
     out.push({ scenario, key, copy: renderScenario(scenario, vars) });
 
-  if ((ctx.trigger === "transfer_screen_open" || ctx.trigger === "app_open") && ctx.accountAgeDays != null && ctx.accountAgeDays <= 7) add("BT1");
   if (ctx.trigger === "hub_open" && ctx.score && ctx.score.level === "Tiêu chuẩn") out.push({ scenario: "BT2", key: null, copy: renderBt2(ctx.score) });
-  if ((ctx.trigger === "incoming_credit" || ctx.trigger === "app_open") && ctx.credit && ctx.credit.amount >= BT3_MIN && !ctx.hasActiveEmergencyContact) {
-    add("BT3", { amount: shortVnd(ctx.credit.amount) });
-  }
   if (ctx.trigger === "incoming_credit") {
     const t7a = ctx.incomingSignals?.find(s => s.code === "T7a");
     const t7b = ctx.incomingSignals?.find(s => s.code === "T7b");
@@ -261,7 +248,6 @@ export function resolveMoment(ctx: MomentContext): Moment[] {
     if (t7b) add("BT5", { amount: shortVnd(Number(t7b.facts.received)) });
   }
   if (ctx.trigger === "transfer_success" && ctx.repeatRecipientKey) add("BT6", {}, ctx.repeatRecipientKey);
-  if (ctx.caseOpenedAt != null && ctx.now - ctx.caseOpenedAt <= 30 * DAY_MS) add("SC3");
   if (ctx.trigger === "hub_open" && ctx.recoveryStepsLeft != null && ctx.recoveryStepsLeft > 0) add("SC4");
   return out;
 }

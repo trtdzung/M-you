@@ -18,7 +18,7 @@ export function startEmergency(cif: string) {
     const intervention = insertIntervention({ cif, scenario: "SC1", level: "red", surface: "fullscreen", target: "global",
       dedupeKey: "SC1", context: { scenarios: ["SC1"], classify: false, evidence: [], key: null },
       copy: SCENARIO_COPY.SC1, countdownSec: null, createdAt: now });
-    const contacts = readProfile(cif).emergencyContacts.filter(c => c.status === "active" || c.status === "removing");
+    const contacts = readProfile(cif).emergencyContacts;
     if (contacts.length) recordEvent(cif, "family_push", {
       message: `${SCENARIO_COPY.SC1.message} (giả lập)`, scenario: "SC1", contactIds: contacts.map(c => c.id),
     }, now);

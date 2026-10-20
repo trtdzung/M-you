@@ -15,7 +15,7 @@ export { enrich } from "./enrich";
 import { redactSecurityText } from "./redact";
 import { recoveryState } from "./recovery";
 import { readProfile } from "./profile-store";
-import { engineNow, readEngineClock } from "./clock";
+import { engineNow } from "./clock";
 import type { SecurityEvent } from "./event-types";
 import { eventsSince, recordEvent } from "./events";
 import {
@@ -36,8 +36,8 @@ export type EvaluateInput = {
   review?: TransferReview;
   /** incoming_credit: the credited transaction (anchors BT4/BT5 on its row). */
   txnId?: string;
-  /** Client facts the server cannot know yet (BT1 account age, BT2 score). */
-  moment?: Pick<MomentContext, "accountAgeDays" | "score">;
+  /** Client facts the server cannot know yet (BT2 score). */
+  moment?: Pick<MomentContext, "score">;
   /** transfer_success: the recipient just paid. */
   recipient?: { last4: string; bank: string };
 };
@@ -86,12 +86,9 @@ function evaluateTransfer(cif: string, review: TransferReview, target: "transfer
   return [intervention];
 }
 
-function momentTarget(id: ScenarioId, txnId?: string, key?: string | null): InterventionTarget {
+function momentTarget(id: ScenarioId, txnId?: string): InterventionTarget {
   if (id === "EDU") return "global";
-  if (id === "HUB") return key === "balance" ? "home-balance" : "hub-gauge";
-  if (id === "BT1") return "home-transfer";
-  if (id === "BT2" || id === "SC4") return "hub-gauge";
-  if (id === "BT3" || id === "SC3") return "home-balance";
+  if (id === "HUB" || id === "BT2" || id === "SC4") return "hub-gauge";
   if ((id === "BT4" || id === "BT5") && txnId) return `txn:${txnId}`;
   if (id === "BT6") return "transfer-success";
   return "global";
@@ -111,16 +108,10 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
       else expireOpen(cif, "hub-gauge");
     }
   }
-  // BT1: account age from the engine state when the app did not send it.
-  if (ctx.accountAgeDays == null) {
-    const opened = readEngineClock(cif).accountOpenedAt;
-    ctx.accountAgeDays = opened == null ? null : Math.max(0, Math.floor((now - opened) / (24 * 60 * MINUTE_MS)));
-  }
   let incomingSignals: Signal[] = [];
   if (trigger === "incoming_credit") {
     const incoming = buildIncomingContext(cif);
     const latest = (eventsSince(cif, now - 5 * MINUTE_MS, ["incoming_credit"]) as SecurityEvent<"incoming_credit">[]).at(-1);
-    ctx.credit = latest ? { amount: latest.payload.amount, kind: latest.payload.kind } : null;
     // BT4/BT5 speak about the credit that just arrived: T7a for its sender, T7b for that credit alone.
     const latestKey = latest ? accountKey(latest.payload.senderLast4, latest.payload.senderBank) : null;
     const bait = computeIncomingSignals(incoming).filter(s => s.code === "T7a" && s.facts.senderKey === latestKey);
@@ -129,7 +120,6 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
         .filter(s => s.code === "T7b")
       : [];
     incomingSignals = [...bait, ...large];
-    ctx.hasActiveEmergencyContact = profile.emergencyContacts.some(c => c.status === "active" || c.status === "removing");
     ctx.incomingSignals = incomingSignals;
   }
   if (trigger === "transfer_success" && input.recipient) {
@@ -144,7 +134,7 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
     // EDU weekly cap lives here. An open incident (khẩn cấp) may show again.
     if (!moment.urgent && !frequencyAllows(moment.scenario, history, now, moment.key)) continue;
     const copy = SCENARIO_COPY[moment.scenario];
-    const target = momentTarget(moment.scenario, input.txnId, moment.key);
+    const target = momentTarget(moment.scenario, input.txnId);
     // Hub coach sits behind a money or recovery tip created in the same pass.
     const at = moment.scenario === "HUB" ? now - 1 : now;
     out.push(store({
@@ -158,7 +148,7 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
 }
 
 function notifyFamily(cif: string, scenario: string, at: number): void {
-  const contacts = readProfile(cif).emergencyContacts.filter(c => c.status === "active" || c.status === "removing");
+  const contacts = readProfile(cif).emergencyContacts;
   if (!contacts.length) return;
   recordEvent(cif, "family_push", {
     message: "M-You, trợ lý AI của MSB, vừa cảnh báo một giao dịch có dấu hiệu lừa đảo của người thân bạn. Hãy gọi hỏi thăm họ ngay (giả lập).",

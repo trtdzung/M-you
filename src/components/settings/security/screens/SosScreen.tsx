@@ -28,7 +28,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 /** Settings › Khẩn cấp (SC1): lock, flag transactions, call the priority hotline. */
 export function SosScreen() {
   const security = useSecurityStore(useShallow(state => ({ accountLocked: state.accountLocked, accountLockedAt: state.accountLockedAt, emergencyContacts: state.emergencyContacts, unlockAt: state.pendingOff.accountLock })));
-  const { requestOff, cancelOff, applyOff } = useSecurityStore.getState();
+  const { requestOff, cancelOff } = useSecurityStore.getState();
   const { persona } = usePersona();
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,7 +65,7 @@ export function SosScreen() {
       {security.accountLocked ? <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2 font-semibold text-positive"><CircleCheck size={20} aria-hidden />Đã khóa tạm{security.accountLockedAt !== null && ` lúc ${timeLabel(security.accountLockedAt)}`}</span>
         {security.unlockAt === undefined && <button type="button" className="text-sm font-semibold text-primary" onClick={() => setUnlocking(true)}>Mở khóa</button>}
-        {security.unlockAt !== undefined && <div className="w-full"><PendingOffNotice action="Mở khóa tài khoản" at={security.unlockAt} onCancel={() => cancelOff("accountLock")} onApply={() => applyOff("accountLock")} /></div>}
+        {security.unlockAt !== undefined && <div className="w-full"><PendingOffNotice action="Mở khóa tài khoản" at={security.unlockAt} onCancel={() => cancelOff("accountLock")} /></div>}
       </div> : <button type="button" className={redButton} onClick={() => setLocking(true)}>{SCENARIO_COPY.SC1.chips[0]}</button>}
     </Step>
     <Link href="/settings/case" className="text-sm font-semibold text-primary">{SCENARIO_COPY.SC2.situation}</Link>

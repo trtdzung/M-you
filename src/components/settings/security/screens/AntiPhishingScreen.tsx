@@ -26,7 +26,7 @@ export function AntiPhishingScreen() {
   const appNow = useAppNow();
   const code = useSecurityStore(state => state.antiPhishingCode);
   const offAt = useSecurityStore(state => state.pendingOff.antiPhishing);
-  const { saveAntiPhishingCode, requestOff: requestStoreOff, cancelOff, applyOff } = useSecurityStore.getState();
+  const { saveAntiPhishingCode, requestOff: requestStoreOff, cancelOff } = useSecurityStore.getState();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [confirm, setConfirm] = useState<"save" | "off" | null>(null);
@@ -61,7 +61,7 @@ export function AntiPhishingScreen() {
         <p className="mb-5 rounded-[16px] border-2 border-dashed border-primary py-4 text-3xl font-bold tracking-[0.2em] text-primary-strong">{code}</p>
         <div className="text-left"><SmsPreview code={code} /></div>
       </div></Panel>
-      {pending && <PendingOffNotice action="Tắt mã chống giả mạo" at={offAt} onCancel={() => cancelOff("antiPhishing")} onApply={() => applyOff("antiPhishing")} />}
+      {pending && <PendingOffNotice action="Tắt mã chống giả mạo" at={offAt} onCancel={() => cancelOff("antiPhishing")} />}
       <Action onClick={() => { setDraft(code); setEditing(true); }}>Đổi mã</Action>
       {!pending && <button type="button" className="text-sm font-semibold text-negative" onClick={() => setConfirm("off")}>Tắt mã</button>}
     </>}

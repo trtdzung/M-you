@@ -3,16 +3,12 @@ import "server-only";
 /**
  * The ONE clock of the Scam Shield engine. Every time window (60 min, 24 h,
  * 10 min, 2 days, 30 days, hold minutes) is measured with `engineNow(cif)`:
- * the app's demo clock (`transferNow`) shifted by the persona's test-tools
- * offset. `engineAlertTime` additionally pins the hour warnings are judged at.
+ * the app's demo clock (`transferNow`) shifted by the persona's goals-advance
+ * offset (`clock_offset_ms`).
  */
 
 import { appNow } from "@/lib/app-clock";
 import { getDb } from "@/lib/db";
-
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
-const VN_OFFSET_MS = 7 * HOUR_MS;
 
 export type EngineClock = { offsetMs: number; alertHour: number | null; accountOpenedAt: number | null; skipHold: boolean };
 
@@ -27,7 +23,7 @@ export function readEngineClock(cif: string): EngineClock {
   };
 }
 
-/** Changes only the fields given; `alertHour: null` returns to the real hour. */
+/** Changes only the fields given. Goals advance writes `offsetMs`. */
 export function writeEngineClock(cif: string, patch: Partial<EngineClock>): EngineClock {
   const next = { ...readEngineClock(cif), ...patch };
   getDb()
@@ -40,16 +36,12 @@ export function writeEngineClock(cif: string, patch: Partial<EngineClock>): Engi
   return next;
 }
 
-/** "Now" for the engine: demo clock + the persona's test-tools offset. */
+/** "Now" for the engine: demo clock + the persona's clock offset. */
 export function engineNow(cif: string, realNow?: Date): Date {
   return appNow(cif, realNow);
 }
 
-/** When a transfer is judged: `engineNow`, or the same VN day at the pinned hour. */
+/** When a transfer is judged — same as `engineNow` (no hour pin). */
 export function engineAlertTime(cif: string, realNow?: Date): Date {
-  const now = engineNow(cif, realNow);
-  const { alertHour } = readEngineClock(cif);
-  if (alertHour === null) return now;
-  const vnDayStart = Math.floor((now.getTime() + VN_OFFSET_MS) / DAY_MS) * DAY_MS;
-  return new Date(vnDayStart + alertHour * HOUR_MS - VN_OFFSET_MS);
+  return engineNow(cif, realNow);
 }

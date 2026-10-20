@@ -2,7 +2,7 @@
 
 import type { PendingOff } from "@/components/settings/security/pending";
 
-export type EmergencyContact = { id: string; name: string; relation: string; phone: string; status: "pending" | "active" | "removing"; removeAt?: number };
+export type EmergencyContact = { id: string; name: string; relation: string; phone: string; status: "active" };
 export type TrustedContact = { id: string; name: string; bank: string; account: string };
 
 /** One M-You warning and what the customer chose. `at` is ms since epoch. */

@@ -188,12 +188,6 @@ export function shownHistory(cif: string): ShownBefore[] {
   }));
 }
 
-/** Test tools: forget every intervention of a persona (frequency resets with it). */
-export function clearInterventions(cif: string, scenario?: string): void {
-  if (scenario) getDb().prepare("DELETE FROM interventions WHERE cif = ? AND scenario = ?").run(cif, scenario);
-  else getDb().prepare("DELETE FROM interventions WHERE cif = ?").run(cif);
-}
-
 /** Temporary AI journal until A10: metadata only, no customer payload. */
 export function recordAgentTrace(cif: string, id: string, entry: { status: string; matched_playbook: string | null; trace: unknown[] }): void {
   const context = getInterventionContext(cif, id);

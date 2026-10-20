@@ -40,8 +40,3 @@ export function eventsSince(cif: string, sinceMs: number, types?: readonly Secur
     .all(cif, sinceMs, ...(types ?? [])) as Row[];
   return rows.map(toEvent).filter((event): event is SecurityEvent => event !== null);
 }
-
-/** Remove every event of a persona (test tools "reset"). */
-export function clearEvents(cif: string): void {
-  getDb().prepare("DELETE FROM security_events WHERE cif = ?").run(cif);
-}

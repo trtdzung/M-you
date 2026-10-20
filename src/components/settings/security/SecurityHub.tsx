@@ -3,7 +3,7 @@
 import { useAppNow } from "@/state/app-clock";
 
 import Link from "next/link";
-import { CircleHelp, FlaskConical, PenLine, Search, ShieldCheck, Smartphone, TriangleAlert } from "lucide-react";
+import { CircleHelp, PenLine, Search, ShieldCheck, Smartphone, TriangleAlert } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useSecurityStore } from "@/state/security/store";
 import { effectiveContacts, isTransferLocked } from "@/state/security/selectors";
@@ -37,7 +37,6 @@ export function SecurityHub() {
   if (!security.hasHydrated) return <SecurityLoading />;
   // A contact being removed stays in effect until the 24h wait ends.
   const activeContacts = effectiveContacts(security).length;
-  const pendingContacts = security.emergencyContacts.some(contact => contact.status === "pending");
   // Score mixes the old demo auth fields with the Scam Shield store.
   const score = securityScore({ passwordUpdated: demo.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1], faceId: demo.faceId, advanced: demo.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
   const lockUntil = isTransferLocked(security, appNow.getTime()) ? security.transferLockUntil : null;
@@ -61,7 +60,7 @@ export function SecurityHub() {
     </Panel>
     <Panel title={<>Bảo vệ nâng cao <span className="ml-1 rounded-full bg-primary px-2 py-0.5 align-middle text-[10px] font-bold text-white">MỚI</span></>}>
       <Row label="Mã chống giả mạo" href={href("anti-phishing")} detail="Dấu hiệu nhận diện bổ sung trên các kênh hỗ trợ mã" trailing={<Badge good={security.antiPhishingCode !== null}>{security.antiPhishingCode !== null ? "Đã bật" : "Chưa bật"}</Badge>} />
-      <Row label="Người thân khẩn cấp" href={href("emergency-contacts")} detail="Nhận báo khi bạn gặp cảnh báo Đỏ. Không xem được số dư" trailing={<Badge good={activeContacts > 0}>{activeContacts > 0 ? `${activeContacts} người` : pendingContacts ? "Chờ đồng ý" : "Chưa có"}</Badge>} />
+      <Row label="Người thân khẩn cấp" href={href("emergency-contacts")} detail="Nhận báo khi bạn gặp cảnh báo Đỏ. Không xem được số dư" trailing={<Badge good={activeContacts > 0}>{activeContacts > 0 ? `${activeContacts} người` : "Chưa có"}</Badge>} />
       <Row label="Danh bạ tin cậy" href={href("trusted-contacts")} detail="Quản lý người nhận và phạm vi cảnh báo áp dụng" trailing={<span className="shrink-0 text-sm text-muted">{security.trustedContacts.length} người</span>} />
       <Row label="Tra cứu tài khoản lừa đảo" href={href("lookup")} detail="Kiểm tra số tài khoản trước khi chuyển · dữ liệu giả lập" />
       <Row label="Tự khóa chuyển tiền" href={href("transfer-lock")} detail="Tạm khóa chuyển tiền ra ngoài khi bạn muốn" trailing={lockUntil !== null ? <Badge tone="danger">Đang khóa đến {dateLabel(lockUntil)}</Badge> : <Badge tone="neutral">Đang tắt</Badge>} />
@@ -69,8 +68,6 @@ export function SecurityHub() {
     <Panel title="Thiết lập khác"><Row label="Quản lý thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Chữ ký số" icon={PenLine} href={href("signature")} /></Panel>
 
     <Panel><Row label="Kiến thức bảo mật hữu ích" icon={CircleHelp} href={href("knowledge")} detail="Trang bị kiến thức để bảo vệ tài sản" /></Panel>
-    {/* Testers: shown in every build, biz test runs a production image. */}
-    <Panel><Row label="Công cụ test (demo)" icon={FlaskConical} href={href("test-tools")} detail="Đặt nhanh trạng thái, giờ giả lập, kịch bản chuyển tiền" /></Panel>
     <button type="button" onClick={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push(href("sos")); }); }} className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-negative bg-white py-3 font-semibold text-negative"><TriangleAlert size={20} aria-hidden />Tôi nghĩ mình bị lừa</button>
   </div>;
 }

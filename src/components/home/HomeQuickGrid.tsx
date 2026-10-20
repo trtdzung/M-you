@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import {
   ArrowUpRight,
   ScanLine,
@@ -11,8 +10,6 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { QuickActions, type QuickAction } from "@/components/common/QuickActions";
-import { CaseBanner } from "@/components/security/CaseBanner";
-import { useScreenEvent } from "@/components/security/useScreenEvent";
 
 /** Hành động demo chưa có màn riêng — no-op, giữ vỏ để khớp ref (source: mock). */
 const noop = () => {};
@@ -39,12 +36,5 @@ const FOOTER: QuickAction[] = [
 ];
 
 export function HomeQuickGrid() {
-  // Scam Shield: opening the app (Home) once per tab session.
-  useScreenEvent("app_open", { oncePerSession: true });
-  // BT1 points at the "Chuyển tiền" button; QuickActions renders it, so tag it after mount.
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.querySelector('a[href="/transfer"]')?.setAttribute("data-shield-anchor", "home-transfer");
-  });
-  return <div ref={ref}><CaseBanner /><div data-shield-slot="home-transfer" /><QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" /></div>;
+  return <QuickActions actions={ACTIONS} footer={FOOTER} className="home-quick-grid" />;
 }

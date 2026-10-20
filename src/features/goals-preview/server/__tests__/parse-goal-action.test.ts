@@ -24,12 +24,14 @@ describe("F1 parseGoalAction / applyAction", () => {
 
   afterAll(() => fx.close());
 
-  it("từ chối world/sync, hydrate, reset, loadScenario, setCustomer, nav/*, toast/*, dismissSuggestion, type lạ", () => {
+  it("từ chối world/sync, hydrate, reset, loadScenario, nav/*, toast/*, dismissSuggestion, type lạ", () => {
     const rejected = [
       { type: "world/sync" },
       { type: "hydrate" },
       { type: "reset" },
       { type: "loadScenario" },
+      { type: "setFundPriceShift", pct: 10 },
+      { type: "triggerEvent", event: "salary" },
       { type: "setCustomer" },
       { type: "nav/push" },
       { type: "toast/push" },
@@ -54,7 +56,6 @@ describe("F1 parseGoalAction / applyAction", () => {
     const invalid = [
       { type: "deposit", goalId: "x", amount: Infinity },
       { type: "advanceTime", days: 0 },
-      { type: "setFundPriceShift", pct: -100 },
       { type: "deposit", goalId: "x", amount: -1 },
       { type: "createGoal", input: { ...goalInput(), targetAmount: 0 } },
     ];

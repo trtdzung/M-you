@@ -8,7 +8,7 @@ import { evaluate, type EvaluateInput } from "@/lib/security/orchestrator";
  * (spec wording at once; the fraud agent may enrich them later).
  */
 
-const TRIGGERS = new Set<EvaluateTrigger>(["transfer_review", "recipient_entered", "fd_settle_review", "incoming_credit", "app_open", "transfer_screen_open", "hub_open", "transfer_success", "device_login"]);
+const TRIGGERS = new Set<EvaluateTrigger>(["transfer_review", "recipient_entered", "fd_settle_review", "incoming_credit", "transfer_screen_open", "hub_open", "transfer_success", "device_login"]);
 const text = (v: unknown, max: number): v is string => typeof v === "string" && v.length <= max;
 const SCORE_LEVELS = new Set(["Rất cao", "Cao", "Tiêu chuẩn"]);
 
@@ -44,9 +44,7 @@ export async function POST(req: NextRequest) {
   }
   if (body.moment !== undefined) {
     const m = body.moment ?? {};
-    const age = m.accountAgeDays;
     const score = m.score;
-    if (age !== undefined && age !== null && !(typeof age === "number" && age >= 0)) return NextResponse.json({ error: "moment is invalid" }, { status: 422 });
     if (score !== undefined && score !== null && !(typeof score?.total === "number" && SCORE_LEVELS.has(score?.level))) {
       return NextResponse.json({ error: "moment is invalid" }, { status: 422 });
     }
@@ -55,7 +53,7 @@ export async function POST(req: NextRequest) {
       text(s?.label, 40) && typeof s?.points === "number" && text(s?.cta, 30)))) {
       return NextResponse.json({ error: "moment is invalid" }, { status: 422 });
     }
-    input.moment = { accountAgeDays: age ?? null, score: score ? { total: score.total, level: score.level, steps } : null };
+    input.moment = { score: score ? { total: score.total, level: score.level, steps } : null };
   }
   if (body.recipient !== undefined) {
     if (!text(body.recipient?.last4, 4) || !/^\d{4}$/.test(body.recipient.last4) || !text(body.recipient?.bank ?? "", 80)) {
