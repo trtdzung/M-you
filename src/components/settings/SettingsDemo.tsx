@@ -120,10 +120,14 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
     content = <><Panel title={section === "support" ? "Chúng tôi có thể giúp gì cho bạn?" : "Bảo vệ tài khoản của bạn"}><Row label="Không chia sẻ mã OTP, PIN hoặc mật khẩu" icon={LockKeyhole} onClick={() => setSheet("safety")} /><Row label="Kiểm tra thiết bị truy cập" icon={Smartphone} href={href("devices")} /><Row label="Quyền dữ liệu và trợ lý AI" icon={ShieldCheck} href={href("privacy")} /></Panel>{section === "support" && <Notice>Đây là trung tâm hỗ trợ mô phỏng. Khi cần hỗ trợ tài khoản thật, hãy sử dụng các kênh chính thức trong app MSB.</Notice>}</>;
   }
 
-  return <div className={`settings-demo ${demo.appearance === "simple" ? "settings-simple" : ""}`}>
-    <header className="settings-header">{section && (section === "sos" ? <Suspense fallback={<Link href={settingsParent("/settings/sos") ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}><SosBackLink fallback={settingsParent("/settings/sos") ?? "/settings"} /></Suspense> : <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>)}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
+  const body = <>
     {section && <p className="mb-4 text-xs text-muted">Giả lập MSB · Chỉ dùng thông tin mẫu</p>}
     <div className="flex flex-col gap-5">{content}</div>
+  </>;
+
+  return <div className={`settings-demo ${section === "security" ? "settings-demo--security" : ""} ${demo.appearance === "simple" ? "settings-simple" : ""}`}>
+    <header className="settings-header">{section && (section === "sos" ? <Suspense fallback={<Link href={settingsParent("/settings/sos") ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>}><SosBackLink fallback={settingsParent("/settings/sos") ?? "/settings"} /></Suspense> : <Link href={settingsParent(`/settings/${section}`) ?? "/settings"} aria-label="Quay lại" className="flex h-11 w-9 items-center"><ArrowLeft size={24} /></Link>)}<h1 className="text-xl font-bold">{section ? TITLES[section] : "Cài đặt"}</h1></header>
+    {section === "security" ? <div className="settings-security-content no-scrollbar">{body}</div> : body}
     <Sheet open={faq !== null} title="Câu hỏi thường gặp" onClose={() => setFaq(null)}>{faq !== null && <><h3 className="mb-4 font-semibold">{FAQ[faq]}</h3><p className="pb-6 text-sm leading-relaxed">{ANSWERS[faq]}</p></>}</Sheet>
     <Sheet open={!!feedback} title="Thông báo" onClose={() => setFeedback(null)}>{feedback && <><p className="mb-5 text-sm leading-relaxed" role="status">{feedback}</p><Action onClick={() => setFeedback(null)}>Đã hiểu</Action></>}</Sheet>
     <Sheet open={!!sheet} title={sheet === "logout" ? "Đăng xuất" : sheet === "revoke" ? "Thu hồi đồng ý" : "Thông tin"} onClose={() => setSheet(null)}>
