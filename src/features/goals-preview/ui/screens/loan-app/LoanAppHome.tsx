@@ -12,16 +12,18 @@ export function LoanAppHome({ params }: ScreenProps) {
   const goalId = paramString(params, "goalId");
   return (
     <div className={`${screenPadding} min-h-full`}>
-      <ScreenHeader title="Vay" />
-      <section className={`${card} flex flex-col items-center gap-6 py-6 text-center`}>
-        <div aria-hidden className="relative flex h-32 w-32 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-          <FileText size={90} strokeWidth={1} />
-          <BadgeDollarSign size={52} className="absolute bottom-0 right-0 text-warning" />
+      <ScreenHeader plain title="Vay" />
+      <section className={`${card} flex flex-col gap-4`}>
+        <div className="flex items-center gap-4">
+          <div aria-hidden className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+            <FileText size={44} strokeWidth={1} />
+            <BadgeDollarSign size={28} className="absolute bottom-0 right-0 text-warning" />
+          </div>
+          <h2 className={emphasisTitle}>Hạn mức thông minh<br />Linh hoạt tài chính</h2>
         </div>
-        <h2 className={emphasisTitle}>Hạn mức thông minh<br />Linh hoạt tài chính</h2>
-        <div className="grid w-full grid-cols-3 gap-3">
+        <div className="grid w-full grid-cols-3 gap-2 text-center">
           {[{ Icon: Star, text: "Phù hợp nhu cầu" }, { Icon: Banknote, text: "Sử dụng chủ động" }, { Icon: BadgeDollarSign, text: "Quản lý dễ dàng" }].map(({ Icon, text }) => (
-            <div key={text} className="flex flex-col items-center gap-3 text-sm font-semibold text-text"><Icon size={28} className="text-primary" /><span>{text}</span></div>
+            <div key={text} className="flex flex-col items-center gap-1.5 text-[13px] leading-5 font-medium text-text"><Icon size={22} className="text-primary" /><span>{text}</span></div>
           ))}
         </div>
       </section>
