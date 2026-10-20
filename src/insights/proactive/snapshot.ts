@@ -272,11 +272,11 @@ export const ALL_CLEAR_SECURITY_CANDIDATE: SnapshotCandidate = {
   impactLine: "Mọi giao dịch và đăng nhập gần đây đều an toàn, chưa phát hiện dấu hiệu bất thường.",
   badgeText: "An toàn",
   actionType: "navigate_security_hub",
-  actionHref: "/settings",
+  actionHref: "/settings/security",
   actionLabel: "Trung tâm bảo mật",
-  primaryAction: { type: "navigate_security_hub", label: "Trung tâm bảo mật", href: "/settings" },
+  primaryAction: { type: "navigate_security_hub", label: "Trung tâm bảo mật", href: "/settings/security" },
   chips: [
-    { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings", variant: "primary" },
+    { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings/security", variant: "primary" },
     { label: "Xem 3 thủ đoạn phổ biến", actionType: "open_security_handbook", variant: "secondary" },
   ],
   metric: { label: "Mức độ an toàn", value: 100, unit: "percent" },
@@ -1268,7 +1268,7 @@ export function buildCustomerSnapshot(raw: RawData, jarConfig: JarConfig, catego
         },
         chips: [
           { label: "Xem 3 thủ đoạn phổ biến", actionType: "open_security_handbook", variant: "primary" },
-          { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings", variant: "secondary" },
+          { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings/security", variant: "secondary" },
         ],
         metric: { label: "Điểm bảo mật", value: scoreVal, unit: "points" },
         facts: { score: scoreVal },

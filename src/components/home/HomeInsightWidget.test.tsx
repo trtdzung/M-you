@@ -227,31 +227,33 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
     expect(takeInsightDraft(cif)).toBeNull();
   });
 
-  it("handles dismissing insight card in 24 hours", async () => {
-    const fetchMock = vi.fn(respond);
-    vi.stubGlobal("fetch", fetchMock);
+  it("does not render ignore or dismiss actions (realtime persistent)", async () => {
+    const strangerCard: HomeInsight = {
+      ...card1,
+      chips: [
+        { label: "Yêu cầu MSB tra soát", actionType: "request_msb_investigation", variant: "primary" },
+        { label: "Tôi biết khoản này", actionType: "mark_known_sender", variant: "secondary" },
+      ],
+    };
+    const customRes: HomeInsightCarouselResult = {
+      ...carouselResponse,
+      insights: [strangerCard],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => customRes })));
 
     render(<HomeInsightWidget />);
-    const slide1Btn = await screen.findByRole("button", {
-      name: new RegExp(card1.title),
+    // Actionable chip is shown, but ignore chip "Tôi biết khoản này" is eliminated
+    expect(await screen.findByText("Yêu cầu MSB tra soát")).toBeInTheDocument();
+    expect(screen.queryByText("Tôi biết khoản này")).not.toBeInTheDocument();
+
+    const slide1Btn = screen.getByRole("button", {
+      name: new RegExp(strangerCard.title),
     });
     fireEvent.click(slide1Btn);
 
-    const dismissBtn = screen.getByRole("button", { name: "Ẩn gợi ý này trong 24h" });
-    expect(dismissBtn).toBeInTheDocument();
-    fireEvent.click(dismissBtn);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/proactive-insights/current",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          cif: "CIF_0001",
-          snapshotId: card1.snapshotId,
-          event: "dismissed",
-        }),
-      })
-    );
+    // Detail sheet does not contain ignore/dismiss buttons
+    expect(screen.queryByRole("button", { name: "Ẩn gợi ý này trong 24h" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tôi biết khoản này" })).not.toBeInTheDocument();
   });
 
   it("handles empty candidate slot gracefully without duplicating candidates", async () => {
@@ -423,5 +425,26 @@ describe("HomeInsightWidget Pure 3-Insight Carousel", () => {
     vi.stubGlobal("open", openMock);
     fireEvent.click(hotlineChip);
     expect(openMock).toHaveBeenCalledWith("tel:19006083");
+  });
+
+  it("navigates directly to Security Hub (/settings/security) when clicking Trung tâm bảo mật chip", async () => {
+    const securityHubCard: HomeInsight = {
+      ...card1,
+      chips: [
+        { label: "Trung tâm bảo mật", actionType: "navigate_security_hub", href: "/settings/security", variant: "primary" },
+      ],
+    };
+    const res: HomeInsightCarouselResult = {
+      ...carouselResponse,
+      insights: [securityHubCard],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => res })));
+
+    render(<HomeInsightWidget />);
+    const chipBtn = await screen.findByRole("button", { name: "Trung tâm bảo mật" });
+    expect(chipBtn).toBeInTheDocument();
+
+    fireEvent.click(chipBtn);
+    expect(push).toHaveBeenCalledWith("/settings/security");
   });
 });
