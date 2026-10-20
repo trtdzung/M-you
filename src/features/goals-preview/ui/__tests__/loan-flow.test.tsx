@@ -26,7 +26,7 @@ function Probe() {
   return null;
 }
 
-describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey and 20s delayed loan dispatch", () => {
+describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval and the customer's switch to repayment", () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -177,13 +177,36 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey and 20s delaye
     const goalBeforeTimer = box.ctx.state.goals.find((g: any) => g.id === testGoal.id);
     expect(goalBeforeTimer.status).toBe("accumulating");
     expect(goalBeforeTimer.loanId).toBeUndefined();
+    // The goal page shows a fixed box: waiting for approval, with a way to look at the application
+    expect(screen.getByText("Hồ sơ của bạn đang chờ phê duyệt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xem hồ sơ" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Chuyển sang giai đoạn trả nợ vay" })).not.toBeInTheDocument();
 
-    // 5. Advance timers by 20 seconds
+    // 5. Advance timers by 20 seconds: the application is approved, but no loan exists until the customer asks for it
     act(() => {
       vi.advanceTimersByTime(20_000);
     });
+    const stillAccumulating = box.ctx.state.goals.find((g: any) => g.id === testGoal.id);
+    expect(stillAccumulating.status).toBe("accumulating");
+    expect(stillAccumulating.loanId).toBeUndefined();
+    expect(box.ctx.loanApplications).toHaveLength(1);
+    expect(box.ctx.loanApplications[0].status).toBe("approved");
+    expect(screen.getByText("Hồ sơ của bạn đã được phê duyệt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xem hồ sơ" })).toBeInTheDocument();
 
-    // takeLoan was dispatched once for that goal
+    // 6. "Chuyển sang giai đoạn trả nợ vay" only opens the settle bottom sheet; the goal stays in phase 1
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Chuyển sang giai đoạn trả nợ vay" }));
+    });
+    expect(screen.getByRole("dialog", { name: "Tất toán để mua tài sản" })).toBeInTheDocument();
+    expect(screen.getByText(/Số tiền của bạn còn trong tài khoản mục tiêu/)).toBeInTheDocument();
+    expect(screen.getByText(/thanh toán một phần giá trị mục tiêu/)).toBeInTheDocument();
+    expect(box.ctx.state.goals.find((g: any) => g.id === testGoal.id).status).toBe("accumulating");
+    // 7. "Tất toán cho ngân hàng": takeLoan runs once and the application is removed
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Tất toán cho ngân hàng" }));
+    });
+    expect(screen.queryByText("Hồ sơ của bạn đã được phê duyệt")).not.toBeInTheDocument();
     const goalAfterLoan = box.ctx.state.goals.find((g: any) => g.id === testGoal.id);
     expect(goalAfterLoan.status).toBe("repaying");
     expect(goalAfterLoan.loanId).toBeTruthy();
@@ -193,13 +216,13 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey and 20s delaye
     expect(createdLoan?.principal).toBe(250_000_000);
     expect(createdLoan?.termMonths).toBe(24);
 
-    // Record is removed from localStorage
     const storedAfter = JSON.parse(localStorage.getItem("goals-preview:loan-app:CIF_0001") ?? "[]");
     expect(storedAfter).toEqual([]);
 
-    // Advance another 20s -> verify takeLoan was only dispatched once
+    // Asking again (or waiting) never creates a second loan
     const loanCount = box.ctx.state.loans.length;
     act(() => {
+      box.ctx.startRepayment(testGoal.id);
       vi.advanceTimersByTime(20_000);
     });
     expect(box.ctx.state.loans.length).toBe(loanCount);

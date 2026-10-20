@@ -16,6 +16,7 @@ import { card, listRow, ring, heroNumber } from "../../shared/styles";
 import { AssetsTab } from "./AssetsTab";
 import { CashTab } from "./CashTab";
 import { GoalNotFound, useGoalContext } from "./common";
+import { LoanApplicationBar } from "./LoanApplicationBar";
 import { OverviewTab } from "./OverviewTab";
 
 type Tab = "overview" | "cash" | "assets";
@@ -94,6 +95,8 @@ export function GoalDetail({ params }: ScreenProps) {
           </button>
         )}
       </div>
+
+      {phase === 1 && <LoanApplicationBar goalId={goalId} />}
 
       {phaseOne && (
         <section className={`${card} flex flex-col gap-2`} aria-label="Kết quả giai đoạn 1">

@@ -20,7 +20,13 @@ export interface PendingLoanApplication {
   principal: number;
   termMonths: number;
   submittedAt: number;
+  /** Chưa có nghĩa là đang chờ phê duyệt. "approved": đã duyệt, chờ khách bấm chuyển sang giai đoạn trả vay. */
+  status?: "pending" | "approved";
+  approvedAt?: number;
 }
+
+/** Thời gian mô phỏng phê duyệt hồ sơ vay. */
+export const LOAN_APPROVAL_MS = 20_000;
 
 /** Window event the shell's edge-swipe back fires on /goals-preview (see AppChrome). */
 export const PREVIEW_BACK_EVENT = "goals-preview:back";
@@ -40,6 +46,10 @@ export interface PreviewNav {
 
 interface PreviewContextValue {
   submitLoanApplication: (record: PendingLoanApplication) => void;
+  /** Hồ sơ vay chưa chuyển sang giai đoạn trả vay của khách đang xem (đang chờ hoặc đã phê duyệt). */
+  loanApplications: PendingLoanApplication[];
+  /** Hồ sơ đã được phê duyệt: giải ngân khoản vay và chuyển mục tiêu sang giai đoạn trả vay. */
+  startRepayment: (goalId: string) => void;
   state: PreviewState;
   dispatch: (action: PreviewAction) => void;
   nav: PreviewNav;
@@ -215,23 +225,32 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
     setLoanAppRevision((revision) => revision + 1);
   }, [readPendingLoans, savePendingLoans]);
 
+  const loanApplications = useMemo(() => readPendingLoans(), [readPendingLoans, loanAppRevision]);
+
+  // Hết thời gian phê duyệt thì chỉ đánh dấu "đã phê duyệt"; khoản vay chỉ được tạo khi khách bấm chuyển giai đoạn.
   useEffect(() => {
     if (loadStatus !== "ready" || !cif) return;
-    const records = readPendingLoans();
-    if (!records.length) return;
+    const waiting = readPendingLoans().filter((record) => record.status !== "approved");
+    if (!waiting.length) return;
     const timer = setTimeout(() => {
-      const due = records.filter((record) => record.submittedAt + 20_000 <= Date.now());
-      for (const record of due) {
-        const goal = stateRef.current.goals.find((item) => item.id === record.goalId);
-        if (!goal) continue;
-        const product = loanProductFor(loanPurposeFor(goal.template));
-        dispatch({ type: "takeLoan", goalId: record.goalId, productId: product.id, principal: record.principal, termMonths: record.termMonths });
-      }
-      savePendingLoans(records.filter((record) => !due.includes(record)));
+      const now = Date.now();
+      const approve = (record: PendingLoanApplication): PendingLoanApplication =>
+        record.status !== "approved" && record.submittedAt + LOAN_APPROVAL_MS <= now ? { ...record, status: "approved", approvedAt: now } : record;
+      savePendingLoans(readPendingLoans().map(approve));
       setLoanAppRevision((revision) => revision + 1);
-    }, Math.max(0, Math.min(...records.map((record) => record.submittedAt + 20_000)) - Date.now()));
+    }, Math.max(0, Math.min(...waiting.map((record) => record.submittedAt + LOAN_APPROVAL_MS)) - Date.now()));
     return () => clearTimeout(timer);
-  }, [cif, loadStatus, dispatch, readPendingLoans, savePendingLoans, loanAppRevision]);
+  }, [cif, loadStatus, readPendingLoans, savePendingLoans, loanAppRevision]);
+
+  const startRepayment = useCallback((goalId: string) => {
+    const record = readPendingLoans().find((item) => item.goalId === goalId && item.status === "approved");
+    const goal = stateRef.current.goals.find((item) => item.id === goalId);
+    if (!record || !goal) return;
+    const product = loanProductFor(loanPurposeFor(goal.template));
+    dispatch({ type: "takeLoan", goalId, productId: product.id, principal: record.principal, termMonths: record.termMonths });
+    savePendingLoans(readPendingLoans().filter((item) => item !== record));
+    setLoanAppRevision((revision) => revision + 1);
+  }, [dispatch, readPendingLoans, savePendingLoans, stateRef]);
 
   useEffect(() => {
     const onBack = (event: Event) => {
@@ -259,8 +278,8 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, nav, toast, submitLoanApplication, hydrated: loadStatus === "ready", loadStatus, reload, refreshPrices, pricesRefreshing }),
-    [state, dispatch, nav, toast, submitLoanApplication, loadStatus, reload, refreshPrices, pricesRefreshing],
+    () => ({ state, dispatch, nav, toast, submitLoanApplication, loanApplications, startRepayment, hydrated: loadStatus === "ready", loadStatus, reload, refreshPrices, pricesRefreshing }),
+    [state, dispatch, nav, toast, submitLoanApplication, loanApplications, startRepayment, loadStatus, reload, refreshPrices, pricesRefreshing],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }

@@ -30,6 +30,7 @@ const NEEDS_GOAL: ScreenId[] = [
   "MaturityChoice",
   "LoanAppHome",
   "LoanAppSurvey",
+  "LoanAppView",
   "LoanSimulator",
   "LoanBlocked",
   "LoanApply",

@@ -78,7 +78,7 @@ const FE_TEXT: Record<string, { text: string; box: string }> = {
 };
 
 export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
-  const { dispatch, nav } = usePreview();
+  const { dispatch, nav, loanApplications } = usePreview();
   const { goal, state, fe, required, stage } = ctx;
   const phase2 = stage.phase === 2;
   const overdue = !!stage.loan?.schedule.some((r) => r.status === "overdue");
@@ -107,6 +107,7 @@ export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string 
       show: investAndLoan,
       go: () => {
         if (hasLoan) nav.push("RepayOverview", { goalId });
+        else if (loanApplications.some((item) => item.goalId === goalId)) nav.push("LoanAppView", { goalId });
         else if (ctx.value.total < goal.targetAmount * LOAN_MIN_SAVED_RATIO) setLoanWarning(true);
         else nav.push("LoanAppHome", { goalId });
       },
