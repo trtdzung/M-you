@@ -66,7 +66,7 @@ export function renderDh8(base: ScenarioId, t8: Signal): Rendered {
   };
 }
 
-const CHANGE_WORDS: Record<string, string> = { device_login: "đăng nhập thiết bị mới", password_changed: "đổi mật khẩu", phone_changed: "đổi số điện thoại" };
+export const CHANGE_WORDS: Record<string, string> = { device_login: "đăng nhập thiết bị mới", password_changed: "đổi mật khẩu", phone_changed: "đổi số điện thoại" };
 
 // Shown first when several match: strong signals before medium, then the spec order.
 const RED_ORDER: ScenarioId[] = ["DH4", "DH5", "DH6", "DH7", "DH-T5", "DH8"];

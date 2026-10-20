@@ -35,6 +35,7 @@ export type StoredContext = {
   evidence: { code: string; evidence: string }[];
   /** Frequency key (recipient, sender…) and anything the agent or UI needs later. */
   key: string | null;
+  transferSignals?: Intervention["transferSignals"];
   facts?: Record<string, unknown>;
 };
 
@@ -77,6 +78,7 @@ function toIntervention(row: Row, agentOn = fraudAgentEnabled()): Intervention {
     countdownSec: row.countdown_sec,
     classify: context.classify,
     evidence: context.evidence,
+    ...(context.transferSignals ? { transferSignals: context.transferSignals } : {}),
     createdAt: row.created_at,
     choice: row.choice,
   };
