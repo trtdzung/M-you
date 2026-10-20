@@ -1,4 +1,5 @@
 import { getInvestProduct, getLoanProduct } from "../data/products";
+import { getInstrument } from "../data/market";
 import { getScenario } from "../data/scenarios";
 import { makeAsset } from "../engine/assets";
 import { advanceTime, describeAdvance, runStandingOrder } from "../engine/advance";
@@ -10,6 +11,7 @@ import { annuityPayment, buildSchedule, outstandingPrincipal } from "../engine/l
 import { assetValue, depositAccrued, fundPriceAt, goalValue, PHASE_ONE_PURCHASE_NOTE } from "../engine/value";
 import type { PreviewState, WorldState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
+import { DECLARED_CATEGORY_LABEL, MSB_CATEGORY_LABEL } from "../model/labels";
 import type { DeclaredAssetCategory, Goal, MsbAsset, ToastTone } from "../model/types";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import type { DeclaredAssetInput, PreviewAction } from "./actions";
@@ -503,6 +505,23 @@ export function previewReducer(state: PreviewState, action: PreviewAction): Prev
           ? action.purchase
           : { name: goal.name, category: (goal.template === "house" ? "house" : goal.template === "car" ? "car" : "other") as DeclaredAssetCategory, value: goal.targetAmount };
       const cash = goalBalance(draft, goal);
+      // Chụp lại phần đã dùng ở giai đoạn 1 để còn xem được sau khi các tài sản bị gỡ.
+      goal.phaseOneUsed = {
+        cash,
+        assets: draft.assets
+          .filter((a) => a.goalId === goal.id && a.status !== "sold")
+          .map((a) => {
+            const instrument = a.type === "declared" ? getInstrument(a.instrumentId) : undefined;
+            return {
+              name: a.name,
+              kind: a.type === "msb" ? MSB_CATEGORY_LABEL[a.category] : DECLARED_CATEGORY_LABEL[a.category],
+              category: a.category,
+              value: Math.round((assetValue(a, draft) * a.countPercent) / 100),
+              percent: a.countPercent,
+              ...(a.type === "declared" && instrument && a.quantity !== undefined ? { quantity: a.quantity, unit: instrument.unit } : {}),
+            };
+          }),
+      };
       // Đầu tư MSB: tất toán ngay (rút toàn bộ giá trị hiện tại về tài khoản chính) hoặc hẹn tất toán vào kỳ tới.
       const investments = draft.assets.filter((a): a is MsbAsset => a.goalId === goal.id && a.type === "msb" && a.status !== "sold");
       const pending: MsbAsset[] = [];

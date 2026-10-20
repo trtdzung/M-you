@@ -31,7 +31,6 @@ export function TemplatePick(_props: ScreenProps) {
                 <Icon size={24} strokeWidth={1.8} aria-hidden />
               </span>
               <span className="text-[16px] font-bold text-text">{t.title}</span>
-              {t.id === "other" && <span className="text-[12px] leading-4 text-muted">{t.hint}</span>}
             </button>
           );
         })}

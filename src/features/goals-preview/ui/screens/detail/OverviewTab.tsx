@@ -89,19 +89,21 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
   const today = state.clock.today;
   const due = goal.targetDate <= today;
   const timeline = buildTimeline(ctx);
+  // Giai đoạn 2 (trả nợ): vẫn nạp / rút, nhưng không còn đầu tư hay vay.
   const active = canTransact(goal);
+  const investAndLoan = active && !phase2;
   const feText = phase2 && fe.status === "reached" ? { text: "Bạn đã đủ tiền để tất toán khoản vay.", box: successBox } : FE_TEXT[fe.status];
 
   const hasLoan = stage.loan?.status === "active";
   const quick = [
     { label: "Nạp tiền", icon: ArrowDownToLine, show: active, go: () => nav.push("DepositFlow", { goalId }) },
     { label: "Rút tiền", icon: ArrowUpFromLine, show: active, go: () => nav.push("WithdrawFlow", { goalId }) },
-    { label: "Đầu tư", icon: LineChart, show: active, go: () => nav.push("InvestSuggest", { goalId }) },
+    { label: "Đầu tư", icon: LineChart, show: investAndLoan, go: () => nav.push("InvestSuggest", { goalId }) },
     // Có khoản vay đang hoạt động thì xem lịch trả nợ, chưa có thì mở mô phỏng vay.
     {
       label: "Vay",
       icon: Banknote,
-      show: active,
+      show: investAndLoan,
       go: () => {
         if (hasLoan) nav.push("RepayOverview", { goalId });
         else if (ctx.value.total < goal.targetAmount * LOAN_MIN_SAVED_RATIO) setLoanWarning(true);

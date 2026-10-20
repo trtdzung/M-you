@@ -141,6 +141,7 @@ export function AddAsset({ params }: ScreenProps) {
   };
 
   const valuation: Valuation = manualFund ? "manual" : type.valuation;
+  const isOther = type.category === "other" && valuation === "manual";
   const instrument = getInstrument(instrumentId);
   const qty = Number(quantity);
   const ratePa = Number(rate.replace(",", "."));
@@ -172,7 +173,7 @@ export function AddAsset({ params }: ScreenProps) {
     (valuation === "market" && instrument ? assetNameFromInstrument(instrument) : valuation === "accrual" && institution.trim() ? `${type.label} · ${institution.trim()}` : type.label);
   const valid =
     valuation === "manual"
-      ? value !== null && value > 0 && date !== "" && date <= today
+      ? value !== null && value > 0 && date !== "" && date <= today && (!isOther || name.trim() !== "")
       : valuation === "market"
         ? !!instrument && qty > 0
         : !!accrual && startDate <= today;
@@ -210,11 +211,19 @@ export function AddAsset({ params }: ScreenProps) {
             </div>
             <SourceTag source="self_reported" />
           </div>
+          {isOther && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="asset-name" className={label}>Tên tài sản</label>
+              <input id="asset-name" className={input} value={name} maxLength={60} placeholder="VD: Bộ sưu tập đồng hồ" onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
           <AmountCard bare title="Giá trị" value={value} onChange={setValue} />
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="asset-name" className={label}>Tên gọi</label>
-            <input id="asset-name" className={input} value={name} maxLength={60} placeholder={manualFund ? "VD: Quỹ ABC tại công ty quản lý quỹ" : type.placeholder} onChange={(e) => setName(e.target.value)} />
-          </div>
+          {!isOther && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="asset-name" className={label}>Tên gọi</label>
+              <input id="asset-name" className={input} value={name} maxLength={60} placeholder={manualFund ? "VD: Quỹ ABC tại công ty quản lý quỹ" : type.placeholder} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="asset-date" className={label}>Ngày định giá</label>
             <input id="asset-date" type="date" className={input} value={date} max={today} onChange={(e) => setDate(e.target.value)} />

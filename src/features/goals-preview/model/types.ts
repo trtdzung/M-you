@@ -107,6 +107,8 @@ export interface Goal {
   achievedAt?: ISODate;
   completedAt?: ISODate;
   closedAt?: ISODate;
+  /** Tài sản và tiền mặt đã dùng ở giai đoạn 1, chụp lúc sang giai đoạn 2 (các tài sản này sau đó bị gỡ khỏi mục tiêu). */
+  phaseOneUsed?: { cash: number; assets: { name: string; kind: string; category: string; value: number; percent: number; quantity?: number; unit?: string }[] };
   /** Goal value captured when it was completed / closed (the account may be emptied after). */
   finalValue?: number;
   /** True when completed before targetDate. */

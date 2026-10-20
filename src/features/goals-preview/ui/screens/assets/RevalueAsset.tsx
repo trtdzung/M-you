@@ -103,7 +103,7 @@ export function RevalueAsset({ params }: ScreenProps) {
         onClose={() => setConfirm(false)}
         onConfirm={() => {
           dispatch({ type: "revalueAsset", assetId: asset.id, value: newValue, countPercent: percent, valuationDate: date });
-          nav.pop();
+          nav.popWith({ declaredAssetId: undefined }); // về màn mục tiêu, không mở lại sheet chi tiết tài sản
         }}
       />
       <ConfirmSheet
@@ -120,7 +120,7 @@ export function RevalueAsset({ params }: ScreenProps) {
         onClose={() => setConfirmRemove(false)}
         onConfirm={() => {
           dispatch({ type: "removeAsset", assetId: asset.id });
-          nav.pop();
+          nav.popWith({ declaredAssetId: undefined }); // về màn mục tiêu, không mở lại sheet chi tiết tài sản
         }}
       />
     </div>

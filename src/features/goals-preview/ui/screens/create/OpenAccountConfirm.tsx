@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Landmark } from "lucide-react";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { formatISODate, monthsLeft, nextDayOfMonth } from "../../../engine/dates";
 import type { ScreenProps } from "../../../model/screens";
@@ -15,11 +14,7 @@ import { DayOfMonthPicker, Switch } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { card, errorBox, primaryButton, screenPadding, sectionTitle } from "../../shared/styles";
-import { WIZARD_STEPS, countedValue, formatAccountNumber, previewAccountNumber, wizardDeposit, wizardPlan, type WizardPlan } from "./wizard";
-
-const INTEREST_RATE_PA = 0.5;
-const WITHDRAW_RULES =
-  "Rút về tài khoản chính bất cứ lúc nào, không mất phí. Rút trước khi đạt mục tiêu sẽ làm kế hoạch chậm lại, ứng dụng báo rõ mức ảnh hưởng. Tiền nhàn rỗi có thể được gợi ý chuyển sang sản phẩm sinh lời, bạn luôn là người quyết định.";
+import { WIZARD_STEPS, countedValue, wizardDeposit, wizardPlan, type WizardPlan } from "./wizard";
 
 /** Bước 3 · Mở tài khoản: tóm tắt kế hoạch, trích tự động (bật sẵn) và xác nhận mở. */
 export function OpenAccountConfirm({ params }: ScreenProps) {
@@ -41,7 +36,6 @@ function Body({ goal, deposit }: { goal: WizardPlan; deposit: number }) {
   const [open, setOpen] = useState(false);
   const balance = state.customer.mainCasaBalance;
   const insufficient = deposit > balance;
-  const accountNumber = previewAccountNumber(state);
   const accountName = `TK mục tiêu – ${goal.name}`;
 
   const left = monthsLeft(state.clock.today, goal.targetDate);
@@ -129,23 +123,6 @@ function Body({ goal, deposit }: { goal: WizardPlan; deposit: number }) {
             </div>
           </>
         )}
-      </section>
-
-      <section className={`${card} flex flex-col gap-2`} aria-label="Tài khoản mục tiêu">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-primary-strong">
-            <Landmark size={22} aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1">
-              <h2 className={sectionTitle}>Tài khoản mục tiêu</h2>
-              <InfoTooltip label="quy tắc rút tiền" text={WITHDRAW_RULES} />
-            </div>
-            <p className="text-[13px] text-muted">
-              Số dự kiến <span className="tabular-nums">{formatAccountNumber(accountNumber)}</span> · lãi {INTEREST_RATE_PA.toString().replace(".", ",")}%/năm
-            </p>
-          </div>
-        </div>
       </section>
 
       {insufficient && (

@@ -4,17 +4,20 @@ import { useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { DeclaredAssetDetailSheet, priceDateOf } from "../assets/DeclaredAssetDetailSheet";
 import { MsbAssetDetail } from "../assets/MsbAssetDetail";
-import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink, Gem, CircleDollarSign, PieChart, FileText, Home } from "lucide-react";
+import { ArrowRight, ChevronRight, Plus, Landmark, Car, Package, Unlink, Gem, CircleDollarSign, PieChart, FileText, Home, Wallet } from "lucide-react";
 import { getInstrument } from "../../../data/market";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
-import { assetGain, assetValue, formatISODate, goalAssets, isAutoValued } from "../../../engine";
+import { assetGain, assetValue, formatISODate, goalAssets, isAutoValued, phaseOneResult } from "../../../engine";
 import { DECLARED_CATEGORY_LABEL, MSB_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
 import { SourceTag } from "../../shared/SourceTag";
 import { InfoTooltip } from "../../shared/InfoTooltip";
 import { card, ring, primaryButton, secondaryButton, sectionTitle, figure } from "../../shared/styles";
 import { pct, progressAfter } from "../assets/helpers";
+import { templateConfig } from "../create/wizard";
 import { canTransact, isStaleValuation, type GoalContext } from "./common";
+
+const ASSET_ICON: Record<string, typeof Package> = { house: Home, car: Car, gold: Gem, stock: CircleDollarSign, external_fund: PieChart, deposit: Landmark, bond: FileText };
 
 export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { nav, dispatch, toast } = usePreview();
@@ -23,7 +26,15 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
   const setDeclaredDetailId = (id: string | null) => nav.updateParams({ declaredAssetId: id ?? undefined });
   const [detailId, setDetailId] = useState<string | null>(null);
   const { state, goal } = ctx;
-  const assets = goalAssets(state, goalId);
+  // Giai đoạn trả nợ: tài sản mua bằng khoản vay (không còn tính vào mục tiêu) hiện gọn: tên và biểu tượng của mục tiêu, không số liệu.
+  const repaying = goal.status === "repaying";
+  const phase2 = repaying || goal.status === "achieved";
+  const allAssets = goalAssets(state, goalId);
+  const purchased = repaying ? allAssets.filter((a) => a.countPercent === 0) : [];
+  const assets = allAssets.filter((a) => !(repaying && a.countPercent === 0));
+  const phaseOne = repaying ? phaseOneResult(state, goal) : undefined;
+  const [savedOpen, setSavedOpen] = useState(false);
+  const GoalIcon = templateConfig(goal.icon ?? goal.template).icon;
   const msb = assets.flatMap((a) => (a.type === "msb" ? [a] : []));
   const declared = assets.flatMap((a) => (a.type === "declared" ? [a] : []));
 
@@ -48,17 +59,81 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
       <Sheet bodyClassName="flex flex-col !overflow-hidden !pb-0" open={detailId !== null} title={msb.find((asset) => asset.id === detailId)?.name ?? "Chi tiết tài sản"} onClose={() => setDetailId(null)}>
         {detailId && <MsbAssetDetail params={{ goalId, assetId: detailId }} embedded onNavigate={() => setDetailId(null)} />}
       </Sheet>
+      <Sheet open={savedOpen && !!phaseOne} title="Tài sản đã tích lũy để đạt mục tiêu" onClose={() => setSavedOpen(false)}>
+        {phaseOne && (
+          <div className="flex flex-col gap-4">
+            <p className="text-[13px] leading-5 text-muted">Các tài sản ở giai đoạn tích lũy đã được dùng để mua “{goal.name}”.</p>
+            {goal.phaseOneUsed ? (
+              <div className="rounded-2xl bg-surface-muted">
+                <ul className="flex flex-col divide-y divide-border">
+                  {goal.phaseOneUsed.assets.map((a, i) => {
+                    const Icon = ASSET_ICON[a.category] ?? Package;
+                    return (
+                      <li key={`${a.name}-${i}`} className="flex items-center gap-3 p-3.5">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-surface text-primary-strong"><Icon size={20} aria-hidden /></span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[15px] font-semibold leading-5 text-text">{a.name}</p>
+                          <p className="mt-0.5 text-[12px] leading-4 text-muted">
+                            {a.kind}
+                            {a.quantity !== undefined && ` · Số lượng ${a.quantity.toLocaleString("vi-VN")} ${a.unit ?? ""}`.trimEnd()}
+                            {a.percent < 100 && ` · Tính ${a.percent}%`}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-[15px] font-semibold tabular-nums text-text">{formatVnd(a.value)}</p>
+                      </li>
+                    );
+                  })}
+                  {goal.phaseOneUsed.cash > 0 && (
+                    <li className="flex items-center gap-3 p-3.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-surface text-primary-strong"><Wallet size={20} aria-hidden /></span>
+                      <p className="min-w-0 flex-1 text-[15px] font-semibold leading-5 text-text">Tiền mặt trong tài khoản mục tiêu</p>
+                      <p className="shrink-0 text-[15px] font-semibold tabular-nums text-text">{formatVnd(goal.phaseOneUsed.cash)}</p>
+                    </li>
+                  )}
+                  <li className="flex items-center justify-between gap-3 p-3.5">
+                    <p className="text-sm font-semibold text-text">Tổng đã dùng</p>
+                    <p className="text-[17px] font-bold tabular-nums text-text">{formatVnd(goal.phaseOneUsed.cash + goal.phaseOneUsed.assets.reduce((sum, a) => sum + a.value, 0))}</p>
+                  </li>
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-surface-muted p-3.5 text-sm">
+                <div className="flex flex-wrap justify-between gap-2"><span className="text-muted">Tự tích lũy</span><span className="font-semibold tabular-nums text-text">{formatVnd(phaseOne.saved)}</span></div>
+                <p className="mt-2 text-[12px] leading-4 text-muted">Mục tiêu này chuyển giai đoạn trước khi hệ thống lưu chi tiết từng tài sản.</p>
+              </div>
+            )}
+            <dl className="flex flex-col gap-3 rounded-2xl border border-border p-4 text-sm">
+              <div className="flex flex-wrap justify-between gap-2"><dt className="text-muted">Đạt mục tiêu ngày</dt><dd className="font-semibold text-text">{formatISODate(phaseOne.achievedAt)}</dd></div>
+              <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-3"><dt className="text-muted">Vay thêm</dt><dd className="font-semibold tabular-nums text-text">{formatVnd(phaseOne.borrowed)}</dd></div>
+              <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-3"><dt className="text-muted">Mục tiêu</dt><dd className="font-semibold tabular-nums text-text">{formatVnd(goal.targetAmount)}</dd></div>
+            </dl>
+          </div>
+        )}
+      </Sheet>
       <section className="flex flex-col gap-2">
         <div className="flex items-center">
           <h2 className={sectionTitle}>Tài sản</h2>
           <InfoTooltip label="tài sản" text="Gồm sản phẩm MSB (tiền gửi, quỹ, trái phiếu) và tài sản bạn tự khai hoặc ở nơi khác (nhà, xe, vàng, cổ phiếu…). Chỉ phần theo tỷ lệ tính vào mục tiêu được cộng vào tiến độ." />
         </div>
-        {assets.length === 0 && (
+        {repaying && (
+          <>
+            {purchased.length > 0 && (
+              <div className={`${card} flex items-center gap-3`}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-source-self-soft text-source-self"><GoalIcon size={20} aria-hidden /></span>
+                <p className="min-w-0 text-[15px] font-semibold leading-5 text-text">{goal.name}</p>
+              </div>
+            )}
+            {assets.length === 0 && <p className="px-1 text-sm text-muted">Các tài sản ở giai đoạn tích lũy đã được dùng để mua mục tiêu.</p>}
+          </>
+        )}
+        {assets.length === 0 && !repaying && (
           <div className={`${card} flex flex-col gap-2 text-center`}>
-            <p className="text-sm text-muted">Chưa có tài sản nào. Đưa tiền nhàn rỗi vào tiết kiệm, quỹ hoặc trái phiếu, hoặc thêm tài sản bạn đang có.</p>
-            <button type="button" className={secondaryButton} onClick={() => nav.push("InvestSuggest", { goalId })}>
-              Xem gợi ý đầu tư
-            </button>
+            <p className="text-sm text-muted">{phase2 ? "Chưa có tài sản nào." : "Chưa có tài sản nào. Đưa tiền nhàn rỗi vào tiết kiệm, quỹ hoặc trái phiếu, hoặc thêm tài sản bạn đang có."}</p>
+            {!phase2 && (
+              <button type="button" className={secondaryButton} onClick={() => nav.push("InvestSuggest", { goalId })}>
+                Xem gợi ý đầu tư
+              </button>
+            )}
           </div>
         )}
         {msb.length > 0 && (
@@ -127,7 +202,12 @@ export function AssetsTab({ ctx, goalId }: { ctx: GoalContext; goalId: string })
           </ul>
         )}
 
-        {canTransact(goal) && (
+        {repaying && phaseOne && (
+          <button type="button" className={secondaryButton} onClick={() => setSavedOpen(true)}>
+            Xem tài sản đã tích lũy để đạt mục tiêu
+          </button>
+        )}
+        {canTransact(goal) && !repaying && (
           <button type="button" className={secondaryButton} onClick={() => nav.push("AddAsset", { goalId })}>
             <Plus size={18} aria-hidden /> Thêm tài sản
           </button>

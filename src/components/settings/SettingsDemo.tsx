@@ -38,6 +38,19 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   const [scopes, setScopes] = useState<ConsentScope[]>([]);
   useEffect(() => { setScopes(getConsent()?.scopes ?? []); }, []);
   const name = LOGIN_DISPLAY_NAME[persona.cif] ?? persona.label.split(" — ")[0];
+  /** Nút ẩn: chạm dòng "Hồ sơ mẫu đang được chọn" để về giờ thật và xoá dữ liệu mục tiêu mô phỏng ở tương lai của hồ sơ này. */
+  async function rewindGoalsSimulation() {
+    if (!window.confirm("Quay về giờ thật và xoá toàn bộ dữ liệu mục tiêu mô phỏng ở tương lai của hồ sơ này? Không hoàn tác được.")) return;
+    try {
+      const res = await fetch("/api/goals-v2/rewind", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cif: persona.cif }) });
+      const data = (await res.json().catch(() => null)) as { error?: string; today?: string; removedTransactions?: number; goalsWithFutureStatus?: string[] } | null;
+      if (!res.ok || !data) throw new Error(data?.error ?? "Không đặt lại được.");
+      const kept = data.goalsWithFutureStatus?.length ? ` ${data.goalsWithFutureStatus.length} mục tiêu vẫn giữ trạng thái đã đổi khi tua thời gian.` : "";
+      setFeedback(`Đã về giờ thật (${data.today}), xoá ${data.removedTransactions ?? 0} giao dịch ở tương lai.${kept} Tải lại ứng dụng để thấy dữ liệu mới.`);
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Không đặt lại được.");
+    }
+  }
   const href = (target: SettingsSection) => `/settings/${target}`;
   const finish = (message: string) => setFeedback(message);
 
@@ -76,7 +89,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "signature") {
     content = <Panel><Row label="Đăng ký chữ ký số" icon={FileCheck2} onClick={() => setSheet("signature-register")} /><Row label="Ký số tài liệu" icon={PenLine} onClick={() => setSheet("signature-sign")} /><Row label="Lịch sử ký số" icon={FileText} onClick={() => setSheet("signature-history")} /></Panel>;
   } else if (section === "profile") {
-    content = <Panel title="Thông tin khách hàng"><Data label="Họ và tên" value={name} /><Data label="Hạng khách hàng" value={persona.tier} /><Data label="Mã khách hàng demo" value={persona.cif} /><p className="py-4 text-sm text-muted">Hồ sơ mẫu đang được chọn trong bản giả lập.</p></Panel>;
+    content = <Panel title="Thông tin khách hàng"><Data label="Họ và tên" value={name} /><Data label="Hạng khách hàng" value={persona.tier} /><Data label="Mã khách hàng demo" value={persona.cif} /><button type="button" onClick={() => void rewindGoalsSimulation()} className="block w-full cursor-text py-4 text-left text-sm text-muted focus-visible:outline-none">Hồ sơ mẫu đang được chọn trong bản giả lập.</button></Panel>;
   } else if (section === "accounts") {
     content = <><Panel><Row label="Danh sách tài khoản" icon={Wallet} href="/accounts" /><Row label="Hạn mức chuyển tiền" detail="Hạn mức demo, không áp dụng cho tài khoản thật" onClick={() => setSheet("limits")} /></Panel><Panel title="Hạn mức đang mô phỏng"><Data label="Mỗi giao dịch" value="100.000.000 VND" /><Data label="Mỗi ngày" value="500.000.000 VND" /></Panel></>;
   } else if (section === "notifications") {

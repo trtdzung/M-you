@@ -17,6 +17,18 @@ describe("takeLoan không còn bị chặn bởi 40% thu nhập hay trạng thá
     expect(next.loans.find((l) => l.id === after.loanId)?.principal).toBe(4_400_000_000);
   });
 
+  it("lưu lại tiền mặt và từng tài sản đã dùng ở giai đoạn 1 cùng giá trị tính vào mục tiêu", () => {
+    const state = stateFromScenario("s13-loan-blocked");
+    const goal = state.goals[0];
+    const cash = state.accounts.find((a) => a.id === goal.accountId)!.balance;
+    const before = state.assets.filter((a) => a.goalId === goal.id && a.status !== "sold");
+    const next = previewReducer(state, { type: "takeLoan", goalId: goal.id, productId: "msb-loan-house", principal: 4_400_000_000, termMonths: 240 });
+    const used = next.goals.find((g) => g.id === goal.id)!.phaseOneUsed!;
+    expect(used.cash).toBe(cash);
+    expect(used.assets.map((a) => a.name)).toEqual(before.map((a) => a.name));
+    expect(used.assets.every((a) => a.value >= 0 && a.kind.length > 0)).toBe(true);
+  });
+
   it("tài sản của mục tiêu biến mất, tiền mặt rút để mua tài sản mục tiêu", () => {
     const state = stateFromScenario("s13-loan-blocked");
     const goal = state.goals[0];
