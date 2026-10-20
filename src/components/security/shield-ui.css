@@ -59,7 +59,7 @@
 
 /* Transfer red popup only; shared Shield screens keep their existing styles. */
 .transfer-alert-sheet { color:var(--color-text); }
-.transfer-alert-content { display:flex; flex-direction:column; gap:20px; }
+.transfer-alert-content { display:flex; flex-direction:column; gap:16px; }
 .transfer-alert-icon { display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; background:var(--color-negative-soft); color:var(--color-negative); }
 .transfer-alert-reason, .transfer-alert-message { font-size:16px; line-height:1.5; }
 .transfer-alert-reason strong { color:var(--color-negative); font-weight:600; }
@@ -69,6 +69,7 @@
 .transfer-alert-recipient-name { font-size:15px; line-height:1.5; font-weight:600; }
 .transfer-alert-recipient-meta { margin-top:2px; font-size:13px; line-height:1.5; color:var(--color-muted); }
 .transfer-alert-amount { max-width:42%; font-size:15px; line-height:1.5; font-weight:600; text-align:right; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.transfer-alert-sheet [data-testid="shield-diagnosis"] { gap:16px; }
 .transfer-alert-sheet .shield-diagnosis-question { padding:0; border-radius:0; background:transparent; font-size:16px; line-height:1.5; font-weight:600; }
 .transfer-alert-sheet .shield-options { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .transfer-alert-sheet .shield-action { height:48px; padding:0 12px; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); font-size:16px; font-weight:600; }
@@ -78,7 +79,7 @@
 .transfer-alert-checklist { display:flex; flex-direction:column; gap:10px; list-style:none; padding:0; }
 .transfer-alert-checklist li { display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:var(--color-surface-muted); font-size:15px; line-height:1.5; }
 .transfer-alert-step { display:flex; flex-shrink:0; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--color-negative-soft); color:var(--color-negative); font-size:13px; font-weight:600; }
-.transfer-alert-actions { display:flex; flex-direction:column; gap:8px; margin-top:24px; }
+.transfer-alert-actions { display:flex; flex-direction:column; gap:16px; margin-top:16px; }
 .transfer-alert-stop { width:100%; height:48px; border:1px solid var(--color-negative); border-radius:12px; background:var(--color-negative-soft); color:var(--color-negative); font-size:16px; font-weight:600; }
 .transfer-alert-support, .transfer-alert-proceed { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; text-align:center; font-size:14px; line-height:1.5; }
 .transfer-alert-support { color:var(--color-primary-strong); font-weight:600; }

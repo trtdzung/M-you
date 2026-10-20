@@ -12,6 +12,7 @@ const EXIT_FALLBACK_MS = 320;
 /** Shared accessible bottom sheet for reports, editors, and confirmations. */
 export function Sheet({
   title,
+  titleIcon,
   description,
   open = true,
   onClose,
@@ -22,6 +23,7 @@ export function Sheet({
   closeLabel = "Đóng",
 }: {
   title: string;
+  titleIcon?: ReactNode;
   description?: string;
   open?: boolean;
   onClose: () => void;
@@ -60,9 +62,9 @@ export function Sheet({
     setDragY(0);
   }
 
-  const frameRef = useRef({ title, description, children, className, bodyClassName, headerAction });
-  if (live) frameRef.current = { title, description, children, className, bodyClassName, headerAction };
-  const frame = live ? { title, description, children, className, bodyClassName, headerAction } : frameRef.current;
+  const frameRef = useRef({ title, titleIcon, description, children, className, bodyClassName, headerAction });
+  if (live) frameRef.current = { title, titleIcon, description, children, className, bodyClassName, headerAction };
+  const frame = live ? { title, titleIcon, description, children, className, bodyClassName, headerAction } : frameRef.current;
 
   // Anchor the sheet inside the device frame, not the browser viewport. The
   // desktop preview applies `zoom` to `.device-canvas`, which breaks
@@ -227,12 +229,21 @@ export function Sheet({
           onPointerMove={onHandlePointerMove}
           onPointerUp={onHandlePointerUp}
           onPointerCancel={onHandlePointerUp}
-          className="flex shrink-0 cursor-grab touch-none items-start justify-between gap-3 border-b border-border px-4 pb-3 pt-4"
+          className={cn("flex shrink-0 cursor-grab touch-none items-start justify-between gap-3 border-b border-border px-4 pb-3 pt-4", Boolean(frame.titleIcon) && "items-center")}
         >
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-base font-semibold text-text">
-              {frame.title}
-            </h2>
+            {frame.titleIcon ? (
+              <div className="flex items-center gap-[10px]">
+                <span className="shrink-0" aria-hidden="true">{frame.titleIcon}</span>
+                <h2 id={titleId} className="text-[18px] font-semibold text-text">
+                  {frame.title}
+                </h2>
+              </div>
+            ) : (
+              <h2 id={titleId} className="text-base font-semibold text-text">
+                {frame.title}
+              </h2>
+            )}
             {frame.description && (
               <p id={descriptionId} className="mt-1 text-sm text-muted">
                 {frame.description}

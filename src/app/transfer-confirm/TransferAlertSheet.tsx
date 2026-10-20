@@ -50,9 +50,10 @@ function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, 
   const recipient = details ? transferRecipientParts(details) : null;
 
   return (
-    <Sheet bodyClassName="transfer-alert-sheet" open title={TRANSFER_RED_STEPS.heading.text} onClose={close}>
+    <Sheet bodyClassName="transfer-alert-sheet" open title={TRANSFER_RED_STEPS.heading.text}
+      titleIcon={<span className="transfer-alert-icon" aria-hidden="true"><AlertTriangle size={20} /></span>}
+      onClose={close}>
       <div data-testid="shield-red" className="transfer-alert-content">
-        <span className="transfer-alert-icon" aria-hidden="true"><AlertTriangle size={20} /></span>
         {step === "question" && <>
           {reason && <p className="transfer-alert-reason"><Emphasized {...reason} /></p>}
           {details && recipient && <div className="transfer-alert-recipient">
