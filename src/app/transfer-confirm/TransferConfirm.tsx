@@ -41,6 +41,8 @@ import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
 import { TransferFundingPreview } from "./TransferFundingPreview";
 import { TransferAlertBanner } from "./TransferAlertBanner";
 import { TransferAlertSheet } from "./TransferAlertSheet";
+import { TransferSafe } from "./TransferSafe";
+import { TRANSFER_LABELS, TRANSFER_SUPPORT_HREF, type TransferDetails, type TransferSafeVariant } from "@/lib/security/transfer-copy";
 
 /**
  * Mock MSB confirm screen — OUTSIDE the AI facade. The human edits every field
@@ -124,6 +126,13 @@ export function TransferConfirm() {
   const [hiddenBanner, setHiddenBanner] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [shieldNotice, setShieldNotice] = useState<string | null>(null);
+  const [safeVariant, setSafeVariant] = useState<TransferSafeVariant | null>(null);
+  const transferDetails: TransferDetails = {
+    amount,
+    recipientName: name.trim(),
+    recipientBank: draft?.recipientBankName ?? "",
+    recipientAccount: draft?.accountNumber ?? acct,
+  };
   const banner = shieldState.intervention?.level === "yellow" && shieldState.intervention.id !== hiddenBanner ? shieldState.intervention : null;
 
   useEffect(() => {
@@ -156,11 +165,11 @@ export function TransferConfirm() {
       return;
     }
     setHiddenBanner(intervention.id);
-    if (choice === "Có người yêu cầu → xem thêm") return setClassifyFor(intervention);
+    if (choice === TRANSFER_LABELS.someoneAsked) return setClassifyFor(intervention);
     if (action.kind === "emergency") return router.push("/settings/sos");
     if (action.kind === "case") return router.push("/settings/case");
-    if (action.kind === "callback") return setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
-    setShieldNotice(familyNote ? `${familyNote}. Giao dịch chưa được thực hiện.` : "Giao dịch chưa được thực hiện.");
+    if (action.kind === "callback") return setSafeVariant("callback");
+    setSafeVariant("stopped");
   }
 
   /** The classify-only popup (DH3 "Có người yêu cầu"): logged locally, the intervention is already answered. */
@@ -172,8 +181,8 @@ export function TransferConfirm() {
       void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); });
       return;
     }
-    if (action.kind === "callback") return setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
-    setShieldNotice("Giao dịch chưa được thực hiện.");
+    if (action.kind === "callback") return setSafeVariant("callback");
+    setSafeVariant("stopped");
   }
 
   // UC 10 (b): a transfer the customer chose to send may still wait (rule, opt-in).
@@ -406,6 +415,10 @@ export function TransferConfirm() {
     );
   }
 
+  if (safeVariant) {
+    return <TransferSafe variant={safeVariant} details={transferDetails} />;
+  }
+
   // Draft consumed after a completed transfer (F#2): a reload/replay must NOT
   // show an editable form again. Distinguish "already completed" from "no draft".
   if (!isValidDraft && draftIdParam && isTransferDraftUsed(draftIdParam)) {
@@ -453,12 +466,12 @@ export function TransferConfirm() {
             hold={hold}
             notice={shieldNotice}
             onSend={() => { setHold(null); void runConfirm(); }}
-            onCancelled={() => { setHold(null); setShieldNotice("Đã hủy giao dịch. Tiền chưa được chuyển."); }}
-            onScam={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); }); }}
+            onCancelled={() => { setHold(null); setSafeVariant("cancelled"); }}
+            onScam={() => { void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push(TRANSFER_SUPPORT_HREF); }); }}
             onChoose={choice => {
               if (choice === "Tôi nghĩ mình bị lừa") void requestEmergency(persona.cif, "enter").then(ok => { if (ok) router.push("/settings/sos"); });
               else if (choice === "Yêu cầu MSB tra soát") router.push("/settings/case");
-              else setShieldNotice("MSB sẽ gọi lại cho bạn trong ít phút (giả lập). Giao dịch chưa được thực hiện.");
+              else if (actionFor(choice).kind === "callback") { setHold(null); setSafeVariant("callback"); }
             }}
           />
         </div>
@@ -474,6 +487,7 @@ export function TransferConfirm() {
         <div className="border-b border-[#dfe5ee] pb-5">
           <p className="text-lg font-semibold text-muted">Xác nhận giao dịch</p>
           <p className="mt-1 text-[28px] font-bold tabular-nums text-text">{formatVnd(amount)}</p>
+          {banner && <TransferAlertBanner intervention={banner} recipientName={name.trim()} onChoose={choice => void chooseShield(banner, choice)} />}
         </div>
         <Labeled label="Người nhận">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
@@ -515,7 +529,6 @@ export function TransferConfirm() {
         />
       )}
 
-      {banner && <TransferAlertBanner intervention={banner} onChoose={choice => void chooseShield(banner, choice)} />}
       {shieldNotice && <p role="status" className="text-sm text-text">{shieldNotice}</p>}
       {error && <p className="text-sm text-negative">{error}</p>}
 
@@ -528,8 +541,8 @@ export function TransferConfirm() {
       >
         {submitting ? "Đang xử lý…" : checking ? "M-You đang kiểm tra giao dịch…" : "Xác nhận"}
       </button>
-      <TransferAlertSheet cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => redFor && void chooseShield(redFor, "Đóng")} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
-      <TransferAlertSheet cif={persona.cif} open={classifyFor !== null} intervention={classifyFor} classifyOnly onClose={() => setClassifyFor(null)} onChoose={chooseClassify} />
+      <TransferAlertSheet details={transferDetails} cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => redFor && void chooseShield(redFor, "Đóng")} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
+      <TransferAlertSheet details={transferDetails} cif={persona.cif} open={classifyFor !== null} intervention={classifyFor} classifyOnly onClose={() => setClassifyFor(null)} onChoose={chooseClassify} />
       </div>
     </div>
   );
