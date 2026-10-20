@@ -1,4 +1,4 @@
-import { ONLINE_DEPOSIT, SAVINGS_FLEX } from "../data/products";
+import { INVEST_PRODUCTS, ONLINE_DEPOSIT, SAVINGS_FLEX } from "../data/products";
 import type { WorldState } from "../model/state";
 import type { Goal, ISODate, RiskLevel } from "../model/types";
 import { addMonths, monthsLeft } from "./dates";
@@ -112,4 +112,29 @@ export function investSuggestions(world: World, goal: Goal, amount = idleCash(wo
     });
   }
   return out;
+}
+
+/** Toàn bộ sản phẩm trong danh mục để khách tự chọn. */
+export function investOptions(world: World, goal: Goal, amount = idleCash(world, goal)): InvestSuggestion[] {
+  if (amount <= 0) return [];
+  const today = world.clock.today;
+  const months = monthsLeft(today, goal.targetDate);
+  return INVEST_PRODUCTS.map((product): InvestSuggestion => {
+    const base = { productId: product.id, riskLevel: "low" as const, title: product.name, reason: product.description, suggestedAmount: amount };
+    if (product.kind === "term_deposit") {
+      const terms = [...product.terms].sort((a, b) => a.months - b.months);
+      const term = terms.filter((t) => t.months < months).pop() ?? terms[0];
+      const maturityDate = addMonths(today, term.months);
+      return {
+        ...base,
+        title: `${product.name} ${term.months} tháng`,
+        termMonths: term.months,
+        ratePa: term.ratePa,
+        caution: "Rút trước hạn chỉ hưởng lãi không kỳ hạn.",
+        estimatedAtMaturity: amount + depositAccrued(amount, term.ratePa, today, maturityDate),
+        maturityDate,
+      };
+    }
+    return { ...base, ratePa: product.kind === "savings" ? product.ratePa : product.kind === "bond" ? product.couponPa : undefined };
+  });
 }

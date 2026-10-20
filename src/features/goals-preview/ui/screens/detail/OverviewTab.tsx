@@ -105,7 +105,7 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
       go: () => {
         if (hasLoan) nav.push("RepayOverview", { goalId });
         else if (ctx.value.total < goal.targetAmount * LOAN_MIN_SAVED_RATIO) setLoanWarning(true);
-        else nav.push("LoanSimulator", { goalId });
+        else nav.push("LoanAppHome", { goalId });
       },
     },
   ].filter((q) => q.show);
@@ -232,7 +232,7 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
               className={primaryButton}
               onClick={() => {
                 setLoanWarning(false);
-                nav.push("LoanSimulator", { goalId });
+                nav.push("LoanAppHome", { goalId });
               }}
             >
               Tiếp tục

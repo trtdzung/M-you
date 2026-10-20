@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Sheet } from "@/components/primitives";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { getInstrument } from "../../../data/market";
-import { assetValue, formatISODate, isAutoValued, seriesPriceAt } from "../../../engine";
+import { assetValue, formatISODate, isAutoValued, seriesPriceAt, seriesPointAt } from "../../../engine";
 import type { ISODate, PricePoint } from "../../../model/types";
 import { DECLARED_CATEGORY_LABEL } from "../../../model/labels";
 import { usePreview } from "../../../store/PreviewStore";
@@ -70,7 +70,7 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold text-text">Cách tính</h3>
             <p className="text-sm tabular-nums text-text">
-              {asset.quantity.toLocaleString("vi-VN")} {instrument.unit} × {formatVnd(unitPrice)} = <b>{formatVnd(now)}</b>
+              {asset.quantity.toLocaleString("vi-VN")} {instrument.unit} × {formatVnd(unitPrice)} (giá ngày {formatISODate(seriesPointAt(instrument.priceSeries, state.clock.today)?.date).slice(0, 5)}) = <b>{formatVnd(now)}</b>
             </p>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[12px] text-muted">
@@ -85,7 +85,10 @@ export function DeclaredAssetDetailSheet({ assetId, onClose }: { assetId: string
                 {pricesRefreshing ? "Đang cập nhật…" : "Cập nhật lại"}
               </button>
             </div>
-            <p className="text-[12px] text-muted">Giá {instrument.name} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}</p>
+            <p className="text-[12px] text-muted">
+              Giá {instrument.name}
+              {instrument.fullName ? ` (${instrument.fullName})` : ""} hôm nay · số lượng xác nhận {dateVi(asset.valuationDate)}
+            </p>
             {editQty && (
               <div className="flex items-baseline gap-2 border-b-2 border-border pb-1 focus-within:border-primary">
                 <input

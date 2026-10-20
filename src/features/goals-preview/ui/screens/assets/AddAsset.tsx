@@ -4,16 +4,17 @@ import { useState } from "react";
 import { Car, CircleDollarSign, FileText, Gem, Home, Landmark, Package, PieChart, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatVnd } from "@/features/goals-preview/format-money";
-import { getInstrument, hydrateMarket, instrumentsOf, MARKET_INSTRUMENTS, type MarketInstrument, type MarketKind } from "../../../data/market";
-import { addMonths, outsideValue, seriesPriceAt } from "../../../engine";
+import { assetNameFromInstrument, getInstrument, instrumentsOf } from "../../../data/market";
+import { addMonths, outsideValue, seriesPriceAt, seriesPointAt, formatISODate } from "../../../engine";
 import { paramNumber, paramString, type ScreenProps } from "../../../model/screens";
 import type { DeclaredAssetCategory } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { AmountCard, SuggestChip } from "../../shared/AmountCard";
 import { InfoTooltip } from "../../shared/InfoTooltip";
+import { InstrumentPicker } from "../../shared/InstrumentPicker";
 import { Switch } from "../../shared/Pickers";
 import { BottomActions, ConfirmSheet, EmptyState, ScreenHeader, SliderRow, SourceTag } from "../../shared";
-import { card, input, label, primaryButton, ring, screenPadding, secondaryButton, sectionTitle } from "../../shared/styles";
+import { card, input, label, primaryButton, ring, screenPadding, sectionTitle } from "../../shared/styles";
 import { findGoal, pct, progressAfter, dateVi } from "./helpers";
 import { countedValue as wizardCounted, wizardAssets } from "../create/wizard";
 
@@ -71,6 +72,26 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
   );
 }
 
+const qtyGroup = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+
+/** Số lượng hiển thị theo vi-VN, lưu thô với dấu chấm thập phân. */
+export function parseQtyInput(text: string, fractional: boolean): string {
+  const t = text.replace(/\./g, "").replace(",", ".");
+  if (!fractional) return t.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12);
+  const [whole = "", ...fraction] = t.replace(/[^\d.]/g, "").split(".");
+  const digits = whole.replace(/^0+(?=\d)/, "").slice(0, 12);
+  return fraction.length ? `${digits || "0"}.${fraction.join("").slice(0, 2)}` : digits;
+
+}
+
+/** Giữ nguyên phần thập phân đang gõ, dùng dấu chấm ngăn nghìn. */
+export function formatQtyInput(raw: string): string {
+  if (raw === "") return "";
+  const [int, dec] = raw.split(".");
+  const grouped = int === "" ? "" : qtyGroup.format(Number(int));
+  return dec === undefined ? grouped : `${grouped},${dec}`;
+}
+
 /** Thêm tài sản ngoài MSB: tài sản vật chất (tự khai giá) hoặc tài sản tài chính ở nơi khác (tự định giá). */
 export function AddAsset({ params }: ScreenProps) {
   const { state, dispatch, nav } = usePreview();
@@ -98,9 +119,8 @@ export function AddAsset({ params }: ScreenProps) {
   const [counted, setCounted] = useState(true);
   const [percent, setPercent] = useState(PHYSICAL[0].percent);
   const [confirm, setConfirm] = useState(false);
-  const [symbolInput, setSymbolInput] = useState("");
-  const [symbolChecking, setSymbolChecking] = useState(false);
-  const [symbolError, setSymbolError] = useState<string | undefined>();
+  /** Quỹ ngoài danh sách Fmarket → tự khai giá (category vẫn external_fund). */
+  const [manualFund, setManualFund] = useState(false);
 
   if (!goal) {
     return (
@@ -114,54 +134,29 @@ export function AddAsset({ params }: ScreenProps) {
   const pick = (t: TypeDef) => {
     setType(t);
     setPercent(t.percent);
-    setInstrumentId(t.valuation === "market" ? instrumentsOf(t.category as MarketKind)[0]?.id : undefined);
+    setInstrumentId(undefined);
     setQuantity("");
+    setManualFund(false);
     setTerm(t.category === "deposit" || t.category === "bond" ? TERMS[t.category][1] : undefined);
   };
 
-  const addSymbol = async () => {
-    const symbol = symbolInput.trim().toUpperCase();
-    if (!symbol || symbolChecking) return;
-    setSymbolChecking(true);
-    setSymbolError(undefined);
-    try {
-      const res = await fetch("/api/goals-v2/market/instruments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ symbol }),
-      });
-      const body = (await res.json().catch(() => null)) as { instrument?: MarketInstrument; error?: string } | null;
-      if (res.ok && body?.instrument) {
-        const added = body.instrument;
-        hydrateMarket([...MARKET_INSTRUMENTS.filter((m) => m.id !== added.id), added]);
-        setInstrumentId(added.id);
-        setSymbolInput("");
-      } else {
-        setSymbolError(body?.error ?? "Chưa kiểm tra được mã cổ phiếu lúc này. Bạn thử lại sau nhé.");
-      }
-    } catch {
-      setSymbolError("Chưa kiểm tra được mã cổ phiếu lúc này. Bạn thử lại sau nhé.");
-    } finally {
-      setSymbolChecking(false);
-    }
-  };
-
+  const valuation: Valuation = manualFund ? "manual" : type.valuation;
   const instrument = getInstrument(instrumentId);
-  const qty = Number(quantity.replace(",", "."));
+  const qty = Number(quantity);
   const ratePa = Number(rate.replace(",", "."));
   const accrual =
-    type.valuation === "accrual" && principal && ratePa >= 0 && rate !== ""
+    valuation === "accrual" && principal && ratePa >= 0 && rate !== ""
       ? { principal, ratePa, startDate, maturityDate: term ? addMonths(startDate, term) : undefined }
       : undefined;
   const autoValue =
-    type.valuation === "market"
+    valuation === "market"
       ? instrument && qty > 0
         ? outsideValue({ instrumentId, quantity: qty }, today, shift)
         : undefined
-      : type.valuation === "accrual" && accrual
+      : valuation === "accrual" && accrual
         ? outsideValue({ accrual }, today, shift)
         : undefined;
-  const assetValue = type.valuation === "manual" ? value ?? 0 : autoValue ?? 0;
+  const assetValue = valuation === "manual" ? value ?? 0 : autoValue ?? 0;
 
   const effPercent = counted ? percent : 0;
   const countedValue = Math.round((assetValue * effPercent) / 100);
@@ -174,14 +169,19 @@ export function AddAsset({ params }: ScreenProps) {
     : progressAfter(state, existingGoal!, countedValue);
   const finalName =
     name.trim() ||
-    (type.valuation === "market" && instrument ? instrument.name : type.valuation === "accrual" && institution.trim() ? `${type.label} · ${institution.trim()}` : type.label);
+    (valuation === "market" && instrument ? assetNameFromInstrument(instrument) : valuation === "accrual" && institution.trim() ? `${type.label} · ${institution.trim()}` : type.label);
   const valid =
-    type.valuation === "manual"
+    valuation === "manual"
       ? value !== null && value > 0 && date !== "" && date <= today
-      : type.valuation === "market"
+      : valuation === "market"
         ? !!instrument && qty > 0
         : !!accrual && startDate <= today;
-  const source = type.valuation === "manual" ? ("self_reported" as const) : ("estimated" as const);
+  const source = valuation === "manual" ? ("self_reported" as const) : ("estimated" as const);
+  const priceDate = formatISODate(instrument ? seriesPointAt(instrument.priceSeries, today)?.date : undefined).slice(0, 5);
+  const quoteTime = instrument?.quotedAt
+    ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(instrument.quotedAt))
+    : undefined;
+  const valueLabel = valuation === "manual" ? "Giá trị tự khai" : valuation === "market" ? `Giá trị ước tính theo giá ngày ${priceDate}` : "Giá trị ước tính hôm nay";
   const unitPrice = instrument ? seriesPriceAt(instrument.priceSeries, today, shift) : 0;
 
   return (
@@ -191,94 +191,114 @@ export function AddAsset({ params }: ScreenProps) {
       <section className={cn(card, "flex flex-col gap-4")} aria-label="Loại tài sản">
         <h2 className={sectionTitle}>Loại tài sản</h2>
         <TypeGrid title="Tài sản vật chất" types={PHYSICAL} value={type.category} onPick={pick} />
-        <TypeGrid title="Tài sản tài chính ở nơi khác" types={FINANCIAL} value={type.category} onPick={pick} />
+        <TypeGrid title="Tài sản tài chính" types={FINANCIAL} value={type.category} onPick={pick} />
       </section>
 
-      {type.valuation === "manual" && (
+      {valuation === "manual" && (
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Thông tin tài sản">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <h2 className={sectionTitle}>Giá trị ước tính</h2>
-              <InfoTooltip label="giá tự khai" text="Bạn tự khai, MSB không có giá thị trường cho tài sản này. Hãy khai sát với giá bán thực tế." />
+              <InfoTooltip
+                label="giá tự khai"
+                text={
+                  manualFund
+                    ? "Quỹ này chưa có giá tự động. Bạn tự khai giá trị hiện tại; MSB không xác minh."
+                    : "Bạn tự khai, MSB không có giá thị trường cho tài sản này. Hãy khai sát với giá bán thực tế."
+                }
+              />
             </div>
             <SourceTag source="self_reported" />
           </div>
           <AmountCard bare title="Giá trị" value={value} onChange={setValue} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor="asset-name" className={label}>Tên gọi</label>
-            <input id="asset-name" className={input} value={name} maxLength={60} placeholder={type.placeholder} onChange={(e) => setName(e.target.value)} />
+            <input id="asset-name" className={input} value={name} maxLength={60} placeholder={manualFund ? "VD: Quỹ ABC tại công ty quản lý quỹ" : type.placeholder} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="asset-date" className={label}>Ngày định giá</label>
             <input id="asset-date" type="date" className={input} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
             {date > today && <p className="text-sm text-negative">Ngày định giá không được ở tương lai.</p>}
           </div>
+          {manualFund && (
+            <button
+              type="button"
+              className="self-start text-[13px] font-semibold text-primary-strong"
+              onClick={() => {
+                setManualFund(false);
+                setValue(null);
+                setName("");
+              }}
+            >
+              Chọn quỹ có giá tự động
+            </button>
+          )}
         </section>
       )}
 
-      {type.valuation === "market" && (
+      {valuation === "market" && (
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Số lượng nắm giữ">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
-              <h2 className={sectionTitle}>{type.category === "gold" ? "Loại vàng" : type.category === "stock" ? "Mã cổ phiếu" : "Quỹ"}</h2>
+              <h2 className={sectionTitle}>{type.category === "gold" ? "Loại vàng" : type.category === "stock" ? "Cổ phiếu" : "Quỹ"}</h2>
               <InfoTooltip
                 label="cách định giá"
-                text="Bạn chỉ khai số lượng. App tự tính giá trị theo giá thị trường hằng ngày (giá mô phỏng trong bản xem trước). Nhớ sửa số lượng khi mua thêm hoặc bán bớt."
+                text="Bạn chỉ khai số lượng. App tự tính giá trị theo giá thị trường hằng ngày. Nhớ sửa số lượng khi mua thêm hoặc bán bớt."
               />
             </div>
-            <SourceTag source="estimated" />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {instrumentsOf(type.category as MarketKind).map((m) => (
-              <SuggestChip key={m.id} label={m.name} selected={m.id === instrumentId} onClick={() => setInstrumentId(m.id)} />
-            ))}
-          </div>
-          {type.category === "stock" && (
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="asset-symbol" className={label}>Mã cổ phiếu khác</label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="asset-symbol"
-                  className={input}
-                  value={symbolInput}
-                  maxLength={10}
-                  placeholder="VD: DGC"
-                  autoCapitalize="characters"
-                  onChange={(e) => {
-                    setSymbolInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
-                    setSymbolError(undefined);
-                  }}
-                />
-                <div className="w-28 shrink-0">
-                  <button type="button" className={secondaryButton} disabled={symbolChecking || symbolInput.trim() === ""} onClick={addSymbol}>
-                    {symbolChecking ? "Đang kiểm tra…" : "Thêm"}
-                  </button>
-                </div>
-              </div>
-              {symbolError && <p className="text-sm text-negative">{symbolError}</p>}
+          {type.category === "gold" ? (
+            <div className="flex flex-wrap gap-2">
+              {instrumentsOf("gold").map((m) => (
+                <SuggestChip key={m.id} label={m.name} selected={m.id === instrumentId} onClick={() => setInstrumentId(m.id)} />
+              ))}
             </div>
+          ) : (
+            <InstrumentPicker
+              kind={type.category as "stock" | "external_fund"}
+              value={instrumentId}
+              onChange={setInstrumentId}
+              today={today}
+              shiftPct={shift}
+              onManualFund={
+                type.category === "external_fund"
+                  ? () => {
+                      setManualFund(true);
+                      setInstrumentId(undefined);
+                      setQuantity("");
+                    }
+                  : undefined
+              }
+            />
           )}
           {instrument && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="asset-qty" className={label}>Số lượng ({instrument.unit})</label>
-              <div className="flex items-baseline gap-2 border-b-2 border-border pb-1 focus-within:border-primary">
+              <label htmlFor="asset-qty" className={label}>Số lượng nắm giữ</label>
+              <div className="flex items-baseline gap-2 rounded-2xl border border-border bg-surface-muted/40 px-3.5 py-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
                 <input
                   id="asset-qty"
                   inputMode={instrument.fractional ? "decimal" : "numeric"}
                   className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tabular-nums text-text outline-none placeholder:text-muted"
                   placeholder="0"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value.replace(instrument.fractional ? /[^\d.,]/g : /\D/g, "").slice(0, 10))}
+                  value={formatQtyInput(quantity)}
+                  onChange={(e) => setQuantity(parseQtyInput(e.target.value, instrument.fractional))}
                 />
-                <span className="shrink-0 text-sm font-semibold text-muted">{instrument.unit}</span>
+                <span className="shrink-0 text-sm font-semibold text-muted">{type.category === "stock" ? "cp" : instrument.unit}</span>
               </div>
-              <p className="text-[13px] text-muted">Giá hôm nay: {formatVnd(unitPrice)}/{instrument.unit}</p>
+              {type.category === "gold" && (
+                <p className="text-[13px] text-muted">Giá mua vào{quoteTime ? ` lúc ${quoteTime}` : ""} ngày {priceDate}: {formatVnd(unitPrice)}/{instrument.unit}</p>
+              )}
             </div>
           )}
+          <div className="rounded-2xl bg-primary-soft px-4 py-3" aria-live="polite" aria-atomic="true">
+            <p className="text-[13px] text-muted">Giá trị ước tính</p>
+            <p className="mt-1 text-[24px] font-bold tabular-nums tracking-tight text-text">{autoValue ? formatVnd(autoValue) : "—"}</p>
+            <p className="mt-1 text-[12px] text-muted">{instrument ? `Theo ${type.category === "stock" ? "giá đóng cửa" : type.category === "gold" ? "giá mua vào" : "NAV công bố"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
+          </div>
         </section>
       )}
 
-      {type.valuation === "accrual" && (
+      {valuation === "accrual" && (
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Thông tin khoản gửi">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
@@ -313,9 +333,9 @@ export function AddAsset({ params }: ScreenProps) {
         </section>
       )}
 
-      {type.valuation !== "manual" && (
-        <section className={cn(card, "flex items-center justify-between gap-3")} aria-label="Giá trị ước tính hôm nay">
-          <span className="text-[13px] text-muted">Giá trị ước tính hôm nay</span>
+      {valuation === "accrual" && (
+        <section className={cn(card, "flex items-center justify-between gap-3")} aria-label={valueLabel}>
+          <span className="text-[13px] text-muted">{valueLabel}</span>
           <span className="text-[16px] font-bold tabular-nums text-text">{autoValue ? formatVnd(autoValue) : "—"}</span>
         </section>
       )}
@@ -332,9 +352,11 @@ export function AddAsset({ params }: ScreenProps) {
           <Switch checked={counted} onChange={setCounted} label="Tính vào mục tiêu" />
         </div>
         {counted && <SliderRow label="Tỷ lệ được tính" value={percent} min={10} max={100} step={10} onChange={setPercent} format={(v) => `${v}%`} />}
-        <p className="text-[13px] text-muted">
-          Cộng vào mục tiêu <b className="text-text">{formatVnd(countedValue)}</b> · tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b>
-        </p>
+        <div className="border-t border-border pt-3" aria-live="polite" aria-atomic="true">
+          <p className="text-[13px] text-muted">Giá trị tính vào mục tiêu</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-text">{valid ? formatVnd(countedValue) : "—"}</p>
+          <p className="mt-1 text-[13px] text-muted">Tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b></p>
+        </div>
       </section>
 
       <BottomActions>
@@ -349,9 +371,9 @@ export function AddAsset({ params }: ScreenProps) {
         rows={[
           { label: "Mục tiêu", value: goal.name },
           { label: "Tài sản", value: finalName },
-          ...(type.valuation === "market" && instrument ? [{ label: "Số lượng", value: `${quantity} ${instrument.unit}` }] : []),
-          { label: type.valuation === "manual" ? "Giá trị tự khai" : "Giá trị ước tính hôm nay", value: assetValue, source },
-          ...(type.valuation === "manual" ? [{ label: "Ngày định giá", value: dateVi(date) }] : []),
+          ...(valuation === "market" && instrument ? [{ label: "Số lượng", value: `${formatQtyInput(quantity)} ${instrument.unit}` }] : []),
+          { label: valueLabel, value: assetValue, source },
+          ...(valuation === "manual" ? [{ label: "Ngày định giá", value: dateVi(date) }] : []),
           { label: "Tính vào mục tiêu", value: counted ? `${percent}%` : "Không tính" },
           { label: "Phần cộng vào mục tiêu", value: countedValue, source, emphasis: true },
         ]}
@@ -363,10 +385,10 @@ export function AddAsset({ params }: ScreenProps) {
             category: type.category,
             value: assetValue,
             countPercent: effPercent,
-            valuationDate: type.valuation === "manual" ? date : today,
+            valuationDate: valuation === "manual" ? date : today,
             source,
-            ...(type.valuation === "market" ? { instrumentId, quantity: qty } : {}),
-            ...(type.valuation === "accrual" ? { accrual, institution: institution.trim() || undefined } : {}),
+            ...(valuation === "market" ? { instrumentId, quantity: qty } : {}),
+            ...(valuation === "accrual" ? { accrual, institution: institution.trim() || undefined } : {}),
           };
           if (wizardGoal) {
             nav.popWith({ assets: JSON.stringify([...wizardGoal.assets, asset]) });

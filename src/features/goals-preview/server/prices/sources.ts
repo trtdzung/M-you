@@ -20,6 +20,8 @@ export interface SourceInstrument {
   id: string;
   kind: MarketKind;
   name: string;
+  /** Company / fund full name (optional). */
+  fullName?: string;
   unit: string;
   fractional: boolean;
   source: string;
@@ -32,6 +34,8 @@ export interface SourceResult {
   instruments: SourceInstrument[];
   /** Lỗi theo nguồn (không ném ra ngoài). */
   errors: string[];
+  /** Present only after a successful Fmarket list request, independent of NAV availability. */
+  listedIds?: string[];
 }
 
 /** Từ khi nào cần lấy lịch sử cho một công cụ (ISO `YYYY-MM-DD`). */
@@ -54,8 +58,8 @@ function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
+async function fetchJson(url: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<unknown> {
+  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -144,7 +148,9 @@ function stockUrl(symbol: string, since: string, now: Date): string {
   return `https://dchart-api.vndirect.com.vn/dchart/history?resolution=D&symbol=${symbol}&from=${from}&to=${to}`;
 }
 
-function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint[] {
+function stockPoints(symbol: string, json: Record<string, unknown>, now: Date): SourcePoint[] {
+  const today = vnDate(now);
+  const beforeClose = new Date(now.getTime() + VN_OFFSET_MS).getUTCHours() < 15;
   const t = json.t as unknown[];
   const c = json.c as unknown[];
   const points: SourcePoint[] = [];
@@ -152,9 +158,11 @@ function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint
     const ts = Number(t[i]);
     const close = Number(c[i]);
     if (!Number.isFinite(ts) || !(close > 0)) continue;
+    const priceDate = vnDate(new Date(ts * 1000));
+    if (beforeClose && priceDate === today) continue;
     points.push({
       instrumentId: `stock-${symbol.toLowerCase()}`,
-      priceDate: vnDate(new Date(ts * 1000)),
+      priceDate,
       price: Math.round(close * 1000),
       rawPrice: close,
       source: "vndirect",
@@ -166,7 +174,7 @@ function stockPoints(symbol: string, json: Record<string, unknown>): SourcePoint
 async function stockHistory(symbol: string, since: string, now: Date): Promise<SourcePoint[]> {
   const json = await fetchJson(stockUrl(symbol, since, now));
   if (!isRecord(json) || !Array.isArray(json.t) || !Array.isArray(json.c)) throw new Error("phản hồi không có t/c");
-  return stockPoints(symbol, json);
+  return stockPoints(symbol, json, now);
 }
 
 export type StockLookup =
@@ -196,7 +204,7 @@ export async function lookupStock(symbolRaw: string, now: Date): Promise<StockLo
     if (!isRecord(json)) return { status: "error", message: "phản hồi không hợp lệ" };
     if (json.s === "no_data") return { status: "not_found" };
     if (!Array.isArray(json.t) || !Array.isArray(json.c)) return { status: "error", message: "phản hồi không có t/c" };
-    const points = stockPoints(symbol, json);
+    const points = stockPoints(symbol, json, now);
     return points.length === 0 ? { status: "not_found" } : { status: "ok", symbol, points };
   } catch (e) {
     return { status: "error", message: errMsg(e) };
@@ -208,7 +216,8 @@ export async function fetchStocks(now: Date, since: SinceFn, extraSymbols: reado
   const symbols = [...new Set<string>([...VN30, ...extraSymbols])];
   const results = await mapLimit(symbols, 6, async (symbol) => {
     try {
-      return { symbol, points: await stockHistory(symbol, since(`stock-${symbol.toLowerCase()}`), now), error: null as string | null };
+      const points = await stockHistory(symbol, since(`stock-${symbol.toLowerCase()}`), now);
+      return { symbol, points, error: null as string | null };
     } catch (e) {
       return { symbol, points: [] as SourcePoint[], error: `${symbol}: ${errMsg(e)}` };
     }
@@ -220,8 +229,8 @@ export async function fetchStocks(now: Date, since: SinceFn, extraSymbols: reado
     if (r.error) errors.push(r.error);
     if (r.points.length === 0) continue;
     instruments.push({
-      id: `stock-${r.symbol.toLowerCase()}`, kind: "stock", name: r.symbol, unit: "cổ phiếu",
-      fractional: false, source: "vndirect", externalRef: r.symbol,
+      id: `stock-${r.symbol.toLowerCase()}`, kind: "stock", name: r.symbol,
+      unit: "cổ phiếu", fractional: false, source: "vndirect", externalRef: r.symbol,
     });
     points.push(...r.points);
   }
@@ -255,9 +264,11 @@ export async function fetchFunds(now: Date, since: SinceFn): Promise<SourceResul
 
   const toDate = fmarketDate(vnDate(now));
   const results = await mapLimit(rows, 6, async (row) => {
-    const code = String(row.code ?? "");
+    // `code` keeps instrument id stable (`fund-${code}`); shortName is the short label when present.
+    const code = String(row.code ?? "").trim();
+    const shortLabel = String(row.shortName ?? row.code ?? "").trim() || code;
     const productId = Number(row.id);
-    const name = String(row.name ?? code);
+    const fullName = String(row.name ?? shortLabel).trim() || shortLabel;
     if (!code || !Number.isFinite(productId)) return null;
     const id = `fund-${code}`;
     try {
@@ -275,9 +286,9 @@ export async function fetchFunds(now: Date, since: SinceFn): Promise<SourceResul
         if (!(nav > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(navDate)) continue;
         points.push({ instrumentId: id, priceDate: navDate, price: nav, rawPrice: nav, source: "fmarket" });
       }
-      return { id, code, name, productId, points, error: null as string | null };
+      return { id, shortLabel, fullName, productId, points, error: null as string | null };
     } catch (e) {
-      return { id, code, name, productId, points: [] as SourcePoint[], error: `${code}: ${errMsg(e)}` };
+      return { id, shortLabel, fullName, productId, points: [] as SourcePoint[], error: `${code}: ${errMsg(e)}` };
     }
   });
 
@@ -288,10 +299,11 @@ export async function fetchFunds(now: Date, since: SinceFn): Promise<SourceResul
     if (r.error) errors.push(r.error);
     if (r.points.length === 0) continue;
     instruments.push({
-      id: r.id, kind: "external_fund", name: r.name, unit: "CCQ", fractional: true,
-      source: "fmarket", externalRef: String(r.productId),
+      id: r.id, kind: "external_fund", name: r.shortLabel,
+      fullName: r.fullName !== r.shortLabel ? r.fullName : undefined,
+      unit: "CCQ", fractional: true, source: "fmarket", externalRef: String(r.productId),
     });
     points.push(...r.points);
   }
-  return { source: "funds", points, instruments, errors };
+  return { source: "funds", points, instruments, errors, listedIds: [...new Set(results.flatMap(r => r ? [r.id] : []))] };
 }

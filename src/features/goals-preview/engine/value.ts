@@ -23,6 +23,16 @@ export function seriesPriceAt(series: PricePoint[], date: ISODate, shiftPct = 0)
   return Math.round(price * (1 + shiftPct / 100));
 }
 
+/** Last stored point on or before `date`, falling back to the first point. */
+export function seriesPointAt(series: PricePoint[], date: ISODate): PricePoint | undefined {
+  let found = series[0];
+  for (const point of series) {
+    if (point.date > date) break;
+    found = point;
+  }
+  return found;
+}
+
 /** Simple interest accrued on a deposit from opening until `date` (capped at maturity). */
 export function depositAccrued(principal: number, ratePa: number, from: ISODate, to: ISODate): number {
   const days = Math.max(0, daysBetween(from, to));

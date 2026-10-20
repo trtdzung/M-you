@@ -9,12 +9,24 @@ export type MarketKind = "gold" | "stock" | "external_fund";
 export interface MarketInstrument {
   id: string;
   kind: MarketKind;
+  /** Short display label: ticker (FPT), fund code (DCDS), or gold product name. */
   name: string;
+  /** Company name / fund full name — optional, for search & descriptive labels. */
+  fullName?: string;
+  listed?: boolean;
   /** Unit the customer counts in ("chỉ", "cổ phiếu", "CCQ"). */
   unit: string;
   /** Quantities may be fractional (gold in chỉ, fund units). */
   fractional: boolean;
   priceSeries: PricePoint[];
+  quotedAt?: string;
+}
+
+/** asset.name when creating from a market instrument (≤60 chars). */
+export function assetNameFromInstrument(instrument: MarketInstrument): string {
+  if (!instrument.fullName) return instrument.name;
+  const combined = `${instrument.name} – ${instrument.fullName}`;
+  return combined.length <= 60 ? combined : `${combined.slice(0, 57)}…`;
 }
 
 /** Danh sách công cụ thị trường: giá thật theo ngày từ `gv2_prices`, nạp lúc chạy bởi server / client. */

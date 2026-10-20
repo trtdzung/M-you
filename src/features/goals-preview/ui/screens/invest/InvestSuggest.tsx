@@ -5,7 +5,7 @@ import { PiggyBank, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatVnd, formatVndCompact } from "@/features/goals-preview/format-money";
 import { getInvestProduct } from "../../../data/products";
-import { daysBetween, fundPriceAt, goalAccount, investableCash, investSuggestions, monthsLeft, addMonths, type InvestSuggestion } from "../../../engine";
+import { daysBetween, fundPriceAt, goalAccount, investableCash, investOptions, monthsLeft, addMonths, type InvestSuggestion } from "../../../engine";
 import { RISK_LEVEL_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
@@ -59,7 +59,7 @@ export function InvestSuggest({ params }: ScreenProps) {
   const idle = investableCash(state, goal);
   const account = goalAccount(state, goal);
   const months = monthsLeft(today, goal.targetDate);
-  const suggestions = investSuggestions(state, goal, idle).slice(0, 3);
+  const suggestions = investOptions(state, goal, idle);
 
   if (idle <= 0 || suggestions.length === 0) {
     return (

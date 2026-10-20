@@ -82,11 +82,23 @@ CREATE TABLE IF NOT EXISTS gv2_instruments (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
   name TEXT NOT NULL,
+  full_name TEXT,
   unit TEXT NOT NULL,
   fractional INTEGER NOT NULL DEFAULT 0,
   source TEXT NOT NULL,
   external_ref TEXT,
-  active INTEGER NOT NULL DEFAULT 1
+  active INTEGER NOT NULL DEFAULT 1,
+  listed INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS gv2_stock_directory (
+  code TEXT PRIMARY KEY,
+  company_name TEXT NOT NULL,
+  short_name TEXT,
+  floor TEXT,
+  listed INTEGER NOT NULL DEFAULT 1,
+  source TEXT NOT NULL,
+  synced_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS gv2_price_sync (
@@ -137,6 +149,9 @@ export function ensureGoalV2Tables(db: Database.Database): void {
   if (!cols.some((c) => c.name === "sim_profile")) db.exec("ALTER TABLE gv2_meta ADD COLUMN sim_profile TEXT");
   const logCols = db.prepare("PRAGMA table_info(gv2_action_log)").all() as { name: string }[];
   if (!logCols.some((c) => c.name === "created_goal_id")) db.exec("ALTER TABLE gv2_action_log ADD COLUMN created_goal_id TEXT");
+  const instrumentCols = db.prepare("PRAGMA table_info(gv2_instruments)").all() as { name: string }[];
+  if (!instrumentCols.some((c) => c.name === "listed")) db.exec("ALTER TABLE gv2_instruments ADD COLUMN listed INTEGER NOT NULL DEFAULT 1");
+  if (!instrumentCols.some((c) => c.name === "full_name")) db.exec("ALTER TABLE gv2_instruments ADD COLUMN full_name TEXT");
 }
 
 const ready = new WeakSet<Database.Database>();

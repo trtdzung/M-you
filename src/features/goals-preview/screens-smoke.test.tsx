@@ -18,7 +18,7 @@ function Probe() {
 }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-const SCREENS = ["GoalList", "GoalDetail", "DepositFlow", "WithdrawFlow", "StandingOrderManage", "EditTarget", "CloseGoalFlow", "AddAsset", "InvestSuggest", "LoanSimulator", "LoanApply", "RepayOverview", "RepaySchedule", "Prepay", "DueResult", "AchievedIntro", "MissedOptions", "TemplatePick", "GoalInfo" ] as const;
+const SCREENS = ["GoalList", "GoalDetail", "DepositFlow", "WithdrawFlow", "StandingOrderManage", "EditTarget", "CloseGoalFlow", "AddAsset", "InvestSuggest", "LoanAppHome", "LoanAppSurvey", "LoanSimulator", "LoanApply", "RepayOverview", "RepaySchedule", "Prepay", "DueResult", "AchievedIntro", "MissedOptions", "TemplatePick", "GoalInfo" ] as const;
 
 describe("smoke: mọi màn render không lỗi / không vòng lặp", () => {
   for (const sc of SCENARIOS) {

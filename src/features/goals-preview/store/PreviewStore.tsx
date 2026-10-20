@@ -11,6 +11,16 @@ import { hydrateMarket } from "../data/market";
 import { usePersonaCif } from "@/providers/context";
 import { usePanelActive } from "@/components/shell/PanelActive";
 
+import { loanProductFor } from "../data/products";
+import { loanPurposeFor } from "../engine";
+
+export interface PendingLoanApplication {
+  goalId: string;
+  principal: number;
+  termMonths: number;
+  submittedAt: number;
+}
+
 const SUGGESTIONS_URL = "/api/goals-v2/suggestions";
 const SUGGESTION_POLL_MS = 3000;
 const SUGGESTION_POLL_MAX = 10;
@@ -52,6 +62,7 @@ export interface PreviewNav {
 }
 
 interface PreviewContextValue {
+  submitLoanApplication: (record: PendingLoanApplication) => void;
   state: PreviewState;
   dispatch: (action: PreviewAction) => void;
   nav: PreviewNav;
@@ -242,6 +253,48 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   stateRef.current = state;
   const { loadStatus, reload, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
 
+  const pendingLoans = useRef<{ cif: string | null; records: PendingLoanApplication[] }>({ cif: null, records: [] });
+  const [loanAppRevision, setLoanAppRevision] = useState(0);
+  const readPendingLoans = useCallback(() => {
+    if (pendingLoans.current.cif !== cif) {
+      let records: PendingLoanApplication[] = [];
+      try {
+        const stored: unknown = JSON.parse(localStorage.getItem(`goals-preview:loan-app:${cif}`) ?? "[]");
+        if (Array.isArray(stored)) records = stored;
+      } catch { /* Storage may be unavailable. */ }
+      pendingLoans.current = { cif, records };
+    }
+    return pendingLoans.current.records;
+  }, [cif]);
+  const savePendingLoans = useCallback((records: PendingLoanApplication[]) => {
+    pendingLoans.current = { cif, records };
+    try {
+      localStorage.setItem(`goals-preview:loan-app:${cif}`, JSON.stringify(records));
+    } catch { /* Keep the current session's timer when storage is unavailable. */ }
+  }, [cif]);
+  const submitLoanApplication = useCallback((record: PendingLoanApplication) => {
+    savePendingLoans([...readPendingLoans(), record]);
+    setLoanAppRevision((revision) => revision + 1);
+  }, [readPendingLoans, savePendingLoans]);
+
+  useEffect(() => {
+    if (loadStatus !== "ready" || !cif) return;
+    const records = readPendingLoans();
+    if (!records.length) return;
+    const timer = setTimeout(() => {
+      const due = records.filter((record) => record.submittedAt + 20_000 <= Date.now());
+      for (const record of due) {
+        const goal = stateRef.current.goals.find((item) => item.id === record.goalId);
+        if (!goal) continue;
+        const product = loanProductFor(loanPurposeFor(goal.template));
+        dispatch({ type: "takeLoan", goalId: record.goalId, productId: product.id, principal: record.principal, termMonths: record.termMonths });
+      }
+      savePendingLoans(records.filter((record) => !due.includes(record)));
+      setLoanAppRevision((revision) => revision + 1);
+    }, Math.max(0, Math.min(...records.map((record) => record.submittedAt + 20_000)) - Date.now()));
+    return () => clearTimeout(timer);
+  }, [cif, loadStatus, dispatch, readPendingLoans, savePendingLoans, loanAppRevision]);
+
   useEffect(() => {
     const onBack = (event: Event) => {
       if (!active || state.nav.stack.length <= 1) return;
@@ -268,8 +321,8 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, nav, toast, hydrated: loadStatus === "ready", loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing }),
-    [state, dispatch, nav, toast, loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing],
+    () => ({ state, dispatch, nav, toast, submitLoanApplication, hydrated: loadStatus === "ready", loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing }),
+    [state, dispatch, nav, toast, submitLoanApplication, loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ensureStockDirectory, readStockDirectoryEntry, resolveFromSsi } from "./directory";
 import { goalsV2Db } from "../db";
 import {
   FETCH_FROM_FIRST,
@@ -30,9 +31,11 @@ function claimRun(db: ReturnType<typeof goalsV2Db>, force: boolean, syncDate: st
       .get(new Date(Date.now() - SYNC_LOCK_MS).toISOString());
     if (locked) return null;
     if (!force) {
+      const closeAt = new Date(`${syncDate}T15:00:00+07:00`).toISOString();
+      const afterClose = new Date().toISOString() >= closeAt;
       const fresh = db
-        .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE sync_date = ? AND status IN ('ok','partial') LIMIT 1")
-        .get(syncDate);
+        .prepare("SELECT 1 AS x FROM gv2_price_sync WHERE sync_date = ? AND status IN ('ok','partial') AND (? = 0 OR started_at >= ?) LIMIT 1")
+        .get(syncDate, afterClose ? 1 : 0, closeAt);
       if (fresh) return null;
     }
     const info = db
@@ -64,11 +67,13 @@ function trigger(force: boolean): { refreshing: boolean; asOf: string | null } {
 
 /** Gọi khi đọc thị trường: trả ngay, đồng bộ (nếu cần) chạy ở nền. */
 export function ensurePricesFresh(): { refreshing: boolean; asOf: string | null } {
+  ensureStockDirectory();
   return trigger(false);
 }
 
 /** Nút "Cập nhật lại": như trên nhưng bỏ điều kiện "đã có hôm nay" (vẫn giữ khoá 2 phút). */
 export function refreshPricesNow(): { refreshing: boolean; asOf: string | null } {
+  ensureStockDirectory({ force: true });
   return trigger(true);
 }
 
@@ -107,10 +112,12 @@ async function runSync(runId: number): Promise<void> {
       "SELECT price FROM gv2_prices WHERE instrument_id = ? ORDER BY price_date DESC LIMIT 1",
     );
     const upsertInstrument = db.prepare(
-      `INSERT INTO gv2_instruments (id, kind, name, unit, fractional, source, external_ref, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-       ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name, unit = excluded.unit,
-         fractional = excluded.fractional, source = excluded.source, external_ref = excluded.external_ref, active = 1`,
+      `INSERT INTO gv2_instruments (id, kind, name, full_name, unit, fractional, source, external_ref, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+       ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name, full_name = COALESCE(excluded.full_name, gv2_instruments.full_name),
+         unit = excluded.unit, fractional = excluded.fractional, source = excluded.source,
+         external_ref = excluded.external_ref,
+         active = CASE WHEN gv2_instruments.kind = 'external_fund' THEN gv2_instruments.active ELSE 1 END`,
     );
     const upsertPrice = db.prepare(
       `INSERT INTO gv2_prices (instrument_id, price_date, price, raw_price, source, fetched_at)
@@ -134,7 +141,12 @@ async function runSync(runId: number): Promise<void> {
       let written = 0;
       db.transaction(() => {
         for (const i of r.instruments) {
-          upsertInstrument.run(i.id, i.kind, i.name, i.unit, i.fractional ? 1 : 0, i.source, i.externalRef);
+          upsertInstrument.run(i.id, i.kind, i.name, i.fullName ?? null, i.unit, i.fractional ? 1 : 0, i.source, i.externalRef);
+        }
+        if (r.source === "funds" && r.listedIds && r.listedIds.length >= 30) {
+          db.prepare("UPDATE gv2_instruments SET listed = 0 WHERE kind = 'external_fund'").run();
+          const markListed = db.prepare("UPDATE gv2_instruments SET listed = 1 WHERE kind = 'external_fund' AND id = ?");
+          for (const id of r.listedIds) markListed.run(id);
         }
         for (const [id, list] of byId) {
           list.sort((a, b) => a.priceDate.localeCompare(b.priceDate));
@@ -192,6 +204,7 @@ export async function registerStockSymbol(symbol: string): Promise<RegisterStock
     console.error("[goals-v2] stock lookup failed", found.message);
     return { ok: false, reason: "unavailable" };
   }
+  if (!readStockDirectoryEntry(found.symbol)) await resolveFromSsi(found.symbol);
   const db = goalsV2Db();
   const id = `stock-${found.symbol.toLowerCase()}`;
   const fetchedAt = now.toISOString();

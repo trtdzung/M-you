@@ -21,6 +21,8 @@ import { SellAsset } from "./screens/assets/SellAsset";
 import { InvestSuggest } from "./screens/invest/InvestSuggest";
 import { InvestConfirm } from "./screens/invest/InvestConfirm";
 import { MaturityChoice } from "./screens/invest/MaturityChoice";
+import { LoanAppHome } from "./screens/loan-app/LoanAppHome";
+import { LoanAppSurvey } from "./screens/loan-app/LoanAppSurvey";
 import { LoanSimulator } from "./screens/loan/LoanSimulator";
 import { LoanBlocked } from "./screens/loan/LoanBlocked";
 import { LoanApply } from "./screens/loan/LoanApply";
@@ -64,6 +66,8 @@ export const SCREEN_REGISTRY: Record<ScreenId, ScreenDef> = {
   InvestSuggest: { component: InvestSuggest, title: "Gợi ý đầu tư", group: "invest", needs: ["goalId"] },
   InvestConfirm: { component: InvestConfirm, title: "Xác nhận đầu tư", group: "invest", needs: ["goalId"] },
   MaturityChoice: { component: MaturityChoice, title: "Tiền gửi đáo hạn", group: "invest", needs: ["goalId", "assetId"] },
+  LoanAppHome: { component: LoanAppHome, title: "Vay", group: "loan", needs: ["goalId"] },
+  LoanAppSurvey: { component: LoanAppSurvey, title: "Khảo sát thông tin", group: "loan", needs: ["goalId"] },
   LoanSimulator: { component: LoanSimulator, title: "Mô phỏng khoản vay", group: "loan", needs: ["goalId"] },
   LoanBlocked: { component: LoanBlocked, title: "Chưa thể vay", group: "loan", needs: ["goalId"] },
   LoanApply: { component: LoanApply, title: "Đăng ký vay", group: "loan", needs: ["goalId"] },
