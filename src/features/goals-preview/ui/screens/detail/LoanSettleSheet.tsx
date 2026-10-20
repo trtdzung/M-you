@@ -1,16 +1,28 @@
 "use client";
 
+import type { ReactNode } from "react";
+import { CircleAlert } from "lucide-react";
 import { Sheet } from "@/components/primitives";
-import { formatVnd } from "@/features/goals-preview/format-money";
+import { loanProductFor } from "../../../data/products";
+import { annuityPayment, loanPurposeFor } from "../../../engine";
 import { usePreview } from "../../../store/PreviewStore";
-import { SummaryRows } from "../../shared/SummaryRows";
+import { SummaryRows, type SummaryRow } from "../../shared/SummaryRows";
 import { primaryButton, secondaryButton } from "../../shared/styles";
 import { useGoalContext } from "./common";
 
+function Group({ title, rows }: { title: string; rows: SummaryRow[] }): ReactNode {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h3 className="text-[13px] font-semibold text-muted">{title}</h3>
+      <SummaryRows rows={rows} />
+    </section>
+  );
+}
+
 /**
- * Bước cuối trước giai đoạn trả vay, cho hồ sơ vay đã được phê duyệt: giải thích khách đang tất toán cái gì cho ngân hàng
- * (tiền và tài sản đã tích luỹ dùng thanh toán một phần giá trị mục tiêu, phần còn lại do khoản vay chi trả).
- * Chỉ khi khách bấm "Tất toán cho ngân hàng" khoản vay mới được giải ngân và mục tiêu sang giai đoạn trả vay.
+ * Xác nhận mua tài sản, bước cuối trước giai đoạn trả vay (hồ sơ vay đã được phê duyệt): nguồn thanh toán (tài sản tích luỹ +
+ * số dư tài khoản mục tiêu + khoản vay = giá trị mục tiêu) và điều khoản khoản vay. Chỉ khi khách bấm "Xác nhận mua tài sản"
+ * khoản vay mới được giải ngân và mục tiêu sang giai đoạn trả vay.
  */
 export function LoanSettleSheet({ goalId, open, onClose, onDone }: { goalId: string; open: boolean; onClose: () => void; onDone?: () => void }) {
   const { loanApplications, startRepayment } = usePreview();
@@ -18,38 +30,47 @@ export function LoanSettleSheet({ goalId, open, onClose, onDone }: { goalId: str
   const record = loanApplications.find((item) => item.goalId === goalId);
   if (!ctx || !record) return null;
   const { goal, value } = ctx;
-  const settle = () => {
+  const product = loanProductFor(loanPurposeFor(goal.template));
+  const termMonths = Math.min(product.maxTermMonths, record.termMonths);
+  const monthly = annuityPayment(record.principal, product.ratePa, termMonths);
+  const confirm = () => {
     startRepayment(goalId);
     onClose();
     onDone?.();
   };
   return (
-    <Sheet open={open} title="Tất toán để mua tài sản" onClose={onClose}>
+    <Sheet open={open} title={`Xác nhận mua ${goal.name}`} onClose={onClose}>
       <div className="flex flex-col gap-4">
         <p className="text-[14px] leading-6 text-text">
-          Hồ sơ vay của bạn đã được phê duyệt. Để mua tài sản cho mục tiêu <b>{goal.name}</b>, bạn cần tất toán phần đã tích luỹ cho ngân hàng. Phần còn lại của giá trị mục tiêu do khoản vay chi trả.
+          Hồ sơ vay của bạn đã được phê duyệt. Để mua {goal.name}, ngân hàng sẽ quy đổi tài sản bạn đã tích luỹ và giải ngân khoản vay cho phần còn lại.
         </p>
-        <SummaryRows
+        <Group
+          title="Nguồn thanh toán"
           rows={[
-            { label: "Giá trị mục tiêu", value: goal.targetAmount },
-            { label: "Số tiền của bạn còn trong tài khoản mục tiêu", value: value.cash, emphasis: true },
-            ...(value.assets > 0 ? [{ label: "Tài sản đã tích luỹ cho mục tiêu", value: value.assets }] : []),
-            { label: "Khoản vay được giải ngân", value: record.principal },
+            ...(value.assets > 0 ? [{ label: "Tài sản tích luỹ", value: value.assets, hint: "Quy đổi theo giá trị hiện tại" }] : []),
+            { label: "Số dư tài khoản mục tiêu", value: value.cash },
+            { label: "Khoản vay", value: record.principal },
+            { label: "Giá trị mục tiêu", value: goal.targetAmount, emphasis: true },
           ]}
         />
-        <ol className="flex list-decimal flex-col gap-2 pl-5 text-[14px] leading-6 text-text">
-          <li>Số tiền còn trong tài khoản mục tiêu ({formatVnd(value.cash)}) được dùng để thanh toán một phần giá trị mục tiêu.</li>
-          {value.assets > 0 && (
-            <li>
-              Các tài sản bạn đã tích luỹ cho mục tiêu ({formatVnd(value.assets)}) cũng được dùng để thanh toán một phần giá trị mục tiêu. Sau khi tất toán, các tài sản này không còn được tính vào mục tiêu và không được quy đổi thành tiền trong tài khoản.
-            </li>
-          )}
-          <li>Khoản vay {formatVnd(record.principal)} do ngân hàng giải ngân cho phần còn lại, không đi qua tài khoản mục tiêu. Bạn trả dần theo lịch trả vay ({record.termMonths} tháng).</li>
-          <li>Sau khi tất toán, mục tiêu chuyển sang giai đoạn 2 (trả vay). Tiến độ lúc này tính theo số gốc đã trả; tài sản vừa mua không được tính vào tiến độ trả vay.</li>
-        </ol>
-        <p className="text-[13px] leading-5 text-muted">Thao tác này không thể hoàn tác.</p>
+        <Group
+          title="Khoản vay của bạn"
+          rows={[
+            { label: "Kỳ hạn", value: `${termMonths} tháng` },
+            { label: "Trả hằng tháng", value: monthly },
+            { label: "Lãi suất", value: `${product.ratePa}%/năm` },
+            { label: "Tổng phải trả", value: monthly * termMonths },
+          ]}
+        />
+        <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[14px] leading-6 text-text">
+          <li>Khoản vay được giải ngân trực tiếp, không đi qua tài khoản mục tiêu.</li>
+          <li>Sau khi hoàn tất, mục tiêu chuyển sang giai đoạn trả vay. Tiến độ tính theo số gốc đã trả, không gồm giá trị tài sản vừa mua.</li>
+        </ul>
+        <p role="alert" className="flex items-center gap-2 rounded-2xl bg-negative-soft px-3.5 py-3 text-[13px] font-medium text-negative">
+          <CircleAlert size={18} className="shrink-0" aria-hidden /> Sau khi xác nhận, bạn không thể hoàn tác.
+        </p>
         <div className="flex flex-col gap-2">
-          <button type="button" className={primaryButton} onClick={settle}>Tất toán cho ngân hàng</button>
+          <button type="button" className={primaryButton} onClick={confirm}>Xác nhận mua tài sản</button>
           <button type="button" className={secondaryButton} onClick={onClose}>Để sau</button>
         </div>
       </div>

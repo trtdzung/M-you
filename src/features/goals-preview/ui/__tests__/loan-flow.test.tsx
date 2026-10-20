@@ -198,13 +198,15 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey 20s approval a
     act(() => {
       fireEvent.click(screen.getByRole("button", { name: "Chuyển sang giai đoạn trả nợ vay" }));
     });
-    expect(screen.getByRole("dialog", { name: "Tất toán để mua tài sản" })).toBeInTheDocument();
-    expect(screen.getByText(/Số tiền của bạn còn trong tài khoản mục tiêu/)).toBeInTheDocument();
-    expect(screen.getByText(/thanh toán một phần giá trị mục tiêu/)).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /Xác nhận mua/ })).toBeInTheDocument();
+    expect(screen.getByText("Nguồn thanh toán")).toBeInTheDocument();
+    expect(screen.getByText("Khoản vay của bạn")).toBeInTheDocument();
+    expect(screen.getByText("Trả hằng tháng")).toBeInTheDocument();
+    expect(screen.getByText("Sau khi xác nhận, bạn không thể hoàn tác.")).toBeInTheDocument();
     expect(box.ctx.state.goals.find((g: any) => g.id === testGoal.id).status).toBe("accumulating");
-    // 7. "Tất toán cho ngân hàng": takeLoan runs once and the application is removed
+    // 7. "Xác nhận mua tài sản": takeLoan runs once and the application is removed
     act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "Tất toán cho ngân hàng" }));
+      fireEvent.click(screen.getByRole("button", { name: "Xác nhận mua tài sản" }));
     });
     expect(screen.queryByText("Hồ sơ của bạn đã được phê duyệt")).not.toBeInTheDocument();
     const goalAfterLoan = box.ctx.state.goals.find((g: any) => g.id === testGoal.id);
