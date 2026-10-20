@@ -1,0 +1,376 @@
+[
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "house",
+  "asset_name": "Căn hộ Q7",
+  "value": 2000000000,
+  "count_percent": 50,
+  "reason": "Khách khai căn hộ Q7 trị giá 2.000.000.000đ và muốn tính 50% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "car",
+  "asset_name": "Xe ô tô Mazda 3",
+  "value": 600000000,
+  "count_percent": 100,
+  "reason": "Khách khai xe ô tô Mazda 3 trị giá 600.000.000đ và muốn tính đủ vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "motorbike",
+  "asset_name": "Xe máy Honda Vision",
+  "value": 30000000,
+  "count_percent": 100,
+  "reason": "Khách khai xe máy Honda Vision trị giá 30.000.000đ và muốn tính đủ (100%) vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "other",
+  "asset_name": "Bộ sưu tập đồng hồ",
+  "value": 80000000,
+  "count_percent": 60,
+  "reason": "Khách khai bộ sưu tập đồng hồ trị giá 80.000.000đ và muốn tính 60% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "gold",
+  "asset_name": "Vàng nhẫn 9999",
+  "instrument_id": "gold-ring",
+  "quantity": 2,
+  "count_percent": 100,
+  "reason": "Khách khai 2 chỉ vàng nhẫn 9999 và muốn tính đủ vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "stock",
+  "asset_name": "Cổ phiếu ACB",
+  "instrument_id": "stock-acb",
+  "quantity": 1000,
+  "count_percent": 80,
+  "reason": "Khách khai 1.000 cổ phiếu ACB và muốn tính 80% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "external_fund",
+  "asset_name": "CCQ Amber",
+  "instrument_id": "fund-AEIF",
+  "quantity": 500,
+  "count_percent": 70,
+  "reason": "Khách khai 500 chứng chỉ quỹ đầu tư cổ phiếu Amber và muốn tính 70% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "deposit",
+  "asset_name": "Gửi tiết kiệm Vietcombank",
+  "accrual": {
+   "principal": 50000000,
+   "rate_pa": 5.2,
+   "start_date": "2026-06-01",
+   "maturity_date": "2027-06-01"
+  },
+  "count_percent": 100,
+  "institution": "Vietcombank",
+  "reason": "Khách khai khoản gửi 50.000.000đ lãi 5,2%/năm ở Vietcombank, đáo hạn 01/06/2027, muốn tính vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "bond",
+  "asset_name": "Trái phiếu doanh nghiệp ABC",
+  "accrual": {
+   "principal": 100000000,
+   "rate_pa": 9,
+   "start_date": "2026-03-01",
+   "maturity_date": "2029-03-01"
+  },
+  "count_percent": 90,
+  "reason": "Khách mua trái phiếu doanh nghiệp ABC, gốc 100.000.000đ, lãi 9%/năm, kỳ hạn 01/03/2026–01/03/2029, muốn tính 90% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "motorbike",
+  "asset_name": "Xe máy Honda Vision",
+  "value": 30000000,
+  "count_percent": 100,
+  "reason": "Khách khai xe máy Honda Vision trị giá 30.000.000đ và muốn tính đủ vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "gold",
+  "asset_name": "Vàng nhẫn 9999",
+  "instrument_id": "gold-ring",
+  "quantity": 2,
+  "count_percent": 100,
+  "reason": "Khách khai 2 chỉ vàng nhẫn 9999 và muốn tính 100% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "deposit",
+  "asset_name": "Gửi tiết kiệm Vietcombank",
+  "accrual": {
+   "principal": 50000000,
+   "rate_pa": 5.2,
+   "start_date": "2026-06-01",
+   "maturity_date": "2027-06-01"
+  },
+  "count_percent": 100,
+  "institution": "Vietcombank",
+  "reason": "Khách khai khoản gửi 50.000.000đ lãi 5,2%/năm ở Vietcombank, đáo hạn 01/06/2027, tính vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "bond",
+  "asset_name": "Trái phiếu doanh nghiệp ABC",
+  "accrual": {
+   "principal": 100000000,
+   "rate_pa": 9,
+   "start_date": "2026-03-01",
+   "maturity_date": "2029-03-01"
+  },
+  "count_percent": 90,
+  "reason": "Khách khai trái phiếu doanh nghiệp ABC, gốc 100.000.000đ, lãi 9%/năm, kỳ hạn 01/03/2026–01/03/2029, muốn tính 90% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn thêm loại vàng nào vào mục tiêu Mua Xe VF3?",
+    "options": [
+     "Vàng nhẫn 9999 (giá 13.940.000đ/chỉ)",
+     "Vàng miếng SJC (giá 14.010.000đ/chỉ)"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn thêm quỹ An Bình nào vào mục tiêu Mua Xe VF3?",
+    "options": [
+     "Quỹ trái phiếu An Bình (14.743đ/CCQ)",
+     "Quỹ cổ phiếu An Bình Thịnh Vượng (9.102đ/CCQ)"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "gold",
+  "asset_name": "Vàng miếng SJC",
+  "instrument_id": "gold-sjc",
+  "quantity": 3,
+  "count_percent": 100,
+  "reason": "Khách khai 3 chỉ vàng miếng SJC mua giá 8.000.000đ/chỉ và muốn tính 100% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "motorbike",
+  "asset_name": "Yamaha Exciter",
+  "value": 40000000,
+  "count_percent": 100,
+  "reason": "Khách khai xe máy Yamaha Exciter trị giá 40.000.000đ và muốn tính đủ vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "edit_asset",
+  "asset_id": "asset-901",
+  "asset_name": "Xe máy Honda",
+  "change": "revalue",
+  "value": 28000000,
+  "reason": "Khách cập nhật giá trị xe máy Honda còn 28.000.000đ"
+ },
+ {
+  "type": "edit_asset",
+  "asset_id": "asset-902",
+  "asset_name": "Vàng nhẫn",
+  "change": "quantity",
+  "quantity": 3,
+  "reason": "Khách mua thêm vàng nhẫn, nâng tổng từ 2 lên 3 chỉ"
+ },
+ {
+  "type": "edit_asset",
+  "asset_id": "asset-903",
+  "asset_name": "Cổ phiếu ACB",
+  "change": "remove",
+  "reason": "Khách muốn bỏ cổ phiếu ACB khỏi mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "edit_asset",
+  "asset_id": "asset-904",
+  "asset_name": "Gửi Vietcombank",
+  "change": "remove",
+  "reason": "Khách muốn bỏ khoản gửi Vietcombank khỏi mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "edit_asset",
+  "asset_id": "asset-903",
+  "asset_name": "Cổ phiếu ACB",
+  "change": "quantity",
+  "quantity": 1500,
+  "reason": "Khách cập nhật số lượng cổ phiếu ACB từ 1.000 lên 1.500 cổ phiếu"
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn thêm loại vàng nào vào mục tiêu Mua Xe VF3?",
+    "options": [
+     "Vàng nhẫn 9999 (giá hôm nay 13.940.000đ/chỉ)",
+     "Vàng miếng SJC (giá hôm nay 14.010.000đ/chỉ)"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn thêm chứng chỉ quỹ An Bình nào vào mục tiêu Mua Xe VF3?",
+    "options": [
+     "Quỹ đầu tư trái phiếu An Bình (giá hôm nay 14.743đ/CCQ)",
+     "Quỹ đầu tư cổ phiếu An Bình Thịnh Vượng (giá hôm nay 9.102đ/CCQ)"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn tiết kiệm khoảng bao nhiêu cho căn nhà?",
+    "options": [
+     "Khoảng 1 tỷ đồng",
+     "Khoảng 2 tỷ đồng",
+     "Khoảng 3 tỷ đồng",
+     "Khoảng 5 tỷ đồng"
+    ]
+   },
+   {
+    "question": "Bạn dự kiến đạt mục tiêu trong bao lâu?",
+    "options": [
+     "Trong 5 năm",
+     "Trong 7 năm",
+     "Trong 10 năm",
+     "Trong 15 năm"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "create_goal",
+  "goal_name": "Mua nhà",
+  "template": "house",
+  "target_amount": 2000000000,
+  "target_date": "2033-10-21",
+  "initial_deposit": 0,
+  "monthly_amount": 23810000,
+  "monthly_day": 6,
+  "reason": "Khách muốn mua nhà khoảng 2.000.000.000đ trong 7 năm tới, cần góp khoảng 23.810.000đ mỗi tháng"
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn dự kiến đạt mục tiêu 600 triệu trong bao lâu?",
+    "options": [
+     "Trong 2 năm",
+     "Trong 3 năm",
+     "Trong 4 năm",
+     "Trong 5 năm"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "create_goal",
+  "goal_name": "Mua xe",
+  "template": "car",
+  "target_amount": 600000000,
+  "target_date": "2029-10-21",
+  "initial_deposit": 0,
+  "monthly_amount": 16667000,
+  "monthly_day": 6,
+  "reason": "Khách muốn mua xe 600.000.000đ trong 3 năm, hạn 21/10/2029, cần góp khoảng 16.667.000đ mỗi tháng"
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn thêm loại vàng nào?",
+    "options": [
+     "Vàng nhẫn 9999 (giá hôm nay 13.940.000đ/chỉ)",
+     "Vàng miếng SJC (giá hôm nay 14.010.000đ/chỉ)"
+    ]
+   },
+   {
+    "question": "Bao nhiêu chỉ?",
+    "options": [
+     "1 chỉ",
+     "2 chỉ",
+     "3 chỉ"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "gold",
+  "asset_name": "Vàng nhẫn 9999",
+  "instrument_id": "gold-ring",
+  "quantity": 2,
+  "count_percent": 100,
+  "reason": "Khách khai 2 chỉ vàng nhẫn 9999 (giá hôm nay 13.940.000đ/chỉ) và muốn tính 100% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "clarify_options",
+  "questions": [
+   {
+    "question": "Bạn muốn thêm quỹ An Bình nào vào mục tiêu Mua Xe VF3?",
+    "options": [
+     "Quỹ đầu tư trái phiếu An Bình (giá hôm nay 14.743đ/CCQ)",
+     "Quỹ đầu tư cổ phiếu An Bình Thịnh Vượng (giá hôm nay 9.102đ/CCQ)"
+    ]
+   }
+  ]
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "external_fund",
+  "asset_name": "CCQ An Bình (trái phiếu)",
+  "instrument_id": "fund-ABBF",
+  "quantity": 100,
+  "count_percent": 100,
+  "reason": "Khách khai đang giữ 100 chứng chỉ quỹ đầu tư trái phiếu An Bình và muốn tính 100% vào mục tiêu Mua Xe VF3"
+ },
+ {
+  "type": "add_asset",
+  "goal_id": "goal-13",
+  "category": "deposit",
+  "asset_name": "Gửi tiết kiệm Techcombank",
+  "accrual": {
+   "principal": 50000000,
+   "rate_pa": 5.5,
+   "start_date": "2026-08-01",
+   "maturity_date": "2027-08-01"
+  },
+  "count_percent": 100,
+  "institution": "Techcombank",
+  "reason": "Khách khai khoản gửi 50.000.000đ lãi 5,5%/năm ở Techcombank, gửi từ 01/08/2026, đáo hạn 01/08/2027, tính vào mục tiêu Mua Xe VF3"
+ }
+]
