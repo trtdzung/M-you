@@ -167,7 +167,7 @@ export function AgentClarifyOptionsCard({
   const question = ui.questions[single ? 0 : step];
 
   return (
-    <div className={cn("shadow-card mt-2 flex flex-col gap-3 rounded-2xl bg-surface p-3", fullWidth ? "w-full" : "max-w-[85%]")}>
+    <div className={cn("shadow-card mt-2 flex flex-col gap-3 rounded-2xl bg-surface p-3", fullWidth ? "w-full" : "w-[85%]")}>
       {reopened && (
         <p className="rounded-lg bg-surface-tint px-2.5 py-1.5 text-[11px] text-muted">
           Bạn đang sửa lại câu trả lời này — câu trả lời mới sẽ được gửi tiếp vào đoạn chat, các tin nhắn cũ vẫn giữ nguyên.
