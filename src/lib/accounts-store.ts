@@ -18,6 +18,7 @@ import { PERSONA_LIST } from "@/providers/mock/personas";
 import { buildPersonaAccounts } from "@/providers/mock/fixtures/generate";
 import { getDb } from "./db";
 import { upsertManualTxn } from "./manual-txns-store";
+import { creditTransferRecipient, type IncomingCredit } from "./security/credit-store";
 
 interface AccountRow {
   cif: string;
@@ -123,7 +124,7 @@ export class AccountNotFoundError extends Error {
  * (rolling back) when the account doesn't exist, rather than storing a txn
  * against no debit.
  */
-export function debitAccount(cif: string, accountId: string, amount: number, record?: Transaction): Account[] {
+export function debitAccount(cif: string, accountId: string, amount: number, record?: Transaction, onCredit?: (credit: IncomingCredit) => void): Account[] {
   if (!Number.isFinite(amount) || amount <= 0) return readAccounts(cif);
   seedIfEmpty(cif);
   const db = getDb();
@@ -134,6 +135,9 @@ export function debitAccount(cif: string, accountId: string, amount: number, rec
         .get(cif, record.id);
       if (exists) return; // replay — already debited + recorded together
     }
+    // Resolve and credit before subtracting so the recipient leg can check full funding.
+    // This shares the transaction (and guardTransferReplay's outer transaction).
+    const credit = record ? creditTransferRecipient(cif, accountId, amount, record) : undefined;
     const { changes } = db
       .prepare(
         `UPDATE accounts
@@ -144,6 +148,7 @@ export function debitAccount(cif: string, accountId: string, amount: number, rec
       .run({ cif, id: accountId, amount });
     if (changes === 0) throw new AccountNotFoundError(accountId);
     if (record) upsertManualTxn(cif, record);
+    if (credit) onCredit?.(credit); // caller collects only; evaluate after the outer commit
   });
   run();
   return readAccounts(cif);
