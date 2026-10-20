@@ -99,7 +99,7 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, onScam, on
         </p>
       </div>
       <div className={`rounded-[20px] border border-border bg-white p-4 ${answer === "Có" ? "hidden" : ""}`}>
-        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} onAnswer={setAnswer} />
+        <Diagnosis cif={cif} id={hold.id} onChoose={onChoose} onProposals={setProposed} onAnswer={setAnswer} sourceLine={false} />
       </div>
       {answer === "Có" && (
         <div className="flex flex-col gap-2 rounded-[20px] border border-border bg-white p-4">

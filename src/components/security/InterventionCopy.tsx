@@ -52,7 +52,7 @@ export function InterventionBody({ intervention, onChoose, extra }: {
 }) {
   const { copy } = intervention;
   const message = intervention.scenario === "BT6"
-    ? "Thêm người nhận này vào danh bạ tin cậy sau khi bạn đã xác minh. Danh bạ được dùng để điều chỉnh cảnh báo và giữ giao dịch theo cài đặt."
+    ? "Anh/chị chuyển cho người này lần thứ 2 rồi. Nếu đã biết rõ, anh/chị lưu vào danh bạ tin cậy để M-You bớt nhắc nhé."
     : copy.message;
   const cards = (intervention.scenario === "BT2" || intervention.scenario === "HUB") ? progressCards(message, copy.chips) : null;
   return (
@@ -72,7 +72,7 @@ export function InterventionBody({ intervention, onChoose, extra }: {
         </>
       ) : (
         <>
-          <SourceLine intervention={intervention} />
+          {intervention.scenario !== "BT6" && <SourceLine intervention={intervention} />}
           {message && <p className="whitespace-pre-line text-[15px] leading-relaxed"><Emphasized text={message} emphasis={copy.emphasis} /></p>}
           {copy.question && <p className="text-[15px] font-semibold leading-relaxed">{copy.question}</p>}
           {copy.chips.length > 0 && (

@@ -181,7 +181,7 @@ export function TransferSuccess({
           )}
 
           <div className="px-5 pt-4" data-shield-slot="transfer-success" />
-          <p className="px-5 pt-3 text-sm leading-relaxed text-muted">Danh bạ tin cậy được dùng để điều chỉnh cảnh báo và giữ giao dịch theo cài đặt. Hãy xác minh đúng người nhận trước khi thêm; bạn có thể gỡ trong Trung tâm bảo mật.</p>
+          <p className="px-5 pt-3 text-sm leading-relaxed text-muted">Danh bạ tin cậy được dùng để điều chỉnh cảnh báo và giữ giao dịch theo cài đặt. Hãy xác minh đúng người nhận trước khi thêm; anh/chị có thể gỡ trong Trung tâm bảo mật.</p>
           <div className="flex justify-center gap-10 px-5 py-5">
             <button
               type="button"
