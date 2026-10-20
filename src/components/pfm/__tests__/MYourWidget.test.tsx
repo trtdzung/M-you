@@ -253,6 +253,31 @@ describe("MYourWidget", () => {
     expect(screen.queryByRole("button", { name: "Thanh toán ngay" })).not.toBeInTheDocument();
   });
 
+  it("renders the goal card for a valid goal proposal and drops a malformed one", async () => {
+    const goalUi = { type: "create_goal", goal_name: "Mua xe", template: "car", target_amount: 600000000, target_date: "2027-12-31", flexibility: "date_flexible", initial_deposit: 0, reason: "Khách muốn mua xe" };
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({ answer: "Mình đề xuất mục tiêu Mua xe.", thread_id: "CIF_0001", ui: goalUi as agentApi.UiPayload });
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Đặt mục tiêu mua xe" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+    expect(await screen.findByText("Đề xuất tạo mục tiêu mới")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tạo mục tiêu" })).toBeEnabled();
+  });
+
+  it("shows only the text when the goal proposal is malformed", async () => {
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
+      answer: "Mình đề xuất mục tiêu.",
+      thread_id: "CIF_0001",
+      ui: { type: "create_goal", goal_name: "Mua xe", template: "boat" } as agentApi.UiPayload,
+    });
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Đặt mục tiêu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+    expect(await screen.findByText("Mình đề xuất mục tiêu.")).toBeInTheDocument();
+    expect(screen.queryByText("Đề xuất tạo mục tiêu mới")).not.toBeInTheDocument();
+  });
+
   it("shows an inline error on the reply bubble when sending fails", async () => {
     vi.spyOn(agentApi, "sendChatMessage").mockRejectedValueOnce(new Error("network down"));
     renderWidget();

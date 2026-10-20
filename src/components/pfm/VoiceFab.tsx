@@ -19,6 +19,8 @@ import { AgentChartCard } from "./AgentChartCard";
 import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
+import { AgentGoalUiCard } from "./AgentGoalUiCard";
+import { isGoalUi } from "@/lib/agent-goal-api";
 import { VoiceWaveform } from "./VoiceWaveform";
 
 /** Tallest the plain-text answer may grow in the voice section before it is cut off. */
@@ -391,6 +393,10 @@ export function VoiceFab({ floating = false }: { floating?: boolean }) {
               ) : isJarUi(reply.ui, expenseIds) ? (
                 <div className="flex w-full flex-col items-start">
                   <AgentJarUiCard ui={reply.ui} fullWidth />
+                </div>
+              ) : isGoalUi(reply.ui) ? (
+                <div className="flex w-full flex-col items-start">
+                  <AgentGoalUiCard ui={reply.ui} fullWidth />
                 </div>
               ) : isChartUi(reply.ui) ? (
                 <div className="flex w-full flex-col items-start">

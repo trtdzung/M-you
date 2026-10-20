@@ -48,4 +48,31 @@ describe("số tài khoản dự kiến ở màn tạo khớp số server cấp"
     const bad = applyAction(CIF, "assets-bad", { type: "createGoal", input: { ...goalInput("bad"), assets: [{ ...asset, category: "nope" }] } });
     expect(bad.ok).toBe(false);
   });
+
+  it("addAsset nhận đủ chín loại tài sản đúng như thẻ gửi, mỗi loại thành tài sản tự khai đúng nhóm", () => {
+    const created = applyAction(CIF, "assets9-goal", { type: "createGoal", input: goalInput("chín loại") });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const goalId = created.createdGoalId!;
+    const hand = (category: string, value: number) => ({ category, value, source: "self_reported" });
+    const market = (category: string, instrumentId: string, quantity: number) => ({ category, value: 0, source: "estimated", instrumentId, quantity });
+    const accrual = (category: string, principal: number, ratePa: number, startDate: string, maturityDate?: string) => ({
+      category, value: principal, source: "estimated", accrual: { principal, ratePa, startDate, ...(maturityDate ? { maturityDate } : {}) },
+    });
+    const cases = [
+      hand("house", 2_000_000_000), hand("car", 600_000_000), hand("motorbike", 30_000_000), hand("other", 80_000_000),
+      market("gold", "gold-ring", 2), market("stock", "stock-acb", 1000), market("external_fund", "fund-AEIF", 500),
+      accrual("deposit", 50_000_000, 5.2, "2026-06-01", "2027-06-01"), accrual("bond", 100_000_000, 9, "2026-03-01", "2029-03-01"),
+    ];
+    for (const extra of cases) {
+      const r = applyAction(CIF, `assets9-${extra.category}`, { type: "addAsset", goalId, name: `Tài sản ${extra.category}`, countPercent: 80, ...extra });
+      expect(r.ok, `${extra.category}: ${r.ok ? "" : r.error}`).toBe(true);
+      if (!r.ok) return;
+      const asset = r.world.assets.find((a) => a.goalId === goalId && a.category === extra.category);
+      expect(asset, extra.category).toMatchObject({ type: "declared", category: extra.category, countPercent: 80, status: "held" });
+      if ("instrumentId" in extra && "quantity" in extra) expect(asset).toMatchObject({ instrumentId: extra.instrumentId, quantity: extra.quantity });
+      if ("accrual" in extra) expect(asset).toMatchObject({ accrual: extra.accrual });
+    }
+    expect(applyAction(CIF, "assets9-bad", { type: "addAsset", goalId, name: "x", category: "crypto", value: 1, countPercent: 10 }).ok).toBe(false);
+  });
 });

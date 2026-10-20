@@ -27,6 +27,8 @@ import { AgentChartCard } from "./AgentChartCard";
 import { AgentClarifyOptionsCard } from "./AgentClarifyOptionsCard";
 import { AgentTransferFormCard } from "./AgentTransferFormCard";
 import { AgentJarUiCard } from "./AgentJarUiCard";
+import { AgentGoalUiCard } from "./AgentGoalUiCard";
+import { isGoalUi } from "@/lib/agent-goal-api";
 import { ClarifyAnswerBubble } from "./ClarifyAnswerBubble";
 import { StatusBar } from "@/components/shell/StatusBar";
 import { takeInsightDraft, takePendingChatMessage } from "@/insights/proactive/chat-handoff";
@@ -459,6 +461,7 @@ export function MYourWidget() {
                       {m.role === "agent" && isChartUi(m.ui) && <AgentChartCard chart={m.ui} />}
                       {m.role === "agent" && isTransferFormUi(m.ui, expenseIds) && <AgentTransferFormCard form={m.ui} />}
                       {m.role === "agent" && isJarUi(m.ui, expenseIds) && <AgentJarUiCard ui={m.ui} />}
+                      {m.role === "agent" && isGoalUi(m.ui) && <AgentGoalUiCard ui={m.ui} />}
                       {clarify && (isLatestUnanswered || isReopened) && (
                         <AgentClarifyOptionsCard
                           ui={clarify}
