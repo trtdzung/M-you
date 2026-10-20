@@ -41,7 +41,7 @@ function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, 
   }, [wait]);
 
   const reason = transferRedReason(intervention, { recipientName: details?.recipientName ?? "người nhận này" });
-  const close = () => step === "yes" ? onChoose(TRANSFER_LABELS.stop) : onClose();
+  const close = () => onClose();
 
   return (
     <Sheet open title={TRANSFER_RED_STEPS.heading.text} onClose={close}>

@@ -501,7 +501,11 @@ export function TransferConfirm() {
       >
         {submitting ? "Đang xử lý…" : checking ? "M-You đang kiểm tra giao dịch…" : "Xác nhận"}
       </button>
-      <TransferAlertSheet details={transferDetails} cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => redFor && void chooseShield(redFor, "Đóng")} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
+      <TransferAlertSheet details={transferDetails} cif={persona.cif} open={redFor !== null} intervention={redFor} onClose={() => {
+        if (!redFor) return;
+        useSecurityStore.getState().logAlert({ level: "red", situation: redFor.copy.message, choice: "Đóng", note: `Nguồn: ${redFor.source === "agent" ? "M-You" : "tự động"} (${redFor.scenario})` });
+        setRedFor(null);
+      }} onChoose={choice => redFor && void chooseShield(redFor, choice)} />
       <TransferAlertSheet details={transferDetails} cif={persona.cif} open={classifyFor !== null} intervention={classifyFor} classifyOnly onClose={() => setClassifyFor(null)} onChoose={chooseClassify} />
       </div>
     </div>
