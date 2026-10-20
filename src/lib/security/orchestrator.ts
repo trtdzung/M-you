@@ -129,7 +129,7 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
         .filter(s => s.code === "T7b")
       : [];
     incomingSignals = [...bait, ...large];
-    ctx.hasActiveEmergencyContact = profile.emergencyContacts.some(c => c.status === "active" || c.status === "removing");
+    ctx.hasActiveEmergencyContact = profile.emergencyContacts.length > 0;
     ctx.incomingSignals = incomingSignals;
   }
   if (trigger === "transfer_success" && input.recipient) {
@@ -158,7 +158,7 @@ function evaluateMoment(cif: string, trigger: MomentContext["trigger"], input: E
 }
 
 function notifyFamily(cif: string, scenario: string, at: number): void {
-  const contacts = readProfile(cif).emergencyContacts.filter(c => c.status === "active" || c.status === "removing");
+  const contacts = readProfile(cif).emergencyContacts;
   if (!contacts.length) return;
   recordEvent(cif, "family_push", {
     message: "M-You, trợ lý AI của MSB, vừa cảnh báo một giao dịch có dấu hiệu lừa đảo của người thân bạn. Hãy gọi hỏi thăm họ ngay (giả lập).",

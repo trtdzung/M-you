@@ -52,7 +52,7 @@ export function requestHold(cif: string, review: TransferReview): Hold | null {
   getDb()
     .prepare("INSERT INTO transfer_holds (id, cif, status, amount, review, created_at, release_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .run(row.id, cif, row.status, row.amount, row.review, row.created_at, row.release_at);
-  const contacts = readProfile(cif).emergencyContacts.filter(c => c.status === "active" || c.status === "removing");
+  const contacts = readProfile(cif).emergencyContacts;
   if (contacts.length) {
     // UC 10: the contact is told a transfer is held — no balance, no amount, no recipient.
     recordEvent(cif, "family_push", { message: `MSB đang tạm giữ một giao dịch chuyển tiền của người thân bạn trong ${HOLD_MINUTES} phút để kiểm tra (giả lập).`, scenario: "HOLD", contactIds: contacts.map(c => c.id) }, now);

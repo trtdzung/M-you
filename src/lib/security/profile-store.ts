@@ -20,9 +20,9 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 
 function emergencyContact(v: unknown): EmergencyContact | null {
   if (!isRecord(v) || !isText(v.id) || !isText(v.name) || !isText(v.relation) || !isText(v.phone)) return null;
-  if (v.status !== "pending" && v.status !== "active" && v.status !== "removing") return null;
-  // "pending" is from before contacts counted once notified; read it as active.
-  return { id: v.id, name: v.name, relation: v.relation, phone: v.phone, status: v.status === "removing" ? "removing" : "active", ...(isTime(v.removeAt) ? { removeAt: v.removeAt } : {}) };
+  // "pending" predates notify-only contacts; read it as active ("removing" ones are dropped below).
+  if (v.status !== "pending" && v.status !== "active") return null;
+  return { id: v.id, name: v.name, relation: v.relation, phone: v.phone, status: "active" };
 }
 
 function trustedContact(v: unknown): TrustedContact | null {
@@ -48,7 +48,8 @@ export function sanitizeSecurityState(v: unknown): SecurityState | { error: stri
   const bool = (key: "aiProtect" | "familyAlerts" | "securityTips") => typeof v[key] === "boolean";
   if (!bool("aiProtect") || !bool("familyAlerts") || !bool("securityTips")) return { error: "flags are invalid" };
   if (v.antiPhishingCode !== null && !isText(v.antiPhishingCode, 12)) return { error: "antiPhishingCode is invalid" };
-  const emergencyContacts = list(v.emergencyContacts, emergencyContact);
+  // Removal is immediate now; a contact saved mid-24h-removal is already gone.
+  const emergencyContacts = list(Array.isArray(v.emergencyContacts) ? v.emergencyContacts.filter(c => !isRecord(c) || c.status !== "removing") : v.emergencyContacts, emergencyContact);
   const trustedContacts = list(v.trustedContacts, trustedContact);
   const alertLog = list(v.alertLog, alertEntry);
   if (!emergencyContacts || !trustedContacts || !alertLog) return { error: "lists are invalid" };

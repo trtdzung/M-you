@@ -6,7 +6,7 @@ export type TransferBlock =
   | { blocked: false }
   | { blocked: true; reason: "account-locked" | "transfer-locked"; until?: number };
 
-/** Contacts that will be notified, including ones waiting out a 24h removal. */
+/** Contacts that will be notified. */
 export function effectiveContacts(state: Pick<SecurityState, "emergencyContacts">): EmergencyContact[] {
   return state.emergencyContacts;
 }

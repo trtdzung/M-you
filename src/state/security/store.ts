@@ -1,8 +1,7 @@
 "use client";
 
 // Scam Shield store (zustand, client only). Actions carry the business rules:
-// raising security applies at once, lowering it waits 24h (`pendingOff`,
-// contact "removing"). The store never reads React context; components pass in
+// raising security applies at once, lowering it waits 24h (`pendingOff`). The store never reads React context; components pass in
 // what it needs. Persisted per persona through `storage.ts` (server API).
 
 import { create } from "zustand";
@@ -27,9 +26,7 @@ type SecurityActions = {
   applyOff: (key: OffKey) => void;
   saveAntiPhishingCode: (code: string) => void;
   addEmergencyContact: (input: { name: string; relation: string; phone: string }) => void;
-  requestRemoveContact: (id: string, now?: number) => void;
-  cancelRemoveContact: (id: string) => void;
-  applyRemoveContact: (id: string) => void;
+  removeEmergencyContact: (id: string) => void;
   removeTrustedContact: (id: string) => void;
   addTrustedContact: (input: Omit<TrustedContact, "id">) => void;
   /** UC 10 (b) hold: turning on applies now; turning off waits 24h (`requestOff("hold")`). */
@@ -64,8 +61,6 @@ const newId = () => crypto.randomUUID();
 const sameName = (a: string, b: string) => a.trim().toUpperCase() === b.trim().toUpperCase();
 
 export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
-  const mapContacts = (id: string, change: (contact: EmergencyContact) => EmergencyContact) =>
-    set(state => ({ emergencyContacts: state.emergencyContacts.map(contact => contact.id === id ? change(contact) : contact) }));
   const dropContact = (id: string) => set(state => ({ emergencyContacts: state.emergencyContacts.filter(contact => contact.id !== id) }));
 
   return {
@@ -83,9 +78,7 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
 
     addEmergencyContact: input => set(state => state.emergencyContacts.length >= MAX_EMERGENCY_CONTACTS ? state
       : { emergencyContacts: [...state.emergencyContacts, { ...input, id: newId(), status: "active" }] }),
-    requestRemoveContact: (id, now = clockNow()) => mapContacts(id, item => ({ ...item, status: "removing", removeAt: now + DAY_MS })),
-    cancelRemoveContact: id => mapContacts(id, contact => ({ ...contact, status: "active", removeAt: undefined })),
-    applyRemoveContact: dropContact,
+    removeEmergencyContact: dropContact,
 
     removeTrustedContact: id => set(state => ({ trustedContacts: state.trustedContacts.filter(contact => contact.id !== id) })),
     addTrustedContact: input => set(state => state.trustedContacts.some(contact => sameName(contact.name, input.name) && contact.account === input.account) ? state
@@ -127,10 +120,11 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     for (const key of Object.keys(SECURITY_DEFAULTS) as (keyof SecurityState)[]) data[key] = state[key];
     return data as SecurityState;
   },
-  // Anything older or partial falls back to defaults. v2: contacts count once notified, so
-  // v1 contacts still waiting for consent become active.
+  // Anything older or partial falls back to defaults. v2: contacts count once notified and
+  // removal is immediate, so old "pending" contacts become active and "removing" ones go.
   migrate: persisted => {
     const data = { ...SECURITY_DEFAULTS, ...(persisted as Partial<SecurityState>) };
-    return { ...data, emergencyContacts: data.emergencyContacts.map(contact => (contact.status as string) === "pending" ? { ...contact, status: "active" as const } : contact) };
+    const contacts = data.emergencyContacts as unknown as (Omit<EmergencyContact, "status"> & { status: string })[];
+    return { ...data, emergencyContacts: contacts.filter(contact => contact.status !== "removing").map(({ id, name, relation, phone }) => ({ id, name, relation, phone, status: "active" as const })) };
   },
 }));

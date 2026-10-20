@@ -66,7 +66,7 @@ export function agentEvents(cif: string, hours: number) {
 }
 export function agentProfile(cif: string) {
   const p = readProfile(cif);
-  const contacts = p.emergencyContacts.filter(c => c.status === "active" || c.status === "removing").length;
+  const contacts = p.emergencyContacts.length;
   return { score: null, score_unknown_reason: "auth settings are not persisted on the server", protection_points: (p.aiProtect ? 10 : 0) + (p.antiPhishingCode ? 15 : 0) + (contacts ? 15 : 0) + (p.trustedContacts.length ? 10 : 0),
     ai_protect: p.aiProtect, anti_phishing: p.antiPhishingCode !== null, active_contacts: contacts,
     account_locked: p.accountLocked, cards_locked: p.cardsLocked ?? p.accountLocked, hold_enabled: p.holdEnabled, hold_threshold: p.holdThreshold };
