@@ -75,7 +75,7 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
 const qtyGroup = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
 /** Số lượng hiển thị theo vi-VN, lưu thô với dấu chấm thập phân. */
-function parseQtyInput(text: string, fractional: boolean): string {
+export function parseQtyInput(text: string, fractional: boolean): string {
   const t = text.replace(/\./g, "").replace(",", ".");
   if (!fractional) return t.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12);
   const [whole = "", ...fraction] = t.replace(/[^\d.]/g, "").split(".");
@@ -85,7 +85,7 @@ function parseQtyInput(text: string, fractional: boolean): string {
 }
 
 /** Giữ nguyên phần thập phân đang gõ, dùng dấu chấm ngăn nghìn. */
-function formatQtyInput(raw: string): string {
+export function formatQtyInput(raw: string): string {
   if (raw === "") return "";
   const [int, dec] = raw.split(".");
   const grouped = int === "" ? "" : qtyGroup.format(Number(int));
