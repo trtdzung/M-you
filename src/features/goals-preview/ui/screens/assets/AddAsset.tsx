@@ -72,28 +72,24 @@ function TypeGrid({ title, types, value, onPick }: { title: string; types: TypeD
   );
 }
 
-const qtyGroup = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const qtyGroup = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 
-/**
- * Chuẩn hoá ô số lượng về dạng thô "1234.5": bỏ dấu phẩy ngăn nghìn, dấu chấm là dấu thập phân (tối đa 2 số).
- * Bàn phím điện thoại tiếng Việt chỉ có ",": gõ "," ở cuối khi chưa có phần thập phân được hiểu là dấu thập phân.
- */
-function parseQtyInput(text: string, prevRaw: string, fractional: boolean): string {
-  let t = text;
-  if (fractional && t.endsWith(",") && !prevRaw.includes(".")) t = `${t.slice(0, -1)}.`;
-  t = t.replace(/,/g, "");
+/** Số lượng hiển thị theo vi-VN, lưu thô với dấu chấm thập phân. */
+function parseQtyInput(text: string, fractional: boolean): string {
+  const t = text.replace(/\./g, "").replace(",", ".");
   if (!fractional) return t.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12);
-  const [int = "", ...rest] = t.replace(/[^\d.]/g, "").split(".");
-  const intPart = int.replace(/^0+(?=\d)/, "").slice(0, 12);
-  return rest.length ? `${intPart || "0"}.${rest.join("").slice(0, 2)}` : intPart;
+  const [whole = "", ...fraction] = t.replace(/[^\d.]/g, "").split(".");
+  const digits = whole.replace(/^0+(?=\d)/, "").slice(0, 12);
+  return fraction.length ? `${digits || "0"}.${fraction.join("").slice(0, 2)}` : digits;
+
 }
 
-/** Hiển thị số lượng thô với dấu phẩy ngăn nghìn, giữ nguyên phần thập phân đang gõ. */
+/** Giữ nguyên phần thập phân đang gõ, dùng dấu chấm ngăn nghìn. */
 function formatQtyInput(raw: string): string {
   if (raw === "") return "";
   const [int, dec] = raw.split(".");
   const grouped = int === "" ? "" : qtyGroup.format(Number(int));
-  return dec === undefined ? grouped : `${grouped}.${dec}`;
+  return dec === undefined ? grouped : `${grouped},${dec}`;
 }
 
 /** Thêm tài sản ngoài MSB: tài sản vật chất (tự khai giá) hoặc tài sản tài chính ở nơi khác (tự định giá). */
@@ -244,13 +240,12 @@ export function AddAsset({ params }: ScreenProps) {
         <section className={cn(card, "flex flex-col gap-4")} aria-label="Số lượng nắm giữ">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
-              <h2 className={sectionTitle}>{type.category === "gold" ? "Loại vàng" : type.category === "stock" ? "Mã cổ phiếu" : "Quỹ"}</h2>
+              <h2 className={sectionTitle}>{type.category === "gold" ? "Loại vàng" : type.category === "stock" ? "Cổ phiếu" : "Quỹ"}</h2>
               <InfoTooltip
                 label="cách định giá"
                 text="Bạn chỉ khai số lượng. App tự tính giá trị theo giá thị trường hằng ngày. Nhớ sửa số lượng khi mua thêm hoặc bán bớt."
               />
             </div>
-            <SourceTag source="estimated" />
           </div>
           {type.category === "gold" ? (
             <div className="flex flex-wrap gap-2">
@@ -278,23 +273,28 @@ export function AddAsset({ params }: ScreenProps) {
           )}
           {instrument && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="asset-qty" className={label}>Số lượng ({instrument.unit})</label>
-              <div className="flex items-baseline gap-2 border-b-2 border-border pb-1 focus-within:border-primary">
+              <label htmlFor="asset-qty" className={label}>Số lượng nắm giữ</label>
+              <div className="flex items-baseline gap-2 rounded-2xl border border-border bg-surface-muted/40 px-3.5 py-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
                 <input
                   id="asset-qty"
                   inputMode={instrument.fractional ? "decimal" : "numeric"}
                   className="min-w-0 flex-1 bg-transparent text-[22px] font-bold tabular-nums text-text outline-none placeholder:text-muted"
                   placeholder="0"
                   value={formatQtyInput(quantity)}
-                  onChange={(e) => setQuantity(parseQtyInput(e.target.value, quantity, instrument.fractional))}
+                  onChange={(e) => setQuantity(parseQtyInput(e.target.value, instrument.fractional))}
                 />
-                <span className="shrink-0 text-sm font-semibold text-muted">{instrument.unit}</span>
+                <span className="shrink-0 text-sm font-semibold text-muted">{type.category === "stock" ? "cp" : instrument.unit}</span>
               </div>
               {type.category === "gold" && (
                 <p className="text-[13px] text-muted">Giá mua vào{quoteTime ? ` lúc ${quoteTime}` : ""} ngày {priceDate}: {formatVnd(unitPrice)}/{instrument.unit}</p>
               )}
             </div>
           )}
+          <div className="rounded-2xl bg-primary-soft px-4 py-3" aria-live="polite" aria-atomic="true">
+            <p className="text-[13px] text-muted">Giá trị ước tính</p>
+            <p className="mt-1 text-[24px] font-bold tabular-nums tracking-tight text-text">{autoValue ? `${qtyGroup.format(autoValue)} ₫` : "—"}</p>
+            <p className="mt-1 text-[12px] text-muted">{instrument ? `Theo giá ${type.category === "stock" ? "đóng cửa" : type.category === "gold" ? "mua vào" : "NAV"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
+          </div>
         </section>
       )}
 
@@ -333,7 +333,7 @@ export function AddAsset({ params }: ScreenProps) {
         </section>
       )}
 
-      {valuation !== "manual" && (
+      {valuation === "accrual" && (
         <section className={cn(card, "flex items-center justify-between gap-3")} aria-label={valueLabel}>
           <span className="text-[13px] text-muted">{valueLabel}</span>
           <span className="text-[16px] font-bold tabular-nums text-text">{autoValue ? formatVnd(autoValue) : "—"}</span>
@@ -352,9 +352,11 @@ export function AddAsset({ params }: ScreenProps) {
           <Switch checked={counted} onChange={setCounted} label="Tính vào mục tiêu" />
         </div>
         {counted && <SliderRow label="Tỷ lệ được tính" value={percent} min={10} max={100} step={10} onChange={setPercent} format={(v) => `${v}%`} />}
-        <p className="text-[13px] text-muted">
-          Cộng vào mục tiêu <b className="text-text">{formatVnd(countedValue)}</b> · tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b>
-        </p>
+        <div className="border-t border-border pt-3" aria-live="polite" aria-atomic="true">
+          <p className="text-[13px] text-muted">Giá trị tính vào mục tiêu</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-text">{valid ? `${qtyGroup.format(countedValue)} ₫` : "—"}</p>
+          <p className="mt-1 text-[13px] text-muted">Tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b></p>
+        </div>
       </section>
 
       <BottomActions>

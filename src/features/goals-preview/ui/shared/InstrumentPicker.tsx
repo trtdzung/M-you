@@ -179,13 +179,14 @@ export function InstrumentPicker({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-[16px] font-bold text-text">{selected.name}</p>
-            {selected.fullName && <p className="mt-0.5 truncate text-[13px] text-muted">{selected.fullName}</p>}
+            {selected.fullName && <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{selected.fullName}</p>}
             <p className="mt-1.5 text-[13px] tabular-nums text-muted">
-              {kind === "stock" ? "Giá đóng cửa ngày" : "NAV ngày"} {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}: {priceLabel(price)}/{selected.unit}
+              {kind === "stock" ? "Giá đóng cửa" : "NAV"} · {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}
+              <span className="mt-0.5 block font-semibold text-text">{new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(price)} đ/{kind === "stock" ? "cp" : selected.unit}</span>
             </p>
           </div>
           <button type="button" className={cn(secondaryButton, "!min-h-11 !w-auto shrink-0 !px-4")} onClick={() => setOpen(true)}>
-            Đổi
+            {kind === "stock" ? "Đổi mã" : "Đổi"}
           </button>
         </div>
         <InstrumentSheet
