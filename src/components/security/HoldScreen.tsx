@@ -106,11 +106,9 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled, details }:
         <button type="button" className="transfer-alert-stop" onClick={() => void cancel()}>
           {copy.primary}
         </button>
-        {released && (
-          <button type="button" className="transfer-alert-proceed" onClick={() => void send()}>
-            {copy.secondary}
-          </button>
-        )}
+        <button type="button" className="transfer-alert-proceed" disabled={!released} onClick={() => { if (released) void send(); }}>
+          {copy.secondary}
+        </button>
         <a className="transfer-alert-support" href={TRANSFER_SUPPORT_HREF} onClick={event => {
             event.preventDefault();
             router.push(transferSupportHref(window.location.pathname + window.location.search));
