@@ -182,7 +182,7 @@ describe("chrome separation — PFM wallet shell vs festive shell", () => {
     expect(container.innerHTML).not.toContain("bg-2-9");
   });
 
-  it("Accounts: BottomNav remains on the peach app background", async () => {
+  it("Accounts: BottomNav remains on the soft festive background", async () => {
     routeMock.pathname = "/accounts";
     const { container } = renderScreen(
       <AppChrome>
@@ -192,6 +192,7 @@ describe("chrome separation — PFM wallet shell vs festive shell", () => {
 
     expect(screen.getByLabelText("Điều hướng chính")).toBeInTheDocument();
     expect(container.innerHTML).toContain("accounts-shell");
-    expect(container.innerHTML).toContain("from-[#fce0d5]");
+    expect(container.innerHTML).toContain("soft-festive-bg");
+    expect(container.innerHTML).not.toContain("home-festive-bg");
   });
 });
