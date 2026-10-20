@@ -21,7 +21,8 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 function emergencyContact(v: unknown): EmergencyContact | null {
   if (!isRecord(v) || !isText(v.id) || !isText(v.name) || !isText(v.relation) || !isText(v.phone)) return null;
   if (v.status !== "pending" && v.status !== "active" && v.status !== "removing") return null;
-  return { id: v.id, name: v.name, relation: v.relation, phone: v.phone, status: v.status, ...(isTime(v.removeAt) ? { removeAt: v.removeAt } : {}) };
+  // "pending" is from before contacts counted once notified; read it as active.
+  return { id: v.id, name: v.name, relation: v.relation, phone: v.phone, status: v.status === "removing" ? "removing" : "active", ...(isTime(v.removeAt) ? { removeAt: v.removeAt } : {}) };
 }
 
 function trustedContact(v: unknown): TrustedContact | null {

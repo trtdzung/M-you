@@ -37,7 +37,6 @@ export function SecurityHub() {
   if (!security.hasHydrated) return <SecurityLoading />;
   // A contact being removed stays in effect until the 24h wait ends.
   const activeContacts = effectiveContacts(security).length;
-  const pendingContacts = security.emergencyContacts.some(contact => contact.status === "pending");
   // Score mixes the old demo auth fields with the Scam Shield store.
   const score = securityScore({ passwordUpdated: demo.passwordUpdated || !!recovery.steps[0], devicesCleared: !!recovery.steps[1], faceId: demo.faceId, advanced: demo.advanced, aiProtect: security.aiProtect, antiPhishing: security.antiPhishingCode !== null, activeEmergencyContacts: activeContacts, trustedContacts: security.trustedContacts.length });
   const lockUntil = isTransferLocked(security, appNow.getTime()) ? security.transferLockUntil : null;
@@ -61,7 +60,7 @@ export function SecurityHub() {
     </Panel>
     <Panel title={<>Bảo vệ nâng cao <span className="ml-1 rounded-full bg-primary px-2 py-0.5 align-middle text-[10px] font-bold text-white">MỚI</span></>}>
       <Row label="Mã chống giả mạo" href={href("anti-phishing")} detail="Dấu hiệu nhận diện bổ sung trên các kênh hỗ trợ mã" trailing={<Badge good={security.antiPhishingCode !== null}>{security.antiPhishingCode !== null ? "Đã bật" : "Chưa bật"}</Badge>} />
-      <Row label="Người thân khẩn cấp" href={href("emergency-contacts")} detail="Nhận báo khi bạn gặp cảnh báo Đỏ. Không xem được số dư" trailing={<Badge good={activeContacts > 0}>{activeContacts > 0 ? `${activeContacts} người` : pendingContacts ? "Chờ đồng ý" : "Chưa có"}</Badge>} />
+      <Row label="Người thân khẩn cấp" href={href("emergency-contacts")} detail="Nhận báo khi bạn gặp cảnh báo Đỏ. Không xem được số dư" trailing={<Badge good={activeContacts > 0}>{activeContacts > 0 ? `${activeContacts} người` : "Chưa có"}</Badge>} />
       <Row label="Danh bạ tin cậy" href={href("trusted-contacts")} detail="Quản lý người nhận và phạm vi cảnh báo áp dụng" trailing={<span className="shrink-0 text-sm text-muted">{security.trustedContacts.length} người</span>} />
       <Row label="Tra cứu tài khoản lừa đảo" href={href("lookup")} detail="Kiểm tra số tài khoản trước khi chuyển · dữ liệu giả lập" />
       <Row label="Tự khóa chuyển tiền" href={href("transfer-lock")} detail="Tạm khóa chuyển tiền ra ngoài khi bạn muốn" trailing={lockUntil !== null ? <Badge tone="danger">Đang khóa đến {dateLabel(lockUntil)}</Badge> : <Badge tone="neutral">Đang tắt</Badge>} />

@@ -6,9 +6,9 @@ export type TransferBlock =
   | { blocked: false }
   | { blocked: true; reason: "account-locked" | "transfer-locked"; until?: number };
 
-/** Contacts that will be notified: accepted, including ones waiting out a 24h removal. */
+/** Contacts that will be notified, including ones waiting out a 24h removal. */
 export function effectiveContacts(state: Pick<SecurityState, "emergencyContacts">): EmergencyContact[] {
-  return state.emergencyContacts.filter(contact => contact.status !== "pending");
+  return state.emergencyContacts;
 }
 
 export function isTransferLocked(state: Pick<SecurityState, "transferLockUntil">, now: number): boolean {

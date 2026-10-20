@@ -27,7 +27,6 @@ type SecurityActions = {
   applyOff: (key: OffKey) => void;
   saveAntiPhishingCode: (code: string) => void;
   addEmergencyContact: (input: { name: string; relation: string; phone: string }) => void;
-  approveContact: (id: string) => void;
   requestRemoveContact: (id: string, now?: number) => void;
   cancelRemoveContact: (id: string) => void;
   applyRemoveContact: (id: string) => void;
@@ -83,14 +82,8 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     saveAntiPhishingCode: code => set(state => ({ antiPhishingCode: code, pendingOff: withoutPending(state.pendingOff, "antiPhishing") })),
 
     addEmergencyContact: input => set(state => state.emergencyContacts.length >= MAX_EMERGENCY_CONTACTS ? state
-      : { emergencyContacts: [...state.emergencyContacts, { ...input, id: newId(), status: "pending" }] }),
-    approveContact: id => mapContacts(id, contact => ({ ...contact, status: "active" })),
-    requestRemoveContact: (id, now = clockNow()) => {
-      const contact = get().emergencyContacts.find(item => item.id === id);
-      // Not yet accepted = never protected anyone, so it goes at once.
-      if (contact?.status === "pending") dropContact(id);
-      else mapContacts(id, item => ({ ...item, status: "removing", removeAt: now + DAY_MS }));
-    },
+      : { emergencyContacts: [...state.emergencyContacts, { ...input, id: newId(), status: "active" }] }),
+    requestRemoveContact: (id, now = clockNow()) => mapContacts(id, item => ({ ...item, status: "removing", removeAt: now + DAY_MS })),
     cancelRemoveContact: id => mapContacts(id, contact => ({ ...contact, status: "active", removeAt: undefined })),
     applyRemoveContact: dropContact,
 
@@ -126,7 +119,7 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
 }, {
   name: "msb-pfm.security",
   storage: createJSONStorage(() => securityStorage),
-  version: 1,
+  version: 2,
   skipHydration: true,
   // Data fields only; actions and the hydration flag are never saved.
   partialize: (state): SecurityState => {
@@ -134,6 +127,10 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     for (const key of Object.keys(SECURITY_DEFAULTS) as (keyof SecurityState)[]) data[key] = state[key];
     return data as SecurityState;
   },
-  // v1 is the first version; anything older or partial falls back to defaults.
-  migrate: persisted => ({ ...SECURITY_DEFAULTS, ...(persisted as Partial<SecurityState>) }),
+  // Anything older or partial falls back to defaults. v2: contacts count once notified, so
+  // v1 contacts still waiting for consent become active.
+  migrate: persisted => {
+    const data = { ...SECURITY_DEFAULTS, ...(persisted as Partial<SecurityState>) };
+    return { ...data, emergencyContacts: data.emergencyContacts.map(contact => (contact.status as string) === "pending" ? { ...contact, status: "active" as const } : contact) };
+  },
 }));
