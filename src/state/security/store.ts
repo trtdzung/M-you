@@ -23,7 +23,8 @@ type SecurityActions = {
   requestOff: (key: OffKey, now?: number) => void;
   cancelOff: (key: OffKey) => void;
   /** Applies a requested "turn off" (the demo simulates the 24h wait). */
-  applyOff: (key: OffKey) => void;
+  /** Apply every requested decrease whose 24h wait is over. */
+  settleDueOff: (now?: number) => void;
   saveAntiPhishingCode: (code: string) => void;
   addEmergencyContact: (input: { name: string; relation: string; phone: string }) => void;
   removeEmergencyContact: (id: string) => void;
@@ -73,7 +74,11 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
     },
     requestOff: (key, now = clockNow()) => set(state => ({ pendingOff: { ...state.pendingOff, [key]: now + DAY_MS } })),
     cancelOff: key => set(state => ({ pendingOff: withoutPending(state.pendingOff, key) })),
-    applyOff: key => set(state => ({ ...OFF_CHANGES[key], pendingOff: withoutPending(state.pendingOff, key) })),
+    settleDueOff: (now = clockNow()) => set(state => {
+      const due = (Object.keys(state.pendingOff) as OffKey[]).filter(key => (state.pendingOff[key] ?? Infinity) <= now);
+      if (due.length === 0) return state;
+      return due.reduce<Partial<SecurityState>>((next, key) => ({ ...next, ...OFF_CHANGES[key], pendingOff: withoutPending(next.pendingOff ?? state.pendingOff, key) }), {});
+    }),
     saveAntiPhishingCode: code => set(state => ({ antiPhishingCode: code, pendingOff: withoutPending(state.pendingOff, "antiPhishing") })),
 
     addEmergencyContact: input => set(state => state.emergencyContacts.length >= MAX_EMERGENCY_CONTACTS ? state
@@ -107,6 +112,7 @@ export const useSecurityStore = create<SecurityStore>()(persist((set, get) => {
       setSecurityCif(cif);
       if (cif) await useSecurityStore.persist.rehydrate();
       set({ hasHydrated: true });
+      get().settleDueOff();
     },
   };
 }, {
