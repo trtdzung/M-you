@@ -12,7 +12,7 @@ export type InterventionCopy = { message: string; question: string | null; chips
 
 /** Where it shows: a screen key or an anchor (`[data-shield-anchor]`). */
 export type InterventionTarget =
-  | "transfer-confirm" | "recipient-entry" | "home-transfer" | "home-balance" | "hub-gauge"
+  | "transfer-confirm" | "recipient-entry" | "hub-gauge"
   | "transfer-success" | "fd-settle" | "global" | `txn:${string}`;
 
 export type Intervention = {
@@ -37,7 +37,7 @@ export type Intervention = {
 };
 
 export type EvaluateTrigger =
-  | "transfer_review" | "recipient_entered" | "fd_settle_review" | "incoming_credit" | "app_open"
+  | "transfer_review" | "recipient_entered" | "fd_settle_review" | "incoming_credit"
   | "transfer_screen_open" | "hub_open" | "transfer_success" | "device_login";
 
 /** What the app should do after a choice; the rule engine decides, never the agent. */

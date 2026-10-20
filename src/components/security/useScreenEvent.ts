@@ -5,7 +5,7 @@ import { postSecurityEvent } from "@/lib/security/post-event";
 import { usePersona } from "@/providers/context";
 import { pokeInterventions } from "./useInterventions";
 
-type ScreenEvent = "app_open" | "hub_open" | "transfer_screen_open";
+type ScreenEvent = "hub_open" | "transfer_screen_open";
 
 // Strict-mode remounts and quick back/forward must not log the same screen twice.
 const DEDUPE_MS = 2_000;
@@ -13,7 +13,7 @@ const lastSent = new Map<string, number>();
 
 /**
  * Logs a screen-opened event for the Scam Shield engine when the component
- * mounts. `oncePerSession` logs at most once per browser tab (e.g. app open).
+ * mounts. `oncePerSession` logs at most once per browser tab.
  */
 export function useScreenEvent(type: ScreenEvent, options: { oncePerSession?: boolean } = {}): void {
   const { persona } = usePersona();
