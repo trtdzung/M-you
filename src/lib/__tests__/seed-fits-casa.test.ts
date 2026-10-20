@@ -27,6 +27,9 @@ describe("seeded jars fit CASA (committed sqlite)", () => {
     const db = new Database(DB_PATH, { readonly: true });
     try {
       for (const persona of PERSONA_LIST) {
+        // CIF_0004 (linhcx, test customer) gets its jars on the first server start
+        // (`seedLinhcxDefaults` in db.ts), so the committed file has none for it.
+        if (persona.cif === "CIF_0004") continue;
         const row = db
           .prepare("SELECT COALESCE(SUM(budget_limit), 0) AS sum, COUNT(*) AS n FROM jars WHERE cif = ?")
           .get(persona.cif) as { sum: number; n: number };
