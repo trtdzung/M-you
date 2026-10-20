@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { Card, Money, Sheet, SourceBadge } from "@/components/primitives";
@@ -46,6 +46,7 @@ export function TransferAmountStep({
   amount,
   memo,
   canContinue,
+  recipientShieldNotice,
   onChangeRecipient,
   onSourceChange,
   onAmountChange,
@@ -68,6 +69,8 @@ export function TransferAmountStep({
   amount: string;
   memo: string;
   canContinue: boolean;
+  /** Scam Shield reminder directly below the recipient card. */
+  recipientShieldNotice?: ReactNode;
   onChangeRecipient: () => void;
   onSourceChange: (source: TransferSource) => void;
   onAmountChange: (amount: string) => void;
@@ -116,6 +119,7 @@ export function TransferAmountStep({
           Đổi
         </button>
       </Card>
+      {recipientShieldNotice}
 
       <Card className="transfer-card flex flex-col gap-4">
         <div>

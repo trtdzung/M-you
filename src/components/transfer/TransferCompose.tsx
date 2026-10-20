@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
 import { TransferAlertSheet } from "@/app/transfer-confirm/TransferAlertSheet";
+import { ShieldReopen } from "@/components/security/ShieldReopen";
 import { TransferSafe } from "@/app/transfer-confirm/TransferSafe";
 import { useInterventions } from "@/components/security/useInterventions";
 import { TRANSFER_LABELS, type TransferDetails } from "@/lib/security/transfer-copy";
@@ -74,6 +75,8 @@ export function TransferCompose() {
   const [agentCategoryId, setAgentCategoryId] = useState<string | undefined>(undefined);
 
   function selectRecipient(next: SelectedRecipient) {
+    setDismissedRecipientAlert(null);
+    setReopenedRecipientAlert(false);
     postSecurityEvent("recipient_entered", {
       recipientName: next.name,
       recipientLast4: lastFourDigits(next.accountNumber ?? next.accountMasked),
@@ -86,6 +89,8 @@ export function TransferCompose() {
   }
 
   function backToPick() {
+    setDismissedRecipientAlert(null);
+    setReopenedRecipientAlert(false);
     setRecipient(null);
     setStep("pick");
   }
@@ -226,6 +231,8 @@ export function TransferCompose() {
   // Scam Shield: recipient-entry DH4 shares the confirm screen's stepped popup.
   const { cif, items: recipientAlerts, respond, shown } = useInterventions("recipient-entry");
   const [answeredAlerts, setAnsweredAlerts] = useState<string[]>([]);
+  const [dismissedRecipientAlert, setDismissedRecipientAlert] = useState<{ intervention: Intervention; details: TransferDetails } | null>(null);
+  const [reopenedRecipientAlert, setReopenedRecipientAlert] = useState(false);
   const [safeDetails, setSafeDetails] = useState<TransferDetails | null>(null);
   const recipientAlert = recipientAlerts.find(item => item.level === "red" && item.surface === "popup" && !answeredAlerts.includes(item.id));
   const shownAlerts = useRef(new Set<string>());
@@ -241,11 +248,18 @@ export function TransferCompose() {
     recipientAccount: recipient.accountNumber ?? recipient.accountMasked,
   } : undefined;
 
+  const activeRecipientAlert = recipientAlert ?? (reopenedRecipientAlert ? dismissedRecipientAlert?.intervention : null);
+  const activeShieldDetails = recipientAlert ? shieldDetails : dismissedRecipientAlert?.details;
+
   function chooseRecipientAlert(item: Intervention, choice: string) {
+    setReopenedRecipientAlert(false);
     setAnsweredAlerts(previous => [...previous, item.id]);
     useSecurityStore.getState().logAlert({ level: "red", situation: item.copy.message, choice });
     void respond(item.id, choice);
-    if (choice === TRANSFER_LABELS.stop && shieldDetails) setSafeDetails(shieldDetails);
+    if (choice === TRANSFER_LABELS.stop) {
+      setDismissedRecipientAlert(null);
+      if (activeShieldDetails) setSafeDetails(activeShieldDetails);
+    }
   }
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
@@ -336,6 +350,9 @@ export function TransferCompose() {
           amount={amount}
           memo={memo}
           canContinue={!loading && !error && canContinue && !block.blocked}
+          recipientShieldNotice={dismissedRecipientAlert && !activeRecipientAlert ? (
+            <ShieldReopen message="Tài khoản bị cảnh báo lừa đảo" onReopen={() => setReopenedRecipientAlert(true)} />
+          ) : null}
           onChangeRecipient={backToPick}
           onSourceChange={setSource}
           onAmountChange={setAmount}
@@ -389,10 +406,14 @@ export function TransferCompose() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col">{content}</div>
-      <TransferAlertSheet cif={cif} open={Boolean(recipientAlert && shieldDetails)} intervention={recipientAlert ?? null}
-        details={shieldDetails}
-        onClose={() => { if (recipientAlert) chooseRecipientAlert(recipientAlert, "Đóng"); }}
-        onChoose={choice => { if (recipientAlert) chooseRecipientAlert(recipientAlert, choice); }} />
+      <TransferAlertSheet cif={cif} open={Boolean(activeRecipientAlert && activeShieldDetails)} intervention={activeRecipientAlert ?? null}
+        details={activeShieldDetails}
+        onClose={() => {
+          if (!activeRecipientAlert || !activeShieldDetails) return;
+          setDismissedRecipientAlert({ intervention: activeRecipientAlert, details: activeShieldDetails });
+          chooseRecipientAlert(activeRecipientAlert, "Đóng");
+        }}
+        onChoose={choice => { if (activeRecipientAlert) chooseRecipientAlert(activeRecipientAlert, choice); }} />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { CATEGORY, CURRENCY_VND, type Transaction } from "@/domain/models";
 import type { FundingAssessment } from "@/domain/engine";
 import { TransferSuccess, type MockExecutedTransfer } from "./TransferSuccess";
 import { TransferFundingPreview } from "./TransferFundingPreview";
+import { ShieldReopen } from "@/components/security/ShieldReopen";
 import { TransferAlertBanner } from "./TransferAlertBanner";
 import { TransferAlertSheet } from "./TransferAlertSheet";
 import { TransferSafe } from "./TransferSafe";
@@ -493,6 +494,10 @@ export function TransferConfirm() {
       )}
 
       {banner && <TransferAlertBanner intervention={banner} recipientName={name.trim()} onChoose={choice => void chooseShield(banner, choice)} />}
+
+      {shieldState.intervention?.level === "red" && redFor === null && (
+        <ShieldReopen message="Giao dịch đang có cảnh báo lừa đảo" onReopen={() => setRedFor(shieldState.intervention)} />
+      )}
 
       {error && <p className="text-sm text-negative">{error}</p>}
 

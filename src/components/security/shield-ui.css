@@ -86,3 +86,9 @@
 .transfer-alert-proceed { color:var(--color-muted); }
 .transfer-alert-proceed:disabled { opacity:.5; }
 .transfer-alert-sheet :is(button,a):focus-visible { outline:2px solid var(--color-primary); outline-offset:3px; }
+
+.shield-reopen { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--color-negative); border-radius:12px; background:var(--color-negative-soft); color:var(--color-negative); font-size:14px; line-height:1.5; }
+.shield-reopen > svg { flex-shrink:0; }
+.shield-reopen > span { flex:1; min-width:0; }
+.shield-reopen > button { flex-shrink:0; min-height:44px; color:inherit; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.shield-reopen > button:focus-visible { outline:2px solid var(--color-negative); outline-offset:3px; }
