@@ -1,4 +1,4 @@
-import type { SecurityLevel } from "./security-score";
+import type { SecurityLevel } from "@/lib/security/security-score";
 
 /** Half-circle gauge filled to `score`/100. */
 export function SecurityGauge({ score, level }: { score: number; level: SecurityLevel }) {

@@ -9,6 +9,7 @@ import { LOGIN_DISPLAY_NAME } from "@/components/login/LoginGate";
 import { getConsent, revokeConsent, type ConsentScope } from "@/lib/consent";
 import { clearSecurityStorage } from "@/state/security/storage";
 import { postSecurityEvent } from "@/lib/security/post-event";
+import { useSecurityStore } from "@/state/security/store";
 import { useSettingsDemo } from "./SettingsDemoContext";
 import { Action, Badge, Notice, Panel, Row, Toggle } from "./settings-ui";
 
@@ -32,6 +33,7 @@ function SecretField({ label, value, onChange, placeholder }: { label: string; v
 export function SettingsDemo({ section }: { section?: SettingsSection }) {
   const { persona } = usePersona();
   const demo = useSettingsDemo();
+  const security = useSecurityStore();
   const [sheet, setSheet] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [faq, setFaq] = useState<number | null>(null);
@@ -77,13 +79,13 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "security") {
     content = <SecurityHub />;
   } else if (section === "pin" || section === "password") {
-    content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") { demo.update({ passwordUpdated: true }); postSecurityEvent("password_changed", {}); } finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
+    content = <CredentialForm kind={section} onSuccess={() => { if (section === "password") { security.updateAuth({ passwordUpdated: true }); postSecurityEvent("password_changed", {}); } else { security.updateAuth({ pinSet: true }); } finish(`Đã cập nhật ${section === "pin" ? "mã PIN" : "mật khẩu"} trong luồng giả lập. Thông tin đăng nhập demo không thay đổi.`); }} onForgot={() => setSheet("forgot")} />;
   } else if (section === "face") {
-    content = <><Panel><div className="flex items-center justify-between py-4"><strong>Trạng thái</strong><Badge good>Đã xác minh</Badge></div></Panel><Notice><strong className="text-blue-600">Thông tin thêm</strong><ul className="mt-3 list-disc space-y-4 pl-4"><li>Xác thực khuôn mặt áp dụng cho chuyển tiền, thanh toán giá trị cao và các cài đặt quan trọng.</li><li>Nhìn thẳng vào camera, đảm bảo khuôn mặt rõ nét và đủ ánh sáng.</li>Trạng thái trong màn này là dữ liệu demo. Bản giả lập không mở camera hoặc thu thập khuôn mặt.</ul></Notice></>;
+    content = <><Panel><div className="flex items-center justify-between py-4"><strong>Trạng thái</strong><Badge good={security.faceVerified}>{security.faceVerified ? "Đã xác minh" : "Chưa xác minh"}</Badge></div></Panel><Notice><strong className="text-blue-600">Thông tin thêm</strong><ul className="mt-3 list-disc space-y-4 pl-4"><li>Xác thực khuôn mặt áp dụng cho chuyển tiền, thanh toán giá trị cao và các cài đặt quan trọng.</li><li>Nhìn thẳng vào camera, đảm bảo khuôn mặt rõ nét và đủ ánh sáng.</li>Trạng thái trong màn này là dữ liệu demo. Bản giả lập không mở camera hoặc thu thập khuôn mặt.</ul></Notice></>;
   } else if (section === "advanced") {
-    content = <><Panel><div className="py-7 text-center"><ShieldCheck size={100} className="mx-auto mb-6 text-orange-400" /><h2 className="font-bold">Tăng cường bảo mật cho giao dịch quan trọng</h2><p className="mt-2 text-sm leading-relaxed">Thêm một lớp xác thực cá nhân hóa bằng câu hỏi bảo mật để bảo vệ tài sản của quý khách</p>{demo.advanced && <div className="mt-4"><Badge good>Đã thiết lập trong giả lập</Badge></div>}</div></Panel><Panel title="Câu hỏi thường gặp">{FAQ.map((q, i) => <Row key={q} label={q} onClick={() => setFaq(i)} />)}</Panel><Link className="settings-action" href={href("questions")}>{demo.advanced ? "Thiết lập lại" : "Bắt đầu thiết lập"}</Link></>;
+    content = <><Panel><div className="py-7 text-center"><ShieldCheck size={100} className="mx-auto mb-6 text-orange-400" /><h2 className="font-bold">Tăng cường bảo mật cho giao dịch quan trọng</h2><p className="mt-2 text-sm leading-relaxed">Thêm một lớp xác thực cá nhân hóa bằng câu hỏi bảo mật để bảo vệ tài sản của quý khách</p>{security.advanced && <div className="mt-4"><Badge good>Đã thiết lập trong giả lập</Badge></div>}</div></Panel><Panel title="Câu hỏi thường gặp">{FAQ.map((q, i) => <Row key={q} label={q} onClick={() => setFaq(i)} />)}</Panel><Link className="settings-action" href={href("questions")}>{security.advanced ? "Thiết lập lại" : "Bắt đầu thiết lập"}</Link></>;
   } else if (section === "questions") {
-    content = <QuestionForm onSuccess={() => { demo.update({ advanced: true }); finish("Đã thiết lập câu hỏi bảo mật trong giả lập. Câu trả lời không được lưu."); }} />;
+    content = <QuestionForm onSuccess={() => { security.updateAuth({ advanced: true }); finish("Đã thiết lập câu hỏi bảo mật trong giả lập. Câu trả lời không được lưu."); }} />;
   } else if (section === "devices") {
     content = <><RecoveryDeviceAction />{["Apple iPhone 14 Plus", "Apple iPhone 14 Plus", "Apple iPhone 11"].map((device, i) => <Panel key={i}><div className="flex items-center gap-3 py-5"><Smartphone size={25} /><div className="flex-1"><strong>{device}</strong><p className="mt-2 text-sm text-muted">{i === 0 ? "Thiết bị hiện tại" : "Lần truy cập trước"} · Dữ liệu demo</p></div>{i === 0 ? <Badge good>Hoạt động</Badge> : <button className="text-sm text-primary" onClick={() => setSheet("device")}>Chi tiết</button>}</div></Panel>)}</>;
   } else if (section === "signature") {

@@ -10,6 +10,11 @@ export type AlertLogEntry = { id: string; at: number; level: "yellow" | "red"; s
 
 /** Persisted Scam Shield state (one copy per persona). */
 export type SecurityState = {
+  pinSet: boolean;
+  faceVerified: boolean;
+  faceId: boolean;
+  passwordUpdated: boolean;
+  advanced: boolean;
   aiProtect: boolean;
   familyAlerts: boolean;
   securityTips: boolean;

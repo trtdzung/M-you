@@ -16,7 +16,7 @@ import { appNow } from "./app-clock";
 import { REBALANCE_CATEGORY, type Transaction } from "@/domain/models";
 import { readProfile } from "./security/profile-store";
 import { readCases } from "./security/case-store";
-import { securityScore } from "@/components/settings/security/security-score";
+import { readProfileScore } from "@/lib/security/profile-store";
 import { getDb } from "./db";
 
 function canonical(value: unknown): unknown {
@@ -69,23 +69,10 @@ export function customerSnapshot(cif: string, input: unknown = {}) {
   let securitySummary: SecuritySummaryInput | undefined;
   try {
     const profileState = readProfile(cif);
-    const activeEmergencies = (profileState.emergencyContacts ?? []).filter((c) => c.status === "active").length;
+    const activeEmergencies = profileState.emergencyContacts.length;
     const demoInput = body.demo && typeof body.demo === "object" ? body.demo as Record<string, unknown> : {};
-    const passwordUpdated = demoInput.passwordUpdated === true;
-    const faceId = demoInput.faceId !== false;
-    const advanced = demoInput.advanced === true;
-    const devicesCleared = demoInput.devicesCleared === true;
-
-    const secScore = securityScore({
-      passwordUpdated,
-      faceId,
-      advanced,
-      devicesCleared,
-      aiProtect: Boolean(profileState.aiProtect),
-      antiPhishing: profileState.antiPhishingCode !== null,
-      activeEmergencyContacts: activeEmergencies,
-      trustedContacts: (profileState.trustedContacts ?? []).length,
-    });
+    const savedScore = readProfileScore(cif);
+    const secScore = { ...savedScore, nextSteps: savedScore.next_steps };
     let hasActiveHold = false;
     try {
       const db = getDb();

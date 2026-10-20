@@ -6,7 +6,7 @@ import { readManualTxns } from "@/lib/manual-txns-store";
 import { engineNow } from "./clock";
 import { eventsSince } from "./events";
 import { getIntervention, getInterventionContext } from "./intervention-store";
-import { readProfile } from "./profile-store";
+import { readProfile, readProfileScore } from "./profile-store";
 import { readCase } from "./case-store";
 import { accountKey, accountLastFour } from "./signals";
 import { LOOKUP_LABELS, lookupAccount } from "./warned-store";
@@ -67,7 +67,7 @@ export function agentEvents(cif: string, hours: number) {
 export function agentProfile(cif: string) {
   const p = readProfile(cif);
   const contacts = p.emergencyContacts.length;
-  return { score: null, score_unknown_reason: "auth settings are not persisted on the server", protection_points: (p.aiProtect ? 10 : 0) + (p.antiPhishingCode ? 15 : 0) + (contacts ? 15 : 0) + (p.trustedContacts.length ? 10 : 0),
+  return { score: readProfileScore(cif), protection_points: (p.aiProtect ? 10 : 0) + (p.antiPhishingCode ? 15 : 0) + (contacts ? 15 : 0) + (p.trustedContacts.length ? 10 : 0),
     ai_protect: p.aiProtect, anti_phishing: p.antiPhishingCode !== null, active_contacts: contacts,
     account_locked: p.accountLocked, cards_locked: p.cardsLocked ?? p.accountLocked, hold_enabled: p.holdEnabled, hold_threshold: p.holdThreshold };
 }

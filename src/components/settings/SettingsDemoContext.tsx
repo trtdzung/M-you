@@ -3,15 +3,12 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 type DemoState = {
-  faceId: boolean;
-  advanced: boolean;
-  passwordUpdated: boolean;
   balanceNotifications: boolean;
   offers: boolean;
   appearance: "anniversary" | "simple";
   widgets: string[];
 };
-const INITIAL: DemoState = { faceId: true, advanced: false, passwordUpdated: false, balanceNotifications: true, offers: true, appearance: "anniversary", widgets: ["Số dư tài khoản", "Chuyển tiền", "Quét QR"] };
+const INITIAL: DemoState = { balanceNotifications: true, offers: true, appearance: "anniversary", widgets: ["Số dư tài khoản", "Chuyển tiền", "Quét QR"] };
 const Context = createContext<(DemoState & { update: (patch: Partial<DemoState>) => void }) | null>(null);
 /** Non-sensitive display state only. Never stores PINs, passwords or security answers. */
 export function SettingsDemoProvider({ children }: { children: ReactNode }) {

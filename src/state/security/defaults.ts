@@ -21,6 +21,11 @@ const ALERT_LOG_SAMPLE: AlertLogEntry[] = [
 ];
 
 export const SECURITY_DEFAULTS: SecurityState = {
+  pinSet: true,
+  faceVerified: true,
+  faceId: true,
+  passwordUpdated: false,
+  advanced: false,
   aiProtect: true,
   familyAlerts: true,
   securityTips: true,
