@@ -556,8 +556,7 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 .home-quick-grid { background: #ffecef; border-color: white; padding: 18px 8px 12px; }
 .home-quick-grid > div:first-child { row-gap: 24px; }
 .home-quick-grid > div:first-child > a, .home-quick-grid > div:first-child > button { min-height: 76px; gap: 12px; }
-.home-quick-grid svg { width: 29px; height: 29px; }
-.home-quick-grid span { font-size: 13px; line-height: 1.35; }
+.home-quick-grid span { font-size: 12px; line-height: 1.35; }
 .home-quick-grid > div:last-child > * { flex: 1; }
 .home-shell .login-anniversary { height: clamp(195px, 23dvh, 230px); }
 .home-shell .login-years { font-size: 175px; }

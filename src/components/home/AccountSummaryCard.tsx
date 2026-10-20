@@ -52,7 +52,7 @@ export function AccountSummaryCard({
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted">{maskedNumber}</p>
-          <p className="text-2xl font-bold tracking-wide text-text">
+          <p className="text-[20px] leading-8 font-bold tracking-wide text-text">
             {hidden ? (
               <span aria-label="Số dư đang ẩn">
                 <span aria-hidden="true">*******</span>{" "}
