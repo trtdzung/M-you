@@ -10,6 +10,7 @@ import { effectiveContacts, isTransferLocked } from "@/state/security/selectors"
 import { Badge, Panel, Row, Toggle } from "../settings-ui";
 import { SecurityGauge } from "./SecurityGauge";
 import { SecurityLoading } from "./SecurityLoading";
+import { SecurityRecommendations } from "@/components/security/SecurityRecommendations";
 import { securityScore } from "@/lib/security/security-score";
 import { useRecovery } from "@/components/security/useRecovery";
 import { useScreenEvent } from "@/components/security/useScreenEvent";
@@ -45,8 +46,17 @@ export function SecurityHub() {
       <span className="flex-1 text-sm text-muted">Kiểm tra tin nhắn, link, số lạ</span>
     </Link>
     <HubShieldCheck score={score} />
-    <Panel><div className="py-6 text-center" data-shield-anchor="hub-gauge"><SecurityGauge score={score.total} level={score.level} /><p className="mt-3 text-sm text-muted">Xác thực {score.auth}/50 · Bảo vệ {score.protection}/50</p></div></Panel>
-    <div data-shield-slot="hub-gauge" />
+    <section className="settings-panel security-score-panel" aria-label="Điểm và gợi ý bảo mật">
+      <div data-shield-anchor="hub-gauge">
+        <SecurityGauge score={score.total} level={score.level} />
+        <p className="security-score-breakdown">Xác thực {score.auth}/50 · Bảo vệ {score.protection}/50</p>
+      </div>
+      <div data-shield-slot="hub-gauge">
+        {score.nextSteps.length > 0 && <section className="shield-inline-notice shield-hub-notice security-suggestions-fallback" aria-label="Gợi ý bảo mật của M-You">
+          <SecurityRecommendations suggestions={score.nextSteps} />
+        </section>}
+      </div>
+    </section>
     <Panel><Row label="M-You bảo vệ bạn" icon={ShieldCheck} href={href("protect")} detail="Trợ lý AI · Kiểm tra mỗi lệnh chuyển tiền, cảnh báo khi có dấu hiệu lừa đảo" trailing={offAt !== undefined ? <Badge>Tắt lúc {timeLabel(offAt)}</Badge> : <Badge good={security.aiProtect}>{security.aiProtect ? "Đang bật" : "Đang tắt"}</Badge>} /></Panel>
     <Panel title="Xác thực">
       <Row label="Mã PIN" href={href("pin")} detail="Dùng để đăng nhập và xác thực giao dịch" trailing={<Badge good={security.pinSet}>{security.pinSet ? "Đã thiết lập" : "Chưa thiết lập"}</Badge>} />

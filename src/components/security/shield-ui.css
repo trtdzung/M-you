@@ -16,12 +16,42 @@
 [data-shield-slot]:empty { display:none; }
 .shield-notice-body { display:flex; flex-direction:column; gap:12px; padding-right:24px; }
 .shield-source { font-size:13px; color:#596983; font-weight:500; }
-.shield-progress { display:flex; gap:8px; margin-right:-24px; overflow-x:auto; scrollbar-width:none; }
+.security-score-panel { container:security-score / inline-size; padding:24px 20px 20px; }
+.security-gauge { width:100%; max-width:360px; margin:0 auto; }
+.security-gauge svg { display:block; width:100%; height:auto; }
+.security-score-breakdown { margin:10px 0 18px; color:#73777f; font-size:15px; line-height:1.5; text-align:center; }
+.shield-hub-notice { margin:0; padding:14px 12px 12px; border-color:#e9ded3; border-radius:20px; background:#fdf6f0; }
+.shield-hub-notice .shield-notice-close { top:0; right:0; width:44px; height:44px; min-height:44px; align-items:flex-start; justify-content:flex-end; padding:4px; }
+.shield-hub-notice .shield-notice-close svg { width:12px; height:12px; }
+.shield-progress-body { padding-right:0; }
+.shield-recommendations { display:flex; flex-direction:column; gap:12px; }
+/* Keep useful next steps visible between engine notices; a live notice takes their place. */
+[data-shield-slot="hub-gauge"]:has(> .shield-inline-notice:not(.security-suggestions-fallback)) > .security-suggestions-fallback { display:none; }
+.shield-recommendations-heading { display:flex; align-items:center; gap:8px; min-width:0; padding-right:8px; }
+.shield-recommendations-icon { display:flex; align-items:center; justify-content:center; flex:0 0 26px; height:26px; border-radius:50%; color:white; background:#c77c43; }
+.shield-recommendations-heading h2 { min-width:0; flex:1; color:#111b30; font-size:15px; font-weight:700; line-height:1.35; }
+.shield-recommendations-badge { flex-shrink:0; border:1px solid #e7d9c9; border-radius:999px; background:#fffdf9; padding:1px 8px; color:#896035; font-size:11px; font-weight:600; white-space:nowrap; }
+.shield-progress { display:flex; gap:10px; margin-right:-12px; padding-right:12px; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; }
 .shield-progress::-webkit-scrollbar { display:none; }
-.shield-progress-card { display:flex; flex:1 0 auto; flex-direction:column; gap:6px; min-width:max-content; border:1px solid #dfe5ee; border-radius:16px; background:#f7f9fc; padding:12px; }
-.shield-progress-card strong { font-size:14px; line-height:1.35; white-space:nowrap; }
-.shield-progress-card p { font-size:13px; color:#596983; white-space:nowrap; }
-.shield-screen .shield-progress-card button { align-self:stretch; margin-top:auto; width:auto; min-height:32px; height:32px; padding:0 12px; border:1px solid #ff650b; border-radius:999px; background:#fff; color:#a83e08; font-size:13px; font-weight:600; line-height:1; }
+.shield-progress:focus-visible { outline:2px solid #c77c43; outline-offset:2px; }
+.shield-progress-card { display:flex; flex:0 0 82%; flex-direction:column; gap:8px; min-width:0; border-radius:16px; background:white; padding:12px; scroll-snap-align:start; }
+.shield-progress-card-heading { display:flex; align-items:baseline; gap:8px; }
+.shield-progress-card-heading h3 { flex:1; min-width:0; color:#111b30; font-size:15px; font-weight:700; line-height:1.4; }
+.shield-progress-card-heading span { flex-shrink:0; border-radius:8px; background:#fbf3e5; padding:1px 7px; color:#896035; font-size:13px; font-weight:600; }
+.shield-progress-card p { color:#73777f; font-size:14px; line-height:1.45; }
+.shield-screen .shield-progress-card :is(button,a) { display:flex; align-items:center; justify-content:center; align-self:stretch; margin-top:auto; width:100%; min-height:36px; padding:6px 12px; border:1px solid #bd8258; border-radius:999px; background:#fff; color:#996036; font-size:14px; font-weight:600; line-height:1.4; text-align:center; }
+@media (max-width:360px) {
+  .security-score-panel { padding:20px 12px 12px; }
+}
+@container security-score (max-width:300px) {
+  .shield-hub-notice { padding:14px 8px 10px; }
+  .shield-recommendations-heading { gap:6px; padding-right:0; }
+  .shield-recommendations-icon { flex-basis:22px; height:22px; }
+  .shield-recommendations-icon svg { width:16px; height:16px; }
+  .shield-recommendations-badge { padding-inline:5px; font-size:10px; }
+  .shield-progress { margin-right:-8px; padding-right:8px; }
+  .shield-progress-card { flex-basis:92%; }
+}
 .shield-notice-close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; justify-content:center; align-items:center; color:#596983; border-radius:50%; }
 .shield-action, .shield-notice-actions button { min-height:44px; padding:10px 14px; border:1px solid #ff650b; border-radius:10px; background:white; color:#a83e08; font-size:14px; line-height:1.5; font-weight:600; text-align:center; }
 .shield-action:disabled { opacity:.5; }
