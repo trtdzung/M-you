@@ -70,7 +70,7 @@ export function Diagnosis({ cif, id, question = CLASSIFY_QUESTION, onAnswer, ses
       {sessionLine && state.source === "agent" && <AiSessionNote />}
       {sourceLine && <p className="shield-source">{state.source === "agent" ? "M-You, trợ lý AI của MSB" : "Cảnh báo tự động"}</p>}
       {state.answers.map((value, index) => <p key={index} className="text-sm text-muted">{question} {value}</p>)}
-      {state.next_question && <p className="rounded-[16px] bg-negative-soft p-4 text-base font-semibold leading-relaxed">{question}</p>}
+      {state.next_question && <p className="shield-diagnosis-question rounded-[16px] bg-negative-soft p-4 text-base font-semibold leading-relaxed">{question}</p>}
       {state.next_question && state.answers.length < 1 && <div className="shield-options">
         {CLASSIFY_ANSWERS.map(value => <button key={value} type="button" disabled={sending || state.pending} className="shield-action disabled:opacity-50" onClick={() => void answer(value)}>{value}</button>)}
       </div>}

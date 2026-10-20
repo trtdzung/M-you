@@ -121,6 +121,19 @@ export function transferProceedLabel(seconds: number): string {
   return seconds > 0 ? `${TRANSFER_LABELS.proceed} (${Math.ceil(seconds)} giây)` : TRANSFER_LABELS.proceed;
 }
 
+/** Presentation parts for the transfer recipient card. */
+export function transferRecipientParts(details: TransferDetails) {
+  const label = details.recipientBank.trim() || details.recipientName.trim();
+  const words = label.replace(/([a-z])([A-Z])/g, "$1 $2").split(/\s+/).filter(Boolean);
+  const initials = words.slice(0, 2).map(word => word[0]).join("").toLocaleUpperCase("vi-VN");
+  const last4 = details.recipientAccount.replace(/\D/g, "").slice(-4);
+  return {
+    name: details.recipientName,
+    initials,
+    bankAccount: `${details.recipientBank} ••••${last4}`,
+  };
+}
+
 /** Recipient line for red step 1, separate from its reason. */
 export function transferRecipientSummary(details: TransferDetails): string {
   const last4 = details.recipientAccount.replace(/\D/g, "").slice(-4);
