@@ -24,8 +24,9 @@ export default function AccountsPage() {
     : null;
 
   return (
-    <div className="accounts-overview">
+    <div className="accounts-overview flex h-full min-h-0 flex-col [&>header]:shrink-0">
       <ScreenHeader title="Tài sản" />
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
 
       {loading && (
         <SkeletonScreen>
@@ -78,6 +79,7 @@ export default function AccountsPage() {
           </section>
         </>
       )}
+      </div>
     </div>
   );
 }
