@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnniversaryHero } from "@/components/home/AnniversaryHero";
-import { HomeHeader } from "@/components/shell/HomeHeader";
+import { HomePageFrame } from "@/components/home/HomePageFrame";
 import { AccountSummaryCard } from "@/components/home/AccountSummaryCard";
 import { HomeQuickGrid } from "@/components/home/HomeQuickGrid";
 import { PromoCarousel } from "@/components/home/PromoCarousel";
@@ -30,8 +30,7 @@ export default function HomePage() {
   const primary = current?.accounts.find(a => a.type === "current") ?? null;
 
   return (
-    <div>
-      <HomeHeader notifications={9} />
+    <HomePageFrame notifications={9}>
       <AnniversaryHero />
 
       <div className="flex flex-col gap-4">
@@ -77,6 +76,6 @@ export default function HomePage() {
             ]}
           />
         </div>
-    </div>
+    </HomePageFrame>
   );
 }
