@@ -55,9 +55,6 @@ describe("Loan flow: Goal 'Vay' → LoanAppHome → LoanAppSurvey and 20s delaye
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string | URL | Request) => {
-        if (String(url).includes("suggestions")) {
-          return new Response(JSON.stringify({ suggestions: [], refreshing: false }));
-        }
         return new Response(
           JSON.stringify({
             world,

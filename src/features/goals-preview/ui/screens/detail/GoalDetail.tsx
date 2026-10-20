@@ -5,7 +5,6 @@ import { ChevronRight, MoreVertical, Pause, Pencil, Play, XCircle } from "lucide
 import { Sheet, SegmentedControl } from "@/components/primitives";
 import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { daysBetween, formatISODate, phaseOneResult } from "../../../engine";
-import { agentCardsFor } from "./agentCards";
 import { goalEmoji, TEMPLATE_LABEL } from "../../../model/labels";
 import { paramString, type ScreenProps } from "../../../model/screens";
 import { usePreview } from "../../../store/PreviewStore";
@@ -47,7 +46,6 @@ export function GoalDetail({ params }: ScreenProps) {
   const shownTarget = history ? goal.targetAmount : stage.target;
   const pct = Math.round((shownTotal / Math.max(1, shownTarget)) * 100);
   const phaseOne = phase === 2 ? phaseOneResult(state, goal) : undefined;
-  const cards = agentCardsFor(state, goalId);
   const canPause = goal.status === "accumulating" || goal.status === "repaying";
   const canClose = !history;
   // Giá trị mục tiêu chỉnh được khi chưa kết thúc và chưa sang giai đoạn trả nợ (giai đoạn 2 mục tiêu là khoản vay).
@@ -140,7 +138,7 @@ export function GoalDetail({ params }: ScreenProps) {
         ]}
       />
 
-      {tab === "overview" && <OverviewTab ctx={ctx} goalId={goalId} suggestions={cards} />}
+      {tab === "overview" && <OverviewTab ctx={ctx} goalId={goalId} />}
       {tab === "cash" && <CashTab ctx={ctx} goalId={goalId} />}
       {tab === "assets" && <AssetsTab ctx={ctx} goalId={goalId} />}
 

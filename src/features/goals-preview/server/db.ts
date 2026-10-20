@@ -110,28 +110,6 @@ CREATE TABLE IF NOT EXISTS gv2_price_sync (
   detail TEXT
 );
 
-CREATE TABLE IF NOT EXISTS gv2_suggestions (
-  cif TEXT NOT NULL,
-  id TEXT NOT NULL,
-  goal_id TEXT NOT NULL,
-  kind TEXT NOT NULL,
-  rank INTEGER NOT NULL DEFAULT 0,
-  fingerprint TEXT NOT NULL,
-  payload TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  dismissed_until TEXT,
-  ignored_count INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (cif, id)
-);
-CREATE INDEX IF NOT EXISTS idx_gv2_suggestions_goal ON gv2_suggestions (cif, goal_id);
-
-CREATE TABLE IF NOT EXISTS gv2_suggestion_events (
-  cif TEXT NOT NULL,
-  suggestion_id TEXT NOT NULL,
-  event TEXT NOT NULL CHECK (event IN ('shown','clicked','dismissed','acted')),
-  created_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS gv2_transfer_sources (
   cif TEXT NOT NULL,
   txn_id TEXT NOT NULL,

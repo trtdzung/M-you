@@ -49,9 +49,6 @@ describe("PreviewStore F7 tải world", () => {
       "fetch",
       vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
         if (init?.method === "POST") data.posts += 1;
-        if (String(url).includes("suggestions")) {
-          return new Response(JSON.stringify({ suggestions: [], refreshing: false }));
-        }
         if (fail) throw new Error("injected GET failure");
         return new Response(
           JSON.stringify({ world, market: { instruments: [], refreshing: false, asOf: null } }),

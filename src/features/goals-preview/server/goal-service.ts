@@ -37,7 +37,7 @@ export type GoalsV2ActionResult = ({ ok: true; createdGoalId?: string } & GoalsV
 
 // --- Danh sách cho phép (F1) ------------------------------------------------
 // Server chỉ nhận thao tác nghiệp vụ liệt kê tường minh dưới đây; `world/sync`, `hydrate`,
-// `loadScenario`, `reset`, `nav/*`, `toast/*`, `dismissSuggestion` và mọi
+// `loadScenario`, `reset`, `nav/*`, `toast/*` và mọi
 // type lạ đều bị từ chối. Mỗi trường được kiểm kiểu rồi dựng lại action sạch (bỏ trường thừa).
 
 type Obj = Record<string, unknown>;
@@ -335,7 +335,6 @@ export function getWorld(cif: string): GoalsV2Snapshot {
 function toPreviewState(world: WorldState): PreviewState {
   return {
     ...world,
-    dismissedSuggestionIds: [],
     nav: { stack: [{ key: "s0-GoalList", screen: "GoalList", params: {} }] },
     toasts: [],
   };

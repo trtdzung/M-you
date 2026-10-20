@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, CalendarCheck, LineChart, PartyPopper } from "lucide-react";
 import { formatVnd } from "@/features/goals-preview/format-money";
 import { addDays, daysBetween, formatISODate, assetValue, phaseOneResult } from "../../../engine";
@@ -12,6 +12,7 @@ import { InfoTooltip } from "../../shared/InfoTooltip";
 import { SummaryRows } from "../../shared/SummaryRows";
 import { card, infoBox, primaryButton, ring, secondaryButton, sectionTitle, successBox, warningBox, figure } from "../../shared/styles";
 import { canTransact, type GoalContext } from "./common";
+import { GoalCoach } from "./GoalCoach";
 
 /** Để hồ sơ vay dễ được phê duyệt, khoản tích luỹ nên đạt tỉ lệ này của giá trị mục tiêu. */
 const LOAN_MIN_SAVED_RATIO = 0.3;
@@ -76,7 +77,7 @@ const FE_TEXT: Record<string, { text: string; box: string }> = {
   not_applicable: { text: "", box: infoBox },
 };
 
-export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; goalId: string; suggestions?: ReactNode }) {
+export function OverviewTab({ ctx, goalId }: { ctx: GoalContext; goalId: string }) {
   const { dispatch, nav } = usePreview();
   const { goal, state, fe, required, stage } = ctx;
   const phase2 = stage.phase === 2;
@@ -193,7 +194,7 @@ export function OverviewTab({ ctx, goalId, suggestions }: { ctx: GoalContext; go
         ) : null}
       </section>
 
-      {suggestions}
+      {(goal.status === "accumulating" || goal.status === "repaying") && <GoalCoach goalId={goal.id} goalName={goal.name} />}
 
       <section className={`${card} flex flex-col gap-3`}>
         <h2 className={sectionTitle}>Lộ trình</h2>

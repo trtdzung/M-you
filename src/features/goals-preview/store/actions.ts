@@ -104,7 +104,6 @@ export type PreviewAction =
   | { type: "closeGoal"; goalId: string }
   | { type: "reorderPriorities"; goalIds: string[] }
   // --- agent / ui
-  | { type: "dismissSuggestion"; id: string }
   | { type: "toast/push"; message: string; tone?: ToastTone }
   | { type: "toast/dismiss"; id: string }
   | NavAction;

@@ -75,9 +75,6 @@ describe("Asset quantity input — parseQtyInput, formatQtyInput and AddAsset sc
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string | URL | Request) => {
-          if (String(url).includes("suggestions")) {
-            return new Response(JSON.stringify({ suggestions: [], refreshing: false }));
-          }
           if (String(url).includes("stock-directory")) {
             return new Response(JSON.stringify({ items: [] }));
           }

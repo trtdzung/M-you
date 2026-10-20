@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type MutableRefObject, type ReactNode } from "react";
-import type { AgentSuggestion, PreviewState } from "../model/state";
+import type { PreviewState } from "../model/state";
 import type { ScreenEntry, ScreenId, ScreenParams } from "../model/screens";
 import type { ToastTone } from "../model/types";
 import type { PreviewAction } from "./actions";
@@ -19,30 +19,6 @@ export interface PendingLoanApplication {
   principal: number;
   termMonths: number;
   submittedAt: number;
-}
-
-const SUGGESTIONS_URL = "/api/goals-v2/suggestions";
-const SUGGESTION_POLL_MS = 3000;
-const SUGGESTION_POLL_MAX = 10;
-
-interface SuggestionsPayload {
-  suggestions: AgentSuggestion[];
-  refreshing: boolean;
-}
-
-async function fetchSuggestions(cif: string): Promise<SuggestionsPayload> {
-  const res = await fetch(`${SUGGESTIONS_URL}?cif=${encodeURIComponent(cif)}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`GET goals-v2/suggestions ${res.status}`);
-  return (await res.json()) as SuggestionsPayload;
-}
-
-/** Fire-and-forget: a lost event only costs a log line. */
-export function postSuggestionEvent(cif: string, suggestionId: string, event: "shown" | "clicked" | "dismissed" | "acted"): void {
-  void fetch(`${SUGGESTIONS_URL}/events`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cif, suggestionId, event }),
-  }).catch(() => undefined);
 }
 
 /** Window event the shell's edge-swipe back fires on /goals-preview (see AppChrome). */
@@ -73,10 +49,6 @@ interface PreviewContextValue {
   loadStatus: LoadStatus;
   /** Retries the world GET after an error. */
   reload: () => void;
-  /** Server suggestions ("M-You gợi ý"); null until the first load (or when it failed). */
-  suggestions: AgentSuggestion[] | null;
-  /** Records a click on a suggestion button ("clicked" for navigation, "acted" for a store action). */
-  recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
   /** Asks the server to re-fetch market prices in the background; never blocks. */
   refreshPrices: () => void;
   /** True while a price refresh started by `refreshPrices` is still running. */
@@ -101,47 +73,23 @@ function useServerWorld(
   loadStatus: LoadStatus;
   reload: () => void;
   dispatch: (a: PreviewAction) => void;
-  suggestions: AgentSuggestion[] | null;
-  recordSuggestionEvent: (suggestionId: string, event: "clicked" | "acted") => void;
   refreshPrices: () => void;
   pricesRefreshing: boolean;
 } {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [reloadKey, setReloadKey] = useState(0);
   const [pricesRefreshing, setPricesRefreshing] = useState(false);
-  const [suggestions, setSuggestions] = useState<AgentSuggestion[] | null>(null);
-  const suggestionRunRef = useRef(0);
   const queueRef = useRef<ActionQueue | null>(null);
   const cancelPollRef = useRef<(() => void) | null>(null);
-
-  /** Loads suggestions without blocking anything; while the server waits for the agent, asks again every 3 s (max 10). */
-  const loadSuggestions = useCallback((cif: string) => {
-    const run = ++suggestionRunRef.current;
-    void (async () => {
-      for (let i = 0; i <= SUGGESTION_POLL_MAX; i += 1) {
-        if (i > 0) await new Promise((resolve) => setTimeout(resolve, SUGGESTION_POLL_MS));
-        if (run !== suggestionRunRef.current) return;
-        try {
-          const payload = await fetchSuggestions(cif);
-          if (run !== suggestionRunRef.current) return;
-          setSuggestions(payload.suggestions);
-          if (!payload.refreshing) return;
-        } catch {
-          if (i === 0) return;
-        }
-      }
-    })();
-  }, []);
 
   const applyPayload = useCallback(
     (payload: WorldPayload, ids?: GoalIdResolution) => {
       hydrateMarket(payload.market.instruments);
       rawDispatch({ type: "world/sync", world: payload.world, goalIdMap: ids?.goalIdMap, unsavedGoalIds: ids?.unsavedGoalIds });
-      if (cif) loadSuggestions(cif);
       if (payload.market.refreshing && !cancelPollRef.current) {
         cancelPollRef.current = pollMarket(
           () => {
-            const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, navSeq: _n, ...world } = stateRef.current;
+            const { nav: _nav, toasts: _toasts, lastCreatedGoalId: _l, navSeq: _n, ...world } = stateRef.current;
             rawDispatch({ type: "world/sync", world });
           },
           () => {
@@ -150,13 +98,11 @@ function useServerWorld(
         );
       }
     },
-    [rawDispatch, stateRef, cif, loadSuggestions],
+    [rawDispatch, stateRef],
   );
 
   useEffect(() => {
     let alive = true;
-    suggestionRunRef.current += 1;
-    setSuggestions(null);
     queueRef.current?.dispose();
     queueRef.current = null;
     cancelPollRef.current?.();
@@ -189,7 +135,6 @@ function useServerWorld(
       queueRef.current?.dispose();
       queueRef.current = null;
       cancelPollRef.current?.();
-      suggestionRunRef.current += 1;
     };
   }, [cif, entryScreen, reloadKey, rawDispatch, applyPayload, stateRef]);
 
@@ -204,17 +149,8 @@ function useServerWorld(
       const localGoalId = action.type === "createGoal" ? previewReducer(stateRef.current, action).lastCreatedGoalId : undefined;
       rawDispatch(action);
       if (!local) queueRef.current?.enqueue(action, localGoalId);
-      // "Để sau" / "Ẩn gợi ý": the server hides the suggestion for 7 days.
-      if (action.type === "dismissSuggestion" && cif) postSuggestionEvent(cif, action.id, "dismissed");
     },
-    [rawDispatch, stateRef, cif],
-  );
-
-  const recordSuggestionEvent = useCallback(
-    (suggestionId: string, event: "clicked" | "acted") => {
-      if (cif) postSuggestionEvent(cif, suggestionId, event);
-    },
-    [cif],
+    [rawDispatch, stateRef],
   );
 
   /** "Cập nhật lại": starts a server price sync (not awaited by the UI), then polls like the first load. */
@@ -222,7 +158,7 @@ function useServerWorld(
     if (!cif || pricesRefreshing) return;
     setPricesRefreshing(true);
     const resync = () => {
-      const { nav: _nav, toasts: _toasts, dismissedSuggestionIds: _d, lastCreatedGoalId: _l, navSeq: _n, ...world } = stateRef.current;
+      const { nav: _nav, toasts: _toasts, lastCreatedGoalId: _l, navSeq: _n, ...world } = stateRef.current;
       rawDispatch({ type: "world/sync", world });
     };
     void requestMarketRefresh()
@@ -242,7 +178,7 @@ function useServerWorld(
       .catch(() => setPricesRefreshing(false));
   }, [cif, pricesRefreshing, rawDispatch, stateRef]);
 
-  return { loadStatus, reload, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing };
+  return { loadStatus, reload, dispatch, refreshPrices, pricesRefreshing };
 }
 
 export function PreviewStoreProvider({ children, entryScreen }: { children: ReactNode; entryScreen?: ScreenId }) {
@@ -251,7 +187,7 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   const [state, rawDispatch] = useReducer(previewReducer, undefined, initialPreviewState);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const { loadStatus, reload, dispatch, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
+  const { loadStatus, reload, dispatch, refreshPrices, pricesRefreshing } = useServerWorld(rawDispatch, stateRef, cif, entryScreen);
 
   const pendingLoans = useRef<{ cif: string | null; records: PendingLoanApplication[] }>({ cif: null, records: [] });
   const [loanAppRevision, setLoanAppRevision] = useState(0);
@@ -321,8 +257,8 @@ export function PreviewStoreProvider({ children, entryScreen }: { children: Reac
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, nav, toast, submitLoanApplication, hydrated: loadStatus === "ready", loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing }),
-    [state, dispatch, nav, toast, submitLoanApplication, loadStatus, reload, suggestions, recordSuggestionEvent, refreshPrices, pricesRefreshing],
+    () => ({ state, dispatch, nav, toast, submitLoanApplication, hydrated: loadStatus === "ready", loadStatus, reload, refreshPrices, pricesRefreshing }),
+    [state, dispatch, nav, toast, submitLoanApplication, loadStatus, reload, refreshPrices, pricesRefreshing],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }

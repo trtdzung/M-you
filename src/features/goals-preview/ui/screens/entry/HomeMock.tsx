@@ -12,7 +12,6 @@ import type { PreviewState } from "../../../model/state";
 import type { Goal } from "../../../model/types";
 import { usePreview } from "../../../store/PreviewStore";
 import { selectActiveGoals, selectTopGoal } from "../../../store/selectors";
-import { ServerSuggestionList } from "../detail/agentCards";
 import { GoalStatusBadge, ProgressStateBadge } from "../../shared/GoalStatusBadge";
 import { SplitProgressBar } from "../../shared/SplitProgressBar";
 import { card, divider, ring, sectionTitle, screenPadding } from "../../shared/styles";
@@ -136,8 +135,6 @@ export function HomeMock({ params }: ScreenProps) {
           </button>
         )}
       </section>
-
-      <ServerSuggestionList limit={2} ariaLabel="Gợi ý từ M-You" />
 
       <section className={`${card} grid grid-cols-4 gap-2`} aria-label="Tiện ích nhanh">
         <QuickTile icon={ArrowLeftRight} label="Chuyển tiền" onClick={outOfScope} />

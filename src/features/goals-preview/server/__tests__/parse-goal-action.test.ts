@@ -24,7 +24,7 @@ describe("F1 parseGoalAction / applyAction", () => {
 
   afterAll(() => fx.close());
 
-  it("từ chối world/sync, hydrate, reset, loadScenario, nav/*, toast/*, dismissSuggestion, type lạ", () => {
+  it("từ chối world/sync, hydrate, reset, loadScenario, nav/*, toast/*, type lạ", () => {
     const rejected = [
       { type: "world/sync" },
       { type: "hydrate" },
@@ -35,7 +35,6 @@ describe("F1 parseGoalAction / applyAction", () => {
       { type: "setCustomer" },
       { type: "nav/push" },
       { type: "toast/push" },
-      { type: "dismissSuggestion" },
       { type: "unknown-action" },
     ];
     for (const action of rejected) {

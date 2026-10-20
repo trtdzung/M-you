@@ -25,7 +25,6 @@ describe("smoke: mọi màn render không lỗi / không vòng lặp", () => {
     it(sc.id, async () => {
       const world = stateFromScenario(sc.id);
       vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request) => {
-        if (String(url).includes("suggestions")) return new Response(JSON.stringify({ suggestions: [], refreshing: false }));
         return new Response(JSON.stringify({ world: { ...world, customer: { ...world.customer, cif: "CIF_0001" } }, market: { instruments: [], refreshing: false, asOf: null } }));
       }));
       const errors: string[] = [];
@@ -53,7 +52,6 @@ describe("EditTarget: đổi giá trị mục tiêu rồi xem lại và xác nh�
     const posted: { type: string; [k: string]: unknown }[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       if (init?.method === "POST") posted.push(JSON.parse(String(init.body)).action);
-      if (String(url).includes("suggestions")) return new Response(JSON.stringify({ suggestions: [], refreshing: false }));
       return new Response(JSON.stringify({ world: { ...world, customer: { ...world.customer, cif: "CIF_0001" } }, market: { instruments: [], refreshing: false, asOf: null } }));
     }));
     const { getByRole, findByText, getByText, queryByText } = render(<PreviewStoreProvider><Probe /><ScreenHost /></PreviewStoreProvider>);
@@ -67,7 +65,7 @@ describe("EditTarget: đổi giá trị mục tiêu rồi xem lại và xác nh�
     const dateInput = document.getElementById("target-date") as HTMLInputElement;
     await act(async () => { fireEvent.change(dateInput, { target: { value: "2035-06-15" } }); });
     await act(async () => { fireEvent.click(getByRole("button", { name: "Xem lại kế hoạch" })); });
-    await findByText("Cần góp mỗi tháng (tính lại)");
+    await findByText("Góp mỗi tháng");
     expect(getByText(/5 tỷ đồng → 6 tỷ đồng/)).toBeTruthy();
     expect(getByText(/→ 15\/06\/2035/)).toBeTruthy();
 

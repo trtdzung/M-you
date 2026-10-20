@@ -24,7 +24,6 @@ export interface PreviewState {
   loans: Loan[];
   clock: SimClock;
   market: MarketState;
-  dismissedSuggestionIds: string[];
   nav: { stack: ScreenEntry[] };
   toasts: Toast[];
   /** Monotonic counter for deterministic business ids. Only business actions move it (same as the server). */
@@ -36,7 +35,7 @@ export interface PreviewState {
 }
 
 /** The data part of a scenario (no nav / toasts / dismissals). */
-export type WorldState = Omit<PreviewState, "nav" | "navSeq" | "toasts" | "dismissedSuggestionIds" | "lastCreatedGoalId">;
+export type WorldState = Omit<PreviewState, "nav" | "navSeq" | "toasts" | "lastCreatedGoalId">;
 
 export interface ScenarioJump {
   screen: ScreenId;
@@ -55,40 +54,3 @@ export interface Scenario {
   build: () => WorldState;
 }
 
-// ---------------------------------------------------------------- agent suggestions
-
-export type SuggestionKind =
-  | "idle_cash"
-  | "fund_drop"
-  | "maturity"
-  | "standing_order_failed"
-  | "behind_plan"
-  | "early_achieved"
-  | "due_soon"
-  | "missed"
-  | "overdue"
-  | "prepay"
-  | "revalue_asset"
-  | "priority_conflict"
-  | "insufficient_data"
-  | "loan_blocked"
-  | "generic";
-
-export interface SuggestionAction {
-  label: string;
-  /** Navigate (push) to a screen. */
-  nav?: { screen: ScreenId; params?: ScreenParams };
-  /** Or (and) dispatch a store action. */
-  action?: PreviewAction;
-  primary?: boolean;
-}
-
-export interface AgentSuggestion {
-  id: string;
-  kind: SuggestionKind;
-  title: string;
-  body: string;
-  goalId?: string;
-  tone?: "info" | "warning" | "success";
-  actions: SuggestionAction[];
-}
