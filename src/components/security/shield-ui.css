@@ -1,5 +1,6 @@
 /* Scam Shield presentation only. No global element selectors or shared theme overrides. */
 .shield-screen { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.shield-screen.shield-hub { gap:12px; }
 .shield-screen .settings-panel { min-width:0; }
 .shield-screen .settings-row { flex-wrap:wrap; gap:12px; }
 .shield-screen .settings-row > span:first-child { min-width:180px; }
