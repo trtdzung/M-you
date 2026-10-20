@@ -42,7 +42,11 @@ function getCategoryVisuals(
   tone?: InsightTone,
   securityLevel?: SecurityAlertLevel
 ) {
-  if (securityLevel === "RED" || category === "SECURITY_RED") {
+  if (
+    securityLevel === "RED" ||
+    category === "SECURITY_RED" ||
+    category === "UPCOMING_OBLIGATION"
+  ) {
     return {
       pill: "bg-red-50 text-red-700 border-red-200/80",
       dot: "bg-red-500",
@@ -70,6 +74,20 @@ function getCategoryVisuals(
     };
   }
 
+  // Cashflow risks and leakage alerts remain warm amber/yellow
+  if (
+    category === "CASHFLOW_RISK" ||
+    category === "ANOMALY_LEAKAGE"
+  ) {
+    return {
+      pill: "bg-amber-50 text-amber-800 border-amber-200/80",
+      dot: "bg-amber-500",
+      iconBg: "bg-amber-50",
+      iconText: "text-amber-700",
+      cardBorder: "",
+    };
+  }
+
   const meta = category ? CATEGORY_META[category] : undefined;
   const effectiveTone = tone ?? meta?.defaultTone ?? "info";
 
@@ -88,10 +106,10 @@ function getCategoryVisuals(
       cardBorder: "border-rose-200",
     },
     urgent: {
-      pill: "bg-red-50 text-red-700 border-red-200/80",
-      dot: "bg-red-500",
-      iconBg: "bg-red-50",
-      iconText: "text-red-600",
+      pill: "bg-amber-50 text-amber-800 border-amber-200/80",
+      dot: "bg-amber-500",
+      iconBg: "bg-amber-50",
+      iconText: "text-amber-700",
       cardBorder: "",
     },
     warning: {
@@ -183,6 +201,19 @@ function CategoryIcon({
     default:
       return <Sparkles size={size} className={className} aria-hidden />;
   }
+}
+
+function isIgnoreAction(chip: InsightActionChip) {
+  return (
+    chip.actionType === "dismiss" ||
+    chip.actionType === "mark_known_sender" ||
+    chip.label === "Tôi biết khoản này" ||
+    chip.label === "Ẩn gợi ý" ||
+    chip.label === "Để sau" ||
+    chip.label === "Bỏ qua" ||
+    chip.label?.toLowerCase().includes("tôi biết") ||
+    chip.label?.toLowerCase().includes("ẩn gợi ý")
+  );
 }
 
 export function HomeInsightWidget() {
@@ -448,6 +479,10 @@ export function HomeInsightWidget() {
       setHandbookOpen(true);
       return;
     }
+    if (chip.actionType === "navigate_security_hub" || chip.label === "Trung tâm bảo mật") {
+      pushWithTransition((href) => router.push(href), "/settings/security");
+      return;
+    }
     if (chip.actionType === "navigate_smart_otp") {
       pushWithTransition((href) => router.push(href), "/pfm?tab=security&action=smart_otp");
       return;
@@ -523,6 +558,18 @@ export function HomeInsightWidget() {
   }
 
   const selectedInsight = selectedInsightIndex !== null ? insights[selectedInsightIndex] ?? null : null;
+  const activeItem = insights[activeSlide] ?? null;
+  const activeVisuals = activeItem
+    ? getCategoryVisuals(
+        activeItem.category ?? activeItem.candidate.category,
+        activeItem.tone ?? activeItem.candidate.tone,
+        activeItem.securityLevel
+      )
+    : null;
+  const activeCategoryLabel =
+    activeItem?.categoryLabel ??
+    activeItem?.candidate.categoryLabel ??
+    (activeItem?.category ? CATEGORY_META[activeItem.category]?.label : "Gợi ý");
 
   return (
     <>
@@ -532,31 +579,50 @@ export function HomeInsightWidget() {
         onKeyDown={handleKeyDown}
         tabIndex={0}
       >
-        {/* Top bar: Carousel Pagination Dots & Slide Counter */}
-        <div className="flex items-center justify-between border-b border-orange-100/70 px-4 py-1.5 text-xs">
-          {/* Dots Indicator */}
-          <div className="flex items-center gap-1.5" role="tablist" aria-label="Danh sách slide gợi ý">
-            {Array.from({ length: totalSlides }).map((_, idx) => {
-              const isActive = activeSlide === idx;
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-label={`Chuyển đến slide ${idx + 1}`}
-                  onClick={() => setActiveSlide(idx)}
-                  className={`h-1.5 rounded-full transition-all ${
-                    isActive ? "w-5 bg-primary" : "w-1.5 bg-orange-200 hover:bg-orange-300"
-                  }`}
-                />
-              );
-            })}
-          </div>
+        {/* Top bar: Unified Header Row (Image 2) */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-1 text-xs shrink-0">
+          {/* Left: Category Pill */}
+          {activeItem && activeVisuals ? (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold transition-colors ${activeVisuals.pill}`}
+            >
+              <CategoryIcon
+                category={activeItem.category ?? activeItem.candidate.category}
+                tone={activeItem.tone ?? activeItem.candidate.tone}
+                securityLevel={activeItem.securityLevel}
+                size={13.5}
+              />
+              <span className="leading-tight">{activeCategoryLabel}</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold bg-white/80 text-primary border-orange-200/80">
+              <Sparkles size={13.5} aria-hidden />
+              <span className="leading-tight">Gợi ý tài chính</span>
+            </span>
+          )}
 
-          {/* Slide counter */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] font-semibold text-muted" aria-live="polite">
+          {/* Right: Dots Indicator & Slide Counter */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5" role="tablist" aria-label="Danh sách slide gợi ý">
+              {Array.from({ length: totalSlides }).map((_, idx) => {
+                const isActive = activeSlide === idx;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={`Chuyển đến slide ${idx + 1}`}
+                    onClick={() => setActiveSlide(idx)}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      isActive ? "w-5 bg-primary" : "w-1.5 bg-[#FDBA74]/60 hover:bg-orange-300"
+                    }`}
+                  />
+                );
+              })}
+            </div>
+
+            <span className="text-[12px] font-semibold text-[#344054] tabular-nums" aria-live="polite">
               {activeSlide + 1} / {totalSlides}
             </span>
           </div>
@@ -581,13 +647,10 @@ export function HomeInsightWidget() {
           >
             {insights.length === 0 ? (
               <div className="w-full min-w-full shrink-0">
-                <div className="flex min-h-[76px] w-full min-w-0 items-center gap-3 px-4 py-2 text-left">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Sparkles size={22} aria-hidden />
-                  </div>
+                <div className="flex min-h-[80px] w-full min-w-0 items-center px-4 pt-1 pb-3 text-left">
                   <div className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-text">Chưa có gợi ý mới</span>
-                    <span className="block text-xs text-muted">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
+                    <span className="block text-[15px] font-bold text-[#0C1A30] tracking-tight">Chưa có gợi ý mới</span>
+                    <span className="block text-[12px] text-[#475467] mt-1">M-Your đang tiếp tục theo dõi tài chính của bạn</span>
                   </div>
                 </div>
               </div>
@@ -598,77 +661,51 @@ export function HomeInsightWidget() {
                   item.tone ?? item.candidate.tone,
                   item.securityLevel
                 );
-                const chips = item.chips ?? item.candidate.chips ?? [];
+                const chips = (item.chips ?? item.candidate.chips ?? []).filter(
+                  (chip) => !isIgnoreAction(chip)
+                );
 
                 return (
                   <div key={item.candidate.id ?? idx} className="w-full min-w-full shrink-0">
                     <button
                       type="button"
                       onClick={() => handleCardClick(() => setSelectedInsightIndex(idx))}
-                      className={`flex min-h-[76px] w-full min-w-0 flex-col justify-center px-4 py-2 text-left focus-visible:outline-primary ${visuals.cardBorder}`}
+                      className={`flex min-h-[80px] w-full min-w-0 flex-col justify-center px-4 pt-1 pb-3 text-left focus-visible:outline-primary ${visuals.cardBorder}`}
                       aria-label={`Xem insight: ${item.title}`}
                     >
-                      <div className="flex w-full items-center gap-3">
-                        <div
-                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${visuals.iconBg} ${visuals.iconText}`}
-                        >
-                          <CategoryIcon
-                            category={item.category ?? item.candidate.category}
-                            tone={item.tone ?? item.candidate.tone}
-                            securityLevel={item.securityLevel}
-                            size={22}
-                          />
-                        </div>
-
+                      <div className="flex w-full items-center gap-2.5">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <span
-                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${visuals.pill}`}
-                            >
-                              <CategoryIcon
-                                category={item.category ?? item.candidate.category}
-                                tone={item.tone ?? item.candidate.tone}
-                                securityLevel={item.securityLevel}
-                                size={10}
-                              />
-                              <span>
-                                {item.categoryLabel ??
-                                  item.candidate.categoryLabel ??
-                                  (item.category ? CATEGORY_META[item.category]?.label : "Gợi ý")}
-                              </span>
-                            </span>
-                            {(item.badgeText || item.candidate.badgeText) && (
-                              <span className="truncate text-[10px] font-medium text-muted bg-neutral-100/90 px-1.5 py-0.5 rounded">
-                                {item.badgeText || item.candidate.badgeText}
-                              </span>
-                            )}
-                          </div>
+                          {(item.badgeText || item.candidate.badgeText) && (
+                            <span className="sr-only">{item.badgeText || item.candidate.badgeText}</span>
+                          )}
 
-                          <span className="block truncate text-sm font-semibold text-text">{item.title}</span>
+                          <span className="block truncate text-[15px] font-bold text-[#0C1A30] tracking-tight leading-snug">
+                            {item.title}
+                          </span>
 
                           {(item.impactLine || item.candidate.impactLine) ? (
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-700 font-medium">
+                            <div className="mt-1 flex items-center gap-1.5 text-[12px] text-[#475467] font-medium leading-tight">
                               <span className={`inline-block h-1.5 w-1.5 rounded-full shrink-0 ${visuals.dot}`} />
                               <span className="truncate">{item.impactLine || item.candidate.impactLine}</span>
                             </div>
                           ) : null}
 
                           {item.candidate.metric?.label ? (
-                            <span className="block truncate text-xs text-muted">
+                            <span className="block truncate text-[12px] text-[#64748B] mt-0.5 leading-tight font-medium">
                               {item.candidate.metric.label}:{" "}
-                              <span className="font-semibold text-text">
+                              <span className="font-bold text-[#0C1A30]">
                                 {formatCandidateMetric(item.candidate.metric)}
                               </span>
                             </span>
                           ) : null}
                         </div>
 
-                        <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
+                        <ChevronRight size={17} className="shrink-0 text-primary/80" aria-hidden />
                       </div>
 
                       {/* Action Chips */}
                       {chips.length > 0 && (
-                        <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                        <div className="mt-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar pt-0.5">
                           {chips.map((chip) => (
                             <span
                               key={chip.label}
@@ -685,12 +722,12 @@ export function HomeInsightWidget() {
                                   handleChipClick(chip, item);
                                 }
                               }}
-                              className={`shrink-0 rounded-full text-[10px] font-semibold px-2.5 py-0.5 border cursor-pointer transition-all ${
+                              className={`shrink-0 rounded-full text-[11.5px] font-semibold px-3 py-1 h-[29px] flex items-center justify-center border cursor-pointer transition-all active:scale-[0.98] ${
                                 chip.variant === "primary"
-                                  ? "bg-primary text-white border-primary hover:opacity-90 shadow-xs"
+                                  ? "bg-[#EA580C] text-white border-[#EA580C] hover:bg-[#C2410C] shadow-xs"
                                   : chip.variant === "ghost"
-                                  ? "text-slate-500 border-slate-200/60 hover:bg-slate-100"
-                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-2xs"
+                                  ? "text-slate-600 border-slate-200/80 hover:bg-slate-100"
+                                  : "bg-white text-[#0F172A] border-slate-200/90 hover:bg-slate-50 shadow-2xs"
                               }`}
                             >
                               {chip.label}
@@ -788,7 +825,9 @@ export function HomeInsightWidget() {
           <div className="flex flex-col gap-2">
             {/* Action Chips as Buttons */}
             {(() => {
-              const chips = selectedInsight.chips ?? selectedInsight.candidate.chips ?? [];
+              const chips = (selectedInsight.chips ?? selectedInsight.candidate.chips ?? []).filter(
+                (chip) => !isIgnoreAction(chip)
+              );
               if (chips.length > 0) {
                 return chips.map((chip) => (
                   <button
@@ -829,6 +868,18 @@ export function HomeInsightWidget() {
                 );
               }
 
+              if (actionType === "navigate_security_hub" || actionLabel === "Trung tâm bảo mật") {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => pushWithTransition((href) => router.push(href), "/settings/security")}
+                    className="login-submit"
+                  >
+                    {actionLabel ?? "Trung tâm bảo mật"}
+                  </button>
+                );
+              }
+
               if (actionHref) {
                 return (
                   <button
@@ -859,15 +910,6 @@ export function HomeInsightWidget() {
                 : selectedInsight.candidate.topic === "investment"
                   ? "Tìm hiểu cùng M-Your"
                   : "Xem cụ thể cùng M-Your"}
-            </button>
-
-            {/* Dismiss Button */}
-            <button
-              type="button"
-              onClick={() => handleDismiss(selectedInsight.snapshotId)}
-              className="mt-1 py-1.5 text-center text-xs text-muted hover:text-text transition-colors"
-            >
-              Ẩn gợi ý này trong 24h
             </button>
           </div>
         </Sheet>
