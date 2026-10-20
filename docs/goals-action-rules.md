@@ -8,8 +8,8 @@ Nguyên tắc: khách dùng được mọi tính năng. Chỉ còn chặn khi d�
 
 `POST /api/goals-v2/actions` với body `{ cif, requestId, action }`. Hàm kiểm tra là `parseGoalAction` trong `server/goal-service.ts`. Thao tác bị từ chối trả HTTP 422 `{ error, world, market }` và không ghi gì.
 
-- **Bị chặn hẳn** ("Thao tác này không dùng được với dữ liệu thật."): `world/sync`, `hydrate`, `loadScenario`, `reset`, `nav/*`, `toast/*`, `dismissSuggestion` và mọi `type` lạ.
-- **Được nhận:** `advanceTime`, `setRiskProfile`, `createGoal`, `deposit`, `withdraw`, `setStandingOrder`, `runStandingOrderNow`, `reserveLoan`, `cancelReservedLoan`, `addAsset` (tên cũ `addFixedAsset` vẫn được nhận), `revalueAsset`, `removeAsset`, `setAssetQuantity`, `invest`, `sellAsset`, `handleMaturity`, `takeLoan`, `repay`, `prepay`, `startRepayment`, `completeEarly`, `extend`, `reduceTarget`, `pauseGoal`, `resumeGoal`, `closeGoal`, `reorderPriorities`.
+- **Bị chặn hẳn** ("Thao tác này không dùng được với dữ liệu thật."): `world/sync`, `hydrate`, `loadScenario`, `reset`, `setCustomer`, `nav/*`, `toast/*`, `dismissSuggestion` và mọi `type` lạ.
+- **Được nhận:** `advanceTime`, `setFundPriceShift`, `setRiskProfile`, `triggerEvent`, `createGoal`, `deposit`, `withdraw`, `setStandingOrder`, `runStandingOrderNow`, `reserveLoan`, `cancelReservedLoan`, `addAsset` (tên cũ `addFixedAsset` vẫn được nhận), `revalueAsset`, `removeAsset`, `setAssetQuantity`, `invest`, `sellAsset`, `handleMaturity`, `takeLoan`, `repay`, `prepay`, `startRepayment`, `completeEarly`, `extend`, `reduceTarget`, `pauseGoal`, `resumeGoal`, `closeGoal`, `reorderPriorities`.
 - **Kiểm kiểu từng trường** (sai thì trả "Dữ liệu thao tác không hợp lệ."; server dựng lại action sạch và bỏ trường thừa):
 
 | Trường | Điều kiện |
@@ -20,6 +20,7 @@ Nguyên tắc: khách dùng được mọi tính năng. Chỉ còn chặn khi d�
 | `dayOfMonth` | số nguyên 1 đến 31 |
 | `countPercent` | 0 đến 100 |
 | `fraction` (`sellAsset`) | lớn hơn 0 và không quá 1 |
+| `pct` (`setFundPriceShift`) | lớn hơn -100 và không quá 1000 |
 | `days` (`advanceTime`) | số nguyên dương, tối đa 3660 |
 | ngày | đúng dạng `YYYY-MM-DD` |
 | `template` | `car`, `house`, `travel`, `education`, `emergency`, `wedding`, `retirement`, `other` |
@@ -27,6 +28,7 @@ Nguyên tắc: khách dùng được mọi tính năng. Chỉ còn chặn khi d�
 | `category` (tài sản tự khai) | `house`, `car`, `motorbike`, `other`, `gold`, `stock`, `external_fund`, `deposit`, `bond` |
 | `source` | `msb`, `self_reported`, `estimated` |
 | `profile` | `conservative`, `balanced`, `growth` |
+| `event` | `salary`, `bigExpense`, `standingOrderFail`, `overdue` |
 | `choice` (`handleMaturity`) | `rollover`, `toCash` |
 | `settlement` (`takeLoan`) | `now`, `next` |
 | `purchase` (`takeLoan`) | `{ assetId }` hoặc `{ name, category, value }` |
