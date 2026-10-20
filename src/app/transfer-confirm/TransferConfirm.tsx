@@ -444,6 +444,7 @@ export function TransferConfirm() {
         <TransferHeader title="Chuyển tiền" onBack={() => backWithTransition(() => router.back())} rightIcon={<Home size={22} />} rightLabel="Về trang chủ" onRightClick={() => pushWithTransition((href) => router.push(href), "/")} />
         <div className="flex flex-1 flex-col gap-4 px-4 pb-[calc(24px+var(--safe-area-bottom))]">
           <HoldScreen
+            details={transferDetails}
             cif={persona.cif}
             hold={hold}
             onSend={() => { setHold(null); void runConfirm(); }}

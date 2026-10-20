@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 
 import { useEffect, useState } from "react";
-import { Hourglass } from "lucide-react";
+import { Hourglass, Phone } from "lucide-react";
+import { formatVnd } from "@/lib/format";
 import { Diagnosis } from "./Diagnosis";
 import { Emphasized } from "./InterventionCopy";
-import { TRANSFER_SUPPORT_HREF, transferSupportHref, transferHoldCopy } from "@/lib/security/transfer-copy";
+import { TRANSFER_SUPPORT_HREF, transferSupportHref, transferHoldCopy, transferRecipientParts, type TransferDetails } from "@/lib/security/transfer-copy";
 import type { Hold } from "@/lib/security/holds";
 
 const POLL_MS = 3_000;
@@ -41,9 +42,10 @@ const mmss = (ms: number) => {
  * the customer's threshold. The rule releases it; the customer can cancel any
  * time. While waiting M-You asks one diagnostic question (UC 12).
  */
-export function HoldScreen({ cif, hold: initial, onSend, onCancelled }: {
+export function HoldScreen({ cif, hold: initial, onSend, onCancelled, details }: {
   cif: string;
   hold: Hold;
+  details?: TransferDetails;
   onSend: () => void;
   onCancelled: () => void;
 }) {
@@ -86,51 +88,63 @@ export function HoldScreen({ cif, hold: initial, onSend, onCancelled }: {
   const released = left <= 0;
   const copy = transferHoldCopy({ amount: hold.amount, recipientName: hold.recipientName }, left);
 
+  const recipient = details ? transferRecipientParts(details) : null;
+
   return (
-    <div data-testid="shield-hold" className="flex flex-col gap-4">
-      <div className="flex flex-col items-center gap-2 rounded-[20px] bg-warning-soft p-5 text-center" role="status">
-        <Hourglass size={36} className="text-warning" aria-hidden />
-        <p className="text-lg font-bold">{released ? "Đã hết thời gian giữ" : "Đang giữ giao dịch"}</p>
-        <p className="text-3xl font-bold tabular-nums">{mmss(left)}</p>
-        <p className="text-sm leading-relaxed">
+    <div data-testid="shield-hold" className="hold-screen">
+      <div className="hold-screen-status" role="status">
+        <span className="transfer-alert-icon hold-screen-icon" aria-hidden="true"><Hourglass size={20} /></span>
+        <p className="hold-screen-title">{released ? "Đã hết thời gian giữ" : "Đang giữ giao dịch"}</p>
+        <p className="hold-screen-countdown">{mmss(left)}</p>
+        <p className="hold-screen-message">
           <Emphasized {...copy.message} />
         </p>
       </div>
-      <div className={`rounded-[20px] border border-border bg-white p-4 ${answer === "Có" ? "hidden" : ""}`}>
+      {details && recipient && <div className="transfer-alert-recipient">
+        <span className="transfer-alert-avatar" aria-hidden="true">{recipient.initials}</span>
+        <div className="transfer-alert-recipient-copy">
+          <p className="transfer-alert-recipient-name">{recipient.name}</p>
+          <p className="transfer-alert-recipient-meta">{recipient.bankAccount}</p>
+        </div>
+        {details.amount !== undefined && <p className="transfer-alert-amount">{formatVnd(details.amount)}</p>}
+      </div>}
+      <div className={`hold-screen-diagnosis ${answer === "Có" ? "hidden" : ""}`}>
         <Diagnosis cif={cif} id={hold.id} question={copy.question} onAnswer={setAnswer} sourceLine={false} />
       </div>
       {answer === "Có" && (
-        <div className="flex flex-col gap-2 rounded-[20px] border border-border bg-white p-4">
-          <p className="text-base font-semibold leading-relaxed">
+        <div className="transfer-alert-content">
+          <p className="transfer-alert-guidance">
             <Emphasized {...copy.yes.message} />
           </p>
-          <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed">
-            {copy.yes.steps.map(step => (
-              <li key={step}>{step}</li>
+          <ol className="transfer-alert-checklist">
+            {copy.yes.steps.map((step, index) => (
+              <li key={step}><span className="transfer-alert-step" aria-hidden="true">{index + 1}</span><span>{step}</span></li>
             ))}
           </ol>
         </div>
       )}
-      <button type="button" className="shield-danger-primary" onClick={() => void cancel()}>
-        {copy.primary}
-      </button>
-      {answer === "Có" ? (
-        <a className="shield-danger-link text-center" href={TRANSFER_SUPPORT_HREF} onClick={event => {
-            event.preventDefault();
-            router.push(transferSupportHref(window.location.pathname + window.location.search));
-          }}>
-          {copy.yes.secondary}
-        </a>
-      ) : (
-        <>
-          {released && (
-            <button type="button" className="shield-danger-link text-center" onClick={() => void send()}>
-              {copy.secondary}
-            </button>
-          )}
-          <p className="text-center text-xs leading-relaxed text-muted">{copy.footnote}</p>
-        </>
-      )}
+      <div className="transfer-alert-actions">
+        <button type="button" className="transfer-alert-stop" onClick={() => void cancel()}>
+          {copy.primary}
+        </button>
+        {answer === "Có" ? (
+          <a className="transfer-alert-support" href={TRANSFER_SUPPORT_HREF} onClick={event => {
+              event.preventDefault();
+              router.push(transferSupportHref(window.location.pathname + window.location.search));
+            }}>
+            <Phone size={16} aria-hidden="true" />{copy.yes.secondary}
+          </a>
+        ) : (
+          <>
+            {released && (
+              <button type="button" className="transfer-alert-proceed" onClick={() => void send()}>
+                {copy.secondary}
+              </button>
+            )}
+            <p className="hold-screen-footnote">{copy.footnote}</p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
