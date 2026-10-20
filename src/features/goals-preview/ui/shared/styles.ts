@@ -25,7 +25,6 @@ export const divider = "divide-y divide-border";
 /**
  * Type scale for every goals-preview screen (px): 28 hero number (one per screen) · 22 page title / figure ·
  * 20 emphasis title · 16 card title / input / callout · 15 section title · 14 body · 12–13 caption · 10–11 tag.
- * Headings carry `!` so the app-wide `.pfm-app-shell #main-content h2 { font-size: 18px }` rule cannot resize them.
  */
 export const sectionTitle = "!text-[15px] !leading-[22px] !font-semibold text-text";
 export const heroNumber = "text-[28px] font-bold leading-9 tabular-nums text-text";

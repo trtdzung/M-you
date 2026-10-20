@@ -32,7 +32,7 @@ export function PfmHeader() {
       >
         <ArrowLeft size={22} strokeWidth={2} />
       </button>
-      <h1 className="text-[22px] font-bold text-text">Tài chính</h1>
+      <h1 className="text-[20px] font-bold text-text">Tài chính</h1>
       <div className="ml-auto" aria-hidden />
     </header>
   );

@@ -688,7 +688,6 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   box-shadow: none;
 }
 .pfm-app-shell #main-content h2 {
-  font-size: 18px;
   line-height: 26px;
   font-weight: 600;
 }
@@ -697,7 +696,6 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   border-radius: 24px 24px 0 0;
 }
 .pfm-app-shell [role="dialog"] h2 {
-  font-size: 20px;
   line-height: 28px;
   font-weight: 700;
 }
@@ -715,9 +713,9 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 }
 .pfm-transactions .txn-row:hover { background: transparent; }
 .pfm-transactions .txn-row:active { opacity: 0.7; }
-.pfm-transactions .txn-row-title { font-size: 16px; font-weight: 600; line-height: 24px; }
-.pfm-transactions .txn-row-meta { margin-top: 4px; font-size: 13px; line-height: 20px; }
-.pfm-transactions .txn-row-amount { font-size: 15px; line-height: 22px; }
+.pfm-transactions .txn-row-title { font-weight: 600; line-height: 24px; }
+.pfm-transactions .txn-row-meta { margin-top: 4px; line-height: 20px; }
+.pfm-transactions .txn-row-amount { line-height: 22px; }
 .pfm-transaction-sheet > div:first-child {
   border-bottom: 1px solid #dfe5ee;
   padding-bottom: 16px;
@@ -729,7 +727,6 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
 
 .pfm-budget .budget-jar-card { padding: 20px; }
 .pfm-budget .budget-jar-card > div:first-child > div > div:first-child {
-  font-size: 16px;
   line-height: 24px;
   align-items: flex-start;
 }
@@ -737,13 +734,11 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   font-weight: 600;
 }
 .pfm-budget .budget-jar-card > div:first-child > div > div:last-child {
-  font-size: 13px;
   line-height: 20px;
   flex-wrap: wrap;
   gap: 4px;
 }
 .pfm-budget .budget-jar-card > div:nth-child(2) {
-  font-size: 14px;
   line-height: 22px;
 }
 
