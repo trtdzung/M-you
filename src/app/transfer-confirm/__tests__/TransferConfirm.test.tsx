@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { type RenderOptions, render as rtlRender, screen, fireEvent, within } from "@testing-library/react";
+import { type RenderOptions, render as rtlRender, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { StubCategoryTaxonomy } from "@/test-utils/category-taxonomy-stub";
 
@@ -183,8 +183,15 @@ function txnByCategory(categoryId: string): MockTxn | undefined {
   return h.store.find((t) => t.categoryId === categoryId);
 }
 
+// Confirmation is disabled while Scam Shield evaluates the draft (ab2fd4c).
+async function confirmButton() {
+  const button = screen.getByRole("button", { name: "Xác nhận chuyển tiền" });
+  await waitFor(() => expect(button).toBeEnabled());
+  return button;
+}
+
 async function completeTransfer() {
-  fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+  fireEvent.click(await confirmButton());
   await screen.findByText("Chuyển tiền thành công");
 }
 
@@ -288,7 +295,7 @@ describe("TransferConfirm — always create + categorize", () => {
   it("double-submit creates only one txn (F#3)", async () => {
     h.draft = jarDraft();
     render(<TransferConfirm />);
-    const btn = screen.getByRole("button", { name: "Xác nhận chuyển tiền" });
+    const btn = await confirmButton();
     fireEvent.click(btn);
     fireEvent.click(btn);
     await screen.findByText("Chuyển tiền thành công");
@@ -313,14 +320,14 @@ describe("TransferConfirm — always create + categorize", () => {
     h.draft = jarDraft();
     h.listAccounts.mockRejectedValueOnce(new Error("provider down"));
     render(<TransferConfirm />);
-    const btn = screen.getByRole("button", { name: "Xác nhận chuyển tiền" });
+    const btn = await confirmButton();
 
     fireEvent.click(btn);
     await screen.findByText(/Không hoàn tất được giao dịch/);
     expect(h.adopt).not.toHaveBeenCalled(); // async failed before any local write
 
     // Retry now succeeds — the latch was released.
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    fireEvent.click(await confirmButton());
     await screen.findByText("Chuyển tiền thành công");
     expect(h.adopt).toHaveBeenCalledTimes(1);
   });
@@ -351,7 +358,7 @@ describe("TransferConfirm — auto-fund (assess-then-commit)", () => {
     h.assessment = { tier: "insufficient", shortfall: 500_000, donors: [], targetJarId: "food", source: "mock" };
     h.draft = jarDraft();
     render(<TransferConfirm />);
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    fireEvent.click(await confirmButton());
 
     await screen.findByText(/Số dư không đủ để hoàn tất giao dịch/);
     expect(h.applyAccountDebit).not.toHaveBeenCalled();
@@ -391,7 +398,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
     h.draft = jarDraft();
     h.applyAccountDebit.mockRejectedValueOnce(new Error("manual-transactions 500"));
     render(<TransferConfirm />);
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    fireEvent.click(await confirmButton());
 
     await screen.findByText(/Không hoàn tất được giao dịch/);
     expect(screen.queryByText("Chuyển tiền thành công")).not.toBeInTheDocument();
@@ -403,7 +410,7 @@ describe("TransferConfirm — write-path / clock / preview edge fixes", () => {
     expect(record).toMatchObject({ amount: AMOUNT, direction: "debit", categoryId: "dining" });
 
     // Retry of the SAME transfer reuses the record id (server-side replay guard).
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+    fireEvent.click(await confirmButton());
     await screen.findByText("Chuyển tiền thành công");
     const retryRecord = h.applyAccountDebit.mock.calls[1][2] as { id: string };
     expect(retryRecord.id).toBe((record as { id: string }).id);

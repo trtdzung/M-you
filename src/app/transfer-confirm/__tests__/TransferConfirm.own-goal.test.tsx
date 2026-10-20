@@ -110,7 +110,9 @@ beforeEach(() => {
 });
 
 async function confirm() {
-  fireEvent.click(screen.getByRole("button", { name: "Xác nhận chuyển tiền" }));
+  const button = screen.getByRole("button", { name: "Xác nhận chuyển tiền" });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
   await waitFor(() => expect(h.applyAccountDebit).toHaveBeenCalled());
 }
 
