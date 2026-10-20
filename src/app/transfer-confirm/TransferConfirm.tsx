@@ -448,7 +448,6 @@ export function TransferConfirm() {
         <div className="border-b border-[#dfe5ee] pb-5">
           <p className="text-lg font-semibold text-muted">Xác nhận giao dịch</p>
           <p className="mt-1 text-[28px] font-bold tabular-nums text-text">{formatVnd(amount)}</p>
-          {banner && <TransferAlertBanner intervention={banner} recipientName={name.trim()} onChoose={choice => void chooseShield(banner, choice)} />}
         </div>
         <Labeled label="Người nhận">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
@@ -489,6 +488,8 @@ export function TransferConfirm() {
           poolSource={sourceKind === "pool"}
         />
       )}
+
+      {banner && <TransferAlertBanner intervention={banner} recipientName={name.trim()} onChoose={choice => void chooseShield(banner, choice)} />}
 
       {error && <p className="text-sm text-negative">{error}</p>}
 
