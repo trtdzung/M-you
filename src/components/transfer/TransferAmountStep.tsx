@@ -200,7 +200,7 @@ export function TransferAmountStep({
           type="button"
           disabled={!canContinue}
           onClick={onContinue}
-          className="login-submit !text-[16px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
+          className="login-submit !text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-45"
         >
           Tiếp tục
         </button>
