@@ -530,8 +530,8 @@ export function HomeInsightWidget() {
           >
             <Sparkles size={24} className="shrink-0 text-primary" aria-hidden />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-text">Gợi ý tài chính</span>
-              <span className="block text-xs text-muted">M-Your · Chạm để xem chi tiết</span>
+              <span className="block text-xs leading-5 font-semibold text-text">Gợi ý tài chính</span>
+              <span className="block text-[11px] leading-4 text-muted">M-Your · Chạm để xem chi tiết</span>
             </span>
             <ChevronRight size={16} className="shrink-0 text-primary" aria-hidden />
           </button>
@@ -811,7 +811,7 @@ export function HomeInsightWidget() {
           {selectedInsight.candidate.metric?.label ? (
             <div className="my-5 rounded-2xl border border-orange-100 bg-[#fff1ea] p-4">
               <p className="text-xs text-muted">{selectedInsight.candidate.metric.label}</p>
-              <p className="mt-2 text-2xl font-bold text-text">
+              <p className="mt-2 text-xl leading-8 font-bold text-text">
                 {formatCandidateMetric(selectedInsight.candidate.metric)}
               </p>
               {selectedInsight.candidate.confidence === "estimated" ? (

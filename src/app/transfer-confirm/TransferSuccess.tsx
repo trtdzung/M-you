@@ -188,7 +188,7 @@ export function TransferSuccess({
         </Card>
 
         <div className="mt-auto grid grid-cols-2 gap-4 pt-4">
-          <button type="button" onClick={() => {}} className="flex min-h-12 items-center justify-center gap-2 rounded-[9px] border border-primary bg-white text-base font-semibold text-primary">
+          <button type="button" onClick={() => {}} className="flex min-h-12 items-center justify-center gap-2 rounded-[9px] border border-primary bg-white text-xs leading-6 font-semibold text-primary">
             <Share2 size={18} />
             Chia sẻ
           </button>

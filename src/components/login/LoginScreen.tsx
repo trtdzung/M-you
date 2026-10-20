@@ -60,7 +60,7 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
             </div>
             <button type="button" aria-label="QR cá nhân" onClick={() => setSheet("personal-qr")} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[8px] border border-orange-300 bg-white/40 text-[#10284b]"><QrCode size={37} /></button>
           </div>
-          <button type="button" onClick={() => { setTransfer(false); setSheet("login"); }} className="login-submit"><ScanFace size={24} aria-hidden />Đăng nhập</button>
+          <button type="button" onClick={() => { setTransfer(false); setSheet("login"); }} className="login-submit !text-[16px] leading-[25.5px]"><ScanFace size={24} aria-hidden />Đăng nhập</button>
         </section>
         <section aria-label="Truy cập nhanh" className="login-shortcuts">
           <button type="button" onClick={() => { setTransfer(true); setSheet("login"); }}><ArrowUpRight size={31} /><span>Chuyển tiền</span></button>
@@ -78,11 +78,11 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
           <p className="mb-4 text-sm font-semibold text-text">{customer?.label ?? "Vui lòng chọn khách hàng ở màn hình đăng nhập"}</p>
           <label className="mb-2 block text-sm font-medium" htmlFor="login-password">Mật khẩu</label>
           <div className="relative mb-3">
-            <input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={e => { setPassword(e.target.value); setError(""); }} placeholder="Nhập mật khẩu" autoComplete="off" aria-invalid={Boolean(error)} aria-describedby={error ? "login-error" : undefined} className="h-12 w-full rounded-[10px] border border-border bg-surface-muted px-3 pr-12 text-base outline-none focus:ring-2 focus:ring-orange-300" />
+            <input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={e => { setPassword(e.target.value); setError(""); }} placeholder="Nhập mật khẩu" autoComplete="off" aria-invalid={Boolean(error)} aria-describedby={error ? "login-error" : undefined} className="h-12 w-full rounded-[10px] border border-border bg-surface-muted px-3 pr-12 text-sm leading-6 outline-none focus:ring-2 focus:ring-orange-300" />
             <button type="button" aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} onClick={() => setShowPassword(v => !v)} className="absolute right-1 top-0 flex h-12 w-11 items-center justify-center text-muted">{showPassword ? <EyeOff size={21} /> : <Eye size={21} />}</button>
           </div>
-          {error && <p id="login-error" role="alert" className="mb-4 text-sm text-negative">{error}</p>}
-          <button type="submit" className="login-submit">Đăng nhập</button>
+          {error && <p id="login-error" role="alert" className="mb-4 text-xs leading-5 text-negative">{error}</p>}
+          <button type="submit" className="login-submit !text-[16px] leading-[25.5px]">Đăng nhập</button>
           <button type="button" onClick={() => { setPassword(""); setError(""); setSheet("support"); }} className="mt-4 flex min-h-11 w-full items-center justify-center text-sm font-semibold text-primary">Hỗ trợ đăng nhập</button>
         </form>
       </Sheet>

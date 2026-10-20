@@ -543,7 +543,8 @@ html[data-vt-dir="back"] ::view-transition-new(shell-main) { animation-name: vt-
   gap: 10px;
   border-radius: 12px;
   color: #10284b;
-  font-size: 13px;
+  font-size: 11px;
+  line-height: 19.5px;
   font-weight: 500;
 }
 .login-shortcuts svg { stroke-width: 1.7; }

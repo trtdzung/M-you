@@ -113,7 +113,7 @@ export function SettingsDemo({ section }: { section?: SettingsSection }) {
   } else if (section === "knowledge") {
     content = <KnowledgeScreen />;
   } else if (section === "privacy") {
-    content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
+    content = <><Panel title="Dữ liệu đã cho phép">{scopes.map(scope => <Data key={scope} label={{ transactions: "Giao dịch", assets: "Tài sản", liabilities: "Khoản nợ", ai: "Trợ lý AI" }[scope]} value="Đã cho phép" />)}<button className="settings-action mb-4 !text-[14px] leading-6" onClick={() => setSheet("revoke")}>Thu hồi đồng ý</button></Panel><Notice>MSB Financial Copilot dùng dữ liệu minh họa. Các màn bảo mật trong Cài đặt mô phỏng app MSB, không thay đổi xác thực ngân hàng thật.</Notice></>;
   } else if (isShieldSection(section)) {
     content = <ShieldSection section={section} />;
   } else {
