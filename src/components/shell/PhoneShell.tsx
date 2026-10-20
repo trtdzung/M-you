@@ -52,7 +52,7 @@ export function PhoneShell({
             <main
               id="main-content"
               className={cn(
-                "shell-main min-h-0 flex-1 overflow-y-auto px-shell-main-inset pt-1",
+                "shell-main no-scrollbar min-h-0 flex-1 overflow-y-auto px-shell-main-inset pt-1",
                 mainClassName,
               )}
             >
