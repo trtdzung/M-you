@@ -11,6 +11,7 @@ import type { ScreenProps } from "../../../model/screens";
 import { paramNumber, paramString } from "../../../model/screens";
 import type { GoalTemplate } from "../../../model/types";
 import type { DeclaredAssetInput } from "../../../store/actions";
+import { usePersonaCif } from "@/providers/context";
 import { usePreview } from "../../../store/PreviewStore";
 import { AmountCard, formatShort, SuggestChip } from "../../shared/AmountCard";
 import { BottomActions } from "../../shared/BottomActions";
@@ -19,6 +20,7 @@ import { MonthYearSheet } from "../../shared/Pickers";
 import { ScreenHeader } from "../../shared/ScreenHeader";
 import { StepProgress } from "../../shared/StepProgress";
 import { card, chip, chipSelected, fieldError, input, primaryButton, progressTrack, ring, screenPadding, secondaryButton, sectionTitle, figure } from "../../shared/styles";
+import { PriceEstimateSheet } from "./PriceEstimateSheet";
 import { TEMPLATES, WIZARD_STEPS, countedValue, quickAmountsFor, suggestedTarget, targetDateFromNow, templateConfig, wizardAssets } from "./wizard";
 
 
@@ -106,6 +108,8 @@ export function GoalInfo({ params }: ScreenProps) {
   const customDate = !quickDates.some((q) => q.date === date);
   const [pickDate, setPickDate] = useState(customDate);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [estimateOpen, setEstimateOpen] = useState(false);
+  const cif = usePersonaCif();
   const Icon = templateConfig(customLogo ? logo : templateId).icon;
   const quickAmounts = quickAmountsFor(config, state.customer);
 
@@ -191,6 +195,21 @@ export function GoalInfo({ params }: ScreenProps) {
         onChange={setAmount}
         error={touched && errors.amount ? errors.amount : undefined}
         chips={quickAmounts.map((a) => ({ label: formatShort(a), amount: a }))}
+        footer={
+          cif && (
+            <button type="button" onClick={() => setEstimateOpen(true)} className={cn("self-start text-[13px] text-muted", ring)}>
+              Chưa rõ? <span className="font-semibold text-primary-strong underline">Để M-You ước tính</span>
+            </button>
+          )
+        }
+      />
+      <PriceEstimateSheet
+        open={estimateOpen}
+        cif={cif}
+        template={templateId}
+        description={name}
+        onClose={() => setEstimateOpen(false)}
+        onApply={setAmount}
       />
 
       <section className={`${card} flex flex-col gap-3`} aria-label="Tài sản có sẵn">

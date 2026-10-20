@@ -112,6 +112,7 @@ export function AgentClarifyOptionsCard({
   reopened,
   hasPrevious,
   onAnswer,
+  onAnswers,
   onBack,
   onCancelEdit,
   fullWidth = false,
@@ -124,6 +125,11 @@ export function AgentClarifyOptionsCard({
   /** True when an earlier `clarify_options` TURN precedes this one in an unbroken chain — shows "← Câu trước". */
   hasPrevious?: boolean;
   onAnswer: (text: string) => void;
+  /**
+   * For callers outside the chat that need each answer apart (the price-estimate form): called with one answer per question,
+   * in order, instead of `onAnswer`'s single joined message.
+   */
+  onAnswers?: (answers: string[]) => void;
   onBack?: () => void;
   /** Only meaningful when `reopened` — return to the live latest turn without sending anything. */
   onCancelEdit?: () => void;
@@ -141,13 +147,15 @@ export function AgentClarifyOptionsCard({
 
   function pick(i: number, text: string) {
     if (single) {
-      onAnswer(text);
+      if (onAnswers) onAnswers([text]);
+      else onAnswer(text);
       return;
     }
     const next = picks.map((p, idx) => (idx === i ? text : p));
     setPicks(next);
     if (i === ui.questions.length - 1) {
-      onAnswer(joinClarifyAnswers(next as string[])); // last question just answered — every pick is filled
+      if (onAnswers) onAnswers(next as string[]);
+      else onAnswer(joinClarifyAnswers(next as string[])); // last question just answered — every pick is filled
     } else {
       setStep(i + 1);
     }

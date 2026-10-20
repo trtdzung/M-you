@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { amountInWords } from "@/features/goals/ui/form/amount-in-words";
 import { formatVndCompact } from "@/features/goals-preview/format-money";
 import { cn } from "@/lib/cn";
@@ -154,6 +154,7 @@ export function AmountCard({
   help,
   autoFocus,
   bare = false,
+  footer,
 }: {
   title: string;
   value: number | null;
@@ -165,6 +166,8 @@ export function AmountCard({
   autoFocus?: boolean;
   /** Render without the card (when already inside one). */
   bare?: boolean;
+  /** Extra content under the field and chips (e.g. a "not sure?" link). */
+  footer?: ReactNode;
 }) {
   const id = useId();
   const words = value && value > 0 ? amountInWords(value) : "";
@@ -187,6 +190,7 @@ export function AmountCard({
           ))}
         </div>
       )}
+      {footer}
     </Wrapper>
   );
 }
