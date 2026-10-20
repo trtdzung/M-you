@@ -1,5 +1,7 @@
 "use client";
 
+import { clearTransferComposeState } from "@/lib/transfer-compose-state";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
@@ -321,6 +323,7 @@ export function TransferConfirm() {
 
     // The money moved — from here on the receipt is true. Consume the draft now so
     // a reload/replay can't resubmit (F#2).
+    clearTransferComposeState(persona.cif);
     if (draftIdParam) deleteTransferDraft(draftIdParam);
     const sentTo = { last4: lastFourDigits(draft?.accountNumber ?? acct), bank: draft?.recipientBankName ?? "" };
     void postSecurityEvent("transfer_out", {
