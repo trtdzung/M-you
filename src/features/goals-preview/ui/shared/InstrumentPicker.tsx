@@ -181,7 +181,7 @@ export function InstrumentPicker({
             <p className="text-[16px] font-bold text-text">{selected.name}</p>
             {selected.fullName && <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{selected.fullName}</p>}
             <p className="mt-1.5 text-[13px] tabular-nums text-muted">
-              {kind === "stock" ? "Giá đóng cửa" : "NAV"} · {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}
+              {kind === "stock" ? "Giá đóng cửa" : "NAV công bố"} · {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}
               <span className="mt-0.5 block font-semibold text-text">{priceLabel(price)}/{kind === "stock" ? "cp" : selected.unit}</span>
             </p>
           </div>

@@ -293,7 +293,7 @@ export function AddAsset({ params }: ScreenProps) {
           <div className="rounded-2xl bg-primary-soft px-4 py-3" aria-live="polite" aria-atomic="true">
             <p className="text-[13px] text-muted">Giá trị ước tính</p>
             <p className="mt-1 text-[24px] font-bold tabular-nums tracking-tight text-text">{autoValue ? formatVnd(autoValue) : "—"}</p>
-            <p className="mt-1 text-[12px] text-muted">{instrument ? `Theo giá ${type.category === "stock" ? "đóng cửa" : type.category === "gold" ? "mua vào" : "NAV"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
+            <p className="mt-1 text-[12px] text-muted">{instrument ? `Theo ${type.category === "stock" ? "giá đóng cửa" : type.category === "gold" ? "giá mua vào" : "NAV công bố"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
           </div>
         </section>
       )}
