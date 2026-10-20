@@ -292,7 +292,7 @@ export function AddAsset({ params }: ScreenProps) {
           )}
           <div className="rounded-2xl bg-primary-soft px-4 py-3" aria-live="polite" aria-atomic="true">
             <p className="text-[13px] text-muted">Giá trị ước tính</p>
-            <p className="mt-1 text-[24px] font-bold tabular-nums tracking-tight text-text">{autoValue ? `${qtyGroup.format(autoValue)} ₫` : "—"}</p>
+            <p className="mt-1 text-[24px] font-bold tabular-nums tracking-tight text-text">{autoValue ? formatVnd(autoValue) : "—"}</p>
             <p className="mt-1 text-[12px] text-muted">{instrument ? `Theo giá ${type.category === "stock" ? "đóng cửa" : type.category === "gold" ? "mua vào" : "NAV"} ${priceDate}` : "Chọn tài sản và nhập số lượng để xem giá trị"}</p>
           </div>
         </section>
@@ -354,7 +354,7 @@ export function AddAsset({ params }: ScreenProps) {
         {counted && <SliderRow label="Tỷ lệ được tính" value={percent} min={10} max={100} step={10} onChange={setPercent} format={(v) => `${v}%`} />}
         <div className="border-t border-border pt-3" aria-live="polite" aria-atomic="true">
           <p className="text-[13px] text-muted">Giá trị tính vào mục tiêu</p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-text">{valid ? `${qtyGroup.format(countedValue)} ₫` : "—"}</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-text">{valid ? formatVnd(countedValue) : "—"}</p>
           <p className="mt-1 text-[13px] text-muted">Tiến độ {pct(progress.before)} → <b className="text-text">{pct(progress.after)}</b></p>
         </div>
       </section>

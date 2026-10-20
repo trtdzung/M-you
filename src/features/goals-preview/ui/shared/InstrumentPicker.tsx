@@ -182,7 +182,7 @@ export function InstrumentPicker({
             {selected.fullName && <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{selected.fullName}</p>}
             <p className="mt-1.5 text-[13px] tabular-nums text-muted">
               {kind === "stock" ? "Giá đóng cửa" : "NAV"} · {formatISODate(seriesPointAt(selected.priceSeries, today)?.date).slice(0, 5)}
-              <span className="mt-0.5 block font-semibold text-text">{new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(price)} đ/{kind === "stock" ? "cp" : selected.unit}</span>
+              <span className="mt-0.5 block font-semibold text-text">{priceLabel(price)}/{kind === "stock" ? "cp" : selected.unit}</span>
             </p>
           </div>
           <button type="button" className={cn(secondaryButton, "!min-h-11 !w-auto shrink-0 !px-4")} onClick={() => setOpen(true)}>
