@@ -17,15 +17,12 @@ import { formatVnd } from "@/lib/format";
 import { transferNow } from "@/lib/demo-clock";
 import { useSecurityStore } from "@/state/security/store";
 import { isTransferBlocked } from "@/state/security/selectors";
-import { useShallow } from "zustand/react/shallow";
-import { accountLastFour, isTrustedRecipient } from "@/lib/transfer-alert";
 import { effectiveContacts } from "@/state/security/selectors";
 import { actionFor } from "@/lib/security/actions";
 import type { Intervention } from "@/lib/security/intervention-types";
 import type { TransferReview } from "@/lib/security/signal-context";
 import { respondIntervention } from "@/components/security/useInterventions";
 import { useTransferShield } from "@/components/security/useTransferShield";
-import { checkRepeatRecipient, SHIELD_TRUST_EVENT } from "@/components/security/afterTransfer";
 import { HoldScreen, requestTransferHold } from "@/components/security/HoldScreen";
 import type { Hold } from "@/lib/security/holds";
 import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
@@ -108,7 +105,6 @@ export function TransferConfirm() {
   // Scam Shield: the engine judges the transfer under review (rule decides,
   // spec wording at once). Yellow = banner with its chips, Red = popup before
   // committing. The engine failing never blocks the transfer.
-  const shield = useSecurityStore(useShallow((state) => ({ trusted: state.trustedContacts, familyAlerts: state.familyAlerts })));
   const review = useMemo<TransferReview | null>(() => (isValidDraft && amount > 0 && name.trim()
     ? {
         amount,
@@ -340,7 +336,7 @@ export function TransferConfirm() {
       recipientLast4: sentTo.last4,
       recipientBank: sentTo.bank,
       isNewPayee: draft?.riskFlags?.includes("new_payee") ?? false,
-    }).then(() => checkRepeatRecipient(persona.cif, sentTo));
+    });
     setCreatedTxnId(primaryTxnId);
     setCreatedSourceJarId(targetJarId); // seeds the categorize picker; null for pool/account
 
@@ -382,24 +378,7 @@ export function TransferConfirm() {
     setSubmitting(false);
   }
 
-  // BT6 chip "Lưu vào danh bạ tin cậy" (InterventionHost) does what the success button does.
-  function trustDoneRecipient() {
-    if (!done) return;
-    const four = accountLastFour(done.recipientAccountNumber ?? done.recipientAccountMasked);
-    if (four) useSecurityStore.getState().addTrustedContact({ name: done.recipientName, bank: done.recipientBankName ?? "Chưa rõ ngân hàng", account: `••• ${four}` });
-  }
-  const trustRef = useRef(trustDoneRecipient);
-  trustRef.current = trustDoneRecipient;
-  useEffect(() => {
-    const onTrustEvent = () => trustRef.current();
-    window.addEventListener(SHIELD_TRUST_EVENT, onTrustEvent);
-    return () => window.removeEventListener(SHIELD_TRUST_EVENT, onTrustEvent);
-  }, []);
-
   if (done) {
-    // Trusting a recipient raises security, so it applies at once (no face check).
-    const doneAccount = done.recipientAccountNumber ?? done.recipientAccountMasked;
-    const lastFour = accountLastFour(doneAccount);
     return (
       <TransferSuccess
         done={done}
@@ -409,8 +388,6 @@ export function TransferConfirm() {
         createdSourceJarId={createdSourceJarId}
         recipientSaved={recipientSaved}
         onSaveRecipient={saveRecipient}
-        trusted={lastFour === null ? null : isTrustedRecipient(shield.trusted, done.recipientName, doneAccount, done.recipientBankName ?? undefined)}
-        onTrust={trustDoneRecipient}
       />
     );
   }

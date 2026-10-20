@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { pushWithTransition } from "@/lib/view-transition";
-import { ChevronDown, ChevronUp, Home, Share2, ShieldCheck, UserPlus } from "lucide-react";
-import { Card, Sheet } from "@/components/primitives";
+import { ChevronDown, ChevronUp, Home, Share2, UserPlus } from "lucide-react";
+import { Card } from "@/components/primitives";
 import { formatDateTime } from "@/lib/format";
 import { avatarColor, initialOf } from "@/lib/avatar";
 import { findBank, findBankByName } from "@/lib/transfer-banks";
@@ -57,8 +57,6 @@ export function TransferSuccess({
   createdSourceJarId,
   recipientSaved,
   onSaveRecipient,
-  trusted,
-  onTrust,
 }: {
   done: MockExecutedTransfer;
   fundResult: FundResult | null;
@@ -67,13 +65,9 @@ export function TransferSuccess({
   createdSourceJarId: string | null;
   recipientSaved: boolean;
   onSaveRecipient: () => void;
-  /** Already in the Scam Shield trusted list (null = no account digits to match on). */
-  trusted: boolean | null;
-  onTrust: () => void;
 }) {
   const router = useRouter();
   const [showDetails, setShowDetails] = useState(false);
-  const [confirmTrust, setConfirmTrust] = useState(false);
   const recipientBank = findBankByName(done.recipientBankName ?? undefined);
   const senderBank = findBank("msb");
   const memoText = done.memo ?? `${toPlainUpper(done.senderName)} chuyen tien`;
@@ -180,8 +174,6 @@ export function TransferSuccess({
             </div>
           )}
 
-          <div className="px-5 pt-4" data-shield-slot="transfer-success" />
-          <p className="px-5 pt-3 text-sm leading-relaxed text-muted">Danh bạ tin cậy được dùng để điều chỉnh cảnh báo và giữ giao dịch theo cài đặt. Hãy xác minh đúng người nhận trước khi thêm; anh/chị có thể gỡ trong Trung tâm bảo mật.</p>
           <div className="flex justify-center gap-10 px-5 py-5">
             <button
               type="button"
@@ -192,18 +184,6 @@ export function TransferSuccess({
               <UserPlus size={28} strokeWidth={1.8} />
               <span className="text-sm font-medium text-text">{recipientSaved ? "Đã lưu" : "Lưu người nhận"}</span>
             </button>
-            {trusted !== null && (
-              <button
-                type="button"
-                data-shield-anchor="transfer-success"
-                onClick={() => setConfirmTrust(true)}
-                disabled={trusted}
-                className="flex flex-col items-center gap-1.5 text-primary disabled:text-positive"
-              >
-                <ShieldCheck size={28} strokeWidth={1.8} />
-                <span className="text-sm font-medium text-text">{trusted ? "Đã trong danh bạ tin cậy" : "Thêm vào danh bạ tin cậy"}</span>
-              </button>
-            )}
           </div>
         </Card>
 
@@ -221,13 +201,6 @@ export function TransferSuccess({
           </button>
         </div>
       </div>
-      <Sheet open={confirmTrust} title="Thêm người nhận tin cậy?" onClose={() => setConfirmTrust(false)}>
-        <p className="text-base font-semibold">{done.recipientName}</p>
-        <p className="mt-1 text-sm text-muted">{done.recipientBankName} · {done.recipientAccountMasked}</p>
-        <p className="my-4 text-sm leading-relaxed">Một số cảnh báo và giữ giao dịch có ngoại lệ cho người trong danh bạ. Chỉ thêm sau khi đã xác minh người nhận. Bạn có thể gỡ trong Trung tâm bảo mật.</p>
-        <button type="button" className="login-submit" onClick={() => { onTrust(); setConfirmTrust(false); }}>Xác nhận thêm</button>
-        <button type="button" className="shield-action mt-3 w-full" onClick={() => setConfirmTrust(false)}>Để sau</button>
-      </Sheet>
     </div>
   );
 }
