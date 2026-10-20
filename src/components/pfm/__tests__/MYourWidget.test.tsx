@@ -25,6 +25,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: nav.replace }),
   useSearchParams: () => new URLSearchParams(nav.search),
 }));
+// Creating a goal from a chat card writes to pfm; the widget test only cares what the chat does next.
+const goalApi = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock("@/lib/agent-goal-api", async (orig) => ({
+  ...(await orig<typeof import("@/lib/agent-goal-api")>()),
+  sendGoalAction: (cif: string, action: unknown) => goalApi.send(cif, action),
+}));
 vi.mock("@/state/jars", () => ({
   useJarConfig: () => ({ config: { version: 3, jars: [{ id: "food", label: "Ăn uống", categoryIds: [] }] } }),
 }));
@@ -341,6 +347,84 @@ describe("MYourWidget", () => {
     fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
     expect(await screen.findByText("Mình đề xuất mục tiêu.")).toBeInTheDocument();
     expect(screen.queryByText("Đề xuất tạo mục tiêu mới")).not.toBeInTheDocument();
+  });
+
+  it("renders the plan roadmap card under the reply; choosing a plan sends its choice_text, then the card is disabled", async () => {
+    const planUi = {
+      type: "plan_roadmap",
+      title: "Căn hộ 1,2 tỷ · 10 năm",
+      baseline: "Đạt mục tiêu ở tháng 130 (thiếu 90 triệu ở hạn)",
+      assumptions: ["Lãi tiết kiệm 6,8%/năm", "Lãi vay 8%/năm"],
+      plans: [
+        {
+          id: "no_loan", name: "Không vay", verdict: "late", headline: "Đạt mục tiêu ở tháng 130, trễ 10 tháng so với hạn", metrics: [],
+          milestones: [{ when: "Tháng 0", kind: "reserve", title: "Giữ quỹ dự phòng" }], choice_text: "Tôi chọn phương án Không vay: trễ 10 tháng",
+        },
+        {
+          id: "optimized", name: "Kết hợp tối ưu", verdict: "recommended", headline: "Mua ở tháng 60 (năm thứ 5), vay 400 triệu",
+          metrics: [{ label: "Số vay", value: "400 triệu" }],
+          milestones: [
+            { when: "Tháng 1–60", kind: "save", title: "Tiết kiệm", detail: "Góp mỗi tháng", action: "Góp khoảng 12 triệu/tháng vào tiết kiệm MSB" },
+            { when: "Tháng 60 (năm thứ 5)", kind: "buy", title: "Mua mục tiêu" },
+          ],
+          risk: "Nếu thu nhập không tăng, mua ở tháng 72", choice_text: "Tôi chọn phương án Kết hợp tối ưu: mua ở tháng 60",
+        },
+      ],
+    };
+    const send = vi.spyOn(agentApi, "sendChatMessage");
+    send.mockResolvedValueOnce({ answer: "Đây là lộ trình mình gợi ý.", thread_id: "CIF_0001", ui: planUi as agentApi.UiPayload });
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Lập kế hoạch mua căn hộ" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    expect(await screen.findByText("Căn hộ 1,2 tỷ · 10 năm")).toBeInTheDocument();
+    expect(screen.getByText("Góp khoảng 12 triệu/tháng vào tiết kiệm MSB")).toBeInTheDocument();
+    const choose = screen.getByRole("button", { name: "Chọn phương án này" });
+    expect(choose).toBeEnabled();
+
+    send.mockResolvedValueOnce({ answer: "Đã ghi nhận lựa chọn.", thread_id: "CIF_0001" });
+    fireEvent.click(choose);
+    expect(send).toHaveBeenLastCalledWith("Tôi chọn phương án Kết hợp tối ưu: mua ở tháng 60", "CIF_0001");
+    expect(await screen.findByText("Đã ghi nhận lựa chọn.")).toBeInTheDocument();
+    // The conversation moved on: the card (still shown) can no longer be used.
+    expect(screen.getByRole("button", { name: "Chọn phương án này" })).toBeDisabled();
+  });
+
+  it("after the customer creates a goal from the chat card, the chat tells the agent so it can ask about assets", async () => {
+    goalApi.send.mockResolvedValue({ ok: true, createdGoalId: "goal-9" });
+    const send = vi.spyOn(agentApi, "sendChatMessage");
+    send.mockResolvedValueOnce({
+      answer: "Mình đề xuất mục tiêu này.",
+      thread_id: "CIF_0001",
+      ui: {
+        type: "create_goal", goal_name: "Mua xe", template: "car", target_amount: 600_000_000, target_date: "2099-12-31",
+        initial_deposit: 5_000_000, reason: "widget test",
+      } as agentApi.UiPayload,
+    });
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Tạo mục tiêu mua xe" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+
+    const create = await screen.findByRole("button", { name: "Tạo mục tiêu" });
+    send.mockResolvedValueOnce({ answer: "Bạn có tài sản nào sẵn có không?", thread_id: "CIF_0001" });
+    fireEvent.click(create);
+    await waitFor(() => expect(send).toHaveBeenLastCalledWith("Mình đã tạo mục tiêu «Mua xe».", "CIF_0001"));
+    expect(await screen.findByText("Bạn có tài sản nào sẵn có không?")).toBeInTheDocument();
+    expect(goalApi.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a malformed plan roadmap and shows only the text", async () => {
+    vi.spyOn(agentApi, "sendChatMessage").mockResolvedValue({
+      answer: "Lộ trình lỗi.", thread_id: "CIF_0001", ui: { type: "plan_roadmap", title: "x", plans: [] } as agentApi.UiPayload,
+    });
+    renderWidget();
+    await waitFor(() => expect(screen.getByPlaceholderText("Nhắn tin cho M-You…")).toBeEnabled());
+    fireEvent.change(screen.getByPlaceholderText("Nhắn tin cho M-You…"), { target: { value: "Kế hoạch" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
+    expect(await screen.findByText("Lộ trình lỗi.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Chọn phương án này" })).not.toBeInTheDocument();
   });
 
   it("shows an inline error on the reply bubble when sending fails", async () => {
