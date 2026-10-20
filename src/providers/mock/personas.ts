@@ -1,5 +1,5 @@
 /**
- * The three prototype personas and their authored holdings.
+ * The prototype personas and their authored holdings.
  *
  * Transactions are generated (see fixtures/generate.ts); assets, liabilities,
  * budgets and goals are hand-authored per persona so the wealth picture is
@@ -15,7 +15,7 @@ import type {
 } from "@/domain/models";
 import { budgetsFromJars, DEFAULT_JAR_CONFIG } from "@/domain/models/jar-defaults";
 
-export type PersonaId = "stable" | "irregular" | "wealthy";
+export type PersonaId = "stable" | "irregular" | "wealthy" | "linhcx";
 export const DEFAULT_PERSONA: PersonaId = "stable";
 
 /** Tunables the transaction generator reads. */
@@ -42,13 +42,15 @@ export interface PersonaParams {
 
 export interface PersonaMeta {
   id: PersonaId;
-  /** Sample customer id shown on the login screen (CIF_0001..0003). */
+  /** Sample customer id shown on the login screen (CIF_0001..0004). */
   cif: string;
   label: string;
   description: string;
   /** Display-only membership tier shown on the primary account (source: mock). */
   tier: string;
   params: PersonaParams;
+  /** Separate account-number seed without changing generated income/spend. */
+  accountSeed?: number;
   assets: Asset[];
   liabilities: Liability[];
   budgets: Budget[];
@@ -140,10 +142,24 @@ const WEALTHY: PersonaMeta = {
   products: MSB_PRODUCTS,
 };
 
+const LINHCX: PersonaMeta = {
+  ...STABLE,
+  id: "linhcx",
+  cif: "CIF_0004",
+  label: "linhcx",
+  params: { ...STABLE.params },
+  accountSeed: 4004,
+  assets: STABLE.assets.map((a) => ({ ...a, id: a.id.replace("stable", "linhcx") })),
+  liabilities: STABLE.liabilities.map((l) => ({ ...l, id: l.id.replace("stable", "linhcx") })),
+  budgets: STABLE.budgets.map((b) => ({ ...b })),
+  goals: STABLE.goals.map((g) => ({ ...g, id: g.id.replace("stable", "linhcx") })),
+};
+
 export const PERSONAS: Record<PersonaId, PersonaMeta> = {
   stable: STABLE,
+  linhcx: LINHCX,
   irregular: IRREGULAR,
   wealthy: WEALTHY,
 };
 
-export const PERSONA_LIST: PersonaMeta[] = [STABLE, IRREGULAR, WEALTHY];
+export const PERSONA_LIST: PersonaMeta[] = [STABLE, IRREGULAR, WEALTHY, LINHCX];

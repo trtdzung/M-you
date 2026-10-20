@@ -226,7 +226,7 @@ export function buildPersonaAccounts(meta: PersonaMeta): Account[] {
 function buildAccounts(meta: PersonaMeta, current: string, savings: string, credit: string): Account[] {
   const now = "2026-10-21T00:00:00.000Z";
   const scale = meta.params.salaryBase / 25_000_000;
-  const seed = meta.params.seed;
+  const seed = meta.accountSeed ?? meta.params.seed;
   const number = (salt: number) => acctNumber(seed, salt);
   const mask = (salt: number) => maskAccountNumber(number(salt));
   return [
