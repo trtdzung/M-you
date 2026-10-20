@@ -77,3 +77,20 @@ describe("EditTarget: đổi giá trị mục tiêu rồi xem lại và xác nh�
     expect(queryByText("Xem lại kế hoạch")).toBeNull();
   });
 });
+
+describe("GoalInfo: lưu ý dưới ô mức góp hằng tháng", () => {
+  it("hiện ngay khi mục tiêu mới + các mục tiêu đang diễn ra vượt 70% số dư hằng tháng, và biến mất khi số góp nhỏ lại", async () => {
+    const world = stateFromScenario("s01-car-feasible");
+    const served = { ...world, customer: { ...world.customer, cif: "CIF_0001", monthlySurplus: 40_000_000 } };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ world: served, market: { instruments: [], refreshing: false, asOf: null } }))));
+    const { queryByText } = render(<PreviewStoreProvider><Probe /><ScreenHost /></PreviewStoreProvider>);
+    await waitFor(() => expect(box.ctx?.loadStatus).toBe("ready"));
+    const NOTE = /mục tiêu mới có thể ảnh hưởng đến dòng tiền các mục tiêu hiện có.*70%/;
+
+    await act(async () => { box.ctx.nav.push("GoalInfo", { template: "car", targetAmount: 3_000_000_000, targetDate: "2030-12-31" }); });
+    expect(queryByText(NOTE)).not.toBeNull();
+
+    await act(async () => { box.ctx.nav.push("GoalInfo", { template: "car", targetAmount: 1_000_000, targetDate: "2030-12-31" }); });
+    expect(queryByText(NOTE)).toBeNull(); // số góp mới quá nhỏ
+  });
+});

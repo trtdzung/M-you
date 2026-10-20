@@ -145,9 +145,16 @@ describe("Chuỗi B1 lifecycle + bảo toàn tiền", () => {
       .run(CIF, ga.id);
 
     const beforeClose = wealth(CIF, world);
+    const goalCash = world.accounts.find((a) => a.id === ga.id)!.balance;
+    const mainBefore = world.customer.mainCasaBalance;
+    expect(goalCash).toBeGreaterThan(0);
     act("b1-close", { type: "closeGoal", goalId: g });
     // Đóng rút tiền về CASA; tài sản còn lại (nếu có) vẫn trong world tới khi bán — closeGoal rút cash.
     world = getWorld(CIF).world;
+    // Đóng mục tiêu: toàn bộ tiền mặt (cả khoản đầu tư MSB vừa tất toán) về tài khoản chính, không mất đồng nào.
+    const closed = world.goals.find((x) => x.id === g)!;
+    expect(world.customer.mainCasaBalance - mainBefore).toBeGreaterThanOrEqual(goalCash);
+    expect(world.customer.mainCasaBalance - mainBefore).toBe(closed.finalValue);
     expect(readAccounts(CIF).some((a) => a.id === ga.id)).toBe(false);
     expect(wealth(CIF, world)).toBe(beforeClose);
 

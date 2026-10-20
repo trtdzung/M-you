@@ -6,7 +6,7 @@ import { formatVnd } from "@/features/goals-preview/format-money";
 import { Sheet } from "@/components/primitives";
 import { cn } from "@/lib/cn";
 import { addMonths, dayOfMonth, formatISODate, formatMonths, monthsBetween, monthsLeft } from "../../../engine/dates";
-import { allocateSurplus } from "../../../engine/feasibility";
+import { allocateSurplus, CASHFLOW_NOTE_SHARE, newGoalCashflowNote } from "../../../engine/feasibility";
 import type { ScreenProps } from "../../../model/screens";
 import { paramNumber, paramString } from "../../../model/screens";
 import type { GoalTemplate } from "../../../model/types";
@@ -124,6 +124,9 @@ export function GoalInfo({ params }: ScreenProps) {
   const monthly = toSave > 0 && left > 0 ? Math.ceil(toSave / left / 1000) * 1000 : 0;
   const share = free === "unknown" || free <= 0 ? null : monthly / free;
   const tone = share === null ? "muted" : share <= 0.5 ? "positive" : share <= 1 ? "warning" : "negative";
+
+  // "Lưu ý": mục tiêu mới cộng số góp các mục tiêu đang diễn ra quá 70% số dư hằng tháng thì có thể ảnh hưởng dòng tiền mục tiêu hiện có.
+  const note = newGoalCashflowNote(state, monthly);
 
   // One-tap fixes when the plan does not fit the free surplus.
   const fixes: { label: string; apply: () => void }[] = [];
@@ -321,6 +324,11 @@ export function GoalInfo({ params }: ScreenProps) {
             </div>
             <span className="text-[13px] font-semibold tabular-nums text-text">{share <= 1 ? `${Math.round(share * 100)}% số dư` : "Vượt số dư"}</span>
           </div>
+        )}
+        {note && (
+          <p className="text-[13px] leading-5 text-text">
+            Lưu ý: mục tiêu mới có thể ảnh hưởng đến dòng tiền các mục tiêu hiện có. Mỗi tháng bạn đang góp {formatVnd(note.existing)} cho các mục tiêu đang diễn ra; cộng {formatVnd(monthly)} cho mục tiêu này là {formatVnd(note.total)}, vượt {Math.round(CASHFLOW_NOTE_SHARE * 100)}% số dư hằng tháng sau khi trừ chi tiêu (mức tối đa {formatVnd(note.limit)}, số dư {formatVnd(note.surplus)}).
+          </p>
         )}
         {stuck && (
           <p className="text-[13px] leading-5 text-text">Số dư hằng tháng gần như đã dành cho mục tiêu khác. Bạn vẫn có thể tiếp tục và điều chỉnh sau.</p>

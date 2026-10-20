@@ -59,6 +59,34 @@ export function allocateSurplus(world: World, extra?: Goal): Record<string, numb
   return result;
 }
 
+/** Phần số dư hằng tháng (sau khi trừ hết chi tiêu) mà tổng số góp của mục tiêu mới và các mục tiêu đang diễn ra được dùng, quá thì cảnh báo. */
+export const CASHFLOW_NOTE_SHARE = 0.7;
+
+export interface CashflowNote {
+  /** Tổng số góp hằng tháng của các mục tiêu đang diễn ra (mục tiêu trả vay tính theo kỳ trả). */
+  existing: number;
+  /** Mục tiêu mới + các mục tiêu đang diễn ra. */
+  total: number;
+  /** CASHFLOW_NOTE_SHARE × số dư hằng tháng. */
+  limit: number;
+  surplus: number;
+}
+
+/**
+ * "Lưu ý" khi tạo mục tiêu: số góp của mục tiêu mới + số góp hằng tháng của các mục tiêu đang diễn ra vượt 70% số dư hằng tháng
+ * thì mục tiêu mới có thể ảnh hưởng đến dòng tiền của các mục tiêu hiện có. Không có mục tiêu hiện có, chưa biết số dư
+ * hoặc chưa có số góp thì không có lưu ý.
+ */
+export function newGoalCashflowNote(world: World, newMonthly: number): CashflowNote | null {
+  const surplus = world.customer.monthlySurplus;
+  if (surplus === "unknown" || newMonthly <= 0) return null;
+  const existing = world.goals.filter(isSaving).reduce((sum, g) => sum + requiredMonthly(world, g), 0);
+  if (existing <= 0) return null;
+  const total = newMonthly + existing;
+  const limit = Math.round(surplus * CASHFLOW_NOTE_SHARE);
+  return total > surplus * CASHFLOW_NOTE_SHARE ? { existing, total, limit, surplus } : null;
+}
+
 export type FeasibilityStatus = "feasible" | "tight" | "infeasible" | "unknown" | "reached" | "not_applicable";
 
 export interface Feasibility {
