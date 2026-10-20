@@ -69,7 +69,7 @@ export function TransferAmountStep({
   amount: string;
   memo: string;
   canContinue: boolean;
-  /** Scam Shield reminder directly below the recipient card. */
+  /** Scam Shield reminder directly above the continue button. */
   recipientShieldNotice?: ReactNode;
   onChangeRecipient: () => void;
   onSourceChange: (source: TransferSource) => void;
@@ -119,7 +119,6 @@ export function TransferAmountStep({
           Đổi
         </button>
       </Card>
-      {recipientShieldNotice}
 
       <Card className="transfer-card flex flex-col gap-4">
         <div>
@@ -200,6 +199,7 @@ export function TransferAmountStep({
       </Card>
 
       <div className="mt-auto flex flex-col gap-1.5">
+        {recipientShieldNotice}
         <button
           type="button"
           disabled={!canContinue}
