@@ -8,7 +8,7 @@ import { lastFourDigits, postSecurityEvent } from "@/lib/security/post-event";
 import { TransferAlertSheet } from "@/app/transfer-confirm/TransferAlertSheet";
 import { TransferSafe } from "@/app/transfer-confirm/TransferSafe";
 import { useInterventions } from "@/components/security/useInterventions";
-import { TRANSFER_LABELS, TRANSFER_SUPPORT_HREF, type TransferDetails } from "@/lib/security/transfer-copy";
+import { TRANSFER_LABELS, type TransferDetails } from "@/lib/security/transfer-copy";
 import type { Intervention } from "@/lib/security/intervention-types";
 import { checkRecipient } from "@/components/security/checkRecipient";
 import Link from "next/link";
@@ -20,7 +20,6 @@ import { useJarConfig } from "@/state/jars";
 import { useFinancials } from "@/state/useFinancials";
 import { useAutoFundWith } from "@/state/use-auto-fund";
 import { maskAccount } from "@/lib/mask-account";
-import { saveTransferComposeState, takeTransferComposeState } from "@/lib/transfer-compose-state";
 import { putTransferDraft, type StoredTransferDraft } from "@/lib/transfer-draft-store";
 import { isNavigationTransitionPending, navigateWithTransition, backWithTransition, pushWithTransition } from "@/lib/view-transition";
 import { assessTransferRisk } from "@/lib/transfer-risk";
@@ -47,7 +46,6 @@ export function TransferCompose() {
   const providers = useProviders();
   const router = useRouter();
   const params = useSearchParams();
-  const { cif, items: recipientAlerts, respond, shown } = useInterventions("recipient-entry");
 
   useEffect(() => {
     router.prefetch?.("/transfer-confirm");
@@ -112,14 +110,6 @@ export function TransferCompose() {
     setTransactions([]);
     setAccounts([]);
     setSource(null);
-    setStep("pick");
-    setRecipient(null);
-    setAmount("");
-    setMemo("");
-    setAgentCategoryId(undefined);
-    setAnsweredAlerts([]);
-    setSafeDetails(null);
-    setTopupOpen(false);
     setError(false);
     Promise.all([
       providers.listBeneficiaries(),
@@ -134,18 +124,6 @@ export function TransferCompose() {
         setTransactions(nextTransactions);
         setAccounts(eligibleAccounts);
         setSource(eligibleAccounts[0] ? { kind: "account", id: eligibleAccounts[0].id } : null);
-
-        const restored = takeTransferComposeState(cif);
-        if (restored) {
-          setStep(restored.step);
-          setRecipient(restored.recipient);
-          setAmount(restored.amount);
-          setMemo(restored.memo);
-          setSource(restored.source);
-          setAgentCategoryId(restored.agentCategoryId);
-          setAnsweredAlerts(restored.answeredAlerts);
-          return;
-        }
 
         // Agent-proposed prefill (Feature 3, `AgentTransferFormCard`): a saved
         // beneficiary id + optional amount/note/category in the query string
@@ -175,7 +153,7 @@ export function TransferCompose() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- prefill from the query string only ever applies once, at the initial load
-  }, [providers, cif]);
+  }, [providers]);
 
   // The single derived quantity every jar number keys off (invariant #1): the
   // engine's jar snapshot for the POSTED txn's month (`snapshotAt`, the same one
@@ -246,6 +224,7 @@ export function TransferCompose() {
   const block = isTransferBlocked(lockState, appNow.getTime());
 
   // Scam Shield: recipient-entry DH4 shares the confirm screen's stepped popup.
+  const { cif, items: recipientAlerts, respond, shown } = useInterventions("recipient-entry");
   const [answeredAlerts, setAnsweredAlerts] = useState<string[]>([]);
   const [safeDetails, setSafeDetails] = useState<TransferDetails | null>(null);
   const recipientAlert = recipientAlerts.find(item => item.level === "red" && item.surface === "popup" && !answeredAlerts.includes(item.id));
@@ -267,12 +246,6 @@ export function TransferCompose() {
     useSecurityStore.getState().logAlert({ level: "red", situation: item.copy.message, choice });
     void respond(item.id, choice);
     if (choice === TRANSFER_LABELS.stop && shieldDetails) setSafeDetails(shieldDetails);
-  }
-
-  function saveComposeState() {
-    saveTransferComposeState(cif, {
-      step, recipient, amount, memo, source, agentCategoryId, answeredAlerts,
-    });
   }
 
   /** Write the draft (with an optional planned reallocation) and navigate to confirm. */
@@ -306,7 +279,6 @@ export function TransferCompose() {
       source: "mock",
       ...extras,
     });
-    saveComposeState();
     navigateWithTransition(
       () => router.push(`/transfer-confirm?draftId=${encodeURIComponent(id)}&from=transfer`),
       "forward",
@@ -393,11 +365,7 @@ export function TransferCompose() {
   }
 
   return (
-    <div className="flex h-full flex-col" onClickCapture={event => {
-      // React events from the sheet portal still bubble through this screen.
-      const link = event.target instanceof Element ? event.target.closest("a") : null;
-      if (link?.getAttribute("href") === TRANSFER_SUPPORT_HREF) saveComposeState();
-    }}>
+    <div className="flex h-full flex-col">
       {step === "pick" ? (
         <TransferHeader onBack={() => backWithTransition(() => router.back())} rightIcon={<QrCode size={20} strokeWidth={2} />} rightLabel="Quét QR" />
       ) : (
