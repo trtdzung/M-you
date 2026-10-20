@@ -41,9 +41,10 @@ function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, 
 
   useEffect(() => {
     setSeconds(wait);
+    if (step !== "no") return;
     const timer = window.setInterval(() => setSeconds(left => Math.max(0, left - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [wait]);
+  }, [wait, step]);
 
   const reason = transferRedReason(intervention, { recipientName: details?.recipientName ?? "người nhận này" });
   const close = () => onClose();
@@ -64,7 +65,7 @@ function TransferAlertSteps({ cif, intervention, classifyOnly = false, details, 
             </div>
             {details.amount !== undefined && <p className="transfer-alert-amount">{formatVnd(details.amount)}</p>}
           </div>}
-          <Diagnosis cif={cif} id={intervention.id} sessionLine={false} sourceLine={false}
+          <Diagnosis fresh cif={cif} id={intervention.id} sessionLine={false} sourceLine={false}
             question={TRANSFER_RED_STEPS.question} onAnswer={answer => setStep(answer === "Có" ? "yes" : "no")} />
         </>}
         {step === "yes" && <>

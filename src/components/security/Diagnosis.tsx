@@ -11,7 +11,8 @@ const CLASSIFY_ANSWERS: readonly [ClassifyAnswer, ClassifyAnswer] = ["Có", "Kh�
 const initial = (): State => ({ answers: [], pending: false, next_question: CLASSIFY_QUESTION, conclusion: null, proposals: [], source: "rule", trace: [] });
 
 /** Answers survive copy enrichment; agent conclusions remain informational. */
-export function Diagnosis({ cif, id, question = CLASSIFY_QUESTION, onAnswer, sessionLine = true, sourceLine = true }: {
+export function Diagnosis({ cif, id, question = CLASSIFY_QUESTION, onAnswer, sessionLine = true, sourceLine = true, fresh = false }: {
+  fresh?: boolean;
   cif: string;
   id: string;
   question?: string;
@@ -21,6 +22,8 @@ export function Diagnosis({ cif, id, question = CLASSIFY_QUESTION, onAnswer, ses
 }) {
   const [state, setState] = useState<State>(initial);
   const [sending, setSending] = useState(false);
+  const freshAnswerRecordedRef = useRef(false);
+  const loadedStateRef = useRef<Promise<State | null>>(Promise.resolve(null));
   const onAnswerRef = useRef(onAnswer);
   useEffect(() => {
     onAnswerRef.current = onAnswer;
@@ -28,26 +31,44 @@ export function Diagnosis({ cif, id, question = CLASSIFY_QUESTION, onAnswer, ses
 
   useEffect(() => {
     const controller = new AbortController();
+    freshAnswerRecordedRef.current = false;
     setState(initial());
     setSending(false);
-    void fetch(`/api/security/interventions/${encodeURIComponent(id)}/diagnose?cif=${encodeURIComponent(cif)}`, { signal: controller.signal })
+    loadedStateRef.current = fetch(`/api/security/interventions/${encodeURIComponent(id)}/diagnose?cif=${encodeURIComponent(cif)}`, { signal: fresh ? undefined : controller.signal })
       .then(async response => {
         if (response.ok) {
-          const value = await response.json();
-          if (!controller.signal.aborted) {
+          const value: State = await response.json();
+          if (!fresh && !controller.signal.aborted) {
             setState(value);
             const first = value.answers?.[0];
             if (first === "Có" || first === "Không") {
               onAnswerRef.current?.(first);
             }
           }
+          return value;
         }
+        return null;
       })
-      .catch(() => {});
+      .catch(() => null);
     return () => controller.abort();
-  }, [cif, id]);
+  }, [cif, id, fresh]);
 
   const answer = async (value: ClassifyAnswer) => {
+    if (fresh) {
+      const loadedState = loadedStateRef.current;
+      onAnswerRef.current?.(value);
+      const saved = await loadedState;
+      if (!saved || saved.pending || saved.answers.length > 0 || freshAnswerRecordedRef.current) return;
+      freshAnswerRecordedRef.current = true;
+      // The popup may already be unmounted; persist only the first answer.
+      loadedStateRef.current = Promise.resolve({ ...saved, answers: [value] });
+      try {
+        await fetch(`/api/security/interventions/${encodeURIComponent(id)}/diagnose`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cif, answer: value }),
+        });
+      } catch {}
+      return;
+    }
     if (sending || state.pending || state.answers.length >= 1) return;
     setSending(true);
     onAnswerRef.current?.(value);

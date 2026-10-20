@@ -8,7 +8,7 @@ export function ShieldReopen({ message, onReopen }: { message: string; onReopen:
     <div className="shield-reopen" role="status">
       <AlertTriangle size={20} aria-hidden="true" />
       <span>{message}</span>
-      <button type="button" onClick={onReopen}>Xem lại</button>
+      <button type="button" onClick={onReopen}>Xem</button>
     </div>
   );
 }
