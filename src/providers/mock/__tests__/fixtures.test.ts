@@ -72,7 +72,11 @@ describe("provider factory", () => {
     const p = getProviders("wealthy");
     expect((await p.listAccounts()).length).toBe(3);
     expect((await p.listAssets()).length).toBeGreaterThan(0);
-    expect((await p.listLiabilities()).length).toBeGreaterThan(0);
+    // the wealthy persona carries no debt; the stable and irregular ones keep one small debt (1,5M card / 2M instalment)
+    expect(await p.listLiabilities()).toEqual([]);
+    expect((await getProviders("stable").listLiabilities()).map((l) => l.outstandingPrincipal)).toEqual([1_500_000]);
+    expect((await getProviders("irregular").listLiabilities()).map((l) => l.outstandingPrincipal)).toEqual([2_000_000]);
+    expect((await getProviders("linhcx").listLiabilities())).toEqual([]);
     expect((await p.getBudgets()).length).toBeGreaterThan(0);
     expect((await p.getMonthlySnapshots()).length).toBe(6);
     expect((await p.listGoals()).length).toBeGreaterThan(0);

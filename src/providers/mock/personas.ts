@@ -91,7 +91,7 @@ const STABLE: PersonaMeta = {
     { id: "a_stable_gold", type: "gold", name: "Vàng SJC (2 chỉ)", value: 15_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
   ],
   liabilities: [
-    { id: "l_stable_loan", type: "personal_loan", name: "Vay tiêu dùng", outstandingPrincipal: 40_000_000, interestRate: 0.14, minimumPayment: 3_500_000, dueDate: "2026-10-25", remainingTerm: 12, source: "self_reported", lastUpdatedAt: NOW },
+    { id: "l_stable_card", type: "credit_card", name: "Thẻ tín dụng MSB", outstandingPrincipal: 1_500_000, interestRate: 0.264, minimumPayment: 75_000, dueDate: "2026-10-10", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
   ],
   budgets: SEED_BUDGETS,
   goals: [{ id: "g_stable_fund", name: "Quỹ dự phòng 6 tháng", targetAmount: 90_000_000, currentAmount: 55_000_000, targetDate: "2027-06-30", source: "self_reported" }],
@@ -110,8 +110,7 @@ const IRREGULAR: PersonaMeta = {
     { id: "a_irr_fund", type: "fund", name: "Chứng chỉ quỹ", value: 18_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
   ],
   liabilities: [
-    { id: "l_irr_card", type: "credit_card", name: "Thẻ tín dụng MSB", outstandingPrincipal: 18_500_000, interestRate: 0.32, minimumPayment: 1_850_000, dueDate: "2026-10-20", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
-    { id: "l_irr_instal", type: "instalment", name: "Trả góp điện thoại", outstandingPrincipal: 9_000_000, interestRate: 0, minimumPayment: 1_500_000, dueDate: "2026-10-28", remainingTerm: 6, source: "self_reported", lastUpdatedAt: NOW },
+    { id: "l_irr_instal", type: "instalment", name: "Trả góp điện thoại", outstandingPrincipal: 2_000_000, interestRate: 0, minimumPayment: 500_000, dueDate: "2026-10-28", remainingTerm: 4, source: "self_reported", lastUpdatedAt: NOW },
   ],
   budgets: SEED_BUDGETS,
   goals: [{ id: "g_irr_buffer", name: "Đệm thu nhập 3 tháng", targetAmount: 60_000_000, currentAmount: 12_000_000, targetDate: null, source: "self_reported" }],
@@ -122,7 +121,7 @@ const WEALTHY: PersonaMeta = {
   id: "wealthy",
   cif: "CIF_0003",
   label: "Đào Nguyên — Tài sản cao",
-  description: "Thu nhập cao, nhiều tài sản & nhiều khoản nợ, có tài sản chưa định giá.",
+  description: "Thu nhập cao, nhiều tài sản, không có nợ, có tài sản chưa định giá.",
   tier: "M-FIRST PRIVATE",
   params: { seed: 3003, salaryBase: 100_000_000, salaryVariance: 0.08, discretionaryScale: 2.2, extraIncomeChance: 0.4, housingBase: 22_000_000 },
   assets: [
@@ -132,11 +131,7 @@ const WEALTHY: PersonaMeta = {
     { id: "a_w_gold", type: "gold", name: "Vàng miếng", value: 90_000_000, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
     { id: "a_w_realestate", type: "real_estate", name: "Căn hộ (chưa định giá)", value: null, currency: "VND", source: "self_reported", lastUpdatedAt: NOW, isEstimated: true },
   ],
-  liabilities: [
-    { id: "l_w_mortgage", type: "mortgage", name: "Vay mua nhà", outstandingPrincipal: 1_800_000_000, interestRate: 0.095, minimumPayment: 24_000_000, dueDate: "2026-10-18", remainingTerm: 180, source: "msb", lastUpdatedAt: NOW },
-    { id: "l_w_card", type: "credit_card", name: "Thẻ tín dụng hạng vàng", outstandingPrincipal: 45_000_000, interestRate: 0.30, minimumPayment: 4_500_000, dueDate: "2026-10-22", remainingTerm: null, source: "msb", lastUpdatedAt: NOW },
-    { id: "l_w_loan", type: "personal_loan", name: "Vay đầu tư", outstandingPrincipal: 200_000_000, interestRate: 0.12, minimumPayment: 10_000_000, dueDate: "2026-10-05", remainingTerm: 24, source: "self_reported", lastUpdatedAt: NOW },
-  ],
+  liabilities: [],
   budgets: SEED_BUDGETS,
   goals: [{ id: "g_w_house", name: "Trả trước nhà nghỉ dưỡng", targetAmount: 2_000_000_000, currentAmount: 650_000_000, targetDate: "2028-12-31", source: "self_reported" }],
   products: MSB_PRODUCTS,
@@ -150,7 +145,7 @@ const LINHCX: PersonaMeta = {
   params: { ...STABLE.params },
   accountSeed: 4004,
   assets: STABLE.assets.map((a) => ({ ...a, id: a.id.replace("stable", "linhcx") })),
-  liabilities: STABLE.liabilities.map((l) => ({ ...l, id: l.id.replace("stable", "linhcx") })),
+  liabilities: [],
   budgets: STABLE.budgets.map((b) => ({ ...b })),
   goals: STABLE.goals.map((g) => ({ ...g, id: g.id.replace("stable", "linhcx") })),
 };
