@@ -20,7 +20,7 @@ import type { LlmClient } from "./types";
 import { createOpenAiCompatibleClient } from "./openai-compatible-client";
 
 const DEFAULT_VNG_BASE_URL = "https://maas-llm-aiplatform-hcm.api.vngcloud.vn/v1";
-const DEFAULT_VNG_MODEL = "qwen/qwen3.6-flash";
+const DEFAULT_VNG_MODEL = "qwen/qwen3.8-flash";
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 

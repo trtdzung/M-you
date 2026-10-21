@@ -43,13 +43,13 @@ describe("getLlmClient — provider resolution", () => {
     expect(getLlmClient()).toBeNull();
   });
 
-  it("LLM_PROVIDER=vng WITH a key returns a non-null client defaulting to qwen/qwen3.6-flash", async () => {
+  it("LLM_PROVIDER=vng WITH a key returns a non-null client defaulting to qwen/qwen3.8-flash", async () => {
     process.env.LLM_PROVIDER = "vng";
     process.env.AI_PLATFORM_API_KEY = "sk-vng-1";
     const { getLlmClient } = await import("../index");
     const client = getLlmClient();
     expect(client).not.toBeNull();
-    expect(client?.model).toBe("qwen/qwen3.6-flash");
+    expect(client?.model).toBe("qwen/qwen3.8-flash");
   });
 
   it("LLM_MODEL overrides the default model for the vng client", async () => {

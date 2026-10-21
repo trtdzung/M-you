@@ -30,13 +30,46 @@ These constraints are the reason the architecture exists and must be preserved b
 
 Full rationale and the request pipeline are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+## Khai báo xuất xứ code và nguồn dữ liệu
+
+### 1. Xuất xứ code
+
+| Thành phần | Nguồn |
+| ---------- | ----- |
+| Khung và thư viện | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, Vitest. Thư viện chạy: `better-sqlite3`, `lucide-react` (biểu tượng), `recharts` (biểu đồ), `motion`, `zustand`, `react-markdown`, `remark-gfm` (phiên bản trong `package.json`). |
+| Do đội viết trong repo này | Giao diện và luồng sản phẩm trong `src/`, engine tính toán tất định, các API `/api/*` (trong đó `/api/agent/*` chuyển tiếp tới agent), mô-đun mục tiêu `src/features/goals-preview/`, mô-đun bảo mật chống lừa đảo `src/lib/security/`, cơ sở dữ liệu và script trong `data/`, `scripts/`. |
+| Agent | Trợ lý M-You chạy ở repo riêng `personal-pfm-agent`; pfm chỉ gọi qua HTTP. |
+| Công cụ AI hỗ trợ lập trình | Phần lớn mã được viết với sự hỗ trợ của Claude (Anthropic); các dòng `Co-Authored-By` trong lịch sử git ghi lại những commit có sự tham gia đó. Đội chịu trách nhiệm về toàn bộ mã nộp, logic tài chính có kiểm thử tất định đi kèm. |
+
+### 2. Mô hình LLM sử dụng
+
+pfm **không tự chạy mô hình** cho chat hay phân tích: mọi tính năng AI của trợ lý M-You (chat, gợi ý mục tiêu, lộ trình, chống lừa đảo) do agent `personal-pfm-agent` thực hiện, pfm chỉ chuyển tiếp qua `/api/agent/*`. Mô hình mà agent dùng được khai báo trong README của repo đó.
+
+| Mục đích | Mô hình | Ghi chú |
+| -------- | ------- | ------- |
+| Tự phân loại giao dịch (`/api/agent/categorize`, `src/ai/llm`) | Tùy chọn: gọi GreenNode / VNG Cloud MaaS, mô hình mặc định `qwen/qwen3.8-flash` (đổi bằng `LLM_MODEL`) | Chỉ chạy khi cấu hình `AI_PLATFORM_API_KEY`. Không có khóa (hoặc `LLM_PROVIDER=none`) thì tuyến trả 501 và ứng dụng dùng bộ phân loại luật cục bộ `src/ai/categorize/local-classifier.ts`, không gọi mô hình nào. Có thể tắt hẳn bằng `NEXT_PUBLIC_ENABLE_AUTO_CATEGORIZE=false`. |
+| Nhận dạng giọng nói | Dịch vụ STT riêng (`STT_API_BASE_URL`); pfm chỉ tạo phiên và nhận kết quả, mô hình do dịch vụ đó cung cấp | Dịch vụ triển khai riêng |
+
+Mô hình không bao giờ là nguồn của số liệu tài chính: engine tất định của pfm là nguồn sự thật.
+
+### 3. Nguồn dữ liệu
+
+| Dữ liệu | Loại | Chi tiết |
+| ------- | ---- | -------- |
+| Khách hàng, tài khoản, giao dịch, hũ, mục tiêu (`data/pfm.sqlite3`) | Giả lập (synthetic) | Bốn persona mẫu tạo bằng `scripts/seed-db.mjs` và các script seed. Giao dịch gắn nhãn `source: mock` (gần như toàn bộ), bản ghi người dùng nhập tay gắn `self_reported`; xem `docs/PRODUCT.md` mục Mock-data strategy và `docs/DATA-READINESS.md`. Không dùng dữ liệu khách hàng thật của MSB. |
+| Giá vàng | API công khai | Lịch sử vàng SJC từ VNAppMob (`scripts/fetch-gold-history.mjs`), giá vàng PNJ từ API công khai của PNJ. |
+| Quỹ mở | API công khai | Danh mục và giá từ Fmarket (`scripts/sync-fund-directory.mjs`). |
+| Cổ phiếu | API công khai | Danh mục và giá từ VNDirect (`scripts/sync-stock-directory.mjs`). |
+| Tham chiếu sản phẩm MSB (`data/msb-reference.json`: khuyến mãi, danh mục) | Tự soạn (nhãn `source: mock`) | Do đội soạn cho prototype, không phải dữ liệu chính thức của MSB. |
+| Hũ mẫu (`data/seed-jars.json`) | Tự soạn | Do đội soạn cho prototype. Kịch bản lừa đảo dùng bởi pfm nằm ở repo `personal-pfm-agent` (`data/fraud_playbook.json`). |
+
 ## Tech stack
 
 - **Next.js 15** (App Router) · **React 19** · **TypeScript 5**
 - **Tailwind CSS v4**
 - **Recharts** (charts) · **lucide-react** (icons)
 - **Vitest** + **Testing Library** (tests)
-- **@anthropic-ai/sdk** (LLM facade, server-only; provider-swappable)
+- **LLM facade** (`src/ai/llm`, server-only): gọi GreenNode MaaS qua HTTP bằng chuẩn chat-completions, không cần SDK riêng; tắt được để chạy offline
 
 ## Getting started
 
@@ -72,10 +105,9 @@ Server-side only — keys never reach the browser bundle. Copy [`.env.example`](
 
 | Variable | Purpose |
 | -------- | ------- |
-| `LLM_PROVIDER` | `anthropic` (default) · `vng` (OpenAI-compatible) · `none` (force offline) |
-| `ANTHROPIC_API_KEY` | Key for the default Anthropic provider (leave empty for offline mode) |
-| `AI_PLATFORM_API_KEY` | Key for the VNG GreenNode provider (`LLM_PROVIDER=vng`) |
-| `LLM_BASE_URL` | Optional base URL override for OpenAI-compatible providers |
+| `LLM_PROVIDER` | `vng` (GreenNode MaaS; picked automatically when `AI_PLATFORM_API_KEY` is set) · `none` (force offline) |
+| `AI_PLATFORM_API_KEY` | Key for the GreenNode MaaS provider (`LLM_PROVIDER=vng`; leave empty for offline mode) |
+| `LLM_BASE_URL` | Optional base URL override for the GreenNode MaaS provider |
 | `LLM_MODEL` | Optional model override (sensible per-provider defaults otherwise) |
 
 ## Project structure
