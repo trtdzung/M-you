@@ -8,7 +8,7 @@ import { PromoCarousel } from "@/components/home/PromoCarousel";
 import { PromoCard } from "@/components/home/PromoCard";
 import { validateLogin, type LoginCustomer } from "@/lib/auth";
 
-/** MSB pre-login landing. Password verification remains in the existing demo gate. */
+/** MSB pre-login landing. The demo password is verified by `/api/login`. */
 export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "", onLogin }: {
   customers: T[];
   initialCif?: string;
@@ -28,10 +28,26 @@ export function LoginScreen<T extends LoginCustomer>({ customers, initialCif = "
     setShowPassword(false);
     setError("");
   }, []);
-  function handleLogin(event: React.FormEvent) {
+  async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
-    const result = validateLogin(cif, password, customers);
+    const result = validateLogin(cif, customers);
     if (!result.ok) { setError(result.error); return; }
+    const loginError = "Không thể đăng nhập. Vui lòng thử lại.";
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.ok !== true) {
+        setError(typeof data.error === "string" ? data.error : loginError);
+        return;
+      }
+    } catch {
+      setError(loginError);
+      return;
+    }
     setError("");
     setPassword("");
     onLogin(result.customer);
