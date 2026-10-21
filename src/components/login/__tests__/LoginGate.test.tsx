@@ -1,11 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { PersonaProvider, usePersona } from "@/providers/context";
-import { LOGIN_PASSWORD } from "@/lib/auth";
 import { LoginScreen } from "../LoginScreen";
 import { LoginGate } from "../LoginGate";
 
 const push = vi.fn();
+const fetchMock = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 /**
@@ -32,7 +32,12 @@ function renderGate() {
 beforeEach(() => {
   window.localStorage.clear();
   push.mockClear();
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(Response.json({ ok: true }));
+  vi.stubGlobal("fetch", fetchMock);
 });
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("LoginGate", () => {
   it("keeps password focus after each keystroke", async () => {
@@ -66,48 +71,54 @@ describe("LoginGate", () => {
     expect(within(dialog).getByRole("button", { name: /Đào Nguyên/ })).toBeInTheDocument();
   });
 
-  it("logs in with a correct CIF + password and switches to the matching persona", () => {
+  it("logs in with a correct CIF + password and switches to the matching persona", async () => {
     renderGate();
 
     fireEvent.click(screen.getByRole("button", { name: "Chọn khách hàng" }));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Toàn Trần/ }));
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
-      target: { value: LOGIN_PASSWORD },
+      target: { value: "test-pass" },
     });
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
-    expect(screen.getByText("Persona hiện tại: irregular")).toBeInTheDocument();
+    expect(await screen.findByText("Persona hiện tại: irregular")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "test-pass" }),
+    });
   });
 
-  it("sends the user to Trang chủ after logging in, regardless of which screen they started on", () => {
+  it("sends the user to Trang chủ after logging in, regardless of which screen they started on", async () => {
     renderGate();
 
     fireEvent.click(screen.getByRole("button", { name: "Chọn khách hàng" }));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Ly Lã/ }));
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
-      target: { value: LOGIN_PASSWORD },
+      target: { value: "test-pass" },
     });
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
-    expect(push).toHaveBeenCalledWith("/");
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
   });
 
-  it("stays signed in after a reload", () => {
+  it("stays signed in after a reload", async () => {
     const first = renderGate();
     fireEvent.click(screen.getByRole("button", { name: "Chọn khách hàng" }));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /Toàn Trần/ }));
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
-      target: { value: LOGIN_PASSWORD },
+      target: { value: "test-pass" },
     });
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
+    await screen.findByText("Persona hiện tại: irregular");
     first.unmount();
 
     renderGate();
 
-    expect(screen.getByText("Persona hiện tại: irregular")).toBeInTheDocument();
+    expect(await screen.findByText("Persona hiện tại: irregular")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Chọn khách hàng" })).not.toBeInTheDocument();
   });
 
@@ -116,16 +127,18 @@ describe("LoginGate", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
-      target: { value: LOGIN_PASSWORD },
+      target: { value: "test-pass" },
     });
     expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" })).toBeEnabled();
 
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
     expect(screen.getByText("Vui lòng chọn khách hàng")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("shows an error and stays on the login screen for a wrong password", () => {
+  it("shows an error and stays on the login screen for a wrong password", async () => {
+    fetchMock.mockResolvedValue(Response.json({ ok: false, error: "Sai mật khẩu, vui lòng thử lại" }, { status: 401 }));
     renderGate();
 
     fireEvent.click(screen.getByRole("button", { name: "Chọn khách hàng" }));
@@ -136,7 +149,33 @@ describe("LoginGate", () => {
     });
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
 
-    expect(screen.getByText("Sai mật khẩu, vui lòng thử lại")).toBeInTheDocument();
+    expect(await screen.findByText("Sai mật khẩu, vui lòng thử lại")).toBeInTheDocument();
     expect(screen.queryByText(/Persona hiện tại/)).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("shows a generic error when the login request fails", async () => {
+    fetchMock.mockRejectedValue(new Error("network failure"));
+    renderGate();
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.change(screen.getByPlaceholderText("Nhập mật khẩu"), {
+      target: { value: "test-pass" },
+    });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
+
+    expect(await screen.findByText("Không thể đăng nhập. Vui lòng thử lại.")).toBeInTheDocument();
+    expect(screen.queryByText(/Persona hiện tại/)).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("shows the server configuration error without logging in", async () => {
+    fetchMock.mockResolvedValue(Response.json({ ok: false, error: "Chưa cấu hình mật khẩu đăng nhập" }, { status: 500 }));
+    renderGate();
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Đăng nhập" }));
+
+    expect(await screen.findByText("Chưa cấu hình mật khẩu đăng nhập")).toBeInTheDocument();
+    expect(screen.queryByText(/Persona hiện tại/)).not.toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
   });
 });

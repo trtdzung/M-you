@@ -107,6 +107,7 @@ Server-side only — keys never reach the browser bundle. Copy [`.env.example`](
 
 | Variable | Purpose |
 | -------- | ------- |
+| `LOGIN_PASSWORD` | Mật khẩu demo đăng nhập, kiểm phía server qua `/api/login`; bắt buộc cấu hình, không dùng tiền tố `NEXT_PUBLIC_` |
 | `LLM_PROVIDER` | `vng` (GreenNode MaaS; picked automatically when `AI_PLATFORM_API_KEY` is set) · `none` (force offline) |
 | `AI_PLATFORM_API_KEY` | Key for the GreenNode MaaS provider (`LLM_PROVIDER=vng`; leave empty for offline mode) |
 | `LLM_BASE_URL` | Optional base URL override for the GreenNode MaaS provider |
