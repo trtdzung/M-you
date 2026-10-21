@@ -34,6 +34,8 @@ Full rationale and the request pipeline are in [`docs/ARCHITECTURE.md`](docs/ARC
 
 ### 1. Xuất xứ code
 
+**Lịch sử phát triển.** Nền tảng ban đầu (khung ứng dụng, engine tính toán, hũ chi tiêu) được đội xây từ 09/2026 trong repo `pfm`. Trong giai đoạn thi (từ 16/10/2026), đội chuyển sang repo này và phát triển thêm các phần chính: workflow mục tiêu, chống gian lận, tra cứu tin tức thị trường, cùng việc nối agent với pfm. Repo này hiện có hơn 600 commit. Toàn bộ mã do các thành viên của đội viết (có hỗ trợ của Claude, xem hàng cuối bảng dưới).
+
 | Thành phần | Nguồn |
 | ---------- | ----- |
 | Khung và thư viện | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, Vitest. Thư viện chạy: `better-sqlite3`, `lucide-react` (biểu tượng), `recharts` (biểu đồ), `motion`, `zustand`, `react-markdown`, `remark-gfm` (phiên bản trong `package.json`). |
